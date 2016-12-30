@@ -95,14 +95,6 @@
 </header>
 
 
-  <div style="background:#fff;width: 100%;">
-
-      <div style="max-height:600px; overflow: hidden;">
-        <img width="100%" alt="Hike News" src="/css/images/pose.jpg">
-      </div>
-
-  </div>
-
 
 
   <div id="container">
@@ -111,6 +103,77 @@
       <div id="content" class="outer">
         
           <section id="main">
+  
+    <article id="post-linux-exploit"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20161230/linux-exploit/">Linux(X86)漏洞利用</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20161230/linux-exploit/" class="article-date">
+	  <time datetime="2016-12-30T07:52:28.000Z" itemprop="datePublished">十二月 30, 2016</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://www.csyssec.org/" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，CSyssec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161230/linux-exploit/" target="_blank" rel="external">Linux(X86)漏洞利用</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<h3 id="基本漏洞"><a href="#基本漏洞" class="headerlink" title="基本漏洞"></a>基本漏洞</h3><ul>
+<li><a href="http://www.csyssec.org/" target="_blank" rel="external">经典栈缓冲区溢出</a></li>
+<li><a href="http://www.csyssec.org/" target="_blank" rel="external">整型溢出</a></li>
+<li><a href="http://www.csyssec.org/" target="_blank" rel="external">基于栈的off-by-one</a></li>
+</ul>
+<h3 id="绕过漏洞利用缓解-Exploit-Mitigation-技术"><a href="#绕过漏洞利用缓解-Exploit-Mitigation-技术" class="headerlink" title="绕过漏洞利用缓解(Exploit Mitigation)技术"></a>绕过漏洞利用缓解(Exploit Mitigation)技术</h3><ul>
+<li><a href="http://www.csyssec.org/" target="_blank" rel="external">Return-to-libc绕过NX</a></li>
+<li><a href="http://www.csyssec.org/" target="_blank" rel="external">链接return-to-libc绕过NX</a></li>
+<li>绕过ASLR<ul>
+<li><a href="http://www.csyssec.org/" target="_blank" rel="external">Return-to-ptl</a></li>
+<li><a href="http://www.csyssec.org/" target="_blank" rel="external">暴力破解</a></li>
+<li><a href="http://www.csyssec.org/" target="_blank" rel="external">GOT覆盖与GOT解引用</a></li>
+</ul>
+</li>
+</ul>
+<h3 id="堆漏洞"><a href="#堆漏洞" class="headerlink" title="堆漏洞"></a>堆漏洞</h3><ul>
+<li><a href="http://www.csyssec.org/" target="_blank" rel="external">Unlink堆溢出</a></li>
+<li><a href="http://www.csyssec.org/" target="_blank" rel="external">Malloc Maleficarum堆溢出</a></li>
+<li><a href="http://www.csyssec.org/" target="_blank" rel="external">基于堆的off-by-one</a></li>
+<li><a href="http://www.csyssec.org/" target="_blank" rel="external">释放后再使用(Use After Free)</a></li>
+</ul>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161230/linux-exploit/" target="_blank" rel="external">Linux(X86)漏洞利用</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Linux-Exploit-Security/">Linux Exploit Security</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
   
     <article id="post-csysseccircus"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
@@ -355,6 +418,18 @@ size:拥有在TOP4会议中发表论文的作者数量
               <div class="widget-entry-summary" style="margin: 0;">
             
 
+              <h6 style="margin: 0;"><a href="/20161230/linux-exploit/">Linux(X86)漏洞利用</a></h6>
+              <span>十二月 30, 2016</span>
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
               <h6 style="margin: 0;"><a href="/20161230/csysseccircus/">计算机系统安全学术圈</a></h6>
               <span>十二月 30, 2016</span>
             </div>
@@ -370,7 +445,7 @@ size:拥有在TOP4会议中发表论文的作者数量
   <div class="widget-wrap">
     <h3 class="widget-title">分类</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">1</span></li></ul>
     </div>
   </div>
 
@@ -380,7 +455,7 @@ size:拥有在TOP4会议中发表论文的作者数量
   <div class="widget-wrap">
     <h3 class="widget-title">标签</h3>
     <div class="widget">
-      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Conference/">Conference</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Security/">Security</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/System/">System</a><span class="tag-list-count">1</span></li></ul>
+      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Conference/">Conference</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux-Exploit-Security/">Linux Exploit Security</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Security/">Security</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/System/">System</a><span class="tag-list-count">1</span></li></ul>
     </div>
   </div>
 
@@ -390,7 +465,7 @@ size:拥有在TOP4会议中发表论文的作者数量
   <div class="widget-wrap">
     <h3 class="widget-title">标签云</h3>
     <div class="widget tagcloud">
-      <a href="/tags/Conference/" style="font-size: 10px;">Conference</a> <a href="/tags/Security/" style="font-size: 10px;">Security</a> <a href="/tags/System/" style="font-size: 10px;">System</a>
+      <a href="/tags/Conference/" style="font-size: 10px;">Conference</a> <a href="/tags/Linux-Exploit-Security/" style="font-size: 10px;">Linux Exploit Security</a> <a href="/tags/Security/" style="font-size: 10px;">Security</a> <a href="/tags/System/" style="font-size: 10px;">System</a>
     </div>
   </div>
 
@@ -400,7 +475,7 @@ size:拥有在TOP4会议中发表论文的作者数量
     <h3 class="widget-title">归档</h3>
 
     <div class="widget">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">1</span></li></ul>
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">2</span></li></ul>
     </div>
   </div>
 
