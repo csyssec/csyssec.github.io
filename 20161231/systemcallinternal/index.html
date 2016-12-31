@@ -41,7 +41,7 @@ CSysSec注： 本文从传统系统调用到快速系统调用详细介绍了Lin
 用">
 <meta property="og:image" content="http://7xppf1.com1.z0.glb.clouddn.com/idt.png">
 <meta property="og:image" content="http://7xppf1.com1.z0.glb.clouddn.com/isr_stack.png">
-<meta property="og:updated_time" content="2016-12-31T11:36:51.000Z">
+<meta property="og:updated_time" content="2016-12-31T11:47:51.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Linux系统调用权威指南">
 <meta name="twitter:description" content="来源：Diting0x | 原文
@@ -131,6 +131,14 @@ CSysSec注： 本文从传统系统调用到快速系统调用详细介绍了Lin
   </div>
 </header>
 
+
+  <div style="background:#fff;width: 100%;">
+
+      <div style="max-height:600px; overflow: hidden;">
+        <img width="100%" alt="Hike News" src="/css/images/pose.jpg">
+      </div>
+
+  </div>
 
 
 
@@ -225,7 +233,6 @@ CSysSec注： 本文从传统系统调用到快速系统调用详细介绍了Lin
 </ul>
 </blockquote>
 <hr>
-<a id="more"></a>
 <h2 id="长话短说-Too-long-Don’t-read"><a href="#长话短说-Too-long-Don’t-read" class="headerlink" title="长话短说(Too long; Don’t read)"></a>长话短说(Too long; Don’t read)</h2><p>文章解释了Linux程序在内核中是如何调用函数的。</p>
 <p>读完你可以知道：触发系统调用的不同方法，如何编写汇编代码触发系统调用(含代码样例), 内核执行系统调用的入口，内核从系统调用返回的出口，glibc封装器，相关bugs，还有更多，更多。</p>
 <h2 id="什么是系统调用？"><a href="#什么是系统调用？" class="headerlink" title="什么是系统调用？"></a>什么是系统调用？</h2><p>当你运行的程序调用 open,fork,read,write（以及其它类似的函数)时,就会触发系统调用。</p>
