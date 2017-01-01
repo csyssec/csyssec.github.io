@@ -15,7 +15,13 @@
 
 CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存的安全性问题，以及相应的攻击模型及防御措施，对整个系统安全问题的概览有很大的帮助。转载本文请务必注明，文章出处：《内存持久战之防御措施》与作者信息：Diting0x
 
-继前两篇文章 内存持久战-内存安全性, 内存持久战-攻击模型, 再加上防御措施，才能算是完整的内存战争。本文首先介绍目前广泛部署的防">
+
+
+0X01 广泛部署的防御机制
+0X02 防御机制Step-by-step 
+
+
+继前两篇文章 内存持久战-内存安全性, 内存持久">
 <meta property="og:type" content="article">
 <meta property="og:title" content="内存持久战之防御措施">
 <meta property="og:url" content="http://yoursite.com/20170101/memorysafety-defense/index.html">
@@ -24,16 +30,28 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
 
 CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存的安全性问题，以及相应的攻击模型及防御措施，对整个系统安全问题的概览有很大的帮助。转载本文请务必注明，文章出处：《内存持久战之防御措施》与作者信息：Diting0x
 
-继前两篇文章 内存持久战-内存安全性, 内存持久战-攻击模型, 再加上防御措施，才能算是完整的内存战争。本文首先介绍目前广泛部署的防">
+
+
+0X01 广泛部署的防御机制
+0X02 防御机制Step-by-step 
+
+
+继前两篇文章 内存持久战-内存安全性, 内存持久">
 <meta property="og:image" content="http://7xppf1.com1.z0.glb.clouddn.com/memorywar.png">
-<meta property="og:updated_time" content="2017-01-01T04:32:41.000Z">
+<meta property="og:updated_time" content="2017-01-01T06:17:01.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="内存持久战之防御措施">
 <meta name="twitter:description" content="作者：Diting0x
 
 CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存的安全性问题，以及相应的攻击模型及防御措施，对整个系统安全问题的概览有很大的帮助。转载本文请务必注明，文章出处：《内存持久战之防御措施》与作者信息：Diting0x
 
-继前两篇文章 内存持久战-内存安全性, 内存持久战-攻击模型, 再加上防御措施，才能算是完整的内存战争。本文首先介绍目前广泛部署的防">
+
+
+0X01 广泛部署的防御机制
+0X02 防御机制Step-by-step 
+
+
+继前两篇文章 内存持久战-内存安全性, 内存持久">
 <meta name="twitter:image" content="http://7xppf1.com1.z0.glb.clouddn.com/memorywar.png">
   
     <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
@@ -110,14 +128,6 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
 </header>
 
 
-  <div style="background:#fff;width: 100%;">
-
-      <div style="max-height:600px; overflow: hidden;">
-        <img width="100%" alt="Hike News" src="/css/images/pose.jpg">
-      </div>
-
-  </div>
-
 
 
   <div id="container">
@@ -152,13 +162,19 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
 <hr>
 <p><strong>CSysSec注</strong>： 本系列文章来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/02/24/memorywar-defense/" target="_blank" rel="external">个人博客</a>，主要介绍内存的安全性问题，以及相应的攻击模型及防御措施，对整个系统安全问题的概览有很大的帮助。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/memorysafety-defense/" target="_blank" rel="external">内存持久战之防御措施</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
 <hr>
+<blockquote>
+<ul>
+<li>0X01 广泛部署的防御机制</li>
+<li>0X02 防御机制Step-by-step </li>
+</ul>
+</blockquote>
 <p>继前两篇文章 <a href="http://www.csyssec.org/20170101/memorysafety/" target="_blank" rel="external">内存持久战-内存安全性</a>, <a href="http://www.csyssec.org/20170101/memorysafety-attack/" target="_blank" rel="external">内存持久战-攻击模型</a>, 再加上防御措施，才能算是完整的内存战争。本文首先介绍目前广泛部署的防御机制，然后根据 <a href="http://www.csyssec.org/20170101/memorysafety-attack/" target="_blank" rel="external">内存持久战-攻击模型</a> 每一步实施的攻击破坏介绍相对应的防御细节。</p>
-<h3 id="广泛部署的防御机制"><a href="#广泛部署的防御机制" class="headerlink" title="广泛部署的防御机制"></a>广泛部署的防御机制</h3><p>目前广泛部署的防御机制有栈粉碎性保护（Stack smashing protection)，DEP/W⊕X以及ASLR(Address Space Layout Randomization)。针对Windows平台，也提出了一些特殊的机制，比如 SafeSEH 与 SEHOP 用来保护堆的元数据和异常处理器。</p>
+<h3 id="0X01-广泛部署的防御机制"><a href="#0X01-广泛部署的防御机制" class="headerlink" title="0X01 广泛部署的防御机制"></a>0X01 广泛部署的防御机制</h3><p>目前广泛部署的防御机制有栈粉碎性保护（Stack smashing protection)，DEP/W⊕X以及ASLR(Address Space Layout Randomization)。针对Windows平台，也提出了一些特殊的机制，比如 SafeSEH 与 SEHOP 用来保护堆的元数据和异常处理器。</p>
 <p>栈粉碎性保护,SafeSEH以及SEHOP的基本思想是在返回地址与缓冲区(比如函数入口）之间放置随机数作为哨兵（称为cookie或canary),在函数返回前先检测哨兵的值是否被篡改，以达到检测缓冲区溢出攻击的目的。这些机制都属于代码指针保护方式（code pointer integrity),主要检测一些特殊代码指针，如栈上的返回地址、异常处理器指针的完整性，然而对于直接修改（比如索引错误）却无能为力。有关stack smashing 可参考这篇文章 <a href="http://www.drdobbs.com/security/anatomy-of-a-stack-smashing-attack-and-h/240001832?pgno=1" target="_blank" rel="external">Anatomy of a Stack Smashing Attack and How GCC Prevents It
 </a></p>
 <p>W⊕X（write XOR executable)属于DEP（data execution prevention)的子集，是不可执行数据（Non-executable data）与代码完整性(code integrity)的结合。所有现代CPU都支持设置不可执行页面权限，结合不可写代码权限，就可以实施W⊕X机制，很简单也很实际。然而无法防御ROP（return oriented programming),ROP指的是在将现有代码中的可复用代码（可以是现有的函数）以及一些指令序列（gadgets)连接起来实施恶意操作。有关ROP可参考这篇文章，<a href="https://www.blackhat.com/presentations/bh-usa-08/Shacham/BH_US_08_Shacham_Return_Oriented_Programming.pdf" target="_blank" rel="external">Return-oriented Programming:<br>Exploitation without Code Injection</a>.</p>
 <p>ASLR在下文会详细描述。</p>
-<h3 id="防御机制Step-by-step"><a href="#防御机制Step-by-step" class="headerlink" title="防御机制Step-by-step"></a>防御机制Step-by-step</h3><p>从目前提出的所有防御机制来看，可将其划分为两大类：概率性以及确定性防御。概率性机制用来随机化一些对象，如ISR(Instruction Set Randomization), ASLR(Address Space Randomizatioin)以及DSR(Data Space Randomization),可选手段相对较少。 确定性防御机制实施reference monitor, 有关reference monitor的定义可参考，<a href="https://en.wikipedia.org/wiki/Reference_monitor" target="_blank" rel="external">wikipedia page on reference monior</a>, 主要就是在参考验证机制上定义了一些设计要求。 其主要利用静态与动态注入技术，静态注入可在编译阶段实施，动态注入需要在运行时加入代码，损耗相对较大。有关注入技术，可参考前面的文章 <a href="http://www.chongh.wiki/blog/2015/12/18/pin-for-dynamic-binary-instrumentation/" target="_blank" rel="external">PIN for Dynamic Binary Instrumentation</a>。</p>
+<h3 id="0X02-防御机制Step-by-step"><a href="#0X02-防御机制Step-by-step" class="headerlink" title="0X02 防御机制Step-by-step"></a>0X02 防御机制Step-by-step</h3><p>从目前提出的所有防御机制来看，可将其划分为两大类：概率性以及确定性防御。概率性机制用来随机化一些对象，如ISR(Instruction Set Randomization), ASLR(Address Space Randomizatioin)以及DSR(Data Space Randomization),可选手段相对较少。 确定性防御机制实施reference monitor, 有关reference monitor的定义可参考，<a href="https://en.wikipedia.org/wiki/Reference_monitor" target="_blank" rel="external">wikipedia page on reference monior</a>, 主要就是在参考验证机制上定义了一些设计要求。 其主要利用静态与动态注入技术，静态注入可在编译阶段实施，动态注入需要在运行时加入代码，损耗相对较大。有关注入技术，可参考前面的文章 <a href="http://www.chongh.wiki/blog/2015/12/18/pin-for-dynamic-binary-instrumentation/" target="_blank" rel="external">PIN for Dynamic Binary Instrumentation</a>。</p>
 <p>下面将针对攻击模型中实施的每个步骤介绍相对应的防御机制，每种防御机制对应每一步的攻击过程。<br>可以先去回顾一下 <a href="http://www.csyssec.org/20170101/memorysafety-attack/" target="_blank" rel="external">内存持久战之攻击模型</a> 的完整实施过程。注意，以下介绍的防御机制并没有时序关系,以横向关系依次描述。</p>
 <p><strong><em>Step 1&amp;2: Memory safety.</em></strong> 考虑完整的内存安全性，空间错误和时域错误都需要阻止。类型安全（Type-safe)的语言通过检查数组边界并使用自动垃圾回收来实施空间与时域安全性。对于非类型安全语言，可嵌入reference monitor针对非安全代码实施类似的策略，对象可以是源码、中间语言、二进制。</p>
 <p>针对空间安全，可跟踪指针边界，将指针结构体的表示方法扩展，加入额外信息。但是这种需要源码标注(annotation)，对于庞大的代码基是不实用的，甚至会改变内存结构带来二进制兼容性问题。可参考 <a href="https://www.cs.virginia.edu/~weimer/p/p477-necula.pdf" target="_blank" rel="external">CCured</a> 项目。为解决兼容性问题，越来越多研究者开始追踪对象边界，不但要知道对象分配的内存区域边界，并利用指针运算而不是引用指针来保护指针边界。</p>
@@ -246,7 +262,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
     <div id="toc" class="toc-article">
     <strong class="toc-title">文章目录</strong>
     
-      <ol class="toc"><li class="toc-item toc-level-3"><a class="toc-link" href="#广泛部署的防御机制"><span class="toc-number">1.</span> <span class="toc-text">广泛部署的防御机制</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#防御机制Step-by-step"><span class="toc-number">2.</span> <span class="toc-text">防御机制Step-by-step</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#参考"><span class="toc-number">3.</span> <span class="toc-text">参考</span></a></li></ol>
+      <ol class="toc"><li class="toc-item toc-level-3"><a class="toc-link" href="#0X01-广泛部署的防御机制"><span class="toc-number">1.</span> <span class="toc-text">0X01 广泛部署的防御机制</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#0X02-防御机制Step-by-step"><span class="toc-number">2.</span> <span class="toc-text">0X02 防御机制Step-by-step</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#参考"><span class="toc-number">3.</span> <span class="toc-text">参考</span></a></li></ol>
     
     </div>
   </aside>
