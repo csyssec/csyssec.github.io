@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   
-  <title>栈缓冲区漏洞溢出 | Index of Computer System and Security</title>
+  <title>经典栈缓冲区溢出 | Index of Computer System and Security</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   
     <meta name="keywords" content="computer system, computer security" />
@@ -13,21 +13,24 @@
   
   <meta name="description" content="作者：CSysSec出品
 
-CSysSec注： 本系列文章译自安全自由工作者Sploitfun的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，CSyssec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。转载本文请务必注明，文章出处：《Linux(X86)漏洞利用系列-栈缓冲区溢出》与作者信息：CSysSec出">
+CSysSec注： 本系列文章译自安全自由工作者Sploitfun的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，CSyssec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。
+转载本文请务必注明，文章出处：《Linux(X86)漏洞利用系列-经典栈缓冲区溢出》与作者信息：CSysS">
 <meta property="og:type" content="article">
-<meta property="og:title" content="栈缓冲区漏洞溢出">
+<meta property="og:title" content="经典栈缓冲区溢出">
 <meta property="og:url" content="http://yoursite.com/20161230/stackbufferflow/index.html">
 <meta property="og:site_name" content="Index of Computer System and Security">
 <meta property="og:description" content="作者：CSysSec出品
 
-CSysSec注： 本系列文章译自安全自由工作者Sploitfun的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，CSyssec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。转载本文请务必注明，文章出处：《Linux(X86)漏洞利用系列-栈缓冲区溢出》与作者信息：CSysSec出">
+CSysSec注： 本系列文章译自安全自由工作者Sploitfun的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，CSyssec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。
+转载本文请务必注明，文章出处：《Linux(X86)漏洞利用系列-经典栈缓冲区溢出》与作者信息：CSysS">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/level1stacklayout.jpeg">
-<meta property="og:updated_time" content="2016-12-30T09:57:50.000Z">
+<meta property="og:updated_time" content="2017-01-01T02:18:32.000Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="栈缓冲区漏洞溢出">
+<meta name="twitter:title" content="经典栈缓冲区溢出">
 <meta name="twitter:description" content="作者：CSysSec出品
 
-CSysSec注： 本系列文章译自安全自由工作者Sploitfun的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，CSyssec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。转载本文请务必注明，文章出处：《Linux(X86)漏洞利用系列-栈缓冲区溢出》与作者信息：CSysSec出">
+CSysSec注： 本系列文章译自安全自由工作者Sploitfun的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，CSyssec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。
+转载本文请务必注明，文章出处：《Linux(X86)漏洞利用系列-经典栈缓冲区溢出》与作者信息：CSysS">
 <meta name="twitter:image" content="http://oij0laovn.bkt.clouddn.com/level1stacklayout.jpeg">
   
     <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
@@ -127,7 +130,7 @@ CSysSec注： 本系列文章译自安全自由工作者Sploitfun的漏洞利用
         
   
     <h1 class="thumb" class="article-title" itemprop="name">
-      栈缓冲区漏洞溢出
+      经典栈缓冲区溢出
     </h1>
   
 
@@ -144,9 +147,8 @@ CSysSec注： 本系列文章译自安全自由工作者Sploitfun的漏洞利用
       
         <p>作者：<a href="http://www.csyssec.org/" target="_blank" rel="external">CSysSec出品</a></p>
 <hr>
-<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，CSyssec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161230/stackbufferflow/" target="_blank" rel="external">Linux(X86)漏洞利用系列-栈缓冲区溢出</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-<hr>
-<blockquote>
+<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，CSyssec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。</p>
+<h2 id="转载本文请务必注明，文章出处：《Linux-X86-漏洞利用系列-经典栈缓冲区溢出》与作者信息：CSysSec出品"><a href="#转载本文请务必注明，文章出处：《Linux-X86-漏洞利用系列-经典栈缓冲区溢出》与作者信息：CSysSec出品" class="headerlink" title="转载本文请务必注明，文章出处：《Linux(X86)漏洞利用系列-经典栈缓冲区溢出》与作者信息：CSysSec出品"></a><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161230/stackbufferflow/" target="_blank" rel="external">Linux(X86)漏洞利用系列-经典栈缓冲区溢出</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></h2><blockquote>
 <ul>
 <li>0X01 什么是缓冲区溢出（Buffer Overflow）</li>
 <li>0X02 什么是任意代码执行（Arbitrary Code Execution）</li>
@@ -203,7 +205,7 @@ CSysSec注： 本系列文章译自安全自由工作者Sploitfun的漏洞利用
 <p>执行上述漏洞利用程序就可以获取root shell，如下所示：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">$ python <span class="built_in">exp</span>.py </div><div class="line">Calling vulnerable program</div><div class="line">Input:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA��������������������������������������������������������������������������������������������������������<span class="number">1</span>�Ph<span class="comment">//shh/bin��P��S���</span></div><div class="line"></div><div class="line"><span class="meta"># id</span></div><div class="line">uid=<span class="number">1000</span>(sploitfun) gid=<span class="number">1000</span>(sploitfun) euid=<span class="number">0</span>(root) egid=<span class="number">0</span>(root) groups=<span class="number">0</span>(root),<span class="number">4</span>(adm),<span class="number">24</span>(cdrom),<span class="number">27</span>(sudo),<span class="number">30</span>(dip),<span class="number">46</span>(plugdev),<span class="number">109</span>(lpadmin),<span class="number">124</span>(sambashare),<span class="number">1000</span>(sploitfun)</div><div class="line"># <span class="built_in">exit</span></div><div class="line">$</div></pre></td></tr></table></figure></p>
 <p><u><em>注意：</em></u>为了得到这个root shell，我们舍弃了很多exploit的mitigation方法。其实在整个系列的<a href="http://www.csyssec.org/20161230/linux-exploit/#基本漏洞" target="_blank" rel="external">第一部分</a>，我都特意没用这些exploit的mitigation方法，因为level 1的目标，仅止于普及漏洞知识。如果你真的想学到有意思的知识，就去看<a href="http://www.csyssec.org/20161230/linux-exploit/" target="_blank" rel="external">Linux (x86)漏洞利用教程系列</a>的<a href="http://www.csyssec.org/20161230/linux-exploit/#绕过漏洞利用缓解-Exploit-Mitigation-技术" target="_blank" rel="external">第二部分</a>吧！到时候我会教你们如何绕过exploit的mitigation方法。</p>
 <hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161230/stackbufferflow/" target="_blank" rel="external">Linux(X86)漏洞利用系列-栈缓冲区溢出</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161230/stackbufferflow/" target="_blank" rel="external">Linux(X86)漏洞利用系列-经典栈缓冲区溢出</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
 
       
     </div>
@@ -221,7 +223,7 @@ CSysSec注： 本系列文章译自安全自由工作者Sploitfun的漏洞利用
 	<div id="comment">
 	
 	<!-- 多说评论框 start -->
-	 <div class="ds-thread" data-thread-key="/20161230/stackbufferflow/" data-title="栈缓冲区漏洞溢出" data-url="http://yoursite.com/20161230/stackbufferflow/"></div>
+	 <div class="ds-thread" data-thread-key="/20161230/stackbufferflow/" data-title="经典栈缓冲区溢出" data-url="http://yoursite.com/20161230/stackbufferflow/"></div>
 	<!-- 多说评论框 end -->
 	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
 	<script type="text/javascript">
@@ -274,7 +276,7 @@ CSysSec注： 本系列文章译自安全自由工作者Sploitfun的漏洞利用
     <div id="toc" class="toc-article">
     <strong class="toc-title">文章目录</strong>
     
-      <ol class="toc"><li class="toc-item toc-level-3"><a class="toc-link" href="#0X01-什么是缓冲区溢出（Buffer-Overflow）"><span class="toc-number">1.</span> <span class="toc-text">0X01 什么是缓冲区溢出（Buffer Overflow）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#0X02-什么是任意代码执行（arbitrary-code-execution）"><span class="toc-number">2.</span> <span class="toc-text">0X02 什么是任意代码执行（arbitrary code execution）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#0X03-如何实现任意代码执行是如何实现的"><span class="toc-number">3.</span> <span class="toc-text">0X03 如何实现任意代码执行是如何实现的</span></a></li></ol>
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#转载本文请务必注明，文章出处：《Linux-X86-漏洞利用系列-经典栈缓冲区溢出》与作者信息：CSysSec出品"><span class="toc-number">1.</span> <span class="toc-text">转载本文请务必注明，文章出处：《Linux(X86)漏洞利用系列-经典栈缓冲区溢出》与作者信息：CSysSec出品</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#0X01-什么是缓冲区溢出（Buffer-Overflow）"><span class="toc-number">1.1.</span> <span class="toc-text">0X01 什么是缓冲区溢出（Buffer Overflow）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#0X02-什么是任意代码执行（arbitrary-code-execution）"><span class="toc-number">1.2.</span> <span class="toc-text">0X02 什么是任意代码执行（arbitrary code execution）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#0X03-如何实现任意代码执行是如何实现的"><span class="toc-number">1.3.</span> <span class="toc-text">0X03 如何实现任意代码执行是如何实现的</span></a></li></ol></li></ol>
     
     </div>
   </aside>
