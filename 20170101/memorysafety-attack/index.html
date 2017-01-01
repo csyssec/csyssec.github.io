@@ -26,9 +26,8 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
 
 内存破坏是计算机安全中亘古不变的话题。内存破坏也被看作是top three危险的软件错误。像C/C++这种底层语言很容易引来这些bu">
 <meta property="og:image" content="http://7xppf1.com1.z0.glb.clouddn.com/hijack-bound.png">
-<meta property="og:image" content="http://7xppf1.com1.z0.glb.clouddn.com/hijack-bound.png">
 <meta property="og:image" content="http://7xppf1.com1.z0.glb.clouddn.com/hijack-dangling.png">
-<meta property="og:updated_time" content="2017-01-01T04:30:49.000Z">
+<meta property="og:updated_time" content="2017-01-01T04:55:55.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="内存持久战之攻击模型">
 <meta name="twitter:description" content="作者：Diting0x
@@ -173,7 +172,6 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
 <p><strong><em>Step 5: 使用修改后的对象</em></strong>。包括利用间接跳转指令 <em>call/jump</em> 引用指针，利用返回指令引用指针，以及引用破坏后的数据变量（data-only attack).至此，数据攻击过程已全部完成。</p>
 <p><strong><em>Step 6: 执行恶意代码</em></strong>。包括重用现有的函数/gadgets以及执行注入的shellcode(control-flow hijack).至此，control-flow hijack过程已全部完成。</p>
 <p>最后看两张图，分别是control-flow hijack利用越界指针与悬挂指针劫持控制流的完整过程：</p>
-<p><img src="http://7xppf1.com1.z0.glb.clouddn.com/hijack-bound.png" alt="hijack-bound"></p>
 <figure><br>    <a href="http://7xppf1.com1.z0.glb.clouddn.com/hijack-bound.png" target="_blank" rel="external"><img src="http://7xppf1.com1.z0.glb.clouddn.com/hijack-bound.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
 
 <figure><br>    <a href="http://7xppf1.com1.z0.glb.clouddn.com/hijack-dangling.png" target="_blank" rel="external"><img src="http://7xppf1.com1.z0.glb.clouddn.com/hijack-dangling.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
