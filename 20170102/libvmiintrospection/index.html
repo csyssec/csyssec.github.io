@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>write introspection tools using libvmi | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="作者：ytliu编辑：@图拉
+
+CSysSec注： Libvmi是个虚拟机监控API，本文介绍如何利用Libvmi写自己的监控工具。作者ytliu，来自上海交通大学PhD,研究方向是虚拟化与系统安全，在顶会CCS，HPCA等发表多篇文章。转载本文请务必注明，文章出处：《Libvmi Setup》
+
+Last week I’ve discussed about how to setup libvmi">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Write Introspection Tools Using Libvmi">
+<meta property="og:url" content="http://yoursite.com/20170102/libvmiintrospection/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="作者：ytliu编辑：@图拉
+
+CSysSec注： Libvmi是个虚拟机监控API，本文介绍如何利用Libvmi写自己的监控工具。作者ytliu，来自上海交通大学PhD,研究方向是虚拟化与系统安全，在顶会CCS，HPCA等发表多篇文章。转载本文请务必注明，文章出处：《Libvmi Setup》
+
+Last week I’ve discussed about how to setup libvmi">
+<meta property="og:updated_time" content="2017-01-02T03:03:56.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Write Introspection Tools Using Libvmi">
+<meta name="twitter:description" content="作者：ytliu编辑：@图拉
+
+CSysSec注： Libvmi是个虚拟机监控API，本文介绍如何利用Libvmi写自己的监控工具。作者ytliu，来自上海交通大学PhD,研究方向是虚拟化与系统安全，在顶会CCS，HPCA等发表多篇文章。转载本文请务必注明，文章出处：《Libvmi Setup》
+
+Last week I’ve discussed about how to setup libvmi">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">FROM 0 TO 1</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">体系结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/celebrity">工业大咖</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+  <div style="background:#fff;width: 100%;">
+
+      <div style="max-height:600px; overflow: hidden;">
+        <img width="100%" alt="Hike News" src="/css/images/pose.jpg">
+      </div>
+
+  </div>
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-libvmiintrospection" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      Write Introspection Tools Using Libvmi
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170102/libvmiintrospection/" class="article-date">
+	  <time datetime="2017-01-02T03:01:20.000Z" itemprop="datePublished">一月 2, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://ytliu.info/blog/2013/08/14/write-introspection-tools-using-libvmi/" target="_blank" rel="external">ytliu</a><br>编辑：@图拉</p>
+<hr>
+<p><strong>CSysSec注</strong>： Libvmi是个虚拟机监控API，本文介绍如何利用Libvmi写自己的监控工具。作者ytliu，来自上海交通大学PhD,研究方向是虚拟化与系统安全，在顶会CCS，HPCA等发表多篇文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/libvmiintrospection/" target="_blank" rel="external">Libvmi Setup</a>》</p>
+<hr>
+<p>Last week I’ve discussed about how to <a href="http://www.csyssec.org/20170102/libvmisetup/" target="_blank" rel="external">setup libvmi</a>, in this post I will show you how to write introspection tools using libvmi.</p>
+<p>The most typical example is <code>examples/process-list.c</code>:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;libvmi/libvmi.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;errno.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/mman.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div></pre></td></tr></table></figure></p>
+<p>Firstly we need to include these header files, especially the <code>&lt;libvmi/libvmi.h&gt;</code>, it defines most of the variables and functions.</p>
+<p>Then we should initialize the vmi environment:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* initialize the libvmi library */</span></div><div class="line"><span class="keyword">if</span> (vmi_init(&amp;vmi, VMI_AUTO | VMI_INIT_COMPLETE, name) == VMI_FAILURE) &#123;</div><div class="line">    <span class="built_in">printf</span>(<span class="string">"Failed to init LibVMI library.\n"</span>);</div><div class="line">    <span class="keyword">return</span> <span class="number">1</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>It will initialize the vmi (<code>vmi_instance_t</code>) struct with some platform information.<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* init the offset values */</span></div><div class="line"><span class="keyword">if</span> (VMI_OS_LINUX == vmi_get_ostype(vmi)) &#123;</div><div class="line">    tasks_offset = vmi_get_offset(vmi, <span class="string">"linux_tasks"</span>);</div><div class="line">    name_offset = vmi_get_offset(vmi, <span class="string">"linux_name"</span>);</div><div class="line">    pid_offset = vmi_get_offset(vmi, <span class="string">"linux_pid"</span>);</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>Then in this case, we should read some offset of tast_struct from the config file <code>/etc/libvmi.conf</code>. And if you want to add a config argument like <code>linux_files</code>, you can do as follows:</p>
+<p>Add an item in <code>libvmi/config/grammar.y</code>:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line">...</div><div class="line">%token&lt;str&gt;  LINUX_FILES</div><div class="line">...</div><div class="line">assignment:</div><div class="line">  |</div><div class="line">...</div><div class="line">  linux_state_assignment</div><div class="line">  |</div><div class="line">...</div></pre></td></tr></table></figure></p>
+<p>Then add an item in <code>libvmi/config/lexicon.l</code>:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">linux_files  &#123; BeginToken(yytext); yylval.str = strndup(yytext, CONFIG_STR_LENGTH); <span class="keyword">return</span> LINUX_FILES;&#125;</div></pre></td></tr></table></figure></p>
+<p>Then add corresponding <code>strncmp</code> in <code>libvmi/os/linux/core.c</code>:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">...</div><div class="line"><span class="keyword">if</span> (stncmp(key, <span class="string">"linux_files"</span>, CONFIG_STR_LENGTH) == <span class="number">0</span>) &#123;</div><div class="line">  linux_instance-&gt;files_offset = *(<span class="keyword">int</span> *)value;</div><div class="line">  <span class="keyword">goto</span> _done;</div><div class="line">&#125;</div><div class="line">...</div><div class="line">&#125; <span class="keyword">else</span> <span class="keyword">if</span> (<span class="built_in">strncmp</span>(offset_name, <span class="string">"linux_files"</span>, max_length) == <span class="number">0</span>) &#123;</div><div class="line">  <span class="keyword">return</span> linux_instance-&gt;files_offset;</div><div class="line">&#125;</div><div class="line">...</div></pre></td></tr></table></figure></p>
+<p>At last add the <code>files_offset</code> item to <code>struct linux_instance</code> in <code>libvmi/os/linux/linux.h</code>:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">struct</span> linux_instance &#123;</div><div class="line">  ...</div><div class="line">  <span class="keyword">uint64_t</span> files_offset;</div><div class="line">  ...</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<h3 id="Then-compile-again-after-that-your-can-add-linux-files-to-your-config-file"><a href="#Then-compile-again-after-that-your-can-add-linux-files-to-your-config-file" class="headerlink" title="Then compile again, after that your can add linux_files to your config file."></a>Then compile again, after that your can add linux_files to your config file.</h3><p>Now, let’s continue to look at the vmi code:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* pause the vm for consistent memory access */</span></div><div class="line"><span class="keyword">if</span> (vmi_pause_vm(vmi) != VMI_SUCCESS) &#123;</div><div class="line">    <span class="built_in">printf</span>(<span class="string">"Failed to pause VM\n"</span>);</div><div class="line">    <span class="keyword">goto</span> error_exit;</div><div class="line">&#125; <span class="comment">// if</span></div></pre></td></tr></table></figure></p>
+<p>Before we do the vmi, we need to pause the vm for consistent memory access, then we can read memory from guest memory:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* get the head of the list */</span></div><div class="line"><span class="keyword">if</span> (VMI_OS_LINUX == vmi_get_ostype(vmi)) &#123;</div><div class="line">    current_process = vmi_translate_ksym2v(vmi, <span class="string">"init_task"</span>);</div><div class="line">&#125;</div><div class="line">...</div><div class="line"><span class="comment">/* walk the task list */</span></div><div class="line">list_head = current_process + tasks_offset;</div><div class="line">current_list_entry = list_head;</div><div class="line"></div><div class="line">status = vmi_read_addr_va(vmi, current_list_entry, <span class="number">0</span>, &amp;next_list_entry);</div><div class="line"><span class="keyword">if</span> (status == VMI_FAILURE) &#123;</div><div class="line">    <span class="built_in">printf</span>(<span class="string">"Failed to read next pointer at 0x%lx before entering loop\n"</span>,</div><div class="line">            current_list_entry);</div><div class="line">    <span class="keyword">goto</span> error_exit;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>We firstly get the head of the task_struct list <code>current_process</code>, then use <code>vmi_read_addr_va</code> to read the memory in address <code>current_list_entry</code>, which is the address of <code>next_list_entry</code>.</p>
+<p>Here <code>vmi_read_addr_va</code> is similar with following <code>vmi_read_32_va</code>, <code>vmi_read_str_va</code> and so on. These lib functions take the virtual address (<code>vaddr</code>) as one of there parameters, they firstly walk the page table with cr3 and get physical address (<code>paddr</code>), then they use the libxenctrl to map a memory page of that paddr, which return back the virtual address (<code>memory</code>) seen by Dom0, with the <code>memory</code>, they can use <code>memcpy</code> to copy the corresponding size of memory to the <code>buf</code>.<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">do</span> &#123;</div><div class="line">    vmi_read_32_va(vmi, current_process + pid_offset, <span class="number">0</span>, &amp;pid);</div><div class="line">    procname = vmi_read_str_va(vmi, current_process + name_offset, <span class="number">0</span>);</div><div class="line">    <span class="keyword">if</span> (procname) &#123;</div><div class="line">        <span class="built_in">free</span>(procname);</div><div class="line">        procname = <span class="literal">NULL</span>;</div><div class="line">    &#125;</div><div class="line"></div><div class="line">    current_list_entry = next_list_entry;</div><div class="line">    current_process = current_list_entry - tasks_offset;</div><div class="line"></div><div class="line">    <span class="comment">/* follow the next pointer */</span></div><div class="line">    status = vmi_read_addr_va(vmi, current_list_entry, <span class="number">0</span>, &amp;next_list_entry);</div><div class="line">    <span class="keyword">if</span> (status == VMI_FAILURE) &#123;</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"Failed to read next pointer in loop at %lx\n"</span>, current_list_entry);</div><div class="line">        <span class="keyword">goto</span> error_exit;</div><div class="line">    &#125;</div><div class="line"></div><div class="line">&#125; <span class="keyword">while</span> (next_list_entry != list_head);</div></pre></td></tr></table></figure></p>
+<p>This is the main loop of process vmi: it uses <code>vmi_read_32_va</code> to read pid (<code>pid_offset</code>) of each process, use <code>vmi_read_str_va</code> to read name (<code>name_offset</code>) of each process, and at last use <code>vmi_read_addr_va</code> to read the next entry of tast_struct in the list.</p>
+<p>Finally we should never forget to resume the guest vm and destroy the vmi environment:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* resume the vm */</span></div><div class="line">vmi_resume_vm(vmi);</div><div class="line"></div><div class="line"><span class="comment">/* cleanup any memory associated with the LibVMI instance */</span></div><div class="line">vmi_destroy(vmi);</div></pre></td></tr></table></figure></p>
+<p>We can compile and run the vmi tool in the root directory of libvmi:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">$ make</div><div class="line">$ sudo ./examples/process-<span class="built_in">list</span> vm_name</div></pre></td></tr></table></figure></p>
+<p>If you want to write your own vmi tools, you can imitate the <code>process-list</code> to write a new one (e.g. my_vmi_tool.c). After that, you need to modify the <code>examples/Makefile.am</code> file:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">...</div><div class="line">bin_PROGRAMS = ... my_vmi_tool</div><div class="line">...</div><div class="line">my_vmi_tool_SOURCES = my_vmi_tool.c</div></pre></td></tr></table></figure></p>
+<p>Actually after we run <code>make</code> in the root directory of libvmi, the <code>Makefile</code> in <code>examples/</code>directory will generate a new executable file called <code>my_vmi_tool</code>, which is a script file to invoke the actual code in your <code>my_vmi_tool.c</code>.</p>
+<hr>
+<p>Last thing you should know is: currently vmi tool are all user mode application code. It does not support to write vmi tool as a kernel module. The environment you vmi code run is just the user space on the host OS.</p>
+<p>Whenever you have any problem with libvmi, you can create a post in their <a href="https://groups.google.com/forum/#!forum/vmitools" target="_blank" rel="external">googlegroup</a>. The guys there are really very friendly, I’ve post 2 topics there and both receive very good feedbacks.</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/libvmiintrospection/" target="_blank" rel="external">Libvmi Setup</a>》</p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Introspection/">Introspection</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+        
+	<div id="comment">
+	
+	<!-- 多说评论框 start -->
+	 <div class="ds-thread" data-thread-key="/20170102/libvmiintrospection/" data-title="Write Introspection Tools Using Libvmi" data-url="http://yoursite.com/20170102/libvmiintrospection/"></div>
+	<!-- 多说评论框 end -->
+	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+	<script type="text/javascript">
+	var duoshuoQuery = {short_name:"csyssec"};
+	  (function() {
+	    var ds = document.createElement('script');
+	    ds.type = 'text/javascript';ds.async = true;
+	    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+	    ds.charset = 'UTF-8';
+	    (document.getElementsByTagName('head')[0] 
+	     || document.getElementsByTagName('body')[0]).appendChild(ds);
+	  })();
+	  </script>
+	<!-- 多说公共JS代码 end -->
+	
+	</div>
+	<link rel="stylesheet" href="/css/comment.css">
+
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/20170102/libvmikvm/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">上一篇</strong>
+      <div class="article-nav-title">
+        
+          KVM Support in Libvmi
+        
+      </div>
+    </a>
+  
+  
+    <a href="/20170102/libvmisetup/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">Libvmi setup</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+      <ol class="toc"><li class="toc-item toc-level-3"><a class="toc-link" href="#Then-compile-again-after-that-your-can-add-linux-files-to-your-config-file"><span class="toc-number">1.</span> <span class="toc-text">Then compile again, after that your can add linux_files to your config file.</span></a></li></ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+        自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a>
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/celebrity" class="mobile-nav-link">Celebrity</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>
