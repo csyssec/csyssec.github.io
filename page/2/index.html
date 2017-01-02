@@ -133,7 +133,7 @@
       
         <p>作者: <a href="http://www.csyssec.org/about" target="_blank" rel="external">CSysSec出品</a></p>
 <hr>
-<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/bypassaslr-returntoplt" target="_blank" rel="external">Linux(X86)漏洞利用系列-Return-to-libc链接绕过NX</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/bypassaslr-returntoplt" target="_blank" rel="external">Linux(X86)漏洞利用系列-绕过ASLR-第一篇章(return-to-plt)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
 <hr>
 <blockquote>
 <ul>
@@ -209,7 +209,7 @@
 <figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">$ python <span class="built_in">exp</span>.py </div><div class="line">Calling vulnerable program</div><div class="line">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA������</div><div class="line"><span class="meta"># id</span></div><div class="line">uid=<span class="number">1000</span>(sploitfun) gid=<span class="number">1000</span>(sploitfun) euid=<span class="number">0</span>(root) egid=<span class="number">0</span>(root) groups=<span class="number">0</span>(root),<span class="number">4</span>(adm),<span class="number">24</span>(cdrom),<span class="number">27</span>(sudo),<span class="number">30</span>(dip),<span class="number">46</span>(plugdev),<span class="number">109</span>(lpadmin),<span class="number">124</span>(sambashare),<span class="number">1000</span>(sploitfun)</div><div class="line"># <span class="built_in">exit</span></div><div class="line">$</div></pre></td></tr></table></figure>
 <p><u>注意</u>： 为了获取这个root shell，可执行文件必须包含’system@PLT’与’exit@PLT’代码。在<a href="http://www.csyssec.org/20170101/bypassaslr-gotgor" target="_blank" rel="external">第三篇</a>中，我会谈谈利用GOT覆盖与GOT解引用技术，在可执行文件中并没有需要的PLT存根代码并且系统已经打开了ASLR的情况下，攻击者如何调用libc函数。 </p>
 <hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/bypassaslr-returntoplt" target="_blank" rel="external">Linux(X86)漏洞利用系列-Return-to-libc链接绕过NX</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/bypassaslr-returntoplt" target="_blank" rel="external">Linux(X86)漏洞利用系列-绕过ASLR-第一篇章(return-to-plt)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
 
       
     </div>
