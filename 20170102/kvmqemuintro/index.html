@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>kvm/qemu虚拟化简介 | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="作者：Diting0x
+
+CSysSec注： 本文来自Diting0x的个人博客，主要介绍KVM/QEMU虚拟化基础，对认识KVM与QEMU的关系有很大帮助。转载本文请务必注明，文章出处：《KVM/QEMU虚拟化简介》与作者信息：Diting0x
+
+
+
+0X01 KVM/Qemu选择与部署
+0X02 KVM/Qemu原理概览
+
+
+0X01 KVM/Qemu选择与部署KVM作为虚拟机监控器VMM，分">
+<meta property="og:type" content="article">
+<meta property="og:title" content="KVM/QEMU虚拟化简介">
+<meta property="og:url" content="http://yoursite.com/20170102/kvmqemuintro/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="作者：Diting0x
+
+CSysSec注： 本文来自Diting0x的个人博客，主要介绍KVM/QEMU虚拟化基础，对认识KVM与QEMU的关系有很大帮助。转载本文请务必注明，文章出处：《KVM/QEMU虚拟化简介》与作者信息：Diting0x
+
+
+
+0X01 KVM/Qemu选择与部署
+0X02 KVM/Qemu原理概览
+
+
+0X01 KVM/Qemu选择与部署KVM作为虚拟机监控器VMM，分">
+<meta property="og:image" content="http://7xppf1.com1.z0.glb.clouddn.com/kvm-qemu.png">
+<meta property="og:updated_time" content="2017-01-02T07:54:36.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="KVM/QEMU虚拟化简介">
+<meta name="twitter:description" content="作者：Diting0x
+
+CSysSec注： 本文来自Diting0x的个人博客，主要介绍KVM/QEMU虚拟化基础，对认识KVM与QEMU的关系有很大帮助。转载本文请务必注明，文章出处：《KVM/QEMU虚拟化简介》与作者信息：Diting0x
+
+
+
+0X01 KVM/Qemu选择与部署
+0X02 KVM/Qemu原理概览
+
+
+0X01 KVM/Qemu选择与部署KVM作为虚拟机监控器VMM，分">
+<meta name="twitter:image" content="http://7xppf1.com1.z0.glb.clouddn.com/kvm-qemu.png">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">FROM 0 TO 1</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">体系结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/celebrity">工业大咖</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+  <div style="background:#fff;width: 100%;">
+
+      <div style="max-height:600px; overflow: hidden;">
+        <img width="100%" alt="Hike News" src="/css/images/pose.jpg">
+      </div>
+
+  </div>
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-kvmqemuintro" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      KVM/QEMU虚拟化简介
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170102/kvmqemuintro/" class="article-date">
+	  <time datetime="2017-01-02T07:53:39.000Z" itemprop="datePublished">一月 2, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本文来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/01/02/kvm-qemu-bytalk/" target="_blank" rel="external">个人博客</a>，主要介绍KVM/QEMU虚拟化基础，对认识KVM与QEMU的关系有很大帮助。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/kvmqemuintro/" target="_blank" rel="external">KVM/QEMU虚拟化简介</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<blockquote>
+<ul>
+<li>0X01 KVM/Qemu选择与部署</li>
+<li>0X02 KVM/Qemu原理概览</li>
+</ul>
+</blockquote>
+<h3 id="0X01-KVM-Qemu选择与部署"><a href="#0X01-KVM-Qemu选择与部署" class="headerlink" title="0X01 KVM/Qemu选择与部署"></a>0X01 KVM/Qemu选择与部署</h3><p>KVM作为虚拟机监控器VMM，分为两部分，分别是运行于kernel模式的KVM内核模块（kvm-kmod)和运行于user模式的Qemu模块。KVM的具体实现下文会作简单介绍。先来看kvm-kmod部分，linux kernel从2.6版本开始便开始集成了KVM模块，如果你只想简单的使用KVM，只需简单编译和配置内科即可使用KVM的一切特性，这里不作介绍，如果你想基于KVM做开发，还是老老实实去<a href="http://sourceforge.net/projects/kvm/files/" target="_blank" rel="external">kvm官网</a>下载，自己源码安装吧，在选择KVM版本之前，可以打开任意一个版本例如kvm-kmod-3.8里面的configure文件，可看到以下代码：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line"># minimum is 2.6.x</div><div class="line">min_kernel_version=24</div><div class="line"># maximum is 3.x</div><div class="line">max_kernel_version=8</div><div class="line">kernel_version=`echo $kernel_version_str | sed &apos;s/\([0-9]*\)\.[0-9]*\.[0-9]*.*/\1/&apos;`</div><div class="line">kernel_patchlevel=`echo $kernel_version_str | sed &apos;s/[0-9]*\.\([0-9]*\)\.[0-9]*.*/\1/&apos;`</div><div class="line">kernel_sublevel=`echo $kernel_version_str | sed &apos;s/[0-9]*\.[0-9]*\.\([0-9]*\).*/\1/&apos;`</div><div class="line">if [ ! -n &quot;$force_build&quot; ]; then</div><div class="line">	if [ $kernel_version -eq 2 ] &amp;&amp; [ $kernel_sublevel -lt $min_kernel_version ]; then</div><div class="line">		echo</div><div class="line">		echo &quot;Error: kernel is too old for this kvm-kmod release.&quot;</div><div class="line">		echo</div><div class="line">		exit 1</div><div class="line">	elif [ $kernel_version -eq 3 ] &amp;&amp; [ $kernel_patchlevel -gt $max_kernel_version ]; then</div><div class="line">		echo</div><div class="line">		echo &quot;Error: kernel is more recent than KVM modules delivered with this release.&quot;</div><div class="line">		echo &quot;You probably want to use the KVM support that is already part of your kernel.&quot;</div><div class="line">		echo</div><div class="line">		exit 1</div><div class="line">	fi</div><div class="line">fi</div></pre></td></tr></table></figure></p>
+<p>这段代码仔细看看，就不难看出kvm-kmod版本的每个数字和kernel版本号都是有关联的，kvm-kmod毕竟是一个内核模块，必须去适应内核，大家如果在安装kvm-kmod时出现kernel is too old 或者kernel is more recent等错误就应该静下来好好看看这段代码了。下载后匹配的kvm-kmod后，安装很简单，只需要执行<code>./configure
+make $$ make install</code>即可</p>
+<p>安装之后，有两个模块<code>kvm.ko kvm-intel.ko</code>便会生成在./kvm/x86文件夹中，执行<code>insmod kvm.ko kvm-intel.ko</code> 或者<code>modprobe kvm.ko kvm-intel.ko</code>，便成功将kvm模块加载到内核了，<br>如果期间出现错误，可执行<code>lsmod | grep kvm</code> 看kvm是否成功加载，或执行<code>dmesg | grep kvm</code>查看具体执行信息。<br>这里强调，kvm-kmod是内核的一个模块，可随时加载随时删除，因此基于kvm的开发，修改kvm的源码之后，编译与运行起来都很方便。</p>
+<p>qemu-kvm是为兼容kvm基于qemu模拟器开发出来的一个分支版本，安装qemu-kvm之前，检查是否有以下依赖包： <code>linux-kernel-headers zlib1g-dev libglib2.0-dev</code>，如果没有<code>apt-get install</code>一下。<br>之后,执行：</p>
+<pre><code>./configure --prefix=/usr/local/kvm 
+make &amp;&amp; make install
+</code></pre><p>即可，qemu-kvm便会安装到/usr/local/kvm路径下，安装成功后，会在此路径的/bin文件夹下出现qemu-img, qemu-system-x86_64等二进制文件,自己也可以选择将这些二进制文件拷贝到根目录下的/bin文件夹中，这样在执行这些二进制文件的时候就不用加前缀/usr/local/kvm/bin了。<br>执行：</p>
+<pre><code>/usr/local/kvm/bin/qemu-img create -f qcow2 imgname.img 10G 
+</code></pre><p>创建一个qcow2格式的空虚拟机img文件<br>执行： </p>
+<pre><code>/usr/local/kvm/bin/qemu-system-x86_64 -hda imgname.img -m 1024 -vnc :1 -cdrom imgname.iso -boot d     
+</code></pre><p>将imgname.iso系统安装到imgname.img中<br>之后利用xvnc4viewer等vnc软件连接虚拟机完成安装过程，安装完后，执行:</p>
+<pre><code>/usr/local/kvm/bin/qemu-system-x86_64 -hda imgname.img -vnc :1 -m 1024 -monitor stdio  
+</code></pre><p>登陆到虚拟机。具体细节可自行摸索。</p>
+<h3 id="0X02-KVM-Qemu原理概览"><a href="#0X02-KVM-Qemu原理概览" class="headerlink" title="0X02 KVM/Qemu原理概览"></a>0X02 KVM/Qemu原理概览</h3><p>说说kvm与qemu的关系，借用实验室某大神给的一张图：</p>
+<p><img src="http://7xppf1.com1.z0.glb.clouddn.com/kvm-qemu.png" alt="kvm-qemu-rela"></p>
+<p>可以看到，这里有三种模式，第一是客户机执行时所处的Guest模式，也就是虚拟化技术VMX中的非Root模式；第二是KVM运行的Kernel模式，即VMX中的Root模式，此时特权级为0；第三是Qemu运行的User模式，处于VMX Root模式中的特权级3.有关VMX技术，以及非Root模式如何通过VM Exit进入到Root模式，Root模式如何通过VM Entry进入到非Root模式，可参考Intel系统编程手册。</p>
+<p>简单说说Qemu所在的User模式如何与KVM所在的kernel模式交互，虚拟化中的VT-x技术的支持，使得KVM可以虚拟出多个虚拟处理器VCPU, 而这些VCPU对应每一个Qemu线程，VCPU的创建、初始化、运行以及退出都是在Qemu线程的上下文中进行，这些过程都是通过Qemu向KVM发送一个I/O通道管理函数ioctl来完成，以qemu-kvm-1.1.2为例，qemu-kvm中首先会在<code>./linux-header/linux/kvm.h</code>注册相应的ioctl,如<code>#define KVM_GET_REGS              _IOR(KVMIO,  0x81, struct kvm_regs)</code>，各参数含义可以具体去了解ioctl的实现方式，之后调用<code>kvm_vcpu_ioctl(env,KVM_GET_REGS,&amp;regs)</code>（有些也会调用kvm_vm_ioctl），KVM-Kmod中也会注册相应的ioctl，之后真正执行时会调用KVM_Kmod的相应函数，一般会在<code>kvm_main.c</code>文件中定义。如果想自定义自己的函数，需要分别在qemu-kvm与kvm-kmod注册相应的ioctl，只要编号不重复即可，注册后再调用自己定义的函数。</p>
+<p>备注：Qemu 线程以 ioctl 的方式向 KVM 内核模块发出指 示,后者执行 VM entry 操作,将处理器由 kernel 模式切换到 Guest 模式,中止宿主机软件, 转而运行客户软件。注意,宿主机软件被中止时,正处于 Qemu 线程上下文,且正在执行 ioctl 系统调用的 kernel 模式处理程序。客户软件在运行过程中,如发生异常或外部中断等事件, 或执行 I/O 操作,可能导致 VM exit,将处理器状态由 Guest 模式切换回 Kernel 模式。KVM 内核模块检查发生 VM exit 的原因,如果 VM exit 由于 I/O 操作导致,则执行系统调用返回操 作,将 I/O 操作交给处于 User 模式的 Qemu 线程来处理,Qemu 线程在处理完 I/O 操作后再 次执行 ioctl,指示 KVM 切换处理器到 Guest 模式,恢复客户软件的运行;如果 VM exit 由于 其它原因导致,则由 KVM 内核模块负责处理,并在处理后切换处理器到 Guest 模式,恢复 客户机的运行。</p>
+<p>完</p>
+<p>作者@<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<p>于2016年1月1日West Lafayette, Lawson Computer Science Building.</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/kvmqemuintro/" target="_blank" rel="external">KVM/QEMU虚拟化简介</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟化基础/">虚拟化基础</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/QEMU/">QEMU</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+        
+	<div id="comment">
+	
+	<!-- 多说评论框 start -->
+	 <div class="ds-thread" data-thread-key="/20170102/kvmqemuintro/" data-title="KVM/QEMU虚拟化简介" data-url="http://yoursite.com/20170102/kvmqemuintro/"></div>
+	<!-- 多说评论框 end -->
+	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+	<script type="text/javascript">
+	var duoshuoQuery = {short_name:"csyssec"};
+	  (function() {
+	    var ds = document.createElement('script');
+	    ds.type = 'text/javascript';ds.async = true;
+	    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+	    ds.charset = 'UTF-8';
+	    (document.getElementsByTagName('head')[0] 
+	     || document.getElementsByTagName('body')[0]).appendChild(ds);
+	  })();
+	  </script>
+	<!-- 多说公共JS代码 end -->
+	
+	</div>
+	<link rel="stylesheet" href="/css/comment.css">
+
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+  
+    <a href="/20170102/libvmikvm/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">KVM Support in Libvmi</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+      <ol class="toc"><li class="toc-item toc-level-3"><a class="toc-link" href="#0X01-KVM-Qemu选择与部署"><span class="toc-number">1.</span> <span class="toc-text">0X01 KVM/Qemu选择与部署</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#0X02-KVM-Qemu原理概览"><span class="toc-number">2.</span> <span class="toc-text">0X02 KVM/Qemu原理概览</span></a></li></ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+        自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a>
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/celebrity" class="mobile-nav-link">Celebrity</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>

