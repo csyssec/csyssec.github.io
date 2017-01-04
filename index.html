@@ -179,74 +179,8 @@
 <li>Trace:包含一些Basic block序列，终止于无条件控制流改变指令；单入口多出口。 </li>
 </ul>
 <p>##Pintools example<br>最后，以一个Pintools 的完整例子结束本文</p>
-<pre><code>#include &lt;iostream&gt;
-#include &lt;fstream&gt;
-#include &quot;pin.H&quot;
-
-ofstream OutFile;
-
-// The running count of instructions is kept here
-// make it static to help the compiler optimize docount
-static UINT64 icount = 0;
-
-// This function is called before every instruction is      executed
-VOID docount() { icount++; }
-
-// Pin calls this function every time a new instruction     is encountered
-VOID Instruction(INS ins, VOID *v)
-{
-    // Insert a call to docount before every            instruction, no arguments are passed
-  INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)docount, IARG_END);
-}
-
-KNOB&lt;string&gt; KnobOutputFile(KNOB_MODE_WRITEONCE, &quot;pintool&quot;,
-&quot;o&quot;, &quot;inscount.out&quot;, &quot;specify output file name&quot;);
-
-// This function is called when the application exits
-VOID Fini(INT32 code, VOID *v)
-{
-    // Write to a file since cout and cerr maybe closed     by the application
-  OutFile.setf(ios::showbase);
-  OutFile &lt;&lt; &quot;Count &quot; &lt;&lt; icount &lt;&lt; endl;
-  OutFile.close();
-}
-
-/* =====================================================     ================ */
-/* Print Help Message                                                        */
-/* =====================================================     ================ */
-
-INT32 Usage()
-{
-   cerr &lt;&lt; &quot;This tool counts the number of dynamic          instructions executed&quot; &lt;&lt; endl;
-   cerr &lt;&lt; endl &lt;&lt; KNOB_BASE::StringKnobSummary() &lt;&lt;      endl;
-    return -1;
-}
-
-/* =====================================================     ================ */
-/* Main                                                                      */
-/* =====================================================     ================ */
-/*   argc, argv are the entire command line: pin -t      &lt;toolname&gt; -- ...    */
-/* =====================================================     ================ */
-
-int main(int argc, char * argv[])
-{
-   // Initialize pin
-   if (PIN_Init(argc, argv)) return Usage();
-
-   OutFile.open(KnobOutputFile.Value().c_str());
-
-  // Register Instruction to be called to instrument      instructions
-    INS_AddInstrumentFunction(Instruction, 0);
-
-   // Register Fini to be called when the application      exits
-    PIN_AddFiniFunction(Fini, 0);
-
-    // Start the program, never returns
-    PIN_StartProgram();
-
-    return 0;
-}
-</code></pre><h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="http://www.cs.virginia.edu/kim/docs/pldi05.pdf" target="_blank" rel="external">PLDI’2005</a></p>
+ <figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div></pre></td><td class="code"><pre><div class="line"> </div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;iostream&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;fstream&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"pin.H"</span></span></div><div class="line"></div><div class="line">ofstream OutFile;</div><div class="line"></div><div class="line"><span class="comment">// The running count of instructions is kept here</span></div><div class="line"><span class="comment">// make it static to help the compiler optimize docount</span></div><div class="line"><span class="keyword">static</span> UINT64 icount = <span class="number">0</span>;</div><div class="line"></div><div class="line"><span class="comment">// This function is called before every instruction is      executed</span></div><div class="line"><span class="function">VOID <span class="title">docount</span><span class="params">()</span> </span>&#123; icount++; &#125;</div><div class="line"></div><div class="line"><span class="comment">// Pin calls this function every time a new instruction     is encountered</span></div><div class="line"><span class="function">VOID <span class="title">Instruction</span><span class="params">(INS ins, VOID *v)</span></span></div><div class="line">&#123;</div><div class="line">    <span class="comment">// Insert a call to docount before every            instruction, no arguments are passed</span></div><div class="line">  INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)docount, IARG_END);</div><div class="line">&#125;</div><div class="line"></div><div class="line">KNOB&lt;<span class="built_in">string</span>&gt; KnobOutputFile(KNOB_MODE_WRITEONCE, <span class="string">"pintool"</span>,</div><div class="line"><span class="string">"o"</span>, <span class="string">"inscount.out"</span>, <span class="string">"specify output file name"</span>);</div><div class="line"></div><div class="line"><span class="comment">// This function is called when the application exits</span></div><div class="line"><span class="function">VOID <span class="title">Fini</span><span class="params">(INT32 code, VOID *v)</span></span></div><div class="line">&#123;</div><div class="line">    <span class="comment">// Write to a file since cout and cerr maybe closed     by the application</span></div><div class="line">  OutFile.setf(ios::showbase);</div><div class="line">  OutFile &lt;&lt; <span class="string">"Count "</span> &lt;&lt; icount &lt;&lt; <span class="built_in">endl</span>;</div><div class="line">  OutFile.close();</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="comment">/* =====================================================     ================ */</span></div><div class="line"><span class="comment">/* Print Help Message                                                        */</span></div><div class="line"><span class="comment">/* =====================================================     ================ */</span></div><div class="line"></div><div class="line"><span class="function">INT32 <span class="title">Usage</span><span class="params">()</span></span></div><div class="line">&#123;</div><div class="line">   <span class="built_in">cerr</span> &lt;&lt; <span class="string">"This tool counts the number of dynamic          instructions executed"</span> &lt;&lt; <span class="built_in">endl</span>;</div><div class="line">   <span class="built_in">cerr</span> &lt;&lt; <span class="built_in">endl</span> &lt;&lt; KNOB_BASE::StringKnobSummary() &lt;&lt;      <span class="built_in">endl</span>;</div><div class="line">    <span class="keyword">return</span> <span class="number">-1</span>;</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="comment">/* =====================================================     ================ */</span></div><div class="line"><span class="comment">/* Main                                                                      */</span></div><div class="line"><span class="comment">/* =====================================================     ================ */</span></div><div class="line"><span class="comment">/*   argc, argv are the entire command line: pin -t      &lt;toolname&gt; -- ...    */</span></div><div class="line"><span class="comment">/* =====================================================     ================ */</span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span> * argv[])</span></span></div><div class="line">&#123;</div><div class="line">   <span class="comment">// Initialize pin</span></div><div class="line">   <span class="keyword">if</span> (PIN_Init(argc, argv)) <span class="keyword">return</span> Usage();</div><div class="line"></div><div class="line">   OutFile.open(KnobOutputFile.Value().c_str());</div><div class="line"></div><div class="line">  <span class="comment">// Register Instruction to be called to instrument      instructions</span></div><div class="line">    INS_AddInstrumentFunction(Instruction, <span class="number">0</span>);</div><div class="line"></div><div class="line">   <span class="comment">// Register Fini to be called when the application      exits</span></div><div class="line">    PIN_AddFiniFunction(Fini, <span class="number">0</span>);</div><div class="line"></div><div class="line">    <span class="comment">// Start the program, never returns</span></div><div class="line">    PIN_StartProgram();</div><div class="line"></div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="http://www.cs.virginia.edu/kim/docs/pldi05.pdf" target="_blank" rel="external">PLDI’2005</a></p>
 <p><a href="https://software.intel.com/sites/landingpage/pintool/docs/65163/Pin/html/" target="_blank" rel="external">PIN User Manual</a></p>
 <p><a href="https://software.intel.com/en-us/articles/pin-a-dynamic-binary-instrumentation-tool" target="_blank" rel="external">PIN Intel Tutorials</a></p>
 <hr>
