@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>kvm源代码分析之io虚拟化之pio | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="作者：Oen Han
+
+CSysSec注： 本KVM源码分析系列文章来自系Intel中国Linux内核与虚拟化开发工程师Oen Han的博客,Oen Han 在虚拟化领域有丰富的开发经验，其写的KVM源码分析系列是本人目前见过最好最详细的，值得推荐。转载本文请务必注明，文章出处：《KVM源码分析之IO虚拟化之PIO》及原作者信息:Oen Han
+
+
+
+0X01 PIO指令介绍
+0X02 PIO运行">
+<meta property="og:type" content="article">
+<meta property="og:title" content="KVM源代码分析之IO虚拟化之PIO">
+<meta property="og:url" content="http://yoursite.com/20170104/kvmsource-io/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="作者：Oen Han
+
+CSysSec注： 本KVM源码分析系列文章来自系Intel中国Linux内核与虚拟化开发工程师Oen Han的博客,Oen Han 在虚拟化领域有丰富的开发经验，其写的KVM源码分析系列是本人目前见过最好最详细的，值得推荐。转载本文请务必注明，文章出处：《KVM源码分析之IO虚拟化之PIO》及原作者信息:Oen Han
+
+
+
+0X01 PIO指令介绍
+0X02 PIO运行">
+<meta property="og:updated_time" content="2017-01-04T05:53:03.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="KVM源代码分析之IO虚拟化之PIO">
+<meta name="twitter:description" content="作者：Oen Han
+
+CSysSec注： 本KVM源码分析系列文章来自系Intel中国Linux内核与虚拟化开发工程师Oen Han的博客,Oen Han 在虚拟化领域有丰富的开发经验，其写的KVM源码分析系列是本人目前见过最好最详细的，值得推荐。转载本文请务必注明，文章出处：《KVM源码分析之IO虚拟化之PIO》及原作者信息:Oen Han
+
+
+
+0X01 PIO指令介绍
+0X02 PIO运行">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">FROM 0 TO 1</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">体系结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/celebrity">工业大咖</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/donation">打赏支持</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+  <div style="background:#fff;width: 100%;">
+
+      <div style="max-height:600px; overflow: hidden;">
+        <img width="100%" alt="Hike News" src="/css/images/pose.jpg">
+      </div>
+
+  </div>
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-kvmsource-io" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      KVM源代码分析之IO虚拟化之PIO
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170104/kvmsource-io/" class="article-date">
+	  <time datetime="2017-01-04T05:52:09.000Z" itemprop="datePublished">一月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://www.oenhan.com/about" target="_blank" rel="external">Oen Han</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本KVM源码分析系列文章来自系Intel中国Linux内核与虚拟化开发工程师Oen Han的<a href="http://www.oenhan.com/kvm-src-5-io-pio" target="_blank" rel="external">博客</a>,Oen Han 在虚拟化领域有丰富的开发经验，其写的KVM源码分析系列是本人目前见过最好最详细的，值得推荐。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/kvmsource-io/" target="_blank" rel="external">KVM源码分析之IO虚拟化之PIO</a>》及原作者信息:<a href="http://www.oenhan.com/about" target="_blank" rel="external">Oen Han</a></p>
+<hr>
+<blockquote>
+<ul>
+<li>0X01 PIO指令介绍</li>
+<li>0X02 PIO运行在KVM</li>
+<li>0X03 PIO运行在QEMU</li>
+</ul>
+</blockquote>
+<p>源代码:git tag, kernel v3.16.37 qemu v2.7 ，上一篇：KVM源代码分析4:内存虚拟化–OenHan</p>
+<h3 id="0X01-PIO指令介绍"><a href="#0X01-PIO指令介绍" class="headerlink" title="0X01 PIO指令介绍"></a>0X01 PIO指令介绍</h3><p>80386的I/O指令使得处理器可以访问I/O端口，以便从外设输入数据，或者向外设发送数据。这些指令有一个指定I/O空间端口地址的操作数。有两类的I/O指令：</p>
+<ul>
+<li><p>1、 在寄存器指定的地址传送一个数据（字节、字、双字）。</p>
+</li>
+<li><p>2、 传送指定内存中的一串数据（字节串、字串、双字串）。这些被称作为“串 I/O指令”或者说“块I/O指令”。</p>
+</li>
+</ul>
+<p>有IN/OUT INS/OUTS指令</p>
+<h3 id="0X02-PIO运行在KVM"><a href="#0X02-PIO运行在KVM" class="headerlink" title="0X02 PIO运行在KVM"></a>0X02 PIO运行在KVM</h3><p>当guest执行PIO指令时，触发vmx_handle_exit，根据EXIT_REASON_IO_INSTRUCTION执行handle_io函数，根据sdm 3 27.5图表：</p>
+<table>
+<thead>
+<tr>
+<th>Bit Position(s) Contents</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2:0</td>
+<td>Size of access：0 = 1-byte 1 = 2-byte 3 = 4-byte Other values not used</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Direction of the attempted access (0 = OUT, 1 = IN)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>String instruction (0 = not string; 1 = string)</td>
+</tr>
+<tr>
+<td>5</td>
+<td>REP prefixed (0 = not REP; 1 = REP)</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Operand encoding (0 = DX, 1 = immediate)</td>
+</tr>
+<tr>
+<td>15:7</td>
+<td>Reserved (cleared to 0)</td>
+</tr>
+<tr>
+<td>31:16</td>
+<td>Port number (as specified in DX or in an immediate operand)</td>
+</tr>
+<tr>
+<td>63:32</td>
+<td>Reserved (cleared to 0). These bits exist only on processors that support Intel 64 architecture.</td>
+</tr>
+</tbody>
+</table>
+<p>在handle_io中，如果</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line"><span class="built_in">string</span> = (exit_qualification &amp; <span class="number">16</span>) != <span class="number">0</span>;</div><div class="line"></div><div class="line">in = (exit_qualification &amp; <span class="number">8</span>) != <span class="number">0</span>;</div><div class="line"></div><div class="line"><span class="comment">// string串指令或者IO读的指令进行处理</span></div><div class="line"></div><div class="line"><span class="keyword">if</span> (<span class="built_in">string</span> || in)</div><div class="line"></div><div class="line"><span class="keyword">return</span> emulate_instruction(vcpu, <span class="number">0</span>) == EMULATE_DONE;</div><div class="line"></div><div class="line">port = exit_qualification &gt;&gt; <span class="number">16</span>;</div><div class="line"></div><div class="line">size = (exit_qualification &amp; <span class="number">7</span>) + <span class="number">1</span>;</div><div class="line"></div><div class="line"><span class="comment">//跳过模拟指令，将非串写指令参数保存</span></div><div class="line"></div><div class="line">skip_emulated_instruction(vcpu);</div><div class="line"></div><div class="line"><span class="keyword">return</span> kvm_fast_pio_out(vcpu, size, port);</div></pre></td></tr></table></figure>
+<p>先看kvm_fast_pio_out函数</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">unsigned</span> <span class="keyword">long</span> val = kvm_register_read(vcpu, VCPU_REGS_RAX);</div><div class="line"></div><div class="line"><span class="keyword">int</span> ret = emulator_pio_out_emulated(&amp;vcpu-&gt;arch.emulate_ctxt,</div><div class="line"></div><div class="line">   size, port, &amp;val, <span class="number">1</span>);</div></pre></td></tr></table></figure>
+<p>pio指令对象放在eax里面，在emulator_pio_out_emulated中</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div></pre></td><td class="code"><pre><div class="line"></div><div class="line"><span class="built_in">memcpy</span>(vcpu-&gt;arch.pio_data, val, size * count);    </div><div class="line"></div><div class="line">vcpu-&gt;arch.pio.port = port;</div><div class="line"></div><div class="line">vcpu-&gt;arch.pio.in = in;</div><div class="line"></div><div class="line">vcpu-&gt;arch.pio.count  = count;</div><div class="line"></div><div class="line">vcpu-&gt;arch.pio.size = size;</div><div class="line"></div><div class="line"><span class="keyword">if</span> (!kernel_pio(vcpu, vcpu-&gt;arch.pio_data)) &#123;</div><div class="line"></div><div class="line">vcpu-&gt;arch.pio.count = <span class="number">0</span>;</div><div class="line"></div><div class="line"><span class="keyword">return</span> <span class="number">1</span>;</div><div class="line"></div><div class="line">&#125;</div><div class="line"></div><div class="line">vcpu-&gt;run-&gt;exit_reason = KVM_EXIT_IO;</div><div class="line"></div><div class="line">vcpu-&gt;run-&gt;io.direction = in ? KVM_EXIT_IO_IN : KVM_EXIT_IO_OUT;</div><div class="line"></div><div class="line">vcpu-&gt;run-&gt;io.size = size;</div><div class="line"></div><div class="line">vcpu-&gt;run-&gt;io.data_offset = KVM_PIO_PAGE_OFFSET * PAGE_SIZE;</div><div class="line"></div><div class="line">vcpu-&gt;run-&gt;io.count = count;</div><div class="line"></div><div class="line">vcpu-&gt;run-&gt;io.port = port;</div></pre></td></tr></table></figure>
+<p>此处就将pio保存到vcpu-&gt;arch.pio中了，注意exit_reason赋值为KVM_EXIT_IO</p>
+<p>麻烦点在x86_emulate_instruction函数，具体看</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div><div class="line">73</div><div class="line">74</div><div class="line">75</div><div class="line">76</div><div class="line">77</div><div class="line">78</div><div class="line">79</div><div class="line">80</div><div class="line">81</div><div class="line">82</div><div class="line">83</div><div class="line">84</div><div class="line">85</div><div class="line">86</div><div class="line">87</div><div class="line">88</div><div class="line">89</div><div class="line">90</div><div class="line">91</div><div class="line">92</div><div class="line">93</div><div class="line">94</div><div class="line">95</div><div class="line">96</div><div class="line">97</div><div class="line">98</div><div class="line">99</div><div class="line">100</div><div class="line">101</div><div class="line">102</div><div class="line">103</div><div class="line">104</div><div class="line">105</div><div class="line">106</div><div class="line">107</div><div class="line">108</div><div class="line">109</div><div class="line">110</div><div class="line">111</div><div class="line">112</div><div class="line">113</div><div class="line">114</div><div class="line">115</div><div class="line">116</div><div class="line">117</div><div class="line">118</div><div class="line">119</div><div class="line">120</div><div class="line">121</div><div class="line">122</div><div class="line">123</div><div class="line">124</div><div class="line">125</div><div class="line">126</div><div class="line">127</div><div class="line">128</div><div class="line">129</div><div class="line">130</div><div class="line">131</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">struct</span> x86_emulate_ctxt &#123;</div><div class="line"></div><div class="line">        <span class="comment">/*操作对象*/</span></div><div class="line"></div><div class="line"><span class="keyword">const</span> <span class="keyword">struct</span> x86_emulate_ops *ops;</div><div class="line"></div><div class="line"><span class="comment">/* Register state before/after emulation. */</span></div><div class="line"></div><div class="line"><span class="keyword">unsigned</span> <span class="keyword">long</span> eflags;</div><div class="line"></div><div class="line"><span class="keyword">unsigned</span> <span class="keyword">long</span> eip;  <span class="comment">/* eip before instruction emulation */</span></div><div class="line"></div><div class="line"><span class="comment">/* Emulated execution mode, represented by an X86EMUL_MODE value. */</span></div><div class="line"></div><div class="line"><span class="keyword">enum</span> x86emul_mode mode;</div><div class="line"></div><div class="line"><span class="comment">/* interruptibility state, as a result of execution of STI or MOV SS */</span></div><div class="line"></div><div class="line"><span class="keyword">int</span> interruptibility;</div><div class="line"></div><div class="line"><span class="keyword">int</span> emul_flags;</div><div class="line"></div><div class="line"><span class="keyword">bool</span> perm_ok; <span class="comment">/* do not check permissions if true */</span></div><div class="line"></div><div class="line"><span class="keyword">bool</span> ud;<span class="comment">/* inject an #UD if host doesn't support insn */</span></div><div class="line"></div><div class="line"><span class="keyword">bool</span> have_exception;</div><div class="line"></div><div class="line"><span class="keyword">struct</span> x86_exception exception;</div><div class="line"></div><div class="line"><span class="comment">/*</span></div><div class="line"></div><div class="line">* decode cache</div><div class="line"></div><div class="line">*/</div><div class="line"></div><div class="line"><span class="comment">/* current opcode length in bytes */</span></div><div class="line"></div><div class="line">u8 opcode_len;</div><div class="line"></div><div class="line">u8 b;</div><div class="line"></div><div class="line">u8 intercept;</div><div class="line"></div><div class="line">u8 op_bytes;</div><div class="line"></div><div class="line">u8 ad_bytes;</div><div class="line"></div><div class="line"><span class="keyword">struct</span> operand src;</div><div class="line"></div><div class="line"><span class="keyword">struct</span> operand src2;</div><div class="line"></div><div class="line"><span class="keyword">struct</span> operand dst;</div><div class="line"></div><div class="line"><span class="keyword">int</span> (*execute)(<span class="keyword">struct</span> x86_emulate_ctxt *ctxt);</div><div class="line"></div><div class="line"><span class="keyword">int</span> (*check_perm)(<span class="keyword">struct</span> x86_emulate_ctxt *ctxt);</div><div class="line"></div><div class="line"><span class="comment">/*</span></div><div class="line"></div><div class="line">* The following six fields are cleared together,</div><div class="line"></div><div class="line">* the rest are initialized unconditionally in x86_decode_insn</div><div class="line"></div><div class="line">* or elsewhere</div><div class="line"></div><div class="line">*/</div><div class="line"></div><div class="line"><span class="keyword">bool</span> rip_relative;</div><div class="line"></div><div class="line">u8 rex_prefix;</div><div class="line"></div><div class="line">u8 lock_prefix;</div><div class="line"></div><div class="line">u8 rep_prefix;</div><div class="line"></div><div class="line"><span class="comment">/* bitmaps of registers in _regs[] that can be read */</span></div><div class="line"></div><div class="line">u32 regs_valid;</div><div class="line"></div><div class="line"><span class="comment">/* bitmaps of registers in _regs[] that have been written */</span></div><div class="line"></div><div class="line">u32 regs_dirty;</div><div class="line"></div><div class="line"><span class="comment">/* modrm */</span></div><div class="line"></div><div class="line">u8 modrm;</div><div class="line"></div><div class="line">u8 modrm_mod;</div><div class="line"></div><div class="line">u8 modrm_reg;</div><div class="line"></div><div class="line">u8 modrm_rm;</div><div class="line"></div><div class="line">u8 modrm_seg;</div><div class="line"></div><div class="line">u8 seg_override;</div><div class="line"></div><div class="line">u64 d;</div><div class="line"></div><div class="line"><span class="keyword">unsigned</span> <span class="keyword">long</span> _eip;</div><div class="line"></div><div class="line"><span class="keyword">struct</span> operand memop;</div><div class="line"></div><div class="line"><span class="comment">/* Fields above regs are cleared together. */</span></div><div class="line"></div><div class="line"><span class="keyword">unsigned</span> <span class="keyword">long</span> _regs[NR_VCPU_REGS];</div><div class="line"></div><div class="line"><span class="keyword">struct</span> operand *memopp;</div><div class="line"></div><div class="line"><span class="keyword">struct</span> fetch_cache fetch;</div><div class="line"></div><div class="line"><span class="keyword">struct</span> read_cache io_read;</div><div class="line"></div><div class="line"><span class="keyword">struct</span> read_cache mem_read;</div><div class="line"></div><div class="line">&#125;;</div><div class="line"></div><div class="line"><span class="comment">//init_emulate_ctxt负责初始化这个结构体，</span></div><div class="line"></div><div class="line">ctxt-&gt;fetch.ptr = ctxt-&gt;fetch.data;</div><div class="line">ctxt-&gt;fetch.end = ctxt-&gt;fetch.data + insn_len;</div><div class="line"><span class="keyword">if</span> (insn_len &gt; <span class="number">0</span>)</div><div class="line">         <span class="comment">/*所有指令内容存放在data中*/</span></div><div class="line"><span class="built_in">memcpy</span>(ctxt-&gt;fetch.data, insn, insn_len);</div><div class="line"><span class="keyword">else</span> &#123;</div><div class="line">        <span class="comment">/*如果没有指定指令的内容，就从当前eip读取一个指令*/</span></div><div class="line">rc = __do_insn_fetch_bytes(ctxt, <span class="number">1</span>);</div><div class="line"><span class="keyword">if</span> (rc != X86EMUL_CONTINUE)</div><div class="line"><span class="keyword">return</span> rc;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>都是将指令读取出来放到ctxt-&gt;fetch.data中而已，没有执行。</p>
+<p>看__do_insn_fetch_bytes函数，</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">int</span> cur_size = ctxt-&gt;fetch.end - ctxt-&gt;fetch.data;</div><div class="line"></div><div class="line"><span class="comment">/*下面的ea事实上应该说是指令decode时真正的eip，因为指令还没有被执行，eip没有</span></div><div class="line"></div><div class="line"> * 更新，所以每次decode计算eip都要加上已经decode的代码长度，就是cur_size */</div><div class="line"></div><div class="line"><span class="keyword">struct</span> segmented_address addr = &#123; .seg = VCPU_SREG_CS,</div><div class="line">  .ea = ctxt-&gt;eip + cur_size &#125;;</div><div class="line"></div><div class="line"><span class="comment">/*__linearize就是获取线性地址*/</span></div><div class="line"> la = seg_base(ctxt, addr.seg) + addr.ea;</div></pre></td></tr></table></figure>
+<p>后面的即是一些处理，如不满足权限的就要模拟gp错误，emulate_gp。</p>
+<p>然后是:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">rc = ctxt-&gt;ops-&gt;fetch(ctxt, linear, ctxt-&gt;fetch.end, size, &amp;ctxt-&gt;exception);</div></pre></td></tr></table></figure>
+<p>即kvm_fetch_guest_virt</p>
+<p>先通过vcpu-&gt;arch.walk_mmu-&gt;gva_to_gpa获取gpa的值，然后用kvm_vcpu_read_guest_page获取gpa对应的内存值，这两个函数不再展开。</p>
+<p>最终效果就是将linear对应的mem中大小为size的内容写入到ctxt-&gt;fetch.end指针对应的缓存中，因为ctxt-&gt;fetch.end = ctxt-&gt;fetch.data + insn_len而insn_len为0，则写入的是ctxt-&gt;fetch.data，在x86_decode_insn中，__do_insn_fetch_bytes就是从eip中copy了一个指令的内容到ctxt-&gt;fetch.data。x86_emulate_insn后面是指令解释的跳过。</p>
+<p>x86_emulate_instruction后面一段代码：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/*exception在decode中产生*/</span></div><div class="line"><span class="keyword">if</span> (ctxt-&gt;have_exception) &#123;</div><div class="line">r = EMULATE_DONE;</div><div class="line"><span class="keyword">if</span> (inject_emulated_exception(vcpu))</div><div class="line"><span class="keyword">return</span> r;</div><div class="line"><span class="comment">/*decode会处理，pio的执行次数，针对串指令*/</span></div><div class="line">&#125; <span class="keyword">else</span> <span class="keyword">if</span> (vcpu-&gt;arch.pio.count) &#123;</div><div class="line"><span class="comment">/*写入io的不特殊处理，只需完成写入即可*/</span></div><div class="line"><span class="keyword">if</span> (!vcpu-&gt;arch.pio.in) &#123;</div><div class="line"><span class="comment">/* <span class="doctag">FIXME:</span> return into emulator if single-stepping.  */</span></div><div class="line">vcpu-&gt;arch.pio.count = <span class="number">0</span>;</div><div class="line">&#125; <span class="keyword">else</span> &#123;</div><div class="line">writeback = <span class="literal">false</span>;</div><div class="line"><span class="comment">/*读取io的则需要回头处理读的值的流程*/</span></div><div class="line">vcpu-&gt;arch.complete_userspace_io = complete_emulated_pio;</div><div class="line">&#125;</div><div class="line">r = EMULATE_USER_EXIT;</div><div class="line">&#125; <span class="keyword">else</span> <span class="keyword">if</span> (vcpu-&gt;mmio_needed) &#123;</div><div class="line"><span class="comment">/*同上*/</span></div><div class="line"><span class="keyword">if</span> (!vcpu-&gt;mmio_is_write)</div><div class="line">writeback = <span class="literal">false</span>;</div><div class="line">r= EMULATE_USER_EXIT;</div><div class="line">vcpu-&gt;arch.complete_userspace_io = complete_emulated_mmio;</div><div class="line">&#125; <span class="keyword">else</span> <span class="keyword">if</span> (r == EMULATION_RESTART)</div><div class="line"><span class="keyword">goto</span> restart;</div><div class="line"><span class="keyword">else</span></div><div class="line">r = EMULATE_DONE;</div></pre></td></tr></table></figure>
+<p>handle_io 返回return emulate_instruction(vcpu, 0) == EMULATE_DONE，即是kvm_x86_ops-&gt;handle_exit(vcpu)的返回值，返回值不大于0，则从vcpu_run循环中跳出到qemu mode。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">if</span> (kvm_vcpu_running(vcpu)) &#123;</div><div class="line">r = vcpu_enter_guest(vcpu);</div><div class="line">&#125; <span class="keyword">else</span> &#123;</div><div class="line">r = vcpu_block(kvm, vcpu);</div><div class="line">&#125;</div><div class="line"><span class="keyword">if</span> (r &lt;= <span class="number">0</span>)</div><div class="line"><span class="keyword">break</span>;</div></pre></td></tr></table></figure>
+<h3 id="0X03-PIO运行在QEMU"><a href="#0X03-PIO运行在QEMU" class="headerlink" title="0X03 PIO运行在QEMU"></a>0X03 PIO运行在QEMU</h3><p>在qemu kvm_cpu_exec函数中：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">switch</span> (run-&gt;exit_reason) &#123;</div><div class="line"><span class="comment">/*KVM_EXIT_IO是在emulator_pio_in_out标记的*/</span></div><div class="line">        <span class="keyword">case</span> KVM_EXIT_IO:</div><div class="line">            DPRINTF(<span class="string">"handle_io\n"</span>);</div><div class="line">            <span class="comment">/* Called outside BQL */</span></div><div class="line">            kvm_handle_io(run-&gt;io.port, attrs,</div><div class="line">                          (<span class="keyword">uint8_t</span> *)run + run-&gt;io.data_offset,</div><div class="line">                         run-&gt;io.direction,</div><div class="line">                          run-&gt;io.size,</div><div class="line">                          run-&gt;io.count);</div><div class="line">            ret = <span class="number">0</span>;</div><div class="line">            <span class="keyword">break</span>;</div><div class="line">        <span class="keyword">case</span> KVM_EXIT_MMIO:</div><div class="line">            DPRINTF(<span class="string">"handle_mmio\n"</span>);</div><div class="line">            <span class="comment">/* Called outside BQL */</span></div><div class="line">            address_space_rw(&amp;address_space_memory,</div><div class="line">                             run-&gt;mmio.phys_addr, attrs,</div><div class="line">                             run-&gt;mmio.data,</div><div class="line">                             run-&gt;mmio.len,</div><div class="line">                             run-&gt;mmio.is_write);</div><div class="line">            ret = <span class="number">0</span>;</div><div class="line">            <span class="keyword">break</span>;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">void</span> <span class="title">kvm_handle_io</span><span class="params">(<span class="keyword">uint16_t</span> port, MemTxAttrs attrs, <span class="keyword">void</span> *data, <span class="keyword">int</span> direction,</span></span></div><div class="line"></div><div class="line">                          <span class="keyword">int</span> size, <span class="keyword">uint32_t</span> count)</div><div class="line">&#123;</div><div class="line">    <span class="keyword">int</span> i;</div><div class="line">    <span class="keyword">uint8_t</span> *ptr = data;</div><div class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; count; i++) &#123;</div><div class="line">        <span class="comment">/*从qemu内存中读写数据，本质就成了mmio操作 */</span></div><div class="line">        address_space_rw(&amp;address_space_io, port, attrs, ptr, size, direction == KVM_EXIT_IO_OUT);</div><div class="line">        ptr += size;</div><div class="line">    &#125;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>如果写IO此处就算完成了，如果读取IO，此时读取完成，还需要后面处理。</p>
+<p>处理在kvm_arch_vcpu_ioctl_run中的vcpu_run之前，</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">if</span> (unlikely(vcpu-&gt;arch.complete_userspace_io)) &#123;</div><div class="line"><span class="keyword">int</span> (*cui)(<span class="keyword">struct</span> kvm_vcpu *) = vcpu-&gt;arch.complete_userspace_io;</div><div class="line">vcpu-&gt;arch.complete_userspace_io = <span class="literal">NULL</span>;</div><div class="line">r = cui(vcpu);</div><div class="line"><span class="keyword">if</span> (r &lt;= <span class="number">0</span>)</div><div class="line"><span class="keyword">goto</span> out;</div><div class="line">&#125; <span class="keyword">else</span></div><div class="line">WARN_ON(vcpu-&gt;arch.pio.count || vcpu-&gt;mmio_needed);</div></pre></td></tr></table></figure>
+<p>本质执行了complete_userspace_io函数，即是complete_emulated_pio。</p>
+<p>就是r = emulate_instruction(vcpu, EMULTYPE_NO_DECODE)，再次模拟IO指令，此时将数据读取到模拟的IO端口上，模拟完成即可。</p>
+<p>—结束—</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/kvmsource-io/" target="_blank" rel="external">KVM源码分析之IO虚拟化之PIO</a>》及原作者信息:<a href="http://www.oenhan.com/about" target="_blank" rel="external">Oen Han</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟化原理/">虚拟化原理</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/QEMU/">QEMU</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+        
+	<div id="comment">
+	
+	<!-- 多说评论框 start -->
+	 <div class="ds-thread" data-thread-key="/20170104/kvmsource-io/" data-title="KVM源代码分析之IO虚拟化之PIO" data-url="http://yoursite.com/20170104/kvmsource-io/"></div>
+	<!-- 多说评论框 end -->
+	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+	<script type="text/javascript">
+	var duoshuoQuery = {short_name:"csyssec"};
+	  (function() {
+	    var ds = document.createElement('script');
+	    ds.type = 'text/javascript';ds.async = true;
+	    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+	    ds.charset = 'UTF-8';
+	    (document.getElementsByTagName('head')[0] 
+	     || document.getElementsByTagName('body')[0]).appendChild(ds);
+	  })();
+	  </script>
+	<!-- 多说公共JS代码 end -->
+	
+	</div>
+	<link rel="stylesheet" href="/css/comment.css">
+
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+  
+    <a href="/20170104/kvmsource-memory/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">KVM源码分析之内存虚拟化</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+      <ol class="toc"><li class="toc-item toc-level-3"><a class="toc-link" href="#0X01-PIO指令介绍"><span class="toc-number">1.</span> <span class="toc-text">0X01 PIO指令介绍</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#0X02-PIO运行在KVM"><span class="toc-number">2.</span> <span class="toc-text">0X02 PIO运行在KVM</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#0X03-PIO运行在QEMU"><span class="toc-number">3.</span> <span class="toc-text">0X03 PIO运行在QEMU</span></a></li></ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+        自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a>
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/celebrity" class="mobile-nav-link">Celebrity</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/donation" class="mobile-nav-link">Donation</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>

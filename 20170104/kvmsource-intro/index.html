@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>kvm源码分析之基本工作原理 | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="作者：Oen Han
+
+CSysSec注： 本KVM源码分析系列文章来自系Intel中国Linux内核与虚拟化开发工程师Oen Han的博客,Oen Han 在虚拟化领域有丰富的开发经验，其写的KVM源码分析系列是本人目前见过最好最详细的，值得推荐。转载本文请务必注明，文章出处：《KVM源码分析之基本工作原理》
+
+
+
+0X01 KVM模型结构
+0X02 KVM工作原理
+0X03 CPU虚拟化
+0X">
+<meta property="og:type" content="article">
+<meta property="og:title" content="KVM源码分析之基本工作原理">
+<meta property="og:url" content="http://yoursite.com/20170104/kvmsource-intro/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="作者：Oen Han
+
+CSysSec注： 本KVM源码分析系列文章来自系Intel中国Linux内核与虚拟化开发工程师Oen Han的博客,Oen Han 在虚拟化领域有丰富的开发经验，其写的KVM源码分析系列是本人目前见过最好最详细的，值得推荐。转载本文请务必注明，文章出处：《KVM源码分析之基本工作原理》
+
+
+
+0X01 KVM模型结构
+0X02 KVM工作原理
+0X03 CPU虚拟化
+0X">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/kvmsource101.png">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/kvmsource102.png">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/kvmsource103.png">
+<meta property="og:updated_time" content="2017-01-04T05:48:02.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="KVM源码分析之基本工作原理">
+<meta name="twitter:description" content="作者：Oen Han
+
+CSysSec注： 本KVM源码分析系列文章来自系Intel中国Linux内核与虚拟化开发工程师Oen Han的博客,Oen Han 在虚拟化领域有丰富的开发经验，其写的KVM源码分析系列是本人目前见过最好最详细的，值得推荐。转载本文请务必注明，文章出处：《KVM源码分析之基本工作原理》
+
+
+
+0X01 KVM模型结构
+0X02 KVM工作原理
+0X03 CPU虚拟化
+0X">
+<meta name="twitter:image" content="http://oij0laovn.bkt.clouddn.com/kvmsource101.png">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">FROM 0 TO 1</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">体系结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/celebrity">工业大咖</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/donation">打赏支持</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+  <div style="background:#fff;width: 100%;">
+
+      <div style="max-height:600px; overflow: hidden;">
+        <img width="100%" alt="Hike News" src="/css/images/pose.jpg">
+      </div>
+
+  </div>
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-kvmsource-intro" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      KVM源码分析之基本工作原理
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170104/kvmsource-intro/" class="article-date">
+	  <time datetime="2017-01-04T05:46:19.000Z" itemprop="datePublished">一月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://www.oenhan.com/about" target="_blank" rel="external">Oen Han</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本KVM源码分析系列文章来自系Intel中国Linux内核与虚拟化开发工程师Oen Han的<a href="http://www.oenhan.com/kvm-src-1" target="_blank" rel="external">博客</a>,Oen Han 在虚拟化领域有丰富的开发经验，其写的KVM源码分析系列是本人目前见过最好最详细的，值得推荐。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/kvmsource-intro/" target="_blank" rel="external">KVM源码分析之基本工作原理</a>》</p>
+<hr>
+<blockquote>
+<ul>
+<li>0X01 KVM模型结构</li>
+<li>0X02 KVM工作原理</li>
+<li>0X03 CPU虚拟化</li>
+<li>0X04 Memory虚拟化</li>
+</ul>
+</blockquote>
+<p>13年的时候准备挖“KVM源代码分析”的坑，陆陆续续2年过去了，坑也没有填上，当时是因为对KVM了解的肤浅，真正的理解必然要深入到代码级别，所谓“摈弃皮毛，看到血肉，看到真相”，当时计划写KVM基本工作原理、虚拟机的创建、VCPU调度原理、KVM内存管理、KVM设备管理等，实际发现代码过程还是很多，估计后续会针对于不同的点专门来写。</p>
+<p>需要假定读者有一定的内核基础，和虚拟化基础，原理性的东西估计会一笔带过，我在知乎上写过一些基础入门的书籍：1.首先有OS基础，随便操作系统大学课本；2.对Linux kernel有全面了解，关键模块有理解，推荐书籍：深入Linux内核架构（+1）或者深入理解LINUX内核；3.Hypervisor虚拟化，Intel的《系统虚拟化-原理与实现》，赶时间的建议先把第3步完成。</p>
+<p>进入正题：</p>
+<h3 id="0X01-KVM模型结构"><a href="#0X01-KVM模型结构" class="headerlink" title="0X01 KVM模型结构"></a>0X01 KVM模型结构</h3><p>为什么有OS虚拟化？随着CPU计算能力的提高，单独的OS已不能充分利用CPU的计算能力，1.很多应用的执行需要单独占用一个OS环境，如安全测试等；2.而IAAS云计算厂商也是以OS为范围销售计算能力。那么在所有虚拟化方案中，都是由hypervisor取代原生的OS去控制具体硬件资源，而同时hypervisor将资源分配具体的VM，VM中运行的是没有修改过的OS，如果让VM中的OS能正常运行，hypervisor的任务就是模拟具体的硬件资源，让OS不能识别出是真是假。</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/kvmsource101.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/kvmsource101.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p>当然上面的模型是Xen示例，OS对应用而言是硬件资源管理中心，那么hypervisor就是具体VM的OS了，KVM是就利用了这一点，利用现有的kernel代码，构建了一个hypervisor，这个样子内存分配，进程调度等就无需重写代码，如此hypervisor就是所谓的host，VM中的OS就是guest。</p>
+<p>guest OS保证具体运行场景中的程序正常执行，而KVM的代码则部署在HOST上，Userspace对应的是QEMU，Kernel对应的是KVM Driver，KVM Driver负责模拟虚拟机的CPU运行，内存管理，设备管理等；QEMU则模拟虚拟机的IO设备接口以及用户态控制接口。QEMU通过KVM等fd进行IOCTL控制KVM驱动的运行过程。</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/kvmsource102.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/kvmsource102.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p>如上图所示，guest自身有自己的用户模式和内核模式；guest是在host中是作为一个用户态进程存在的，这个进程就是qemu，qemu本身就是一个虚拟化程序，只是纯软件虚拟化效率很低，它被KVM进行改造后，作为KVM的前端存在，用来进行<a href="http://www.oenhan.com/cpu-load-balance" target="_blank" rel="external">创建进程</a>或者IO交互等；而KVM Driver则是Linux内核模式，它提供KVM fd给qemu调用，用来进行cpu虚拟化，内存虚拟化等。QEMU通KVM提供的fd接口，通过ioctl系统调用创建和运行虚拟机。KVM Driver使得整个Linux成为一个虚拟机监控器，负责接收qemu模拟效率很低的命令。</p>
+<h3 id="0X02-KVM工作原理"><a href="#0X02-KVM工作原理" class="headerlink" title="0X02 KVM工作原理"></a>0X02 KVM工作原理</h3><figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/kvmsource103.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/kvmsource103.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>上图是一个执行过程图，首先启动一个虚拟化管理软件qemu，开始启动一个虚拟机，通过ioctl等系统调用向内核中申请指定的资源，搭建好虚拟环境，启动虚拟机内的OS，执行 VMLAUCH 指令，即进入了guest代码执行过程。如果 Guest OS 发生外部中断或者影子页表缺页之类的事件，暂停 Guest OS 的执行，退出QEMU即guest VM-exit，进行一些必要的处理，然后重新进入客户模式，执行guest代码；这个时候如果是io请求，则提交给用户态下的qemu处理，qemu处理后再次通过IOCTL反馈给KVM驱动。</p>
+<h3 id="0X03-CPU虚拟化"><a href="#0X03-CPU虚拟化" class="headerlink" title="0X03 CPU虚拟化"></a>0X03 CPU虚拟化</h3><p>X86体系结构CPU虚拟化技术的称为 Intel VT-x 技术，引入了VMX，提供了两种处理器的工作环境。 VMCS 结构实现两种环境之间的切换。 VM Entry 使虚拟机进去guest模式，VM Exit 使虚拟机退出guest模式。</p>
+<p>VMM调度guest执行时，qemu 通过 ioctl 系统调用进入内核模式，在 KVM Driver中获得当前物理 CPU的引用。之后将guest状态从VMCS中读出， 并装入物理CPU中。执行 VMLAUCH 指令使得物理处理器进入非根操作环境，运行guest OS代码。</p>
+<p>当 guest OS 执行一些特权指令或者外部事件时， 比如I/O访问，对控制寄存器的操作，MSR的读写等， 都会导致物理CPU发生 VMExit， 停止运行 Guest OS，将 Guest OS保存到VMCS中， Host 状态装入物理处理器中， 处理器进入根操作环境，KVM取得控制权，通过读取 VMCS 中 VM_EXIT_REASON 字段得到引起 VM Exit 的原因。 从而调用kvm_exit_handler 处理函数。 如果由于 I/O 获得信号到达，则退出到userspace模式的 Qemu 处理。处理完毕后，重新进入guest模式运行虚拟 CPU。</p>
+<h3 id="0X04-Mem虚拟化"><a href="#0X04-Mem虚拟化" class="headerlink" title="0X04 Mem虚拟化"></a>0X04 Mem虚拟化</h3><p>OS对于物理内存主要有两点认识：1.物理地址从0开始；2.内存地址是连续的。VMM接管了所有内存，但guest OS的对内存的使用就存在这两点冲突了，除此之外，一个guest对内存的操作很有可能影响到另外一个guest乃至host的运行。VMM的内存虚拟化就要解决这些问题。</p>
+<p>在OS代码中，应用也是占用所有的逻辑地址，同时不影响其他应用的关键点在于有线性地址这个中间层；解决方法则是添加了一个中间层：guest物理地址空间；guest看到是从0开始的guest物理地址空间（类比从0开始的线性地址），而且是连续的，虽然有些地址没有映射；同时guest物理地址映射到不同的host逻辑地址，如此保证了VM之间的安全性要求。</p>
+<p>这样MEM虚拟化就是GVA-&gt;GPA-&gt;HPA的寻址过程，传统软件方法有影子页表，硬件虚拟化提供了EPT支持。</p>
+<p>总体描述到此，后面代码里面见真相。</p>
+<p>《<a href="http://www.csyssec.org/20170104/kvmsource-create/" target="_blank" rel="external">KVM源码分析之虚拟机的创建与运行</a>》</p>
+<p>-结束-</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/kvmsource-intro/" target="_blank" rel="external">KVM源码分析之基本工作原理</a>》</p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟化原理/">虚拟化原理</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/QEMU/">QEMU</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+        
+	<div id="comment">
+	
+	<!-- 多说评论框 start -->
+	 <div class="ds-thread" data-thread-key="/20170104/kvmsource-intro/" data-title="KVM源码分析之基本工作原理" data-url="http://yoursite.com/20170104/kvmsource-intro/"></div>
+	<!-- 多说评论框 end -->
+	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+	<script type="text/javascript">
+	var duoshuoQuery = {short_name:"csyssec"};
+	  (function() {
+	    var ds = document.createElement('script');
+	    ds.type = 'text/javascript';ds.async = true;
+	    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+	    ds.charset = 'UTF-8';
+	    (document.getElementsByTagName('head')[0] 
+	     || document.getElementsByTagName('body')[0]).appendChild(ds);
+	  })();
+	  </script>
+	<!-- 多说公共JS代码 end -->
+	
+	</div>
+	<link rel="stylesheet" href="/css/comment.css">
+
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/20170104/kvmsource-create/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">上一篇</strong>
+      <div class="article-nav-title">
+        
+          KVM源码分析之虚拟机的创建与运行
+        
+      </div>
+    </a>
+  
+  
+    <a href="/20170102/bypassaslr-gotgor/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">绕过ASLR-第三篇章(GOT覆盖与GOT解引用)</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+      <ol class="toc"><li class="toc-item toc-level-3"><a class="toc-link" href="#0X01-KVM模型结构"><span class="toc-number">1.</span> <span class="toc-text">0X01 KVM模型结构</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#0X02-KVM工作原理"><span class="toc-number">2.</span> <span class="toc-text">0X02 KVM工作原理</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#0X03-CPU虚拟化"><span class="toc-number">3.</span> <span class="toc-text">0X03 CPU虚拟化</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#0X04-Mem虚拟化"><span class="toc-number">4.</span> <span class="toc-text">0X04 Mem虚拟化</span></a></li></ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+        自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a>
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/celebrity" class="mobile-nav-link">Celebrity</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/donation" class="mobile-nav-link">Donation</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>
