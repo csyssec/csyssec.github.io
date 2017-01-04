@@ -108,6 +108,109 @@
         
           <section id="main">
   
+    <article id="post-kvmsource-create"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170104/kvmsource-create/">KVM源码分析之虚拟机的创建与运行</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170104/kvmsource-create/" class="article-date">
+	  <time datetime="2017-01-04T05:48:14.000Z" itemprop="datePublished">一月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://www.oenhan.com/about" target="_blank" rel="external">Oen Han</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本KVM源码分析系列文章来自系Intel中国Linux内核与虚拟化开发工程师Oen Han的<a href="http://www.oenhan.com/kvm-src-2-vm-run" target="_blank" rel="external">博客</a>,Oen Han 在虚拟化领域有丰富的开发经验，其写的KVM源码分析系列是本人目前见过最好最详细的，值得推荐。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/kvmsource-create/" target="_blank" rel="external">KVM源码分析之虚拟机的创建与运行</a>》</p>
+<hr>
+<p>前段时间挖了一个坑，<a href="http://www.csyssec.org/20170104/kvmsource1/" target="_blank" rel="external">KVM源码分析之基本工作原理</a>，准备写一下kvm的代码机制，结果一直没时间填土，现在还一下旧账，争取能温故而知新。 基本原理里面提到kvm虚拟化由用户态程序Qemu和内核态驱动kvm配合完成，qemu负责HOST用户态层面进程管理，IO处理等，KVM负责把qemu的部分指令在硬件上直接实现，从虚拟机的创建和运行上看，qemu的代码占了流程上的主要部分。下面的代码主要主要针对与qemu，KVM部分另外开篇再说。</p>
+<p>代码：</p>
+<pre><code>QEMU：git://git.qemu.org/qemu.git v2.4.0
+
+KVM：https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git v4.2
+</code></pre><p>QEMU和KVM是通过IOCTL进行配合的，直接抓住这个线看有kvm_ioctl、kvm_vm_ioctl、kvm_vcpu_ioctl、kvm_device_ioctl等，他们还都在一个C文件里面。</p>
+<p>使用kvm_ioctl很少了，直接看调用的代码，有KVM_GET_VCPU_MMAP_SIZE，KVM_CHECK_EXTENSION，KVM_GET_API_VERSION，KVM_CREATE_VM，KVM_GET_SUPPORTED_CPUID等等，需要记住只有KVM_CREATE_VM。</p>
+<p>而调用kvm_vm_ioctl的函数真是海了去了，需要看的是KVM_SET_USER_MEMORY_REGION，KVM_CREATE_VCPU，KVM_CREATE_DEVICE。</p>
+<p>所有寄存器的交换信息都是通过kvm_vcpu_ioctl，需要记住的操作只有，KVM_RUN。</p>
+<p>所有看QEMU和KVM的配合流程如下</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/kvmsource201.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/kvmsource201.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>接下来参考上图分析qemu代码流程： 从vl.c代码的main函数开始。 atexit(qemu_run_exit_notifiers)注册了qemu的退出处理函数，后面在具体看qemu_run_exit_notifiers函数。 module_call_init则开始初始化qemu的各个模块，陆陆续续的有以下参数：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">typedef</span> <span class="keyword">enum</span> &#123;</div><div class="line">    MODULE_INIT_BLOCK,</div><div class="line">    MODULE_INIT_MACHINE,</div><div class="line">    MODULE_INIT_QAPI,</div><div class="line">    MODULE_INIT_QOM,</div><div class="line">    MODULE_INIT_MAX</div><div class="line">&#125; module_init_type;</div></pre></td></tr></table></figure>
+<p>最开始初始化的MODULE_INIT_QOM，QOM是qemu实现的一种模拟设备，具体可以参考<a href="http://wiki.qemu.org/Features/QOM，代码下面的不远处就MODULE_INIT_MACHINE的初始化，这两条语句放到一起看，直接说一下module_call_init的机制。" target="_blank" rel="external">http://wiki.qemu.org/Features/QOM，代码下面的不远处就MODULE_INIT_MACHINE的初始化，这两条语句放到一起看，直接说一下module_call_init的机制。</a> module_call_init实际设计的一个函数链表，ModuleTypeList ，链表关系如下图</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/kvmsource202.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/kvmsource202.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>它把相关的函数注册到对应的数组链表上，通过执行init项目完成所有设备的初始化。module_call_init就是执行e-&gt;init()完成功能的，而e-&gt;init是什么时候通过register_module_init注册到ModuleTypeList上的ModuleEntry，是module_init注册的，而调用module_init的有</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">define</span> block_init(function) module_init(function, MODULE_INIT_BLOCK)</span></div><div class="line"><span class="meta">#<span class="meta-keyword">define</span> machine_init(function) module_init(function, MODULE_INIT_MACHINE)</span></div><div class="line"><span class="meta">#<span class="meta-keyword">define</span> qapi_init(function) module_init(function, MODULE_INIT_QAPI)</span></div><div class="line"><span class="meta">#<span class="meta-keyword">define</span> type_init(function) module_init(function, MODULE_INIT_QOM)</span></div></pre></td></tr></table></figure>
+<p>那么执行machine_init则是挂到了MODULE_INIT_MACHINE，type_init则将函数挂载了MODULE_INIT_QOM。那么排查一下是，我们只关注PC的注册，那么就是machine_init(pc_machine<em>init</em>##suffix)，源自DEFINE_PC_MACHINE(suffix, namestr, initfn, optsfn)宏，而DEFINE_I440FX_MACHINE有</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">define</span> DEFINE_I440FX_MACHINE(suffix, name, compatfn, optionfn) </span></div><div class="line">    <span class="keyword">static</span> <span class="keyword">void</span> pc_init_#<span class="meta">#suffix(MachineState *machine) </span></div><div class="line">    &#123; </div><div class="line">        <span class="keyword">void</span> (*compat)(MachineState *m) = (compatfn); </div><div class="line">        <span class="keyword">if</span> (compat) &#123; </div><div class="line">            compat(machine); </div><div class="line">        &#125; </div><div class="line">        pc_init1(machine); </div><div class="line">    &#125; </div><div class="line">    DEFINE_PC_MACHINE(suffix, name, pc_init_##suffix, optionfn)</div><div class="line"></div><div class="line"><span class="meta">#<span class="meta-keyword">define</span> DEFINE_PC_MACHINE(suffix, namestr, initfn, optsfn) </span></div><div class="line">    <span class="keyword">static</span> <span class="keyword">void</span> pc_machine_#<span class="meta">#suffix##_class_init(ObjectClass *oc, void *data) </span></div><div class="line">    &#123; </div><div class="line">        MachineClass *mc = MACHINE_CLASS(oc); </div><div class="line">        optsfn(mc); </div><div class="line">        mc-&gt;name = namestr; </div><div class="line">        mc-&gt;init = initfn; </div><div class="line">    &#125; </div><div class="line">    <span class="keyword">static</span> <span class="keyword">const</span> TypeInfo pc_machine_type_#<span class="meta">#suffix = &#123; </span></div><div class="line">        .name       = namestr TYPE_MACHINE_SUFFIX, </div><div class="line">        .parent     = TYPE_PC_MACHINE, </div><div class="line">        .class_init = pc_machine_##suffix##_class_init, </div><div class="line">    &#125;; </div><div class="line">    <span class="keyword">static</span> <span class="keyword">void</span> pc_machine_init_#<span class="meta">#suffix(void) </span></div><div class="line">    &#123; </div><div class="line">        type_register(&amp;pc_machine_type_##suffix); </div><div class="line">    &#125; </div><div class="line">    machine_init(pc_machine_init_##suffix)</div></pre></td></tr></table></figure>
+<p>DEFINE_PC_MACHINE注册的函数pc<em>init</em>##suffix在DEFINE_I440FX_MACHINE中定义，怎么组合都无关，pc_init1(machine)函数一定要执行，本质就是pc_init1赋值给了mc-&gt;init，其他爱看不看吧。<br>而module_init的宏是</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">define</span> module_init(function, type)                                         </span></div><div class="line"><span class="keyword">static</span> <span class="keyword">void</span> __attribute__((constructor)) do_qemu_init_ #<span class="meta"># function(void)    </span></div><div class="line">&#123;                                                                           </div><div class="line">    register_dso_module_init(function, type);                               </div><div class="line">&#125;</div><div class="line"><span class="meta">#<span class="meta-keyword">else</span></span></div><div class="line"><span class="comment">/* This should not be used directly.  Use block_init etc. instead.  */</span></div><div class="line"><span class="meta">#<span class="meta-keyword">define</span> module_init(function, type)                                         </span></div><div class="line"><span class="keyword">static</span> <span class="keyword">void</span> __attribute__((constructor)) do_qemu_init_ #<span class="meta"># function(void)    </span></div><div class="line">&#123;                                                                           </div><div class="line">    register_module_init(function, type);                                   </div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>它前面的修饰是<strong>attribute</strong>((constructor)),这个导致machine_init或者type_init等会在main()之前就被执行。所有type_init(kvm_type_init）-&gt; kvm_accel_type -&gt; kvm_accel_class_init -&gt; kvm_init依次完成了函数注册，所有说module_call_init(MODULE_INIT_QOM)函数已经完成了kvm_init的执行，所有这样就清楚KVM调用关系了。<br>如此就先去看kvm_init函数，前面主要干了一件事，填充KVMState *s结构体，然后通过kvm_ioctl(s, KVM_GET_API_VERSION, 0)判断内核KVM驱动和当前QEMU版本是否兼容，下面则是执行kvm_ioctl(s, KVM_CREATE_VM, type)进行虚拟机的创建活动，创建了KVM虚拟机，获取虚拟机句柄。具体KVM_CREATE_VM在内核态做了什么，ioctl的工作等另外再说，现在假定KVM_CREATE_VM所代表的虚拟机创建成功，下面通过检查kvm_check_extension结果填充KVMState，kvm_arch_init初始化KVMState，其中有IDENTITY_MAP_ADDR，TSS_ADDR，NR_MMU_PAGES等，cpu_register_phys_memory_client注册qemu对内存管理的函数集，kvm_create_irqchip创建kvm中断管理内容，通过kvm_vm_ioctl(s, KVM_CREATE_IRQCHIP)实现，具体内核态的工作内容后面分析。到此kvm_init的工作就完成了，最主要的工作就是创建的虚拟机。</p>
+<p>这样绕了这么大圈，重新回到vl.c上面来，前面刚说了module_call_init(MODULE_INIT_MACHINE)本质就是把pc_init1赋值给了mc-&gt;init，然后machine_class = find_default_machine()，如此可以看到machine_class的init函数一定会执行pc_init1。</p>
+<p>下面涉及对OPT入参的解析过程略过不提。 qemu准备模拟的机器的类型从下面语句获得:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">current_machine = MACHINE(object_new(object_class_get_name( OBJECT_CLASS(machine_class))));</div></pre></td></tr></table></figure>
+<p>machine_class则是通过入参传入的</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">case</span> QEMU_OPTION_machine:</div><div class="line">                olist = qemu_find_opts(<span class="string">"machine"</span>);</div><div class="line">                opts = qemu_opts_parse_noisily(olist, optarg, <span class="literal">true</span>);</div><div class="line">                <span class="keyword">if</span> (!opts) &#123;</div><div class="line">                    <span class="built_in">exit</span>(<span class="number">1</span>);</div><div class="line">                &#125;</div><div class="line">                <span class="keyword">break</span>;</div></pre></td></tr></table></figure>
+<p>man qemu</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">-machine [type=]name[,prop=value[,...]]</div><div class="line">           Select the emulated machine by name.</div><div class="line">           Use <span class="string">"-machine help"</span> to <span class="built_in">list</span> available machines</div></pre></td></tr></table></figure>
+<p>下面有cpu_exec_init_all就是执行了qemu的内存结构体的初始化而已，cpudef_init则提供了VCPU的不同型号的模拟，qemu_set_log设置日志输出，kvm对外的日志是从这里配置的。中间的乱七八糟的就忽略掉即可，然后直接到了machine_class-&gt;init(current_machine)函数，其实就是执行了pc_init1。暂且记下来，先看下面的，cpu_synchronize_all_post_init就是内核和qemu数据不一致同步一下。下面的函数没有重要的了，只有vm_start()函数需要记一下，后面会用到。</p>
+<p>现在进入pc_init1函数：</p>
+<p>在pc_init1中重点看两个函数，pc_cpus_init和pc_memory_init，顾名思义，CPU和内存的初始化，中断，vga等函数的初始化先忽略掉，先看这两个。<br>pc_cpus_init入参是cpu_model，前面说过这是具体的CPU模型，所有X86的CPU模型都在builtin_x86_defs中定义，取其中一个看看</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div></pre></td><td class="code"><pre><div class="line">&#123;</div><div class="line">       .name = <span class="string">"SandyBridge"</span>,</div><div class="line">       .level = <span class="number">0xd</span>,</div><div class="line">       .vendor = CPUID_VENDOR_INTEL,</div><div class="line">       .family = <span class="number">6</span>,</div><div class="line">       .model = <span class="number">42</span>,</div><div class="line">       .stepping = <span class="number">1</span>,</div><div class="line">       .features[FEAT_1_EDX] =</div><div class="line">           CPUID_VME | CPUID_SSE2 | CPUID_SSE | CPUID_FXSR | CPUID_MMX |</div><div class="line">           CPUID_CLFLUSH | CPUID_PSE36 | CPUID_PAT | CPUID_CMOV | CPUID_MCA |</div><div class="line">           CPUID_PGE | CPUID_MTRR | CPUID_SEP | CPUID_APIC | CPUID_CX8 |</div><div class="line">           CPUID_MCE | CPUID_PAE | CPUID_MSR | CPUID_TSC | CPUID_PSE |</div><div class="line">           CPUID_DE | CPUID_FP87,</div><div class="line">       .features[FEAT_1_ECX] =</div><div class="line">           CPUID_EXT_AVX | CPUID_EXT_XSAVE | CPUID_EXT_AES |</div><div class="line">           CPUID_EXT_TSC_DEADLINE_TIMER | CPUID_EXT_POPCNT |</div><div class="line">           CPUID_EXT_X2APIC | CPUID_EXT_SSE42 | CPUID_EXT_SSE41 |</div><div class="line">           CPUID_EXT_CX16 | CPUID_EXT_SSSE3 | CPUID_EXT_PCLMULQDQ |</div><div class="line">           CPUID_EXT_SSE3,</div><div class="line">       .features[FEAT_8000_0001_EDX] =</div><div class="line">           CPUID_EXT2_LM | CPUID_EXT2_RDTSCP | CPUID_EXT2_NX |</div><div class="line">           CPUID_EXT2_SYSCALL,</div><div class="line">       .features[FEAT_8000_0001_ECX] =</div><div class="line">           CPUID_EXT3_LAHF_LM,</div><div class="line">       .features[FEAT_XSAVE] =</div><div class="line">           CPUID_XSAVE_XSAVEOPT,</div><div class="line">       .features[FEAT_6_EAX] =</div><div class="line">           CPUID_6_EAX_ARAT,</div><div class="line">       .xlevel = <span class="number">0x80000008</span>,</div><div class="line">       .model_id = <span class="string">"Intel Xeon E312xx (Sandy Bridge)"</span>,</div><div class="line">   &#125;,</div></pre></td></tr></table></figure>
+<p>你可以cat一个本地的/proc/cpuinfo，builtin_x86_defs定义的就是这些参数。<br>然后是for循环中针对每个CPU初始化，即pc_new_cpu，直接进入cpu_x86_create函数，<br>主要就是把CPUX86State填充了一下，涉及到CPUID和其他的feature。下面是x86_cpu_realize，即唤醒CPU，重点是qemu_init_vcpu，MCE忽略掉，走到qemu_kvm_start_vcpu，qemu创建VCPU，如下：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//创建VPU对于的qemu线程，线程函数是qemu_kvm_cpu_thread_fn</span></div><div class="line">    qemu_thread_create(cpu-&gt;thread, thread_name, qemu_kvm_cpu_thread_fn,</div><div class="line">                       cpu, QEMU_THREAD_JOINABLE);</div><div class="line">    <span class="comment">//如果线程没有创建成功，则一直在此处循环阻塞。说明多核vcpu的创建是顺序的</span></div><div class="line">    <span class="keyword">while</span> (!cpu-&gt;created) &#123;</div><div class="line">        qemu_cond_wait(&amp;qemu_cpu_cond, &amp;qemu_global_mutex);</div><div class="line">    &#125;</div></pre></td></tr></table></figure>
+<p>线程创建完成，具体任务支线提，回到主流程上，qemu_init_vcpu执行完成后，下面就是cpu_reset，此处的作用是什么呢？答案是无用，本质是一个空函数，它的主要功能就是CPUClass的reset函数，reset在cpu_class_init里面注册的，注册的是cpu_common_reset，这是一个空函数，没有任何作用。cpu_class_init则是被cpu_type_info即TYPE_CPU使用，而cpu_type_info则由type_init(cpu_register_types)完成，type_init则是前面提到的和machine_init对应的注册关系。根据下句完成工作</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">C</div><div class="line"></div><div class="line"><span class="meta">#<span class="meta-keyword">define</span> type_init(function) module_init(function, MODULE_INIT_QOM)</span></div><div class="line"><span class="number">1</span></div><div class="line"><span class="meta">#<span class="meta-keyword">define</span> type_init(function) module_init(function, MODULE_INIT_QOM)</span></div></pre></td></tr></table></figure>
+<p>从上面看，pc_cpus_init函数过程已经理顺了，下面看一下，vcpu所在的线程对应的qemu_kvm_cpu_thread_fn中：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//初始化VCPU</span></div><div class="line">    r = kvm_init_vcpu(env);</div><div class="line"><span class="comment">//初始化KVM中断</span></div><div class="line">    qemu_kvm_init_cpu_signals(env);</div><div class="line"></div><div class="line"><span class="comment">//标志VCPU创建完成，和上面判断是对应的</span></div><div class="line">    cpu-&gt;created = <span class="literal">true</span>;</div><div class="line">    qemu_cond_signal(&amp;qemu_cpu_cond);</div><div class="line">    <span class="keyword">while</span> (<span class="number">1</span>) &#123;</div><div class="line">        <span class="keyword">if</span> (cpu_can_run(env)) &#123;</div><div class="line">          <span class="comment">//CPU进入执行状态</span></div><div class="line">            r = kvm_cpu_exec(env);</div><div class="line">            <span class="keyword">if</span> (r == EXCP_DEBUG) &#123;</div><div class="line">                cpu_handle_guest_debug(env);</div><div class="line">            &#125;</div><div class="line">        &#125;</div><div class="line">        qemu_kvm_wait_io_event(env);</div><div class="line">    &#125;</div></pre></td></tr></table></figure>
+<p>CPU进入执行状态的时候我们看到其他的VCPU包括内存可能还没有初始化，关键是此处有一个开关，qemu_cpu_cond,打开这个开关才能进入到CPU执行状态，谁来打开这个开关，后面再说。先看kvm_init_vcpu，通过kvm_vm_ioctl，KVM_CREATE_VCPU创建VCPU，用KVM_GET_VCPU_MMAP_SIZE获取env-&gt;kvm_run对应的内存映射，kvm_arch_init_vcpu则填充对应的kvm_arch内容，具体内核部分，后面单独写。kvm_init_vcpu就是获取了vcpu，将相关内容填充了env。<br>qemu_kvm_init_cpu_signals则是将中断组合掩码传递给kvm_set_signal_mask，最终给内核KVM_SET_SIGNAL_MASK。kvm_cpu_exec此时还在阻塞过程中，先挂起来，看内存的初始化。<br>内存初始化函数是pc_memory_init,memory_region_init_ram传入了高端内存和低端内存的值，memory_region_init负责填充mr，重点在qemu_ram_alloc，即qemu_ram_alloc_from_ptr，首先有RAMBlock，ram_list，那就直接借助find_ram_offset函数一起看一下qemu的内存分布模型。</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/kvmsource203.bmp" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/kvmsource203.bmp" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>qemu模拟了普通内存分布模型，内存的线性也是分块被使用的，每个块称为RAMBlock，由ram_list统领，RAMBlock.offset则是区块的线性地址，即相对于开始的偏移位，RAMBlock.length(size)则是区块的大小，find_ram_offset则是在线性区间内找到没有使用的一段空间，可以完全容纳新申请的ramblock length大小，代码就是进行了所有区块的遍历，找到满足新申请length的最小区间，把ramblock安插进去即可，返回的offset即是新分配区间的开始地址。<br>而RAMBlock的物理则是在RAMBlock.host,由kvm_vmalloc(size)分配真正物理内存，内部qemu_vmalloc使用qemu_memalign页对齐分配内存。后续的都是对RAMBlock的插入等处理。<br>从上面看，memory_region_init_ram已经将qemu内存模型和实际的物理内存初始化了。<br>vmstate_register_ram_global这个函数则是负责将前面提到的ramlist中的ramblock和memory region的初始地址对应一下，将mr-&gt;name填充到ramblock的idstr里面，就是让二者有确定的对应关系，如此mr就有了物理内存使用。<br>后面则是subregion的处理，memory_region_init_alias初始化，其中将ram传递给mr-&gt;owner确定了隶属关系，memory_region_add_subregion则是大头，memory_region_add_subregion_common前面的判断忽略，QTAILQ_INSERT_TAIL(&amp;mr-&gt;subregions, subregion, subregions_link)就是插入了链表而已，主要内容在memory_region_transaction_commit。<br>memory_region_transaction_commit中引入了新的结构address_spaces（AS），注释里面提到“AddressSpace: describes a mapping of addresses to #MemoryRegion objects”，就是内存地址的映射关系，因为内存有不同的应用类型，address_spaces以链表形式存在，commit函数则是对所有AS执行address_space_update_topology，先看AS在哪里注册的，就是前面提到的kvm_init里面，执行memory_listener_register，注册了address_space_memory和address_space_io两个，涉及的另外一个结构体则是MemoryListener，有kvm_memory_listener和kvm_io_listener，就是用于监控内存映射关系发生变化之后执行回调函数。<br>下面进入到address_space_update_topology函数，FlatView则是“Flattened global view of current active memory hierarchy”，address_space_get_flatview直接获取当前的，generate_memory_topology则根据前面已经变化的mr重新生成FlatView,然后通过address_space_update_topology_pass比较，简单说address_space_update_topology_pass就是两个FlatView逐条的FlatRange进行对比，以后一个FlatView为准，如果前面FlatView的FlatRange和后面的不一样，则对前面的FlatView的这条FlatRange进行处理，差别就是3种情况，如代码：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">while</span> (iold &lt; old_view-&gt;nr || inew &lt; new_view-&gt;nr) &#123;</div><div class="line">        <span class="keyword">if</span> (iold &lt; old_view-&gt;nr) &#123;</div><div class="line">            frold = &amp;old_view-&gt;ranges[iold];</div><div class="line">        &#125; <span class="keyword">else</span> &#123;</div><div class="line">            frold = <span class="literal">NULL</span>;</div><div class="line">        &#125;</div><div class="line">        <span class="keyword">if</span> (inew &lt; new_view-&gt;nr) &#123;</div><div class="line">            frnew = &amp;new_view-&gt;ranges[inew];</div><div class="line">        &#125; <span class="keyword">else</span> &#123;</div><div class="line">            frnew = <span class="literal">NULL</span>;</div><div class="line">        &#125;</div><div class="line"></div><div class="line">        <span class="keyword">if</span> (frold</div><div class="line">            &amp;&amp; (!frnew</div><div class="line">                || int128_lt(frold-&gt;addr.start, frnew-&gt;addr.start)</div><div class="line">                || (int128_eq(frold-&gt;addr.start, frnew-&gt;addr.start)</div><div class="line">                    &amp;&amp; !flatrange_equal(frold, frnew)))) &#123;</div><div class="line">            <span class="comment">/* In old but not in new, or in both but attributes changed. */</span></div><div class="line"></div><div class="line">            <span class="keyword">if</span> (!adding) &#123; <span class="comment">//这个判断代码添加的无用，可以直接删除,</span></div><div class="line">                <span class="comment">//address_space_update_topology里面的两个pass也可以删除一个</span></div><div class="line">                MEMORY_LISTENER_UPDATE_REGION(frold, as, Reverse, region_del);</div><div class="line">            &#125;</div><div class="line"></div><div class="line">            ++iold;</div><div class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (frold &amp;&amp; frnew &amp;&amp; flatrange_equal(frold, frnew)) &#123;</div><div class="line">            <span class="comment">/* In both and unchanged (except logging may have changed) */</span></div><div class="line"></div><div class="line">            <span class="keyword">if</span> (adding) &#123;</div><div class="line">                MEMORY_LISTENER_UPDATE_REGION(frnew, as, Forward, region_nop);</div><div class="line">                <span class="keyword">if</span> (frold-&gt;dirty_log_mask &amp;&amp; !frnew-&gt;dirty_log_mask) &#123;</div><div class="line">                    MEMORY_LISTENER_UPDATE_REGION(frnew, as, Reverse, log_stop);</div><div class="line">                &#125; <span class="keyword">else</span> <span class="keyword">if</span> (frnew-&gt;dirty_log_mask &amp;&amp; !frold-&gt;dirty_log_mask) &#123;</div><div class="line">                    MEMORY_LISTENER_UPDATE_REGION(frnew, as, Forward, log_start);</div><div class="line">                &#125;</div><div class="line">            &#125;</div><div class="line"></div><div class="line">            ++iold;</div><div class="line">            ++inew;</div><div class="line">        &#125; <span class="keyword">else</span> &#123;</div><div class="line">            <span class="comment">/* In new */</span></div><div class="line"></div><div class="line">            <span class="keyword">if</span> (adding) &#123;</div><div class="line">                MEMORY_LISTENER_UPDATE_REGION(frnew, as, Forward, region_add);</div><div class="line">            &#125;</div><div class="line"></div><div class="line">            ++inew;</div><div class="line">        &#125;</div><div class="line">    &#125;</div></pre></td></tr></table></figure>
+<p>重点在MEMORY_LISTENER_UPDATE_REGION函数上，将变化的FlatRange构造一个MemoryRegionSection，然后遍历所有的memory_listeners，如果memory_listeners监控的内存区域和MemoryRegionSection一样，则执行第四个入参函数，如region_del函数，即kvm_region_del函数，这个是在kvm_init中初始化的。kvm_region_del主要是kvm_set_phys_mem函数，主要是将MemoryRegionSection有效值转换成KVMSlot形式，在kvm_set_user_memory_region中使用kvm_vm_ioctl(s, KVM_SET_USER_MEMORY_REGION, &amp;mem)传递给kernel。<br>我们看内存初始化真正需要做的是什么？就是qemu申请内存，把申请物理地址传递给kernel进行映射，那我们直接就可以KVMSlot申请内存，然后传递给kvm_vm_ioctl，这样也是OK的，之所以有这么多代码，因为qemu本身是一个软件虚拟机，mr涉及的地址已经是vm的地址，对于KVM是多余的，只是方便函数复用而已。<br>内存初始化之后还是pci等处理先跳过，如此pc_init就完成了，但是前面VM线程已经初始化成功，在qemu_kvm_cpu_thread_fn函数中等待运行：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">while</span> (<span class="number">1</span>) &#123;</div><div class="line">        <span class="keyword">if</span> (cpu_can_run(cpu)) &#123;</div><div class="line">            r = kvm_cpu_exec(cpu);</div><div class="line">            <span class="keyword">if</span> (r == EXCP_DEBUG) &#123;</div><div class="line">                cpu_handle_guest_debug(cpu);</div><div class="line">            &#125;</div><div class="line">        &#125;</div><div class="line">        qemu_kvm_wait_io_event(cpu);</div><div class="line">    &#125;</div></pre></td></tr></table></figure>
+<p>判断条件就是cpu_can_run函数，即cpu-&gt;stop &amp;&amp; cpu-&gt;stopped &amp;&amp; current_run_state ！= running 都是false，而这几个参数都是由vm_start函数决定的</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">vm_start</span><span class="params">(<span class="keyword">void</span>)</span></span></div><div class="line">&#123;</div><div class="line">    <span class="keyword">if</span> (!runstate_is_running()) &#123;</div><div class="line">        cpu_enable_ticks();</div><div class="line">        runstate_set(RUN_STATE_RUNNING);</div><div class="line">        vm_state_notify(<span class="number">1</span>, RUN_STATE_RUNNING);</div><div class="line">        resume_all_vcpus();</div><div class="line">        monitor_protocol_event(QEVENT_RESUME, <span class="literal">NULL</span>);</div><div class="line">    &#125;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>如此kvm_cpu_exec就真正进入执行阶段，即通过kvm_vcpu_ioctl传递KVM_RUN给内核。</p>
+<p>《<a href="http://www.csyssec.org/20170104/kvmsource-cpu/" target="_blank" rel="external">KVM源码分析之CPU虚拟化</a>》</p>
+<p>—结束—</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/kvmsource-create/" target="_blank" rel="external">KVM源码分析之虚拟机的创建与运行</a>》</p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟化原理/">虚拟化原理</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/QEMU/">QEMU</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-kvmsource-intro"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -521,249 +624,6 @@ CSysSec注： 本文来自Diting0x的个人博客，分析了Linux下不同类�
 <!-- Table of Contents -->
 
   
-    <article id="post-virtualizationcomprehensive"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170102/virtualizationcomprehensive/">虚拟机环境搭建、管理、监控与分析</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170102/virtualizationcomprehensive/" class="article-date">
-	  <time datetime="2017-01-02T08:23:01.000Z" itemprop="datePublished">一月 2, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
-<p><strong>CSysSec注</strong>： 本文来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/03/31/virt-setup-analysis/" target="_blank" rel="external">个人博客</a>，从虚拟机的环境搭建、管理、监控到分析，介绍的内容非常全面，值得推荐。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/virtualizationcomprehensive/" target="_blank" rel="external">虚拟机环境搭建、管理、监控与分析</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
-<blockquote>
-<ul>
-<li>0x01 全文环境 </li>
-<li>0x02 虚拟机创建KVM/QEMU </li>
-<li>0x03 虚拟机管理Libvirt</li>
-<li>0x04 虚拟机监控Libvmi</li>
-<li>0x05 虚拟机监控Volatility</li>
-</ul>
-</blockquote>
-<p>本文介绍了一套完整的虚拟化环境搭建与分析工作，包括虚拟机的创建，虚拟机的管理，以及虚拟机的监控与分析。可根据自身需要阅读相关内容。</p>
-<hr>
-<h3 id="0x01-全文环境"><a href="#0x01-全文环境" class="headerlink" title="0x01 全文环境"></a>0x01 全文环境</h3><p>Ubuntu12.04 + Kvm-kmod-3.8 + Qemu-kvm-1.1.2+ Libvirt 1.3.2 + Libvmi + Volatility </p>
-<h3 id="Ox02-虚拟机创建KVM-QEMU"><a href="#Ox02-虚拟机创建KVM-QEMU" class="headerlink" title="Ox02 虚拟机创建KVM/QEMU"></a>Ox02 虚拟机创建KVM/QEMU</h3><p>Kvm需要CPU的支持（Intel VT 或者 AMD SVM)，在安装KVM之前，可先检查CPU是否支持硬件虚拟化技术。基于Intel的系统，可运行 ‘grep vmx /proc/cpuinfo’ 查看是否含有vmx的关键字，如果有，则表示支持；基于AMD的系统，可运行 ‘grep svm /proc/cpuinfo’ 查看是否含有svm的关键字。<br>另外，CPU若支持硬件虚拟化，还得确保BLOS开启了VT选项（有些厂商默认是禁用的，如thinkpad t450). 可以下载 cpu-checker 工具（apt-get install cpu-checker)，之后运行kvm-ok， 如果提示 kvm acceleration can not be used，则可能是blos禁用了kvm虚拟化，在blos设置中开启即可。</p>
-<p>可执行：</p>
-<pre><code>modprobe kvm 
-modprobe kvm_intel 
-</code></pre><p>开启内核自带的kvm</p>
-<p>关于源码安装kvm-kmod以及qemu-kvm的详细过程可参考 <a href="http://www.csyssec.org/20170102/kvmqemuintro/" target="_blank" rel="external">上一篇</a> 文章。kvm-kmod安装成功后，运行lsmod | grep kvm， 会显示两个module:</p>
-<pre><code>kvm_intel             137721  3 
-kvm                   415549  1 kvm_intel
-</code></pre><p>qemu-kvm安装成功后会在/your-confiure-location/bin/qemu-system-x86_64等可执行文件。</p>
-<p>安装完KVM/QEMU后，创建虚拟机的时候，虚拟机的网络方式是比较关心的问题，KVM/QEMU有两种网络配置方式。</p>
-<p>其一，用户模式（User Networking): 即NAT方式，也是默认的网络模式。让虚拟机访问主机、互联网或本地网络上的资源的简单方法，但是不能从网络或其他的客户机访问客户机。既然无法访问客户机，那宿主机与客户机该如何传输文件呢？默认的，客户机得到的ip空间为10.0.2.0/24，宿主机提供了ip为10.0.2.2的地址让虚拟机访问。可以ssh到宿主机(10.0.2.2)，用scp来拷贝文件。</p>
-<p>其二，桥接模式（Bridge Networking): 这种模式允许客户机就像一台独立的主机一样拥有网络。这种方式要比用户网络复杂一些，但是设置好后客户机与互联网，客户机与主机之间的通信都很容易。桥接网络需要网卡支持，一般的有线网卡都支持，绝大部分的无线网卡都不支持。</p>
-<p>NAT方式是KVM/QEMU提供的默认方式，要设置桥接模式，首先在宿主机上安装桥接相关的包，</p>
-<pre><code>apt-get install bridge-utils. 
-</code></pre><p>修改/etc/network/interfaces</p>
-<pre><code>auto lo
-iface lo inet loopback
-auto eth0
-iface eth0 inet manual
-auto br0
-iface br0 inet dhcp
-   bridge_ports eth0
-   bridge_stp off
-   bridge_fd 9
-   bridge_hello 2
-   bridge_maxwait 0
-</code></pre><p>执行</p>
-<pre><code>/etc/init.d/networking restart
-</code></pre><p>配置好后，可运行brctl-show命令，会显示：</p>
-<pre><code>bridge name      bridge id              STP enabled interfaces
-br0              8000.68f728eddb0d      no          eth0
-                                              vnet0
-</code></pre><p>之后在创建虚拟机的时候可添加-net nic -net tap参数，如</p>
-<pre><code>/usr/local/bin/qemu-system-x86_64 -hda imgname.img -vnc :1 -m 1024 -net nic -net tap -monitor stdio    
-</code></pre><p>之后创建的虚拟机便工作在网桥模式中。</p>
-<h3 id="0x03-虚拟机管理Libvirt"><a href="#0x03-虚拟机管理Libvirt" class="headerlink" title="0x03 虚拟机管理Libvirt"></a>0x03 虚拟机管理Libvirt</h3><p>除了用qemu命令行的方式创建与管理虚拟机，也可将一些命令行参数保存为xml配置文件，用libvirt来管理。libvirt是一套管理虚拟机的工具，包括管理虚拟机的API、一个守护进程（libvirtd)和一个命令行工具（virsh). Libvirt 的主要目标是提供一个单一途径以管理多种不同虚拟化方案已经虚拟化主机，包括KVM/QEMU,Xen,LXC等。安装libvirt后，会产生libvirtd进程以及virsh工具，要利用libvirt做开发，可调用其中的API。libvirt, libvirtd 以及virsh的关系如下图：</p>
-<p><img src="http://7xppf1.com1.z0.glb.clouddn.com/libvirt-internal.png" alt="libvirt-internal"></p>
-<p>详细介绍可参考：<a href="http://libvirt.org/internals.html" target="_blank" rel="external">libvirt internals</a></p>
-<p>安装libvirt: </p>
-<p>先安装libvirt所依赖的包</p>
-<pre><code>apt-get install libnl-dev libxml2 libxml2-dev  libpciaccess-dev libyajl-dev libdevmapper-dev libgnutls-dev
-</code></pre><p>如出现以下错误，都可以检查上述这些包是否安装好</p>
-<pre><code>error: Could not find libxml2 anywhere
-
-error: You must install the GnuTLS library in order to compile and run libvirt
-
-error: You must install device-mapper-devel/libdevmapper &gt;= 1.0.0 to compile libvirt
-
-error: libnl-devel &gt;= 1.1 is required for macvtap support
-</code></pre><p>下载libvirt1.3.2.tar.gz</p>
-<pre><code>tar xvf libvirt1.3.2.tar.gz
-./configure
-make &amp;&amp; make install
-</code></pre><p>安装完成后，执行ldconfig同步链接库，否则会出现以下错误：</p>
-<pre><code>virsh: error while loading shared libraries: libvirt.so.0: cannot open shared object file: No such file or directory
-</code></pre><p>执行检查libvirt安装成功</p>
-<pre><code>which libvirtd
-libvirtd –version
-which virsh
-virsh –version
-</code></pre><p>若出现此类错误：</p>
-<pre><code>error: Failed to reconnect to the hypervisor
-error: no valid connection
-error: Failed to connect socket to &apos;/usr/local/var/run/libvirt/libvirt-sock&apos;: No such file or directory
-</code></pre><p>则很有可能是libvirtd进程没有开启，这时需要手动开启libvirtd,执行libvirtd -d 即可。(libvirtd具体参数可参考：<a href="http://linux.die.net/man/8/libvirtd" target="_blank" rel="external">libvirtd manual</a> ）</p>
-<p>另外注意，libvirt从1.3版本后增加了virtlogd特性，需要执行virtlogd -d手动开启virtlogd进程（virtlogd具体参数可参看：<a href="https://www.mankier.com/8/virtlogd" target="_blank" rel="external">virtlogd manual</a> ）. 否则会出现以下错误：</p>
-<pre><code>error: Failed to connect socket to &apos;/usr/local/var/run/libvirt/virtlogd-sock&apos;: No such file or directory
-</code></pre><p>安装好libvirt后，便可配置好xml文件，用virsh来管理。具体virsh命令这里不做介绍，可参考其中一个配置文件：</p>
-<pre><code>&lt;domain type=&apos;kvm&apos;&gt;
-&lt;name&gt;ubuntudemo&lt;/name&gt;&lt;!--虚拟机名称--&gt;
-&lt;memory&gt;1048576&lt;/memory&gt;&lt;!--最大内存，单位KB--&gt;
-&lt;currentMemory&gt;1048576&lt;/currentMemory&gt;&lt;!--可用内存，单位k--&gt;
-&lt;uuid&gt;87d5b3d2-3618-4a59-9efb-aa869ff34999&lt;/uuid&gt;
-
-&lt;vcpu&gt;1&lt;/vcpu&gt;&lt;!--虚拟cpu个数--&gt;
-&lt;os&gt;
-    &lt;type arch=&apos;x86_64&apos;,machine=&apos;pc&apos;&gt;hvm&lt;/type&gt;
-    &lt;boot dev=&apos;hd&apos;/&gt;&lt;!--光盘启动--&gt;
-&lt;/os&gt;
-&lt;features&gt;
-    &lt;acpi/&gt;
-    &lt;apic/&gt;
-    &lt;pae/&gt;
-&lt;/features&gt;
-&lt;clock offset=&apos;localtime&apos;/&gt;
-&lt;on_poweroff&gt;destroy&lt;/on_poweroff&gt;
-&lt;on_reboot&gt;restart&lt;/on_reboot&gt;
-&lt;on_crash&gt;destroy&lt;/on_crash&gt;
-&lt;devices&gt;
-    &lt;emulator&gt;/usr/bin/qemu&lt;/emulator&gt; &lt;!--先创建好软链接   ln -s /use/local/qemukvm1.1.2/bin/qemu-system-x86_64 /usr/bin/qemu--&gt;
-    &lt;disk type=&apos;file&apos; device=&apos;disk&apos;&gt;
-        &lt;driver name=&apos;qemu&apos; type=&apos;qcow2&apos;/&gt;
-        &lt;source file=&apos;/home/os.img/server12041.img&apos;/&gt;&lt;!--目的镜像路径--&gt;
-        &lt;target dev=&apos;vda&apos; bus=&apos;virtio&apos;/&gt;
-    &lt;/disk&gt;
-
-    &lt;interface type=&apos;bridge&apos;&gt;&lt;!--虚拟机网络连接方式--&gt;
-        &lt;source bridge=&apos;br0&apos;/&gt;&lt;!--当前主机网桥的名称--&gt;
-        &lt;mac address=&quot;00:16:3e:5d:aa:a8&quot;/&gt;&lt;!--为虚拟机分配mac地址，务必唯一，否则dhcp获得同样ip,引起冲突--&gt;
-    &lt;/interface&gt;
-    &lt;input type=&apos;mouse&apos; bus=&apos;ps2&apos;/&gt;
-    &lt;!--vnc方式登录，端口号自动分配，自动加1，可以通过virsh vncdisplay ubuntudemo来查询（实际端口为显示结果+5900）--&gt; 
-    &lt;graphics type=&apos;vnc&apos; port=&apos;-1&apos; autoport=&apos;yes&apos; listen=&apos;0.0.0.0&apos; keymap=&apos;en-us&apos;/&gt;
-&lt;/devices&gt;
-</code></pre><p></p>
-<h3 id="0x04-虚拟机监控Libvmi"><a href="#0x04-虚拟机监控Libvmi" class="headerlink" title="0x04 虚拟机监控Libvmi"></a>0x04 虚拟机监控Libvmi</h3><p>Libvmi是一套能从底层二进制信息重构虚拟机上层语义的C语言API。由于hypervisor(VMM)获取的全是客户机的二进制比特，用户为了从外部（比如宿主机)监控客户机的行为需要理解客户机上层的语义，比如客户机正在运行的进程列表、模块列表等信息，这种二进制到上层语义之间的gap称之为语义鸿沟（semantic gap)，从外部监控客户机的行为称之为虚拟机自省（VM Introspection）。 Libvmi提供的API，能够读取物理内存、虚拟内存、符号表（System.map）、暂停/打开虚拟机、接收内存与寄存器事件的通知等，让用户能很方便的构建插件，来读取进程列表、模块列表等信息（大部分linux原生监控工具都可以通过libvmi来构建). </p>
-<p>Libvmi目前支持Intel,AMD64以及ARM系统结构，支持的虚拟机平台包括XEN与KVM/QEMU，支持的被监控系统类型包括windows和linux. Libvmi从Xenaccess发展而来，要了解其详细原理，可参考论文<a href="https://www.acsac.org/2007/papers/138.pdf" target="_blank" rel="external">Secure and Flexible Monitoring of Virtual Machines</a>以及官方主页<a href="http://libvmi.com/" target="_blank" rel="external">libvmi</a>.</p>
-<p>安装libvmi:</p>
-<p>先安装其依赖的包，注，这里针对KVM/QEMU，关于XEN依赖的包，会有所不同，可参考<a href="http://libvmi.com/docs/gcode-install.html" target="_blank" rel="external">libvmi-installation</a></p>
-<pre><code>apt-get install automake autoconf
-apt-get install libtool
-apt-get install flex bison
-apt-get install check
-</code></pre><p>下载libvmi-0.10.1.tar.gz</p>
-<pre><code>tar xvf libvmi-0.10.1.tar.gz
-</code></pre><p>安装    </p>
-<pre><code>cd libvmi-0.10.1
-./autogen.sh
-./congfigure
-make 
-make install
-ldconfig
-</code></pre><p>libvmi提供了很多plugin examples在/libvmi/examples文件夹中，<br>要运行其中的plugin（比如process-list，列举客户机中进程信息，类似linux的原生ls命令), 首先要找出客户机符号表中的一些偏移信息. libvmi提供了获取偏移信息的工具在/libvmi/tools/linux-offset-finder/ 文件夹中，将其拷贝到虚拟机中，make编译，生成了一个内核模块findoffset.ko，执行insmod findoffset.ko将其插入内核中，<br> 再执行dmesg 将得到的偏移信息，如：</p>
-<pre><code>ostype = &quot;Linux&quot;;
-//sysmap = &quot;/boot/System.map-3.2.0-29-generic&quot;;
-linux_name = 0x470;
-linux_tasks = 0x248;
-linux_mm=0x280;
-linux_pid=0x2bc;
-linux_pgd=0x58;
-</code></pre><p>写进宿主机的/libvmi/etc/libvmi-example.conf中，将libvmi-example.conf拷贝到/etc/libvmi.conf或者\$HOME/etc/libvmi.conf中,注，这里libvmi会在/etc/libvmi.conf或者\$HOME/etc/libvmi.conf中读取偏移信息。另外，这里的sysmap路径是host主机的路径，需要把guest中的System.map文件拷贝到host主机上。(还发现一个问题，虚拟机的名字不能全以数字命名，比如120432,不然在读取libvmi.conf配置文件时会出错).</p>
-<p>之后运行</p>
-<pre><code>/libvmi/examples/process-list ubuntudemo 
-</code></pre><p>这里ubuntudemo是创建的虚拟机名字。以下是列出的部分信息：</p>
-<pre><code>Process listing for VM ubuntudemo (id=3)
-Next list entry is at: ffff88003d638248
-[    0] swapper/0 (struct addr:ffffffff81c0d020)
-[    1] init (struct addr:ffff88003d638000)
-[    2] kthreadd (struct addr:ffff88003d639700)
-[    3] ksoftirqd/0 (struct addr:ffff88003d63ae00)
-[    6] migration/0 (struct addr:ffff88003d658000)
-[    7] watchdog/0 (struct addr:ffff88003d659700)
-[    8] cpuset (struct addr:ffff88003d65ae00)
-[    9] khelper (struct addr:ffff88003d65c500)
-[   10] kdevtmpfs (struct addr:ffff88003d65dc00)
-[   11] netns (struct addr:ffff88003d698000)
-[   12] sync_supers (struct addr:ffff88003d699700)
-</code></pre><p>Libvmi提供的plugins有限，用户可根据需要编写，也可利用取证工具volatlity做更高层次语义的分析。Libvmi支持python绑定，提供了与volatility绑定的接口，具体可见下文。</p>
-<p>###0x05 虚拟机监控Volatility  </p>
-<p>Volatility是一个用python编写的内存分析工具，与libvmi（利用sysystem.map符号表信息)不同的是，volatility利用可执行文件elf中的调试信息（dwarf格式）以及system.map符号表信息来获取更丰富的变量和函数语义。其支持windows， linux以及mac。 文中以Linux为例。</p>
-<p>Get Started:</p>
-<p>下载volatility包</p>
-<pre><code>git clone https://github.com/volatilityfoundation/volatility.git
-</code></pre><p>创建Linux profile</p>
-<p>profile是个zip文件，包含内核数据结构以及调试信息，也就是dwarf文件（volatility称之为vtypes)与system.map的压缩包。</p>
-<p>volatility提供了一个内核模块在/volatility/tools/linux文件夹下来获取vtypes信息，将文件夹内容拷贝到要分析的客户机中，编译make，生成module.dwarf文件。在此之前请确保客户机中以及安装dwarfdump (apt-get install dwarfdump）。之后执行 head module.dwarf，会显示以下内容:</p>
-<pre><code>.debug_info
-
-&lt;0&gt;&lt;0+11&gt;&lt;DW_TAG_compile_unit&gt; DW_AT_producer&lt;GNU C 4.6.3&gt; DW_AT_language&lt;DW_LANG_C89&gt;.....
-
-&lt;1&gt;&lt;45&gt;&lt;DW_TAG_typedef&gt; DW_AT_name&lt;__s8&gt; DW_AT_decl_file&lt;1 include/asm-generic/int-ll64.h&gt;.....
-</code></pre><p>生成</p>
-<p>接着将module.dwarf文件以及/boot/System.map-3.2.0-99-generic 文件（不同系统文件名不同）压缩成一个zip文件，如Ubuntu1204.zip。执行：</p>
-<pre><code>zip volatility/volatility/plugins/overlays/linux/Ubuntu1204.zip volatility/tools/linux/module.dwarf /boot/System.map-3.2.0-99-generic
-</code></pre><p>使用profile</p>
-<pre><code>python vol.py --info | grep Linux 
-</code></pre><p> 这时会显示之前创建的profile名，Linuxubuntu1204x64.</p>
-<pre><code>LinuxUbuntu1204x64    - A Profile for Linux Ubuntu1204 x64 &lt;=== This is the one we just created
-</code></pre><p>绑定libvmi的python接口</p>
-<p>在./volatility/plugins/addrspaces 有针对不同内存快照的物理地址空间，如vmware.py,lime.py，crash.py等。libvmi则提供了pyvmi接口，在/libvmi/tools/pyvmi文件夹中有个pyvmiaddressspace.py文件可供volatility使用，（若需要自己编写python程序，则需要build pyvmi，build过程可参见其中的README文件，若出现编译错误，请确保安装 apt-get install build-essentials, apt-get install python2.7-dev).<br>将pyvmiaddressspace.py文件拷贝至./volatility/plugins/addrespaces文件夹中便可以利用volatility的plugins来分析虚拟机的内存了。以linux_pslist plugin为例，执行：</p>
-<pre><code>python vol.py -l vmi://ubuntudemo --profile=Linuxubuntu1204x64 linux_pslist  
-</code></pre><p>若出现distorm3（反编译库)相关错误，请确保已经安装distorm3</p>
-<pre><code>apt-get install python-pip
-pip install distorm3
-</code></pre><p>绑定pyvmi接口后，volatility所有的plugins都可以用来分析虚拟机内存。 </p>
-<p>完</p>
-<hr>
-<h3 id="References"><a href="#References" class="headerlink" title="References"></a>References</h3><p><a href="http://libvmi.com/" target="_blank" rel="external">Libvmi</a></p>
-<p><a href="http://libvirt.org/" target="_blank" rel="external">Libvirt</a></p>
-<p><a href="https://github.com/volatilityfoundation/volatility/wiki" target="_blank" rel="external">Volatility wiki</a></p>
-<p><a href="https://www.acsac.org/2007/papers/138.pdf" target="_blank" rel="external">Secure and Flexible Monitoring of Virtual Machines</a></p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/virtualizationcomprehensive/" target="_blank" rel="external">虚拟化环境搭建、管理、监控与分析</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟化综合/">虚拟化综合</a>
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Introspection/">Introspection</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Libvmi/">Libvmi</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/QEMU/">QEMU</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Volatility/">Volatility</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -856,6 +716,18 @@ pip install distorm3
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170104/useafterfree/">Use-after-free</a></h6>
+          <!--  <span>一月 4, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -1032,18 +904,6 @@ pip install distorm3
             
 
               <h6 style="margin: 0;"><a href="/20170102/virtualizationcomprehensive/">虚拟机环境搭建、管理、监控与分析</a></h6>
-          <!--  <span>一月 2, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170102/kvmqemuintro/">KVM/QEMU虚拟化简介</a></h6>
           <!--  <span>一月 2, 2017</span> -->
             </div>
 
