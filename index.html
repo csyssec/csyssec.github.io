@@ -141,20 +141,19 @@
 <li>0X02 mmap</li>
 </ul>
 </blockquote>
-<p>学到这里，你应该已经知道malloc是使用系统调用从操作系统获取内存，正如下图所示，malloc是使用brk或者mmap系统调用来获得内存分配的。</p>
+<p>学到这里，你应该已经知道malloc是使用系统调用从操作系统获取内存，正如下图所示，malloc是使用<a href="http://man7.org/linux/man-pages/man2/sbrk.2.html" target="_blank" rel="external">brk</a>或者<a href="http://man7.org/linux/man-pages/man2/mmap.2.html" target="_blank" rel="external">mmap</a>系统调用来获得内存分配的。</p>
 <figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/mallocsystemcall1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/mallocsystemcall1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
 
-
-<h3 id="0X01-brk"><a href="#0X01-brk" class="headerlink" title="0X01 brk"></a>0X01 brk</h3><p>brk通过增加程序中断位置从内核中获取内存（初始化非0）。一开始堆段的起始(start_brk)和结束(brk)都指向同一位置。</p>
+<h3 id="0X01-brk"><a href="#0X01-brk" class="headerlink" title="0X01 brk"></a>0X01 brk</h3><p><a href="http://lxr.free-electrons.com/source/mm/mmap.c?v=3.8#L252" target="_blank" rel="external">brk</a>通过增加程序中断位置(<a href="http://lxr.free-electrons.com/source/include/linux/mm_types.h?v=3.8#L365" target="_blank" rel="external">brk</a>)从内核中获取内存（初始化非0）。一开始堆段的起始(<a href="http://lxr.free-electrons.com/source/include/linux/mm_types.h?v=3.8#L365" target="_blank" rel="external">start_brk</a>)和结束(<a href="http://lxr.free-electrons.com/source/include/linux/mm_types.h?v=3.8#L365" target="_blank" rel="external">brk</a>)都指向同一位置。</p>
+<blockquote>
 <ul>
-<li>当ASLR关闭时，start_brk和brk将指向数据段(end_data)的末尾</li>
+<li>当<a href="https://en.wikipedia.org/wiki/Address_space_layout_randomization" target="_blank" rel="external">ASLR</a>关闭时，start_brk和brk将指向数据段(<a href="http://lxr.free-electrons.com/source/include/linux/mm_types.h?v=3.8#L364" target="_blank" rel="external">end_data</a>)的末尾</li>
 <li>当ASLR打开时，start_brk和brk指向的位置即为数据段(end_data)的末尾地址加上随机brk偏移地址所指向的位置</li>
 </ul>
+</blockquote>
 <figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/mallocsystemcall2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/mallocsystemcall2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
 
-
-<p>由上图可知，start_brk即为堆段的初始位置，brk（程序中断）即为堆段的末尾位置</p>
-<p><em><u>Example:</u></em></p>
+<p>由上图可知，start_brk即为堆段的初始位置，brk（程序中断）即为堆段的末尾位置<br><em><u>Example:</u></em></p>
 <pre><code> /* sbrk and brk example */
 #include &lt;stdio.h&gt;
 #include &lt;unistd.h&gt;
@@ -209,7 +208,7 @@ sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$
 </ul>
 </blockquote>
 <p>在这<br>0804b000-0804c000是这个堆段的虚拟地址范围<br>rw-p是权限（读，写，不可执行，私有）<br>00000000代表文件偏移量——由于它不是从其它文件映射而来，所以就为0<br>00:00是主要/次要设备编号——由于它不是从其它文件映射而来，所以这里为0<br>0代表Inode编号——由于它不是从其它文件映射而来，所以这里为0<br>[heap]堆段</p>
-<h3 id="0X02-mmap"><a href="#0X02-mmap" class="headerlink" title="0X02 mmap"></a>0X02 mmap</h3><p>malloc使用mmap创建私有匿名映射段。私有匿名映射的主要目的是分配新的内存（零填充），并且这个新的内存将被调用进程独占使用。<br><em><u>Example:</u></em></p>
+<h3 id="0X02-mmap"><a href="#0X02-mmap" class="headerlink" title="0X02 mmap"></a>0X02 mmap</h3><p> malloc使用<a href="http://lxr.free-electrons.com/source/mm/mmap.c?v=3.8#L1285" target="_blank" rel="external">mmap</a>创建私有匿名映射段。私有匿名映射的主要目的是分配新的内存（零填充），并且这个新的内存将被调用进程独占使用。<br><em><u>Example:</u></em></p>
 <pre><code> /* Private anonymous mapping example using mmap syscall */
 #include &lt;stdio.h&gt;
 #include &lt;sys/mman.h&gt;
@@ -265,7 +264,7 @@ b7e21000-b7e22000 rw-p 00000000 00:00 0
 ...
 sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$
 </code></pre><p><em><u>注意：</u></em>在我们的示例程序执行过程中ASLR是被关闭的。</p>
-<p><em><u>参考文献：</u></em><br>1.Anatomy of program in memory</p>
+<p><em><u>参考文献：</u></em><br>1.<a href="http://duartes.org/gustavo/blog/post/anatomy-of-a-program-in-memory/" target="_blank" rel="external">Anatomy of program in memory</a></p>
 <hr>
 <p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170105/mallocsystemcall" target="_blank" rel="external">Linux(X86)漏洞利用系列-Malloc使用的系统调用</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
 
