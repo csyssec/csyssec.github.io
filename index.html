@@ -154,53 +154,15 @@
 <figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/mallocsystemcall2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/mallocsystemcall2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
 
 <p>由上图可知，start_brk即为堆段的初始位置，brk（程序中断）即为堆段的末尾位置<br><em><u>Example:</u></em></p>
-<pre><code> /* sbrk and brk example */
-#include &lt;stdio.h&gt;
-#include &lt;unistd.h&gt;
-#include &lt;sys/types.h&gt;
-int main()
-{
-        void *curr_brk, *tmp_brk = NULL;
-
-        printf(&quot;Welcome to sbrk example:%d\n&quot;, getpid());
-
-        /* sbrk(0) gives current program break location */
-        tmp_brk = curr_brk = sbrk(0);
-        printf(&quot;Program Break Location1:%p\n&quot;, curr_brk);
-        getchar();
-
-        /* brk(addr) increments/decrements program break location */
-        brk(curr_brk+4096);
-
-        curr_brk = sbrk(0);
-        printf(&quot;Program break Location2:%p\n&quot;, curr_brk);
-        getchar();
-
-        brk(tmp_brk);
-
-        curr_brk = sbrk(0);
-        printf(&quot;Program Break Location3:%p\n&quot;, curr_brk);
-        getchar();
-
-        return 0;
-}
-</code></pre><p><em><u>输出分析:</u></em><br>在增加程序中断之前：在下面的输出中我们可以看到这没有堆段，因此</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div></pre></td><td class="code"><pre><div class="line"> <span class="comment">/* sbrk and brk example */</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;unistd.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/types.h&gt;</span></span></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span></span></div><div class="line">&#123;</div><div class="line">        <span class="keyword">void</span> *curr_brk, *tmp_brk = <span class="literal">NULL</span>;</div><div class="line"></div><div class="line">        <span class="built_in">printf</span>(<span class="string">"Welcome to sbrk example:%d\n"</span>, getpid());</div><div class="line"></div><div class="line">        <span class="comment">/* sbrk(0) gives current program break location */</span></div><div class="line">        tmp_brk = curr_brk = sbrk(<span class="number">0</span>);</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"Program Break Location1:%p\n"</span>, curr_brk);</div><div class="line">        getchar();</div><div class="line"></div><div class="line">        <span class="comment">/* brk(addr) increments/decrements program break location */</span></div><div class="line">        brk(curr_brk+<span class="number">4096</span>);</div><div class="line"></div><div class="line">        curr_brk = sbrk(<span class="number">0</span>);</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"Program break Location2:%p\n"</span>, curr_brk);</div><div class="line">        getchar();</div><div class="line"></div><div class="line">        brk(tmp_brk);</div><div class="line"></div><div class="line">        curr_brk = sbrk(<span class="number">0</span>);</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"Program Break Location3:%p\n"</span>, curr_brk);</div><div class="line">        getchar();</div><div class="line"></div><div class="line">        <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p><em><u>输出分析:</u></em><br>在增加程序中断之前：在下面的输出中我们可以看到这没有堆段，因此</p>
 <blockquote>
 <ul>
 <li>start_brk=brk=end_data=0x804b000</li>
 </ul>
 </blockquote>
-<pre><code>sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$ ./sbrk 
-Welcome to sbrk example:6141
-Program Break Location1:0x804b000
-...
-sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$ cat /proc/6141/maps
-...
-0804a000-0804b000 rw-p 00001000 08:01 539624     /home/sploitfun/ptmalloc.ppt/syscalls/sbrk
-b7e21000-b7e22000 rw-p 00000000 00:00 0 
-...
-sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$
-</code></pre><p><em>增加了程序中断位置之后：</em>在下面的输出中我们可以看到这有堆段了，因此：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$ ./sbrk </div><div class="line">Welcome to sbrk example:<span class="number">6141</span></div><div class="line">Program Break Location1:<span class="number">0x804b000</span></div><div class="line">...</div><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$ cat /proc/<span class="number">6141</span>/maps</div><div class="line">...</div><div class="line"><span class="number">0804</span>a000<span class="number">-0804</span>b000 rw-p <span class="number">00001000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539624</span>     /home/sploitfun/ptmalloc.ppt/syscalls/sbrk</div><div class="line">b7e21000-b7e22000 rw-p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span> </div><div class="line">...</div><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$</div></pre></td></tr></table></figure>
+<p><em>增加了程序中断位置之后：</em>在下面的输出中我们可以看到这有堆段了，因此：</p>
 <blockquote>
 <ul>
 <li>start_brk=end_data=0x804b000</li>
@@ -209,43 +171,8 @@ sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$
 </blockquote>
 <p>在这<br>0804b000-0804c000是这个堆段的虚拟地址范围<br>rw-p是权限（读，写，不可执行，私有）<br>00000000代表文件偏移量——由于它不是从其它文件映射而来，所以就为0<br>00:00是主要/次要设备编号——由于它不是从其它文件映射而来，所以这里为0<br>0代表Inode编号——由于它不是从其它文件映射而来，所以这里为0<br>[heap]堆段</p>
 <h3 id="0X02-mmap"><a href="#0X02-mmap" class="headerlink" title="0X02 mmap"></a>0X02 mmap</h3><p> malloc使用<a href="http://lxr.free-electrons.com/source/mm/mmap.c?v=3.8#L1285" target="_blank" rel="external">mmap</a>创建私有匿名映射段。私有匿名映射的主要目的是分配新的内存（零填充），并且这个新的内存将被调用进程独占使用。<br><em><u>Example:</u></em></p>
-<pre><code> /* Private anonymous mapping example using mmap syscall */
-#include &lt;stdio.h&gt;
-#include &lt;sys/mman.h&gt;
-#include &lt;sys/types.h&gt;
-#include &lt;sys/stat.h&gt;
-#include &lt;fcntl.h&gt;
-#include &lt;unistd.h&gt;
-#include &lt;stdlib.h&gt;
-
-void static inline errExit(const char* msg)
-{
-        printf(&quot;%s failed. Exiting the process\n&quot;, msg);
-        exit(-1);
-}
-
-int main()
-{
-        int ret = -1;
-        printf(&quot;Welcome to private anonymous mapping example::PID:%d\n&quot;, getpid());
-        printf(&quot;Before mmap\n&quot;);
-        getchar();
-        char* addr = NULL;
-        addr = mmap(NULL, (size_t)132*1024, PROT_READ|PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-        if (addr == MAP_FAILED)
-                errExit(&quot;mmap&quot;);
-        printf(&quot;After mmap\n&quot;);
-        getchar();
-
-        /* Unmap mapped region. */
-        ret = munmap(addr, (size_t)132*1024);
-        if(ret == -1)
-                errExit(&quot;munmap&quot;);
-        printf(&quot;After munmap\n&quot;);
-        getchar();
-        return 0;
-}
-</code></pre><p><em><u>输出分析：</u></em><br><em><u>mmap之前：</u></em>在下面的输出中，我们只能看到属于共享库libc.so和ld-linux.so的内存映射段</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div></pre></td><td class="code"><pre><div class="line"></div><div class="line"> <span class="comment">/* Private anonymous mapping example using mmap syscall */</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/mman.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/types.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/stat.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;fcntl.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;unistd.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">void</span> <span class="keyword">static</span> <span class="keyword">inline</span> <span class="title">errExit</span><span class="params">(<span class="keyword">const</span> <span class="keyword">char</span>* msg)</span></span></div><div class="line">&#123;</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"%s failed. Exiting the process\n"</span>, msg);</div><div class="line">        <span class="built_in">exit</span>(<span class="number">-1</span>);</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span></span></div><div class="line">&#123;</div><div class="line">        <span class="keyword">int</span> ret = <span class="number">-1</span>;</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"Welcome to private anonymous mapping example::PID:%d\n"</span>, getpid());</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"Before mmap\n"</span>);</div><div class="line">        getchar();</div><div class="line">        <span class="keyword">char</span>* addr = <span class="literal">NULL</span>;</div><div class="line">        addr = mmap(<span class="literal">NULL</span>, (<span class="keyword">size_t</span>)<span class="number">132</span>*<span class="number">1024</span>, PROT_READ|PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, <span class="number">-1</span>, <span class="number">0</span>);</div><div class="line">        <span class="keyword">if</span> (addr == MAP_FAILED)</div><div class="line">                errExit(<span class="string">"mmap"</span>);</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"After mmap\n"</span>);</div><div class="line">        getchar();</div><div class="line"></div><div class="line">        <span class="comment">/* Unmap mapped region. */</span></div><div class="line">        ret = munmap(addr, (<span class="keyword">size_t</span>)<span class="number">132</span>*<span class="number">1024</span>);</div><div class="line">        <span class="keyword">if</span>(ret == <span class="number">-1</span>)</div><div class="line">                errExit(<span class="string">"munmap"</span>);</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"After munmap\n"</span>);</div><div class="line">        getchar();</div><div class="line">        <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p><em><u>输出分析：</u></em><br><em><u>mmap之前：</u></em>在下面的输出中，我们只能看到属于共享库libc.so和ld-linux.so的内存映射段</p>
 <pre><code>sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$ cat /proc/6067/maps
 08048000-08049000 r-xp 00000000 08:01 539691     /home/sploitfun/ptmalloc.ppt/syscalls/mmap
 08049000-0804a000 r--p 00000000 08:01 539691     /home/sploitfun/ptmalloc.ppt/syscalls/mmap
@@ -256,14 +183,8 @@ sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$
 </code></pre><p><em><u>mmap之后：</u></em>在下面的输出中，我们可以观察到我们的内存映射段（b7e00000 - b7e21000，大小为132KB）与已有的内存映射段（b7e21000 - b7e22000）结合了</p>
 <p>在这里<br>b7e00000-b7e22000是这个堆段的虚拟地址范围<br>rw-p代表权限（读，写，不可执行，私有）<br>00000000代表文件偏移量——由于它不是从其它文件映射而来，所以就为0<br>00:00是主要/次要设备编号——由于它不是从其它文件映射而来，所以这里为0<br>0代表Inode编号——由于它不是从其它文件映射而来，所以这里为0</p>
 <p><em><u>munmap之后：</u></em>在下面的输出中，我们可以看到我们的内存映射段是未映射的，即它的相应的内存被释放到操作系统。</p>
-<pre><code>sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$ cat /proc/6067/maps
-08048000-08049000 r-xp 00000000 08:01 539691     /home/sploitfun/ptmalloc.ppt/syscalls/mmap
-08049000-0804a000 r--p 00000000 08:01 539691     /home/sploitfun/ptmalloc.ppt/syscalls/mmap
-0804a000-0804b000 rw-p 00001000 08:01 539691     /home/sploitfun/ptmalloc.ppt/syscalls/mmap
-b7e21000-b7e22000 rw-p 00000000 00:00 0 
-...
-sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$
-</code></pre><p><em><u>注意：</u></em>在我们的示例程序执行过程中ASLR是被关闭的。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$ cat /proc/<span class="number">6067</span>/maps</div><div class="line"><span class="number">08048000</span><span class="number">-08049000</span> r-xp <span class="number">00000000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539691</span>     /home/sploitfun/ptmalloc.ppt/syscalls/mmap</div><div class="line"><span class="number">08049000</span><span class="number">-0804</span>a000 r--p <span class="number">00000000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539691</span>     /home/sploitfun/ptmalloc.ppt/syscalls/mmap</div><div class="line"><span class="number">0804</span>a000<span class="number">-0804</span>b000 rw-p <span class="number">00001000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539691</span>     /home/sploitfun/ptmalloc.ppt/syscalls/mmap</div><div class="line">b7e21000-b7e22000 rw-p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span> </div><div class="line">...</div><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$</div></pre></td></tr></table></figure>
+<p><em><u>注意：</u></em>在我们的示例程序执行过程中ASLR是被关闭的。</p>
 <p><em><u>参考文献：</u></em><br>1.<a href="http://duartes.org/gustavo/blog/post/anatomy-of-a-program-in-memory/" target="_blank" rel="external">Anatomy of program in memory</a></p>
 <hr>
 <p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170105/mallocsystemcall" target="_blank" rel="external">Linux(X86)漏洞利用系列-Malloc使用的系统调用</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
