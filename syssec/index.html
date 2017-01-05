@@ -16,15 +16,14 @@
 
 经典栈缓冲区溢出
 整型溢出
-基于栈的off-by-one
+栈内off-by-one漏洞利用
 
 
 绕过漏洞利用缓解(Exploit Mitigation)技术
 
 Return-to-libc绕过NX
 链接return-to-libc绕过NX
-绕过ASLR+ [Return-to-ptl](http://www.csyssec.org/)
-+ [暴力破解](http://www.csyss">
+绕过ASLR- [绕过ASLR-第一篇章(Return-to-ptl)](http://www.csyssec.org/20170101/byp">
 <meta name="keywords">
 <meta property="og:type" content="website">
 <meta property="og:title" content="系统安全">
@@ -35,16 +34,15 @@ Return-to-libc绕过NX
 
 经典栈缓冲区溢出
 整型溢出
-基于栈的off-by-one
+栈内off-by-one漏洞利用
 
 
 绕过漏洞利用缓解(Exploit Mitigation)技术
 
 Return-to-libc绕过NX
 链接return-to-libc绕过NX
-绕过ASLR+ [Return-to-ptl](http://www.csyssec.org/)
-+ [暴力破解](http://www.csyss">
-<meta property="og:updated_time" content="2016-12-30T13:26:21.000Z">
+绕过ASLR- [绕过ASLR-第一篇章(Return-to-ptl)](http://www.csyssec.org/20170101/byp">
+<meta property="og:updated_time" content="2017-01-05T05:42:18.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="系统安全">
 <meta name="twitter:description" content="Linux(X86)漏洞利用系列
@@ -52,15 +50,14 @@ Return-to-libc绕过NX
 
 经典栈缓冲区溢出
 整型溢出
-基于栈的off-by-one
+栈内off-by-one漏洞利用
 
 
 绕过漏洞利用缓解(Exploit Mitigation)技术
 
 Return-to-libc绕过NX
 链接return-to-libc绕过NX
-绕过ASLR+ [Return-to-ptl](http://www.csyssec.org/)
-+ [暴力破解](http://www.csyss">
+绕过ASLR- [绕过ASLR-第一篇章(Return-to-ptl)](http://www.csyssec.org/20170101/byp">
   
     <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
   
@@ -170,29 +167,29 @@ Return-to-libc绕过NX
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <h3 id="Linux-X86-漏洞利用系列"><a href="#Linux-X86-漏洞利用系列" class="headerlink" title="Linux(X86)漏洞利用系列"></a>Linux(X86)漏洞利用系列</h3><ul>
+        <h3 id="Linux-X86-漏洞利用系列"><a href="#Linux-X86-漏洞利用系列" class="headerlink" title="Linux(X86)漏洞利用系列"></a><a href="http://www.csyssec.org/20161230/linux-exploit/" target="_blank" rel="external">Linux(X86)漏洞利用系列</a></h3><ul>
 <li><p>基本漏洞</p>
 <ul>
-<li><a href="http://www.csyssec.org/" target="_blank" rel="external">经典栈缓冲区溢出</a></li>
-<li><a href="http://www.csyssec.org/" target="_blank" rel="external">整型溢出</a></li>
-<li><a href="http://www.csyssec.org/" target="_blank" rel="external">基于栈的off-by-one</a></li>
+<li><a href="http://www.csyssec.org/20161230/stackbufferflow/" target="_blank" rel="external">经典栈缓冲区溢出</a></li>
+<li><a href="http://www.csyssec.org/20161230/integerflow/" target="_blank" rel="external">整型溢出</a></li>
+<li><a href="http://www.csyssec.org/20161231/stackoffbyone/" target="_blank" rel="external">栈内off-by-one漏洞利用</a></li>
 </ul>
 </li>
 <li><p>绕过漏洞利用缓解(Exploit Mitigation)技术</p>
 <ul>
-<li><a href="http://www.csyssec.org/" target="_blank" rel="external">Return-to-libc绕过NX</a></li>
-<li><a href="http://www.csyssec.org/" target="_blank" rel="external">链接return-to-libc绕过NX</a></li>
-<li>绕过ASLR<pre><code>+ [Return-to-ptl](http://www.csyssec.org/)
-+ [暴力破解](http://www.csyssec.org/)
-+ [GOT覆盖与GOT解引用](http://www.csyssec.org/)
+<li><a href="http://www.csyssec.org/20161231/returntolibc/" target="_blank" rel="external">Return-to-libc绕过NX</a></li>
+<li><a href="http://www.csyssec.org/20170101/chainingreturntolibc/" target="_blank" rel="external">链接return-to-libc绕过NX</a></li>
+<li>绕过ASLR<pre><code>- [绕过ASLR-第一篇章(Return-to-ptl)](http://www.csyssec.org/20170101/bypassaslr-returntoplt/)
+- [绕过ASLR-第二篇章(暴力破解_](http://www.csyssec.org/20170102/bypassaslr-bruteforce/)
+- [绕过ASLR-第三篇章(GOT覆盖与GOT解引用)](http://www.csyssec.org/20170102/bypassaslr-gotgor/)
 </code></pre></li>
 </ul>
 </li>
 <li>堆漏洞<ul>
-<li><a href="http://www.csyssec.org/" target="_blank" rel="external">Unlink堆溢出</a></li>
-<li><a href="http://www.csyssec.org/" target="_blank" rel="external">Malloc Maleficarum堆溢出</a></li>
-<li><a href="http://www.csyssec.org/" target="_blank" rel="external">基于堆的off-by-one</a></li>
-<li><a href="http://www.csyssec.org/" target="_blank" rel="external">释放后再使用(Use After Free)</a></li>
+<li><a href="http://www.csyssec.org/20170104/heapoverflow-unlink/" target="_blank" rel="external">Unlink堆溢出</a></li>
+<li><a href="http://www.csyssec.org/20170104/maleficarum/" target="_blank" rel="external">Malloc Maleficarum堆溢出</a></li>
+<li><a href="http://www.csyssec.org/20170104/heap-offbyone/" target="_blank" rel="external">堆内off-by-one漏洞利用</a></li>
+<li><a href="http://www.csyssec.org/20170104/useafterfree/" target="_blank" rel="external">释放后再使用(Use After Free)</a></li>
 </ul>
 </li>
 </ul>
