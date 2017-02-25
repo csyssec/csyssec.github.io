@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>名人课堂-软件安全 | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="来源： https://lifeasageek.github.io/class/cs52700-fall16/
+
+CSysSec注： 本系列文章在于收集知名海外教授在计算机系统与安全领域的授课信息，会包含课程详细信息以及slides。转载本文请务必注明，文章出处：《名人课堂-软件安全》与作者信息：CSysSec
+
+教授Byongyoung Lee
+课程简介This course focuses o">
+<meta property="og:type" content="article">
+<meta property="og:title" content="名人课堂-软件安全">
+<meta property="og:url" content="http://yoursite.com/20170225/course-byoungyounglee2/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="来源： https://lifeasageek.github.io/class/cs52700-fall16/
+
+CSysSec注： 本系列文章在于收集知名海外教授在计算机系统与安全领域的授课信息，会包含课程详细信息以及slides。转载本文请务必注明，文章出处：《名人课堂-软件安全》与作者信息：CSysSec
+
+教授Byongyoung Lee
+课程简介This course focuses o">
+<meta property="og:updated_time" content="2017-02-25T09:17:00.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="名人课堂-软件安全">
+<meta name="twitter:description" content="来源： https://lifeasageek.github.io/class/cs52700-fall16/
+
+CSysSec注： 本系列文章在于收集知名海外教授在计算机系统与安全领域的授课信息，会包含课程详细信息以及slides。转载本文请务必注明，文章出处：《名人课堂-软件安全》与作者信息：CSysSec
+
+教授Byongyoung Lee
+课程简介This course focuses o">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">FROM 0 TO 1</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">体系结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/celebrity">工业大咖</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/donation">打赏支持</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+  <div style="background:#fff;width: 100%;">
+
+      <div style="max-height:600px; overflow: hidden;">
+        <img width="100%" alt="Hike News" src="/css/images/pose.jpg">
+      </div>
+
+  </div>
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-course-byoungyounglee2" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      名人课堂-软件安全
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170225/course-byoungyounglee2/" class="article-date">
+	  <time datetime="2017-02-25T09:15:42.000Z" itemprop="datePublished">二月 25, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>来源： <a href="https://lifeasageek.github.io/class/cs52700-fall16/" target="_blank" rel="external">https://lifeasageek.github.io/class/cs52700-fall16/</a></p>
+<hr>
+<p><strong>CSysSec注：</strong> 本系列文章在于收集知名海外教授在计算机系统与安全领域的授课信息，会包含课程详细信息以及slides。<br><strong>转载本文请务必注明</strong>，文章出处：<a href="">《名人课堂-软件安全》</a>与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<h3 id="教授"><a href="#教授" class="headerlink" title="教授"></a>教授</h3><p><a href="http://www.csyssec.org/20170224/byoungyounglee/" target="_blank" rel="external">Byongyoung Lee</a></p>
+<h2 id="课程简介"><a href="#课程简介" class="headerlink" title="课程简介"></a>课程简介</h2><p>This course focuses on software security fundamentals, secure coding guidelines and principles, and advanced software security concepts. Students will learn to assess and understand threats, learn how to design and implement secure software systems, and get hands-on experience with common security pitfalls.<br>The course consists of two lectures per week (50 minutes each) and a 2-hour lab.</p>
+<ul>
+<li>Instructor : [Byoungyoung Lee][<a href="http://www.csyssec.org/20170224/byoungyounglee/" target="_blank" rel="external">http://www.csyssec.org/20170224/byoungyounglee/</a>] (email: byoungyoung@purdue.edu)</li>
+<li>TA : Chen Feng (email: fang102@purdue.edu)</li>
+<li>Lecture: 2:30 pm - 3:20 pm (Mon &amp; Wed) at Felix Haas Hall G066.</li>
+<li>Lab: 2:30pm - 4:20pm (Fri) at Felix Haas Hall G056 (by annoucements)</li>
+<li>Office hour: 3:30 pm - 4:30 pm (Mon &amp; Wed) at LWSN 1187</li>
+</ul>
+<p>##Schedule</p>
+<table>
+<thead>
+<tr>
+<th>Date</th>
+<th style="text-align:left">Slides</th>
+<th style="text-align:left">Reading material</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>08/22</td>
+<td style="text-align:left"><a href="https://lifeasageek.github.io/class/cs52700-fall16/slides/intro.pdf" target="_blank" rel="external">Introduction</a></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td>08/24</td>
+<td style="text-align:left"><a href="https://lifeasageek.github.io/class/cs52700-fall16/slides/mem-corruption.pdf" target="_blank" rel="external">Memory corruption</a></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td>08/29</td>
+<td style="text-align:left"><a href="https://lifeasageek.github.io/class/cs52700-fall16/slides/mem-attack.pdf" target="_blank" rel="external">Attacks on Memory Corruption</a></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td>09/07</td>
+<td style="text-align:left"><a href="https://lifeasageek.github.io/class/cs52700-fall16/slides/mem-defense.pdf" target="_blank" rel="external">Defenses on Memory Corruption</a></td>
+</tr>
+<tr>
+<td>09/11</td>
+<td style="text-align:left"><a href="https://lifeasageek.github.io/class/cs52700-fall16/slides/sym-exec.pdf" target="_blank" rel="external">Bug finding: symbolic execution</a></td>
+<td style="text-align:left"><a href="http://llvm.org/pubs/2008-12-OSDI-KLEE.pdf" target="_blank" rel="external">KLEE</a></td>
+</tr>
+<tr>
+<td>09/19</td>
+<td style="text-align:left"><a href="https://lifeasageek.github.io/class/cs52700-fall16/slides/fuzz.pdf" target="_blank" rel="external">Bug finding: fuzzing</a></td>
+<td style="text-align:left"><a href="ftp://ftp.cs.wisc.edu/paradyn/technical_papers/fuzz.pdf" target="_blank" rel="external">The reliability of UNIX utilities</a></td>
+</tr>
+<tr>
+<td>09/21</td>
+<td style="text-align:left"><a href="https://lifeasageek.github.io/class/cs52700-fall16/slides/aeg.pdf" target="_blank" rel="external">Automated exploitation generation</a></td>
+<td style="text-align:left"><a href="http://dl.acm.org/citation.cfm?doid=2556647.2560219" target="_blank" rel="external">AEG</a></td>
+</tr>
+<tr>
+<td>09/26</td>
+<td style="text-align:left"><a href="https://lifeasageek.github.io/class/cs52700-fall16/slides/jailbreak.pdf" target="_blank" rel="external">    Jailbreaking</a></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td>09/28</td>
+<td style="text-align:left"><a href="https://lifeasageek.github.io/class/cs52700-fall16/slides/mem-safety.pdf" target="_blank" rel="external">Memory safety</a></td>
+<td style="text-align:left"><a href="http://drops.dagstuhl.de/opus/volltexte/2015/5026/pdf/16.pdf" target="_blank" rel="external">Pointer-based checking (SoftBound, etc.)</a></td>
+</tr>
+<tr>
+<td>10/03</td>
+<td style="text-align:left">Research projects mid-presentation</td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td>10/05</td>
+<td style="text-align:left"><a href="https://www.usenix.org/sites/default/files/conference/protected-files/serebryany_atc12_slides.pdf" target="_blank" rel="external">Memory error detection</a></td>
+<td style="text-align:left"><a href="http://static.googleusercontent.com/media/research.google.com/en//pubs/archive/37752.pdf" target="_blank" rel="external">Address Sanitizer</a></td>
+</tr>
+<tr>
+<td>10/10</td>
+<td style="text-align:left">No class(October break)</td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td>10/12</td>
+<td style="text-align:left"><a href="https://taesoo.gtisc.gatech.edu/pubs/2015/lu:aslrguard-slides.pdf" target="_blank" rel="external">Runtime defense - ASLR</a></td>
+<td style="text-align:left"><a href="http://wenke.gtisc.gatech.edu/papers/aslrguard.pdf" target="_blank" rel="external">ASLR-guard</a></td>
+</tr>
+<tr>
+<td>10/17</td>
+<td style="text-align:left"><a href="https://lifeasageek.github.io/class/cs52700-fall16/slides/cfi.pdf" target="_blank" rel="external">    Runtime defense - CFI</a></td>
+<td style="text-align:left"><a href="http://spin2013.cs.stonybrook.edu/~rob/teaching/cse608-fa05/controlflowintegrity.pdf" target="_blank" rel="external">Control-Flow Integrity</a></td>
+</tr>
+<tr>
+<td>10/19</td>
+<td style="text-align:left">Midterm exam</td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td>10/24</td>
+<td style="text-align:left">No class</td>
+</tr>
+<tr>
+<td>10/26</td>
+<td style="text-align:left">Guest Lecture(TBD)</td>
+</tr>
+<tr>
+<td>10/31</td>
+<td style="text-align:left"><a href="https://lifeasageek.github.io/class/cs52700-fall16/slides/sfi.pdf" target="_blank" rel="external">Software Fault Isolation</a></td>
+<td style="text-align:left"><a href="http://static.googleusercontent.com/media/research.google.com/en//pubs/archive/34913.pdf" target="_blank" rel="external">NaCl</a></td>
+</tr>
+<tr>
+<td>11/02</td>
+<td style="text-align:left"><a href="https://lifeasageek.github.io/class/cs52700-fall16/slides/chrome.pdf" target="_blank" rel="external">Browser Security</a></td>
+<td style="text-align:left"><a href="http://css.csail.mit.edu/6.858/2010/readings/chromium.pdf" target="_blank" rel="external">    Chrome Security Architecture</a></td>
+</tr>
+<tr>
+<td>11/09</td>
+<td style="text-align:left"><a href="https://lifeasageek.github.io/class/cs52700-fall16/slides/mimicry.pdf" target="_blank" rel="external">Intrusion Detection</a></td>
+<td style="text-align:left"><a href="http://www.ismlab.usf.edu/isec/files/kemmerer2002.pdf" target="_blank" rel="external">Intrusion Detection</a> <br>  <a href="https://people.eecs.berkeley.edu/~daw/papers/mimicry.pdf" target="_blank" rel="external">Mimicry attacks</a></td>
+</tr>
+<tr>
+<td>11/14</td>
+<td style="text-align:left"><a href="https://lifeasageek.github.io/class/cs52700-fall16/slides/side-channel.pdf" target="_blank" rel="external">Side-channel Attacks</a></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td>11/16</td>
+<td style="text-align:left"><a href="https://lifeasageek.github.io/class/cs52700-fall16/slides/malware.pdf" target="_blank" rel="external">Malware analysis</a></td>
+<td style="text-align:left"><a href="http://dl.acm.org/citation.cfm?id=1455779" target="_blank" rel="external">Ether</a></td>
+</tr>
+<tr>
+<td>11/23</td>
+<td style="text-align:left"><a href="https://lifeasageek.github.io/class/cs52700-fall16/slides/mobile.pdf" target="_blank" rel="external">Mobile Security</a></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td>11/30</td>
+<td style="text-align:left"><a href="https://lifeasageek.github.io/class/cs52700-fall16/slides/sgx.pdf" target="_blank" rel="external">Trusted computing</a></td>
+<td style="text-align:left"><a href="https://www.usenix.org/system/files/conference/osdi14/osdi14-paper-baumann.pdf" target="_blank" rel="external">Haven</a></td>
+</tr>
+<tr>
+<td>12/05</td>
+<td style="text-align:left"><a href="https://lifeasageek.github.io/class/cs52700-fall16/slides/sgx-attack.pdf" target="_blank" rel="external">Attacks/Defenses on Trusted computing</a></td>
+<td style="text-align:left"><a href="https://www.cs.utexas.edu/~yxu/files/xu15oakland.pdf" target="_blank" rel="external">Controlled-Channel Attacks</a></td>
+</tr>
+<tr>
+<td>12/07</td>
+<td style="text-align:left">Research projects final-presentation</td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td>12/12</td>
+<td style="text-align:left">Final exam</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>This schedule is subject to change, and changes will be announced in class or emailed if necessary.</li>
+</ul>
+<hr>
+<p><strong>CSysSec注：</strong> 本系列文章在于收集知名海外教授在计算机系统与安全领域的授课信息，会包含课程详细信息以及slides。<br><strong>转载本文请务必注明</strong>，文章出处：<a href="">《名人课堂-软件安全》</a>与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/名人课堂/">名人课堂</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Course/">Course</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Professor/">Professor</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
+
+      
+        
+	<div id="comment">
+	
+	<!-- 多说评论框 start -->
+	 <div class="ds-thread" data-thread-key="/20170225/course-byoungyounglee2/" data-title="名人课堂-软件安全" data-url="http://yoursite.com/20170225/course-byoungyounglee2/"></div>
+	<!-- 多说评论框 end -->
+	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+	<script type="text/javascript">
+	var duoshuoQuery = {short_name:"csyssec"};
+	  (function() {
+	    var ds = document.createElement('script');
+	    ds.type = 'text/javascript';ds.async = true;
+	    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+	    ds.charset = 'UTF-8';
+	    (document.getElementsByTagName('head')[0] 
+	     || document.getElementsByTagName('body')[0]).appendChild(ds);
+	  })();
+	  </script>
+	<!-- 多说公共JS代码 end -->
+	
+	</div>
+	<link rel="stylesheet" href="/css/comment.css">
+
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+  
+    <a href="/20170225/migration-papers/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">虚拟机迁移论文阅读列表</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+      <ol class="toc"><li class="toc-item toc-level-3"><a class="toc-link" href="#教授"><span class="toc-number">1.</span> <span class="toc-text">教授</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#课程简介"><span class="toc-number"></span> <span class="toc-text">课程简介</span></a>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+       <!--  自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a> --> 
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/celebrity" class="mobile-nav-link">Celebrity</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/donation" class="mobile-nav-link">Donation</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>

@@ -116,6 +116,78 @@
         
           <section id="main">
   
+    <article id="post-libvmiintrospection"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170102/libvmiintrospection/">Write Introspection Tools Using Libvmi</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170102/libvmiintrospection/" class="article-date">
+	  <time datetime="2017-01-02T03:01:20.000Z" itemprop="datePublished">一月 2, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://ytliu.info/blog/2013/08/14/write-introspection-tools-using-libvmi/" target="_blank" rel="external">ytliu</a><br>编辑：@Tula</p>
+<hr>
+<p><strong>CSysSec注</strong>： Libvmi是个虚拟机监控API，本文介绍如何利用Libvmi写自己的监控工具。作者ytliu，来自上海交通大学PhD,研究方向是虚拟化与系统安全，在顶会CCS，HPCA等发表多篇文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/libvmiintrospection/" target="_blank" rel="external">Libvmi Setup</a>》</p>
+<hr>
+<p>Last week I’ve discussed about how to <a href="http://www.csyssec.org/20170102/libvmisetup/" target="_blank" rel="external">setup libvmi</a>, in this post I will show you how to write introspection tools using libvmi.</p>
+<p>The most typical example is <code>examples/process-list.c</code>:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;libvmi/libvmi.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;errno.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/mman.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div></pre></td></tr></table></figure></p>
+<p>Firstly we need to include these header files, especially the <code>&lt;libvmi/libvmi.h&gt;</code>, it defines most of the variables and functions.</p>
+<p>Then we should initialize the vmi environment:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* initialize the libvmi library */</span></div><div class="line"><span class="keyword">if</span> (vmi_init(&amp;vmi, VMI_AUTO | VMI_INIT_COMPLETE, name) == VMI_FAILURE) &#123;</div><div class="line">    <span class="built_in">printf</span>(<span class="string">"Failed to init LibVMI library.\n"</span>);</div><div class="line">    <span class="keyword">return</span> <span class="number">1</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>It will initialize the vmi (<code>vmi_instance_t</code>) struct with some platform information.<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* init the offset values */</span></div><div class="line"><span class="keyword">if</span> (VMI_OS_LINUX == vmi_get_ostype(vmi)) &#123;</div><div class="line">    tasks_offset = vmi_get_offset(vmi, <span class="string">"linux_tasks"</span>);</div><div class="line">    name_offset = vmi_get_offset(vmi, <span class="string">"linux_name"</span>);</div><div class="line">    pid_offset = vmi_get_offset(vmi, <span class="string">"linux_pid"</span>);</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>Then in this case, we should read some offset of tast_struct from the config file <code>/etc/libvmi.conf</code>. And if you want to add a config argument like <code>linux_files</code>, you can do as follows:</p>
+<p>Add an item in <code>libvmi/config/grammar.y</code>:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line">...</div><div class="line">%token&lt;str&gt;  LINUX_FILES</div><div class="line">...</div><div class="line">assignment:</div><div class="line">  |</div><div class="line">...</div><div class="line">  linux_state_assignment</div><div class="line">  |</div><div class="line">...</div></pre></td></tr></table></figure></p>
+<p>Then add an item in <code>libvmi/config/lexicon.l</code>:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">linux_files  &#123; BeginToken(yytext); yylval.str = strndup(yytext, CONFIG_STR_LENGTH); <span class="keyword">return</span> LINUX_FILES;&#125;</div></pre></td></tr></table></figure></p>
+<p>Then add corresponding <code>strncmp</code> in <code>libvmi/os/linux/core.c</code>:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">...</div><div class="line"><span class="keyword">if</span> (stncmp(key, <span class="string">"linux_files"</span>, CONFIG_STR_LENGTH) == <span class="number">0</span>) &#123;</div><div class="line">  linux_instance-&gt;files_offset = *(<span class="keyword">int</span> *)value;</div><div class="line">  <span class="keyword">goto</span> _done;</div><div class="line">&#125;</div><div class="line">...</div><div class="line">&#125; <span class="keyword">else</span> <span class="keyword">if</span> (<span class="built_in">strncmp</span>(offset_name, <span class="string">"linux_files"</span>, max_length) == <span class="number">0</span>) &#123;</div><div class="line">  <span class="keyword">return</span> linux_instance-&gt;files_offset;</div><div class="line">&#125;</div><div class="line">...</div></pre></td></tr></table></figure></p>
+<p>At last add the <code>files_offset</code> item to <code>struct linux_instance</code> in <code>libvmi/os/linux/linux.h</code>:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">struct</span> linux_instance &#123;</div><div class="line">  ...</div><div class="line">  <span class="keyword">uint64_t</span> files_offset;</div><div class="line">  ...</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<h3 id="Then-compile-again-after-that-your-can-add-linux-files-to-your-config-file"><a href="#Then-compile-again-after-that-your-can-add-linux-files-to-your-config-file" class="headerlink" title="Then compile again, after that your can add linux_files to your config file."></a>Then compile again, after that your can add linux_files to your config file.</h3><p>Now, let’s continue to look at the vmi code:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* pause the vm for consistent memory access */</span></div><div class="line"><span class="keyword">if</span> (vmi_pause_vm(vmi) != VMI_SUCCESS) &#123;</div><div class="line">    <span class="built_in">printf</span>(<span class="string">"Failed to pause VM\n"</span>);</div><div class="line">    <span class="keyword">goto</span> error_exit;</div><div class="line">&#125; <span class="comment">// if</span></div></pre></td></tr></table></figure></p>
+<p>Before we do the vmi, we need to pause the vm for consistent memory access, then we can read memory from guest memory:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* get the head of the list */</span></div><div class="line"><span class="keyword">if</span> (VMI_OS_LINUX == vmi_get_ostype(vmi)) &#123;</div><div class="line">    current_process = vmi_translate_ksym2v(vmi, <span class="string">"init_task"</span>);</div><div class="line">&#125;</div><div class="line">...</div><div class="line"><span class="comment">/* walk the task list */</span></div><div class="line">list_head = current_process + tasks_offset;</div><div class="line">current_list_entry = list_head;</div><div class="line"></div><div class="line">status = vmi_read_addr_va(vmi, current_list_entry, <span class="number">0</span>, &amp;next_list_entry);</div><div class="line"><span class="keyword">if</span> (status == VMI_FAILURE) &#123;</div><div class="line">    <span class="built_in">printf</span>(<span class="string">"Failed to read next pointer at 0x%lx before entering loop\n"</span>,</div><div class="line">            current_list_entry);</div><div class="line">    <span class="keyword">goto</span> error_exit;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>We firstly get the head of the task_struct list <code>current_process</code>, then use <code>vmi_read_addr_va</code> to read the memory in address <code>current_list_entry</code>, which is the address of <code>next_list_entry</code>.</p>
+<p>Here <code>vmi_read_addr_va</code> is similar with following <code>vmi_read_32_va</code>, <code>vmi_read_str_va</code> and so on. These lib functions take the virtual address (<code>vaddr</code>) as one of there parameters, they firstly walk the page table with cr3 and get physical address (<code>paddr</code>), then they use the libxenctrl to map a memory page of that paddr, which return back the virtual address (<code>memory</code>) seen by Dom0, with the <code>memory</code>, they can use <code>memcpy</code> to copy the corresponding size of memory to the <code>buf</code>.<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">do</span> &#123;</div><div class="line">    vmi_read_32_va(vmi, current_process + pid_offset, <span class="number">0</span>, &amp;pid);</div><div class="line">    procname = vmi_read_str_va(vmi, current_process + name_offset, <span class="number">0</span>);</div><div class="line">    <span class="keyword">if</span> (procname) &#123;</div><div class="line">        <span class="built_in">free</span>(procname);</div><div class="line">        procname = <span class="literal">NULL</span>;</div><div class="line">    &#125;</div><div class="line"></div><div class="line">    current_list_entry = next_list_entry;</div><div class="line">    current_process = current_list_entry - tasks_offset;</div><div class="line"></div><div class="line">    <span class="comment">/* follow the next pointer */</span></div><div class="line">    status = vmi_read_addr_va(vmi, current_list_entry, <span class="number">0</span>, &amp;next_list_entry);</div><div class="line">    <span class="keyword">if</span> (status == VMI_FAILURE) &#123;</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"Failed to read next pointer in loop at %lx\n"</span>, current_list_entry);</div><div class="line">        <span class="keyword">goto</span> error_exit;</div><div class="line">    &#125;</div><div class="line"></div><div class="line">&#125; <span class="keyword">while</span> (next_list_entry != list_head);</div></pre></td></tr></table></figure></p>
+<p>This is the main loop of process vmi: it uses <code>vmi_read_32_va</code> to read pid (<code>pid_offset</code>) of each process, use <code>vmi_read_str_va</code> to read name (<code>name_offset</code>) of each process, and at last use <code>vmi_read_addr_va</code> to read the next entry of tast_struct in the list.</p>
+<p>Finally we should never forget to resume the guest vm and destroy the vmi environment:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* resume the vm */</span></div><div class="line">vmi_resume_vm(vmi);</div><div class="line"></div><div class="line"><span class="comment">/* cleanup any memory associated with the LibVMI instance */</span></div><div class="line">vmi_destroy(vmi);</div></pre></td></tr></table></figure></p>
+<p>We can compile and run the vmi tool in the root directory of libvmi:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">$ make</div><div class="line">$ sudo ./examples/process-<span class="built_in">list</span> vm_name</div></pre></td></tr></table></figure></p>
+<p>If you want to write your own vmi tools, you can imitate the <code>process-list</code> to write a new one (e.g. my_vmi_tool.c). After that, you need to modify the <code>examples/Makefile.am</code> file:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">...</div><div class="line">bin_PROGRAMS = ... my_vmi_tool</div><div class="line">...</div><div class="line">my_vmi_tool_SOURCES = my_vmi_tool.c</div></pre></td></tr></table></figure></p>
+<p>Actually after we run <code>make</code> in the root directory of libvmi, the <code>Makefile</code> in <code>examples/</code>directory will generate a new executable file called <code>my_vmi_tool</code>, which is a script file to invoke the actual code in your <code>my_vmi_tool.c</code>.</p>
+<hr>
+<p>Last thing you should know is: currently vmi tool are all user mode application code. It does not support to write vmi tool as a kernel module. The environment you vmi code run is just the user space on the host OS.</p>
+<p>Whenever you have any problem with libvmi, you can create a post in their <a href="https://groups.google.com/forum/#!forum/vmitools" target="_blank" rel="external">googlegroup</a>. The guys there are really very friendly, I’ve post 2 topics there and both receive very good feedbacks.</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/libvmiintrospection/" target="_blank" rel="external">Libvmi Setup</a>》</p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Introspection/">Introspection</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Libvmi/">Libvmi</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-libvmisetup"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -460,104 +532,11 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
 <!-- Table of Contents -->
 
   
-    <article id="post-memorysafety"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170101/memorysafety/">内存持久战之内存安全性</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170101/memorysafety/" class="article-date">
-	  <time datetime="2017-01-01T04:10:20.000Z" itemprop="datePublished">一月 1, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
-<p><strong>CSysSec注</strong>： 本系列文章来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/02/18/memory-safety/" target="_blank" rel="external">个人博客</a>，主要介绍内存的安全性问题，以及相应的攻击模型及防御措施，对整个系统安全问题的概览有很大的帮助。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/memorysafety" target="_blank" rel="external">内存持久战之内存安全性</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
-<blockquote>
-<ul>
-<li>IEEE Security&amp;Privacy’13</li>
-<li>不访问未定义的内存</li>
-<li>无限间距</li>
-<li>Pointers as capabilities</li>
-</ul>
-</blockquote>
-<p>C语言中的buffer overflows, format string attacks等其它的一些vulnerabilities都有一个共同的问题：违背内存安全(Memory Safety)。本文主要讲述如何准确定义内存安全，为什么这些vulnerabilities违背了内存安全。 也为后续两篇文章<a href="http://www.csyssec.org/20170101/memorysafety-attack" target="_blank" rel="external">内存持久战-攻击模型</a>，<a href="http://www.csyssec.org/20170101/memorysafety-defense" target="_blank" rel="external">内存持久战-防御措施</a>做好铺垫。</p>
-<h3 id="IEEE-Security-amp-Privacy’13"><a href="#IEEE-Security-amp-Privacy’13" class="headerlink" title="IEEE Security&amp;Privacy’13"></a>IEEE Security&amp;Privacy’13</h3><p>发表在IEEE Security&amp;Privacy’13的一篇SoK(Systematization of Knowledge)文章，<a href="https://nebelwelt.net/publications/files/13Oakland.pdf" target="_blank" rel="external">Eternal War in Memory </a>，阐述了一种定义内存安全的通用方法。<br><strong><em>Definition 1:</em></strong> 文中提到，一个程序的执行，只要不会出现以下内存访问错误，就是内存安全的：</p>
-<ul>
-<li>[X] 1.缓冲区溢出</li>
-<li>[X] 2.引用空指针</li>
-<li>[X] 3.释放后使用（use after free）</li>
-<li>[X] 4.使用未初始化内存</li>
-<li>[X] 5.非法释放已经释放过的指针或未分配的指针</li>
-</ul>
-<p>维基百科 <a href="https://en.wikipedia.org/wiki/Memory_safety" target="_blank" rel="external">wikipedia page on memory safety</a> 也有类似的定义。从定义来看，排除这些错误是内存安全本身的定义所导向的，而并非内存安全性的本质。那么，如何将这些错误统一起来？</p>
-<h3 id="不访问未定义的内存"><a href="#不访问未定义的内存" class="headerlink" title="不访问未定义的内存"></a>不访问未定义的内存</h3><p>只有当程序访问未定义的内存时才会产生内存错误，这块内存是在程序中没有具体分配的，例如，<em>heap</em> 的一部分（通过<em>malloc</em>)，<em>stack</em>(作为局部变量或者函数参数），又或者是静态数据区域（作为全局变量). <a href="http://www.cs.berkeley.edu/~necula/" target="_blank" rel="external">George Necula</a> 在他的<em>CCured</em>项目中（旨在为C程序实施内存安全性）提到，一个内存安全的程序从来不会去访问未定义的内存。我们可以假设，内存可以无限的大，大到内存地址从不会复用(reused).如此一来，被释放的内存（可以调用<em>free</em> 或者从函数返回的时候<em>pop</em>）从不会被重新分配，并且会永久的保持未定义状态。</p>
-<p><strong><em>Definition 2:</em></strong> 不访问未定义的内存就是内存安全的。<br>这种定义明显排除了<em>error 2</em> 和 <em>error 3</em>. 如果将<em>allocated</em> 的定义包括<em>initialized</em>，又可以排除<em>error 4</em>. 如果假设<em>free</em>只能在定义过的内存指针中调用，那又可以排除<em>error 5</em>. </p>
-<p>不幸的是，<em>Definition 2</em> 并未排除缓冲区溢出错误，也就是<em>error 1</em>。 来看一个例子，假定一个标准<em>stack</em> 布局， 在此定义下，<em>program 1</em> 的执行会被认为是内存安全的：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">/* Program 1 */</div><div class="line">int x;</div><div class="line">int buf[4];</div><div class="line">buf[5] =3; /*overwrite*/</div></pre></td></tr></table></figure>
-<p><em>Definition 2</em> 允许 <em>Program 1</em> 通过是因为此程序是在合法分配的内存中写数据，甚至写的数据类型也是正确的。但实际上问题在于，数组<em>buf</em> 的溢出将数据写进了变量<em>x</em> 中，显然这是内存不安全的。</p>
-<p>###无限间距<br>将 <em>Definition 2</em> 延伸， <em>Program 1</em> 被看作是内存不安全的。只要加上这个假设： 内存区域分配的间距是无限大的。</p>
-<p> <em>Buf</em> 和 <em>x</em> 的分配间距无限的大，<em>buf[5]</em> 将会访问 <em>buf</em> 区域的边界外部。边界外部是个未定义的内存区域，按照上述定义，就会产生错误。<em>heap</em> ,静态数据区域对溢出的处理方式类似。</p>
-<p>尽管 <em>Definition 2</em> 是个很接近让人满意的定义，但事实并未如此。来看 <em>Program 1</em> 的变形 <em>Program 2</em>，也是一种缓冲区溢出, <em>Definition 2</em>  仍然会允许 <em>Program 2</em> 执行。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">/*Program 2 */</div><div class="line">struct foo &#123;</div><div class="line">   int buf[4];</div><div class="line">   int x;</div><div class="line">   &#125;;</div><div class="line">struct foo *pf -malloc(sizeof(struct foo));</div><div class="line">pf-&gt;buf[5] =3;/*overwrite pf-&gt;x*/</div></pre></td></tr></table></figure>
-<p>这里，缓冲区溢出发生在 <em>object</em> 的内部。我们仍然可以类似的在域间引入无限间距的概念来排除缓冲区溢出的错误。这并未太背离现实，C标准允许编译器决定不同域的间距。另一方面，程序语言把结构体当做一个单独的<em>object</em> (从 <em>malloc</em> 返回的单独指针). 许多程序会把一个结构体映射到另一个结构体，或者会确定好一种间距方案。许多编译器都支持这些操作，但是否可以有一种更好的定义不依赖于这些？</p>
-<h3 id="Pointers-as-capabilities"><a href="#Pointers-as-capabilities" class="headerlink" title="Pointers as capabilities"></a>Pointers as capabilities</h3><p>从 <em>Definition 2</em> 中，了解到许多概念，比如，定义的（分配的），未定义的（从没有分配的或者分配后回收的),我们假设分配后回收的内存不会再复用。如此一来，只要访问未定义的内存，就会违背内存安全性。</p>
-<p><strong><em>Definition 3:</em></strong> 我们引入这么一个概念, Pointers as capabilities. 也就是说，允许指针的持有者访问一定区域中的内存。一个指针由三个元素组成<em>（p,b,e)</em>: <em>b</em> 定义有效的区域，<em>e</em> 定义边界，<em>p</em> 代表指针本身。 程序只能操作<em>p</em>，<em>b</em> 和<em>e</em> ,这样做只是为了定义一次执行是否是内存安全的。</p>
-<p>举个例子，看下面的<em>Program 3</em>以及对应的内存效果图：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line">/* Program 3 */</div><div class="line">struct foo &#123;</div><div class="line">  int x;</div><div class="line">  int y;</div><div class="line">  char *pc;</div><div class="line">&#125;;</div><div class="line">struct foo *pf = malloc(...);</div><div class="line">pf-&gt;x = 5;</div><div class="line">pf-&gt;y = 256;</div><div class="line">pf-&gt;pc = &quot;before&quot;;</div><div class="line">pf-&gt;pc += 3;</div><div class="line">int *px = &amp;pf-&gt;x;</div></pre></td></tr></table></figure>
-<p><img src="http://7xppf1.com1.z0.glb.clouddn.com/memory-safety3.jpg" alt="memory-safety3"></p>
-<p>重点关注代码的最后两行。<em>Program 3</em> 允许指针运算来新建一个新的指针，但只能当新指针落在b到e之间才能被解引用。从代码中看到，增加 <em>\</em>pc<em>的</em>p<em> ,新指针仍然落在</em>b<em> 和</em>e<em> 之间，所以执行</em>*(pf-&gt;pc)<em> 是合法有效的。但如果执行 </em>pf-&gt;pc+=10<em> , </em>*(pf-&gt;pc)<em> 将会违背内存安全性，尽管</em>pf-&gt;pc<em> 有可能碰巧就落在定义的内存区域中（这块内存区域可能分配给了其它</em>object*).</p>
-<p>最后一行代码创建一个新的指针<em>px</em> 指向<em>pf</em> 指针的第一个域，将边界缩小到其中的一个域中。这就排除了 <em>Program 2</em> 带来的内存溢出问题。加入我们保留<em>pf</em>整个的边界，此程序可能会利用<em>px</em>溢出到结构体中的其它域中。</p>
-<p>Capability是无法伪造的，就像我们并不能伪造一个指针映射到整形数据中。非法映射可以是直接的（<em>e.g. p=(int \</em>)5<em> ） 也可以是间接的，比如将含有整形数据的结构体映射到含有指针的结构体中（</em>e.g. p=(int **)pf<em> ), 将</em>Program 3<em> 中结构体中的第一个整形数据域映射成指针。我们的定义简单的将映射看作是空操作。只有有效的指针才能被解引用，一个指针的capabilities在它创建的时候就已经确定了。 我们的定义中允许 </em>Program 4* 的执行：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">/* Program 4 */</div><div class="line">int x;</div><div class="line">int *p = &amp;x;</div><div class="line">int y = (int)p;</div><div class="line">int *q = (int *)y</div><div class="line">*q = 5;</div></pre></td></tr></table></figure>
-<p><em>p</em> 指针初始化得<em>b</em> 和<em>e</em> 一直会保持不变，尽管之后<em>p</em> 被转化成整形y, 因此当<em>y</em> 被转回为<em>q</em> 并被解引用的时候，指针依然存在。从另一方面来看，如果在<em>Program 3</em> 的最后加上 <em>p=(int \</em>*)pf<em> , 紧接着 </em>*p=malloc(sizeof(int))<em>， 之后的操作 </em>**p<em>以及</em>printf(“%d\n”,pf-&gt;x)* 都是合法的。也就是说，一块内存区域一开始存储了整形数据，之后也可将整形数据修改为指向整形数据的指针，然后解引用指针，这样操作是安全的，但反过来却不行。</p>
-<p>在某种意义上来说，基于capability定义的内存安全性是一种类型安全形式（type safety)。这里只有两种类型：指针类型和非指针类型。这种定义保证了 1) 指针只在定义了合法内存区域的安全模式下被创建. 2) 指针只有在它们是指向分配给它们的内存区域的情况下被解引用. 3) 那块内存区域仍然是定义过的。这种定义排除了上述所有的五种错误。</p>
-<p>注：本文主要意译 PL Enthusiast 上的一篇文章： <a href="http://www.pl-enthusiast.net/2014/07/21/memory-safety/" target="_blank" rel="external">What is memory safety</a> </p>
-<h3 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h3><p><a href="http://www.pl-enthusiast.net/2014/07/21/memory-safety/" target="_blank" rel="external">What is memory safety</a><br><a href="https://nebelwelt.net/publications/files/13Oakland.pdf" target="_blank" rel="external">S&amp;P’13 Eternal War in Memory </a></p>
-<p>作者[@diting0x] 于2016年2月17日Lawson computer science building &amp;&amp; The lodge apartment</p>
-<p>另，感谢<a href="https://nebelwelt.net/publications/files/13Oakland.pdf" target="_blank" rel="external">S&amp;P’13 Eternal War in Memory </a><br>的作者 <a href="https://nebelwelt.net" target="_blank" rel="external">Mathis Payer教授</a> 的某些答疑，感谢感谢好友 <a href="http://www.yebangyu.org/" target="_blank" rel="external">叶邦宇</a> 指出的一些勘误。</p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/memorysafety" target="_blank" rel="external">内存持久战之内存安全性</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/内存安全/">内存安全</a>
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Memory/">Memory</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
     
-    <a class="extend prev" rel="prev" href="/page/5/">上一页</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/4/">4</a><a class="page-number" href="/page/5/">5</a><span class="page-number current">6</span><a class="page-number" href="/page/7/">7</a><a class="page-number" href="/page/8/">8</a><a class="extend next" rel="next" href="/page/7/">下一页</a>
+    <a class="extend prev" rel="prev" href="/page/5/">上一页</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/4/">4</a><a class="page-number" href="/page/5/">5</a><span class="page-number current">6</span><a class="page-number" href="/page/7/">7</a><a class="page-number" href="/page/8/">8</a><a class="page-number" href="/page/9/">9</a><a class="extend next" rel="next" href="/page/7/">下一页</a>
   </nav>
 
 </section>
@@ -652,6 +631,18 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
               <div class="widget-entry-summary" style="margin: 0;">
             
 
+              <h6 style="margin: 0;"><a href="/20170225/course-byoungyounglee2/">名人课堂-软件安全</a></h6>
+          <!--  <span>二月 25, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
               <h6 style="margin: 0;"><a href="/20170225/migration-papers/">虚拟机迁移论文阅读列表</a></h6>
           <!--  <span>二月 25, 2017</span> -->
             </div>
@@ -688,7 +679,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170223/course-byoungyounglee1/">安全与可信系统</a></h6>
+              <h6 style="margin: 0;"><a href="/20170223/course-byoungyounglee1/">名人课堂-安全与可信系统</a></h6>
           <!--  <span>二月 23, 2017</span> -->
             </div>
 
@@ -826,18 +817,6 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170104/kvmsource-cpu/">KVM源码分析之CPU虚拟化</a></h6>
-          <!--  <span>一月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -858,7 +837,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 12.22px;">ASLR</a> <a href="/tags/Binary/" style="font-size: 10px;">Binary</a> <a href="/tags/Conference/" style="font-size: 10px;">Conference</a> <a href="/tags/Course/" style="font-size: 10px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.78px;">Exploit</a> <a href="/tags/Heap/" style="font-size: 11.11px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.33px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 15.56px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 13.33px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.33px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.33px;">Linux</a> <a href="/tags/Malware/" style="font-size: 11.11px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.33px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.11px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 11.11px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Professor/" style="font-size: 11.11px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.44px;">QEMU</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 10px;">Rootkit</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 11.11px;">Stack</a> <a href="/tags/System/" style="font-size: 18.89px;">System</a> <a href="/tags/Systemcall/" style="font-size: 12.22px;">Systemcall</a> <a href="/tags/Virtualization/" style="font-size: 16.67px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a>
+      <a href="/tags/ASLR/" style="font-size: 12.22px;">ASLR</a> <a href="/tags/Binary/" style="font-size: 10px;">Binary</a> <a href="/tags/Conference/" style="font-size: 10px;">Conference</a> <a href="/tags/Course/" style="font-size: 11.11px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.78px;">Exploit</a> <a href="/tags/Heap/" style="font-size: 11.11px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.33px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 15.56px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 13.33px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.33px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.33px;">Linux</a> <a href="/tags/Malware/" style="font-size: 11.11px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.33px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.11px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 11.11px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Professor/" style="font-size: 12.22px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.44px;">QEMU</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 10px;">Rootkit</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 11.11px;">Stack</a> <a href="/tags/System/" style="font-size: 18.89px;">System</a> <a href="/tags/Systemcall/" style="font-size: 12.22px;">Systemcall</a> <a href="/tags/Virtualization/" style="font-size: 16.67px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a>
     </div>
   </div>
 
