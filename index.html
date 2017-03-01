@@ -108,6 +108,70 @@
         
           <section id="main">
   
+    <article id="post-pvops"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170301/pvops/">Hook内核之PVOPS</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170301/pvops/" class="article-date">
+	  <time datetime="2017-03-01T05:19:20.000Z" itemprop="datePublished">三月 1, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本文来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/05/03/pvops/" target="_blank" rel="external">个人博客</a>，讲述在虚拟化平台下如何利用PVOPS框架来hook内核<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170301/pvops/" target="_blank" rel="external">Hook内核之PVOPS</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<p>pvops是做什么的？ 简单地说，hook kernel.<br>利用pvops你可以自定义自己的write_cr3函数，你可以修改页表，追踪页表更新的信息，而这些听起来非常底层的操作，利用pvops都变得简单起来。</p>
+<p>pvops接口来源于Xen项目，初衷是建立一个类虚拟化(para-virtualized）内核来适应于不同的hypervisor，当然也包括适应于非虚拟化平台。</p>
+<p>pvops将类虚拟化操作分成一系列结构：pv_time_ops,pv_cpu_ops,pv_mmu_ops,pv_lock_ops和pv_irq_ops。</p>
+<p>举个例子，x86系统中利用’MOV CR3’指令来加载页表。pvops将其替换为一个间接跳转到pv_mmu_ops -&gt; write_cr3函数。 每种虚拟化系统，包括本地x86平台，对这些函数都有自己的实现。 对于x86平台，这些函数的实现只是简单地对原始函数指令的封装。比如对于pv_mmu_ops -&gt; write_cr3函数，x86平台的具体实现为native_write_cr3函数：</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"></div><div class="line">static inline void native_write_cr3(unsigned long val)</div><div class="line">&#123;</div><div class="line">        asm volatile("mov %0,%%cr3": : "r" (val), "m" (__force_order));</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>pvops将本地底层的硬件指令通过pv_xxx_ops结构体替换为间接跳转函数。下面以pv_mmu_ops为例，详细分析其内部结构，pv_mmu_ops的定义为：(文中列出主要部分，完整定义，可参看<a href="http://lxr.free-electrons.com/source/arch/x86/kernel/paravirt.c#L395" target="_blank" rel="external">pv_mmu_ops结构定义</a>）</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div></pre></td><td class="code"><pre><div class="line"></div><div class="line"><span class="keyword">struct</span> pv_mmu_ops &#123;</div><div class="line">         <span class="function"><span class="keyword">unsigned</span> <span class="title">long</span> <span class="params">(*read_cr2)</span><span class="params">(<span class="keyword">void</span>)</span></span>;</div><div class="line">         <span class="keyword">void</span> (*write_cr2)(<span class="keyword">unsigned</span> <span class="keyword">long</span>);</div><div class="line"> </div><div class="line">         <span class="function"><span class="keyword">unsigned</span> <span class="title">long</span> <span class="params">(*read_cr3)</span><span class="params">(<span class="keyword">void</span>)</span></span>;</div><div class="line">         <span class="keyword">void</span> (*write_cr3)(<span class="keyword">unsigned</span> <span class="keyword">long</span>);</div><div class="line"> </div><div class="line">         <span class="comment">/*</span></div><div class="line">          * Hooks for intercepting the creation/use/destruction of an</div><div class="line">          * mm_struct.</div><div class="line">          */</div><div class="line">         <span class="keyword">void</span> (*activate_mm)(<span class="keyword">struct</span> mm_struct *prev,</div><div class="line">                             <span class="keyword">struct</span> mm_struct *next);</div><div class="line">         <span class="keyword">void</span> (*dup_mmap)(<span class="keyword">struct</span> mm_struct *oldmm,</div><div class="line">                          <span class="keyword">struct</span> mm_struct *mm);</div><div class="line">         <span class="keyword">void</span> (*exit_mmap)(<span class="keyword">struct</span> mm_struct *mm);</div><div class="line"> </div><div class="line"> </div><div class="line">         <span class="comment">/* TLB operations */</span></div><div class="line">         <span class="keyword">void</span> (*flush_tlb_user)(<span class="keyword">void</span>);</div><div class="line">         <span class="keyword">void</span> (*flush_tlb_kernel)(<span class="keyword">void</span>);</div><div class="line">         <span class="keyword">void</span> (*flush_tlb_single)(<span class="keyword">unsigned</span> <span class="keyword">long</span> addr);</div><div class="line">         <span class="keyword">void</span> (*flush_tlb_others)(<span class="keyword">const</span> <span class="keyword">struct</span> cpumask *cpus,</div><div class="line">                                  <span class="keyword">struct</span> mm_struct *mm,</div><div class="line">                                  <span class="keyword">unsigned</span> <span class="keyword">long</span> start,</div><div class="line">                                  <span class="keyword">unsigned</span> <span class="keyword">long</span> end);</div><div class="line"> </div><div class="line">         <span class="comment">/* Hooks for allocating and freeing a pagetable top-level */</span></div><div class="line">         <span class="keyword">int</span>  (*pgd_alloc)(<span class="keyword">struct</span> mm_struct *mm);</div><div class="line">         <span class="keyword">void</span> (*pgd_free)(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">pgd_t</span> *pgd);</div><div class="line"> </div><div class="line">         <span class="comment">/*</span></div><div class="line">          * Hooks for allocating/releasing pagetable pages when they're</div><div class="line">          * attached to a pagetable</div><div class="line">          */</div><div class="line">         <span class="keyword">void</span> (*alloc_pte)(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">unsigned</span> <span class="keyword">long</span> pfn);</div><div class="line">         <span class="keyword">void</span> (*alloc_pmd)(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">unsigned</span> <span class="keyword">long</span> pfn);</div><div class="line">         <span class="keyword">void</span> (*alloc_pud)(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">unsigned</span> <span class="keyword">long</span> pfn);</div><div class="line">         <span class="keyword">void</span> (*release_pte)(<span class="keyword">unsigned</span> <span class="keyword">long</span> pfn);</div><div class="line">         <span class="keyword">void</span> (*release_pmd)(<span class="keyword">unsigned</span> <span class="keyword">long</span> pfn);</div><div class="line">         <span class="keyword">void</span> (*release_pud)(<span class="keyword">unsigned</span> <span class="keyword">long</span> pfn);</div><div class="line"> </div><div class="line">         <span class="comment">/* Pagetable manipulation functions */</span></div><div class="line">         <span class="keyword">void</span> (*set_pte)(<span class="keyword">pte_t</span> *ptep, <span class="keyword">pte_t</span> pteval);</div><div class="line">         <span class="keyword">void</span> (*set_pte_at)(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">unsigned</span> <span class="keyword">long</span> addr,</div><div class="line">                            <span class="keyword">pte_t</span> *ptep, <span class="keyword">pte_t</span> pteval);</div><div class="line">         <span class="keyword">void</span> (*set_pmd)(<span class="keyword">pmd_t</span> *pmdp, <span class="keyword">pmd_t</span> pmdval);</div><div class="line">         <span class="keyword">void</span> (*set_pmd_at)(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">unsigned</span> <span class="keyword">long</span> addr,</div><div class="line">                            <span class="keyword">pmd_t</span> *pmdp, <span class="keyword">pmd_t</span> pmdval);</div><div class="line">         <span class="keyword">void</span> (*pte_update)(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">unsigned</span> <span class="keyword">long</span> addr,</div><div class="line">                            <span class="keyword">pte_t</span> *ptep);</div><div class="line"> </div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>比如说你要在分配页表项的时候hook (<em>write_cr3)函数, 可以将(</em>write_cr3)函数赋值为自己的自定义函数。 默认情况下，内核中pvops框架中提供的自定义函数如下： (完整可参看 <a href="http://lxr.free-electrons.com/source/arch/x86/kernel/paravirt.c#L395" target="_blank" rel="external">pv_mmu_ops函数定义</a>)</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">struct</span> pv_mmu_ops pv_mmu_ops &#123;</div><div class="line"></div><div class="line">.read_cr2 = native_read_cr2,</div><div class="line">.write_cr2 = native_write_cr2,</div><div class="line">.read_cr3 = native_read_cr3,</div><div class="line">.write_cr3 = native_write_cr3,</div><div class="line"> .alloc_pte = paravirt_nop,</div><div class="line">.alloc_pmd = paravirt_nop,</div><div class="line">.alloc_pud = paravirt_nop,</div><div class="line">.release_pte = paravirt_nop,</div><div class="line">.release_pmd = paravirt_nop,</div><div class="line">.release_pud = paravirt_nop,</div><div class="line"></div><div class="line">.set_pte = native_set_pte,</div><div class="line">.set_pte_at = native_set_pte_at,</div><div class="line">.set_pmd = native_set_pmd,</div><div class="line">.set_pmd_at = native_set_pmd_at,</div><div class="line">.pte_update = paravirt_nop,</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>接着定义的函数会被传入到这里：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"></div><div class="line"> <span class="function"><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keyword">void</span> <span class="title">write_cr3</span><span class="params">(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">unsigned</span> <span class="keyword">long</span> pfn)</span></span></div><div class="line"> &#123;</div><div class="line">         PVOP_VCALL2(pv_mmu_ops.write_cr3, mm, pfn);</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>至于PVOP_VCALL2具体做了什么，可以不必去关心。</p>
+<p>完</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170301/pvops/" target="_blank" rel="external">Hook内核之PVOPS</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统内核/">系统内核</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-course-fengweizhang1"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -669,117 +733,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-migration"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170224/migration/">云平台高可用之虚拟机迁移</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170224/migration/" class="article-date">
-	  <time datetime="2017-02-24T06:04:17.000Z" itemprop="datePublished">二月 24, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
-<p><strong>CSysSec注</strong>： 本文来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/01/03/highavailability-migration/" target="_blank" rel="external">个人博客</a>，主要介绍虚拟机迁移技术，包括虚拟机迁移主要算法以及在KVM/QEMU平台上的迁移细节。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170224/migration/" target="_blank" rel="external">云平台高可用之虚拟机迁移</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
-<blockquote>
-<ul>
-<li>什么是云平台高可用</li>
-<li>虚拟机迁移主要算法</li>
-<li>实现 Pre-copy</li>
-<li>思考</li>
-</ul>
-</blockquote>
-<h2 id="什么是云平台高可用"><a href="#什么是云平台高可用" class="headerlink" title="什么是云平台高可用"></a>什么是云平台高可用</h2><p>云，一个再熟悉不过的词了。大家都看到了云计算的商业价值，于是乎各大IT公司都纷纷提出自己的云计算服务，有Amozon的EC2，微软的Azure,谷歌的Google AppEngine,腾讯云，百度云，阿里云等。说到Google AppEngine，相信许多用goagent翻墙党都用过这个东西，但估计大家都只忙着使用goagent，却忽略了AppEngine其中提供的云服务。如今，云无处不在，从当今主流产品看，云平台需要满足以下几个需求：</p>
-<ul>
-<li>第一，满足多用户的大规模并发访问，想想2015年的双十一，官方数据表明Taobao每秒钟要处理14万订单交易，平均每天也有七八千万访客（具体数据待我问阿里朋友）</li>
-<li>第二，处理海量数据，14年，google平均每天要处理57.4亿次查询，处理的数据高达100PB；阿里云的大数据产品ODPS在6个小时内就能处理100PB的数据</li>
-<li>第三，提供可持续的服务，如今云平台的用户如此之大，分秒级的停机时间将影响数百万用户，导致数十万美元损失，不管从用户角度还是公司本身角度来看，停机时间过长都是不可容忍的</li>
-</ul>
-<p>针对需求一和需求二，当前云平台的解决方案大多是通过分布式协议及系统来组织管理大量的廉价设备，以提供良好的可扩展性，从而满足大量用户的高并发访问需求以及对海量数据的处理能力，这不在本文考虑范围之内，不多叙说。本文只针对第三个需求，提供可持续的服务，也就是云计算平台中常说的高可用性（high availability)。可用性的准确定义是，在需要的外部资源得到保证的前提下，系统在规定的条件和时间内处于可执行功能状态的能力，高可用则定义为用来保障系统可用性达到某一预定水平的系统设计和技术手段。目前，许多云服务提供商都声称自己的云平台能保证较高的可用性，但实际上，近年来云平台的失效事件频繁发生。具体事件，可搜索了解一下。</p>
-<p>虚拟化技术是云计算平台的核心支撑技术，虚拟机的强隔离性有效解决了资源的共享使用问题，大大支撑了云计算平台的资源聚合、负载均衡、节能、可扩展等特性。为保证云平台的高可用性，基于虚拟机备份思想的技术应运而生，也是当前云平台为保证高可用性的最主要途径。虚拟机备份思想，主要包括三个方面：</p>
-<ul>
-<li>第一，快照回滚（snapshot&amp;rollback)，将虚拟机备份状态保存在持久化存储系统中, 在虚拟机因上层软件或底层硬件故障失效后,可以加载备份状态并恢复到之前的运行 状态继续运行</li>
-<li>第二，热备技术（hot-standby)，将虚拟机执行状态实时传输到目的端计算节点,在检测到源计算节点失效后,目的端的虚拟机状态可立刻恢复并持续提供任务</li>
-<li>第三，虚拟机迁移（migration)，将虚拟机运行时状态从一台计算节点传输到另一台计算节点,保证虚拟机在源计算节点因失效或维护而停机时可以在目的端继续执行</li>
-</ul>
-<p>本文旨在讲解虚拟机迁移技术</p>
-<h2 id="虚拟机迁移主要算法"><a href="#虚拟机迁移主要算法" class="headerlink" title="虚拟机迁移主要算法"></a>虚拟机迁移主要算法</h2><p>目前运用最广泛最原始的算法是预拷贝（pre-copy)算法和后拷贝（post-copy)算法，Pre-copy算法也被集成在主流虚拟机平台中如Xen,KVM,VMWare的官方源码中, Post-copy虽还没被各主流虚拟机平台集成，但个人实现起来也不是什么难事。 下面主要介绍这两种算法：</p>
-<p>Pre-copy, 先引用顶会 <a href="https://www.usenix.org/legacy/event/nsdi05/tech/full_papers/clark/clark.pdf" target="_blank" rel="external">NSDI’05 Live Migration of Virtual Machines</a> 论文中的一张图，描述了pre-copy算法的时间线</p>
-<p><img src="http://7xppf1.com1.z0.glb.clouddn.com/precopy-step.png" alt="pre-copy steps"><br>简而言之，大致思想就是先迭代的迁移整个内存的所有页面，迭代过程中，如果页面有更新，则再迁移更新过的页面，直到满足一个条件让迭代过程收敛（这个条件可以自己根据不同情况合理设置），最后再迁移剩余的页面、cpu、寄存器等状态以及外部设备。<br>贴一个基于Qemu/kvm 1.1.2的pre-copy算法主要代码：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div><div class="line">73</div><div class="line">74</div><div class="line">75</div><div class="line">76</div><div class="line">77</div><div class="line">78</div><div class="line">79</div><div class="line">80</div><div class="line">81</div><div class="line">82</div><div class="line">83</div><div class="line">84</div><div class="line">85</div><div class="line">86</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">ram_save_live</span><span class="params">(QEMUFile *f, <span class="keyword">int</span> stage, <span class="keyword">void</span> *opaque)</span></span></div><div class="line">&#123;</div><div class="line">    <span class="keyword">ram_addr_t</span> addr;</div><div class="line">    <span class="keyword">uint64_t</span> bytes_transferred_last;</div><div class="line">    <span class="keyword">double</span> bwidth = <span class="number">0</span>;</div><div class="line">    <span class="keyword">uint64_t</span> expected_time = <span class="number">0</span>;</div><div class="line">    <span class="keyword">int</span> ret;</div><div class="line"></div><div class="line">    <span class="keyword">if</span> (stage &lt; <span class="number">0</span>) &#123;</div><div class="line">        memory_global_dirty_log_stop();</div><div class="line">        <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">    &#125;</div><div class="line"></div><div class="line">    memory_global_sync_dirty_bitmap(get_system_memory());</div><div class="line"></div><div class="line">    <span class="keyword">if</span> (stage == <span class="number">1</span>) &#123;</div><div class="line">        RAMBlock *block;</div><div class="line">        bytes_transferred = <span class="number">0</span>;</div><div class="line">        last_block = <span class="literal">NULL</span>;</div><div class="line">        last_offset = <span class="number">0</span>;</div><div class="line">        sort_ram_list();</div><div class="line"></div><div class="line">        <span class="comment">/* Make sure all dirty bits are set */</span></div><div class="line">        QLIST_FOREACH(block, &amp;ram_list.blocks, next) &#123;</div><div class="line">            <span class="keyword">for</span> (addr = <span class="number">0</span>; addr &lt; block-&gt;length; addr += TARGET_PAGE_SIZE) &#123;</div><div class="line">                <span class="keyword">if</span> (!memory_region_get_dirty(block-&gt;mr, addr, TARGET_PAGE_SIZE,</div><div class="line">                                             DIRTY_MEMORY_MIGRATION)) &#123;</div><div class="line">                    memory_region_set_dirty(block-&gt;mr, addr, TARGET_PAGE_SIZE);</div><div class="line">                &#125;</div><div class="line">            &#125;</div><div class="line">        &#125;</div><div class="line"></div><div class="line">        memory_global_dirty_log_start();</div><div class="line"></div><div class="line">        qemu_put_be64(f, ram_bytes_total() | RAM_SAVE_FLAG_MEM_SIZE);</div><div class="line"></div><div class="line">        QLIST_FOREACH(block, &amp;ram_list.blocks, next) &#123;</div><div class="line">            qemu_put_byte(f, <span class="built_in">strlen</span>(block-&gt;idstr));</div><div class="line">            qemu_put_buffer(f, (<span class="keyword">uint8_t</span> *)block-&gt;idstr, <span class="built_in">strlen</span>(block-&gt;idstr));</div><div class="line">            qemu_put_be64(f, block-&gt;length);</div><div class="line">        &#125;</div><div class="line">    &#125;</div><div class="line"></div><div class="line">    bytes_transferred_last = bytes_transferred;</div><div class="line">    bwidth = qemu_get_clock_ns(rt_clock);</div><div class="line"></div><div class="line">    <span class="keyword">while</span> ((ret = qemu_file_rate_limit(f)) == <span class="number">0</span>) &#123;</div><div class="line">        <span class="keyword">int</span> bytes_sent;</div><div class="line"></div><div class="line">        bytes_sent = ram_save_block(f);</div><div class="line">        bytes_transferred += bytes_sent;</div><div class="line">        <span class="keyword">if</span> (bytes_sent == <span class="number">0</span>) &#123; <span class="comment">/* no more blocks */</span></div><div class="line">            <span class="keyword">break</span>;</div><div class="line">        &#125;</div><div class="line">    &#125;</div><div class="line"></div><div class="line">    <span class="keyword">if</span> (ret &lt; <span class="number">0</span>) &#123;</div><div class="line">        <span class="keyword">return</span> ret;</div><div class="line">    &#125;</div><div class="line"></div><div class="line">    bwidth = qemu_get_clock_ns(rt_clock) - bwidth;</div><div class="line">    bwidth = (bytes_transferred - bytes_transferred_last) / bwidth;</div><div class="line"></div><div class="line">    <span class="comment">/* if we haven't transferred anything this round, force expected_time to a</span></div><div class="line">     * a very high value, but without crashing */</div><div class="line">    <span class="keyword">if</span> (bwidth == <span class="number">0</span>) &#123;</div><div class="line">        bwidth = <span class="number">0.000001</span>;</div><div class="line">    &#125;</div><div class="line"></div><div class="line">    <span class="comment">/* try transferring iterative blocks of memory */</span></div><div class="line">    <span class="keyword">if</span> (stage == <span class="number">3</span>) &#123;</div><div class="line">        <span class="keyword">int</span> bytes_sent;</div><div class="line"></div><div class="line">        <span class="comment">/* flush all remaining blocks regardless of rate limiting */</span></div><div class="line">        <span class="keyword">while</span> ((bytes_sent = ram_save_block(f)) != <span class="number">0</span>) &#123;</div><div class="line">            bytes_transferred += bytes_sent;</div><div class="line">        &#125;</div><div class="line">        memory_global_dirty_log_stop();</div><div class="line">    &#125;</div><div class="line"></div><div class="line">    qemu_put_be64(f, RAM_SAVE_FLAG_EOS);</div><div class="line"></div><div class="line">    expected_time = ram_save_remaining() * TARGET_PAGE_SIZE / bwidth;</div><div class="line"></div><div class="line">    <span class="keyword">return</span> (stage == <span class="number">2</span>) &amp;&amp; (expected_time &lt;= migrate_max_downtime());</div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<ul>
-<li>第一阶段，（14-42），代码所有的内存被标记为脏页并初始化页面更新追踪机制</li>
-<li>第二阶段，（47-55），如果页面被标记为脏页，则传输这些页面，页面脏位被重置，如果有程序修改页面，页面的脏位又可设置。一般来说，第二阶段是迭代过程最长的</li>
-<li>第三阶段，（71-79），那些修改过的却还没有来得及被传输到目的端的页面可以用来计算停机时间，设置一个目标停机时间，当达到这个值的时候，停止第二阶段的迭代过程，进入第三阶段，这时源虚拟机被暂停，将剩余的页面、CPU等状态一同传输到目的端，目的端再重新恢复虚拟机。</li>
-</ul>
-<p>pre-copy总体来说能带来很小的停机时间，但不太适合写密集型的负载，写密集型负载会大量更新页面，使得迭代过程结束后的剩余页面增多，延长停机时间。</p>
-<p>下面再来看看post-copy算法</p>
-<p>Post-copy算法的思想是先暂停源虚拟机，把能保证一次正常运行的最小运行集（所有的CPU状态）传输到目的端，目的端恢复虚拟机的执行，若需要内存页，则产生页错误，主动从源虚拟机中获取。Post-copy能保证尽可能的做到个内存也最多只传输一次，避免pre-copy算法迭代过程中的重复传输；由于不断地从源端获取丢失页，不可避免地带来性能损失。<a href="http://www.cs.binghamton.edu/~mhines/papers/vee2009.pdf" target="_blank" rel="external">VEE’09 Post-Copy Based Live Virtual Machine Migration Using Adaptive Pre-Paging and Dynamic Self-Ballooning</a> 利用了一种称之为<code>adaptive pre-paging</code>的方法来减少页错误，<code>adaptive pre-paging</code>能尽可能的预测出目的端下一个需要的页面，从而减少页面传输的次数。</p>
-<h2 id="实现-Pre-copy"><a href="#实现-Pre-copy" class="headerlink" title="实现 Pre-copy"></a>实现 Pre-copy</h2><p>这一章节主要讲述KVM/Qemu关于Pre-copy迁移算法的实现，基于qemu-kvm-1.1.2版本。首先看一下源码中的hmp-commands.hx文件内容：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div></pre></td><td class="code"><pre><div class="line">    &#123;</div><div class="line">        .name       = &quot;migrate&quot;,</div><div class="line">        .args_type  = &quot;detach:-d,blk:-b,inc:-i,uri:s&quot;,</div><div class="line">        .params     = &quot;[-d] [-b] [-i] uri&quot;,</div><div class="line">        .help       = &quot;migrate to URI (using -d to not wait for completion)&quot;</div><div class="line">		      &quot;\n\t\t\t -b for migration without shared storage with&quot;</div><div class="line">		      &quot; full copy of disk\n\t\t\t -i for migration without &quot;</div><div class="line">		      &quot;shared storage with incremental copy of disk &quot;</div><div class="line">		      &quot;(base image shared between src and destination)&quot;,</div><div class="line">        .mhandler.cmd = hmp_migrate,</div><div class="line">    &#125;,</div><div class="line"></div><div class="line"></div><div class="line">STEXI</div><div class="line">@item migrate [-d] [-b] [-i] @var&#123;uri&#125;</div><div class="line">@findex migrate</div><div class="line">Migrate to @var&#123;uri&#125; (using -d to not wait for completion).</div><div class="line">	-b for migration with full copy of disk</div><div class="line">	-i for migration with incremental copy of disk (base image is shared)</div><div class="line">ETEXI</div></pre></td></tr></table></figure>
-<p>每一个Qemu相关命令都需要在此文件中注册，如savevm,snapshot,migrate等，如果想自定义命令，亦是如此，关于如何修改KVM/Qemu源码，可以结合我的 <a href="http://www.chongh.wiki/blog/2016/01/01/kvm-qemu-bytalk/" target="_blank" rel="external">上一篇</a> 文章.</p>
-<p>Qemu-kvm利用<code>hmp-commands.hx</code>这个文件保存相应的命令行参数以及常量，然后使用<code>hxtool</code>工具产生对应的头文件<code>hmp-commands.h</code>到<code>./x86_64-softmmu</code>文件夹中，这个过程自动进行。注，STEXI与ETEXI之间的内容属于注释内容。从代码中可看到，与迁移命令migrate相对应的处理函数是<code>hmp_migrate</code>,从<code>hmp_migrate</code>函数开始，会依次调用<code>qmp_migrate</code>,<code>tcp_start_outgoing_migration</code>,<code>migrate_fd_connect</code>, <code>migrate_fd_put_ready</code>,具体可看源码，不一一详细介绍。</p>
-<p>重点说一下<code>migrate_fd_connect</code>函数与<code>migrate_fd_put_ready</code>函数，<br><code>migrate_fd_connect</code>函数主要调用了<code>qemu_savevm_state_begin</code>函数进行迁移工作的初始化工作（对应于前文说的迁移过程的第一阶段），而<code>migrate_fd_connect</code>函数主要调用了<code>qemu_savevm_state_iterate</code>函数（对应第二阶段）与<code>qemu_savevm_state_complete</code>函数（对应第三阶段），这里注意，此三个函数（<code>qemu_savevm_state_beging</code>,<code>qemu_savevm_state_iterate</code>,<code>qemu_savevm_state_complete</code>)里面代码结构非同类似，必有蹊跷，这里贴出其中的<code>qemu_savevm_state_iterate</code>函数：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">qemu_savevm_state_iterate</span><span class="params">(QEMUFile *f)</span></span></div><div class="line">&#123;</div><div class="line">    SaveStateEntry *se;</div><div class="line">    <span class="keyword">int</span> ret = <span class="number">1</span>;</div><div class="line"></div><div class="line">    QTAILQ_FOREACH(se, &amp;savevm_handlers, entry) &#123;</div><div class="line">        <span class="keyword">if</span> (se-&gt;save_live_state == <span class="literal">NULL</span>)</div><div class="line">            <span class="keyword">continue</span>;</div><div class="line"></div><div class="line">        <span class="comment">/* Section type */</span></div><div class="line">        qemu_put_byte(f, QEMU_VM_SECTION_PART);</div><div class="line">        qemu_put_be32(f, se-&gt;section_id);</div><div class="line"></div><div class="line">        ret = se-&gt;save_live_state(f, QEMU_VM_SECTION_PART, se-&gt;opaque);</div><div class="line">        <span class="keyword">if</span> (ret &lt;= <span class="number">0</span>) &#123;</div><div class="line">            <span class="comment">/* Do not proceed to the next vmstate before this one reported</span></div><div class="line">               completion of the current stage. This serializes the migration</div><div class="line">               and reduces the probability that a faster changing state is</div><div class="line">               synchronized over and over again. */</div><div class="line">            <span class="keyword">break</span>;</div><div class="line">        &#125;</div><div class="line">    &#125;</div><div class="line">    <span class="keyword">if</span> (ret != <span class="number">0</span>) &#123;</div><div class="line">        <span class="keyword">return</span> ret;</div><div class="line">    &#125;</div><div class="line">    ret = qemu_file_get_error(f);</div><div class="line">    <span class="keyword">if</span> (ret != <span class="number">0</span>) &#123;</div><div class="line">        qemu_savevm_state_cancel(f);</div><div class="line">    &#125;</div><div class="line">    <span class="keyword">return</span> ret;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<p>三个函数都会有一句代码</p>
-<pre><code>ret = se-&gt;save_live_state(f, QEMU_VM_SECTION_PART, se-&gt;opaque); 
-</code></pre><p>只是其中参数不同。</p>
-<p>这个save_live_state是什么？</p>
-<p>注意，非常重要，存在于虚拟机迁移的核心结构体SaveStateEntry中：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">typedef</span> <span class="keyword">struct</span> SaveStateEntry &#123;</div><div class="line">    QTAILQ_ENTRY(SaveStateEntry) entry;</div><div class="line">    <span class="keyword">char</span> idstr[<span class="number">256</span>];</div><div class="line">    <span class="keyword">int</span> instance_id;</div><div class="line">    <span class="keyword">int</span> alias_id;</div><div class="line">    <span class="keyword">int</span> version_id;</div><div class="line">    <span class="keyword">int</span> section_id;</div><div class="line">    SaveSetParamsHandler *set_params;</div><div class="line">    SaveLiveStateHandler *save_live_state;</div><div class="line">    SaveStateHandler *save_state;</div><div class="line">    LoadStateHandler *load_state;</div><div class="line">    <span class="keyword">const</span> VMStateDescription *vmsd;</div><div class="line">    <span class="keyword">void</span> *opaque;</div><div class="line">    CompatEntry *compat;</div><div class="line">    <span class="keyword">int</span> no_migrate;</div><div class="line">    <span class="keyword">int</span> is_ram;</div><div class="line">&#125; SaveStateEntry;</div></pre></td></tr></table></figure>
-<p>此结构体存储了虚拟机迁移的用到的所有数据结构，主要包括被传输设备的存储格式以及被调用的具体设备的迁移功能函数. 那指针 <code>*save_live_state</code> 到底做了什么，一一追踪可发现，在<code>vl.c</code>文件中的main函数中（整个qemu程序的开始),针对ram设备，可发现如下一段代码：</p>
-<pre><code>register_savevm_live(NULL, &quot;ram&quot;, 0, 4, NULL, ram_save_live, NULL, ram_load, NULL);
-</code></pre><p>正是<code>register_savem_live</code>函数将<code>ram_save_live</code>指针传递给了<code>save_live_state</code>，前文说了，<code>ram_save_live</code>便是真正执行迁移工作的函数，这里如果需要自定义迁移工作，修改<code>ram_save_live</code>注册到<code>register_savevm_live</code>函数中就行了。了解清楚这一连串的函数调用关系，便能彻底明白迁移的每一步工作。</p>
-<h2 id="思考"><a href="#思考" class="headerlink" title="思考"></a>思考</h2><p>本文重点介绍了pre-copy迁移算法的详细过程，并简单介绍了post-copy算法，两个算法各有优缺点，也都各有改进之处。虚拟机迁移的初衷是保证云平台的高可用性，高可用性要尽量减少提供服务的云主机的宕机时间即停机时间，在此同时，也应尽量减少迁移过程中带来的性能开销，就像post-copy若不断的缺页，虽保证了极短的宕机时间，但如果性能损失太大也是无法接受的。目前多数优化迁移算法的工作主要是采取减少传输的内存数据量来实现，而为了减少内存数据量，又有：</p>
-<ul>
-<li>压缩内存</li>
-<li>基于hash指纹找出相同或类似页面去重</li>
-<li>尽可能传输不必要的页面如free页面等</li>
-</ul>
-<p>除此之外，也有工作不传输整个内存页面，而是传输内存页面到外部设备的映射关系，目的端则靠此映射关系从外设获取数据。这里不一一列出相关论文，若有兴趣深入者，可自行查阅。笔者也有一部分工作提出了相应的思路与实现，之后会有专门文章作详细介绍。</p>
-<p>如果你对迁移算法的优化有什么看法或什么建议，可留言，也可直接与我邮件联系。</p>
-<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p>崔磊先生的博士论文</p>
-<p><a href="https://www.usenix.org/legacy/event/nsdi05/tech/full_papers/clark/clark.pdf" target="_blank" rel="external">NSDI’05 Live Migration of Virtual Machines</a></p>
-<p><a href="http://www.cs.binghamton.edu/~mhines/papers/vee2009.pdf" target="_blank" rel="external">VEE’09 Post-Copy Based Live Virtual Machine Migration Using Adaptive Pre-Paging and Dynamic Self-Ballooning</a> </p>
-<hr>
-<p><strong>CSysSec注</strong>： 本文来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/01/03/highavailability-migration/" target="_blank" rel="external">个人博客</a>，主要介绍虚拟机迁移技术，包括虚拟机迁移主要算法以及在KVM/QEMU平台上的迁移细节。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170224/migration/" target="_blank" rel="external">云平台高可用之虚拟机迁移</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机迁移/">虚拟机迁移</a>
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Migration/">Migration</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/QEMU/">QEMU</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -872,6 +825,18 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170301/pvops/">Hook内核之PVOPS</a></h6>
+          <!--  <span>三月 1, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -1053,18 +1018,6 @@
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170104/kvmsource-io/">KVM源码分析之IO虚拟化之PIO</a></h6>
-          <!--  <span>一月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -1085,7 +1038,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 12px;">ASLR</a> <a href="/tags/Binary/" style="font-size: 10px;">Binary</a> <a href="/tags/Conference/" style="font-size: 10px;">Conference</a> <a href="/tags/Course/" style="font-size: 12px;">Course</a> <a href="/tags/Exploit/" style="font-size: 18px;">Exploit</a> <a href="/tags/Heap/" style="font-size: 11px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 16px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 14px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 14px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 14px;">Linux</a> <a href="/tags/Malware/" style="font-size: 11px;">Malware</a> <a href="/tags/Memory/" style="font-size: 14px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 11px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Professor/" style="font-size: 13px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15px;">QEMU</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 10px;">Rootkit</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 11px;">Stack</a> <a href="/tags/System/" style="font-size: 19px;">System</a> <a href="/tags/Systemcall/" style="font-size: 12px;">Systemcall</a> <a href="/tags/Virtualization/" style="font-size: 17px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a>
+      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/Binary/" style="font-size: 10px;">Binary</a> <a href="/tags/Conference/" style="font-size: 10px;">Conference</a> <a href="/tags/Course/" style="font-size: 11.82px;">Course</a> <a href="/tags/Exploit/" style="font-size: 18.18px;">Exploit</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.64px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 16.36px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 14.55px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 10.91px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.91px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15.45px;">QEMU</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 10px;">Rootkit</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/Virtualization/" style="font-size: 17.27px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a>
     </div>
   </div>
 

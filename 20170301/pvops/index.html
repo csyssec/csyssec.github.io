@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>hook内核之pvops | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="作者：Diting0x
+
+CSysSec注： 本文来自Diting0x的个人博客，讲述在虚拟化平台下如何利用PVOPS框架来hook内核转载本文请务必注明，文章出处：《Hook内核之PVOPS》与作者信息：Diting0x
+
+pvops是做什么的？ 简单地说，hook kernel.利用pvops你可以自定义自己的write_cr3函数，你可以修改页表，追踪页表更新的信息，而这些听起来非常底层的操">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Hook内核之PVOPS">
+<meta property="og:url" content="http://yoursite.com/20170301/pvops/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="作者：Diting0x
+
+CSysSec注： 本文来自Diting0x的个人博客，讲述在虚拟化平台下如何利用PVOPS框架来hook内核转载本文请务必注明，文章出处：《Hook内核之PVOPS》与作者信息：Diting0x
+
+pvops是做什么的？ 简单地说，hook kernel.利用pvops你可以自定义自己的write_cr3函数，你可以修改页表，追踪页表更新的信息，而这些听起来非常底层的操">
+<meta property="og:updated_time" content="2017-03-01T05:20:20.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Hook内核之PVOPS">
+<meta name="twitter:description" content="作者：Diting0x
+
+CSysSec注： 本文来自Diting0x的个人博客，讲述在虚拟化平台下如何利用PVOPS框架来hook内核转载本文请务必注明，文章出处：《Hook内核之PVOPS》与作者信息：Diting0x
+
+pvops是做什么的？ 简单地说，hook kernel.利用pvops你可以自定义自己的write_cr3函数，你可以修改页表，追踪页表更新的信息，而这些听起来非常底层的操">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">FROM 0 TO 1</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">体系结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/celebrity">工业大咖</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/donation">打赏支持</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-pvops" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      Hook内核之PVOPS
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170301/pvops/" class="article-date">
+	  <time datetime="2017-03-01T05:19:20.000Z" itemprop="datePublished">三月 1, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本文来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/05/03/pvops/" target="_blank" rel="external">个人博客</a>，讲述在虚拟化平台下如何利用PVOPS框架来hook内核<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170301/pvops/" target="_blank" rel="external">Hook内核之PVOPS</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<p>pvops是做什么的？ 简单地说，hook kernel.<br>利用pvops你可以自定义自己的write_cr3函数，你可以修改页表，追踪页表更新的信息，而这些听起来非常底层的操作，利用pvops都变得简单起来。</p>
+<p>pvops接口来源于Xen项目，初衷是建立一个类虚拟化(para-virtualized）内核来适应于不同的hypervisor，当然也包括适应于非虚拟化平台。</p>
+<p>pvops将类虚拟化操作分成一系列结构：pv_time_ops,pv_cpu_ops,pv_mmu_ops,pv_lock_ops和pv_irq_ops。</p>
+<p>举个例子，x86系统中利用’MOV CR3’指令来加载页表。pvops将其替换为一个间接跳转到pv_mmu_ops -&gt; write_cr3函数。 每种虚拟化系统，包括本地x86平台，对这些函数都有自己的实现。 对于x86平台，这些函数的实现只是简单地对原始函数指令的封装。比如对于pv_mmu_ops -&gt; write_cr3函数，x86平台的具体实现为native_write_cr3函数：</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"></div><div class="line">static inline void native_write_cr3(unsigned long val)</div><div class="line">&#123;</div><div class="line">        asm volatile("mov %0,%%cr3": : "r" (val), "m" (__force_order));</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>pvops将本地底层的硬件指令通过pv_xxx_ops结构体替换为间接跳转函数。下面以pv_mmu_ops为例，详细分析其内部结构，pv_mmu_ops的定义为：(文中列出主要部分，完整定义，可参看<a href="http://lxr.free-electrons.com/source/arch/x86/kernel/paravirt.c#L395" target="_blank" rel="external">pv_mmu_ops结构定义</a>）</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div></pre></td><td class="code"><pre><div class="line"></div><div class="line"><span class="keyword">struct</span> pv_mmu_ops &#123;</div><div class="line">         <span class="function"><span class="keyword">unsigned</span> <span class="title">long</span> <span class="params">(*read_cr2)</span><span class="params">(<span class="keyword">void</span>)</span></span>;</div><div class="line">         <span class="keyword">void</span> (*write_cr2)(<span class="keyword">unsigned</span> <span class="keyword">long</span>);</div><div class="line"> </div><div class="line">         <span class="function"><span class="keyword">unsigned</span> <span class="title">long</span> <span class="params">(*read_cr3)</span><span class="params">(<span class="keyword">void</span>)</span></span>;</div><div class="line">         <span class="keyword">void</span> (*write_cr3)(<span class="keyword">unsigned</span> <span class="keyword">long</span>);</div><div class="line"> </div><div class="line">         <span class="comment">/*</span></div><div class="line">          * Hooks for intercepting the creation/use/destruction of an</div><div class="line">          * mm_struct.</div><div class="line">          */</div><div class="line">         <span class="keyword">void</span> (*activate_mm)(<span class="keyword">struct</span> mm_struct *prev,</div><div class="line">                             <span class="keyword">struct</span> mm_struct *next);</div><div class="line">         <span class="keyword">void</span> (*dup_mmap)(<span class="keyword">struct</span> mm_struct *oldmm,</div><div class="line">                          <span class="keyword">struct</span> mm_struct *mm);</div><div class="line">         <span class="keyword">void</span> (*exit_mmap)(<span class="keyword">struct</span> mm_struct *mm);</div><div class="line"> </div><div class="line"> </div><div class="line">         <span class="comment">/* TLB operations */</span></div><div class="line">         <span class="keyword">void</span> (*flush_tlb_user)(<span class="keyword">void</span>);</div><div class="line">         <span class="keyword">void</span> (*flush_tlb_kernel)(<span class="keyword">void</span>);</div><div class="line">         <span class="keyword">void</span> (*flush_tlb_single)(<span class="keyword">unsigned</span> <span class="keyword">long</span> addr);</div><div class="line">         <span class="keyword">void</span> (*flush_tlb_others)(<span class="keyword">const</span> <span class="keyword">struct</span> cpumask *cpus,</div><div class="line">                                  <span class="keyword">struct</span> mm_struct *mm,</div><div class="line">                                  <span class="keyword">unsigned</span> <span class="keyword">long</span> start,</div><div class="line">                                  <span class="keyword">unsigned</span> <span class="keyword">long</span> end);</div><div class="line"> </div><div class="line">         <span class="comment">/* Hooks for allocating and freeing a pagetable top-level */</span></div><div class="line">         <span class="keyword">int</span>  (*pgd_alloc)(<span class="keyword">struct</span> mm_struct *mm);</div><div class="line">         <span class="keyword">void</span> (*pgd_free)(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">pgd_t</span> *pgd);</div><div class="line"> </div><div class="line">         <span class="comment">/*</span></div><div class="line">          * Hooks for allocating/releasing pagetable pages when they're</div><div class="line">          * attached to a pagetable</div><div class="line">          */</div><div class="line">         <span class="keyword">void</span> (*alloc_pte)(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">unsigned</span> <span class="keyword">long</span> pfn);</div><div class="line">         <span class="keyword">void</span> (*alloc_pmd)(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">unsigned</span> <span class="keyword">long</span> pfn);</div><div class="line">         <span class="keyword">void</span> (*alloc_pud)(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">unsigned</span> <span class="keyword">long</span> pfn);</div><div class="line">         <span class="keyword">void</span> (*release_pte)(<span class="keyword">unsigned</span> <span class="keyword">long</span> pfn);</div><div class="line">         <span class="keyword">void</span> (*release_pmd)(<span class="keyword">unsigned</span> <span class="keyword">long</span> pfn);</div><div class="line">         <span class="keyword">void</span> (*release_pud)(<span class="keyword">unsigned</span> <span class="keyword">long</span> pfn);</div><div class="line"> </div><div class="line">         <span class="comment">/* Pagetable manipulation functions */</span></div><div class="line">         <span class="keyword">void</span> (*set_pte)(<span class="keyword">pte_t</span> *ptep, <span class="keyword">pte_t</span> pteval);</div><div class="line">         <span class="keyword">void</span> (*set_pte_at)(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">unsigned</span> <span class="keyword">long</span> addr,</div><div class="line">                            <span class="keyword">pte_t</span> *ptep, <span class="keyword">pte_t</span> pteval);</div><div class="line">         <span class="keyword">void</span> (*set_pmd)(<span class="keyword">pmd_t</span> *pmdp, <span class="keyword">pmd_t</span> pmdval);</div><div class="line">         <span class="keyword">void</span> (*set_pmd_at)(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">unsigned</span> <span class="keyword">long</span> addr,</div><div class="line">                            <span class="keyword">pmd_t</span> *pmdp, <span class="keyword">pmd_t</span> pmdval);</div><div class="line">         <span class="keyword">void</span> (*pte_update)(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">unsigned</span> <span class="keyword">long</span> addr,</div><div class="line">                            <span class="keyword">pte_t</span> *ptep);</div><div class="line"> </div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>比如说你要在分配页表项的时候hook (<em>write_cr3)函数, 可以将(</em>write_cr3)函数赋值为自己的自定义函数。 默认情况下，内核中pvops框架中提供的自定义函数如下： (完整可参看 <a href="http://lxr.free-electrons.com/source/arch/x86/kernel/paravirt.c#L395" target="_blank" rel="external">pv_mmu_ops函数定义</a>)</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">struct</span> pv_mmu_ops pv_mmu_ops &#123;</div><div class="line"></div><div class="line">.read_cr2 = native_read_cr2,</div><div class="line">.write_cr2 = native_write_cr2,</div><div class="line">.read_cr3 = native_read_cr3,</div><div class="line">.write_cr3 = native_write_cr3,</div><div class="line"> .alloc_pte = paravirt_nop,</div><div class="line">.alloc_pmd = paravirt_nop,</div><div class="line">.alloc_pud = paravirt_nop,</div><div class="line">.release_pte = paravirt_nop,</div><div class="line">.release_pmd = paravirt_nop,</div><div class="line">.release_pud = paravirt_nop,</div><div class="line"></div><div class="line">.set_pte = native_set_pte,</div><div class="line">.set_pte_at = native_set_pte_at,</div><div class="line">.set_pmd = native_set_pmd,</div><div class="line">.set_pmd_at = native_set_pmd_at,</div><div class="line">.pte_update = paravirt_nop,</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>接着定义的函数会被传入到这里：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"></div><div class="line"> <span class="function"><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keyword">void</span> <span class="title">write_cr3</span><span class="params">(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">unsigned</span> <span class="keyword">long</span> pfn)</span></span></div><div class="line"> &#123;</div><div class="line">         PVOP_VCALL2(pv_mmu_ops.write_cr3, mm, pfn);</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>至于PVOP_VCALL2具体做了什么，可以不必去关心。</p>
+<p>完</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170301/pvops/" target="_blank" rel="external">Hook内核之PVOPS</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统内核/">系统内核</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+        
+	<div id="comment">
+	
+	<!-- 多说评论框 start -->
+	 <div class="ds-thread" data-thread-key="/20170301/pvops/" data-title="Hook内核之PVOPS" data-url="http://yoursite.com/20170301/pvops/"></div>
+	<!-- 多说评论框 end -->
+	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+	<script type="text/javascript">
+	var duoshuoQuery = {short_name:"csyssec"};
+	  (function() {
+	    var ds = document.createElement('script');
+	    ds.type = 'text/javascript';ds.async = true;
+	    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+	    ds.charset = 'UTF-8';
+	    (document.getElementsByTagName('head')[0] 
+	     || document.getElementsByTagName('body')[0]).appendChild(ds);
+	  })();
+	  </script>
+	<!-- 多说公共JS代码 end -->
+	
+	</div>
+	<link rel="stylesheet" href="/css/comment.css">
+
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+  
+    <a href="/20170226/course-fengweizhang1/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">名人课堂-计算机安全</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+    <ol class="toc">无</ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+       <!--  自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a> --> 
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/celebrity" class="mobile-nav-link">Celebrity</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/donation" class="mobile-nav-link">Donation</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>
