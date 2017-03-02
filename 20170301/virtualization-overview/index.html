@@ -30,29 +30,29 @@ CSysSec注： 本文是一篇虚拟机技术的科普文，从虚拟化历史，
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview3.jpeg">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview4.jpeg">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview5.jpeg">
-<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overvie6.jpeg">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview6.jpeg">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview7.jpeg">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview8.jpeg">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview9.jpeg">
-<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview10.jpeg">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview10.png">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview11.jpeg">
-<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview12.jpeg">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview12.png">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview13.jpeg">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview14.jpeg">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview15.jpeg">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview16.jpeg">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview17.jpeg">
-<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview18.jpeg">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview18.png">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview19.jpeg">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview20.jpeg">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview21.jpeg">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview22.jpeg">
-<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview23.jpeg">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview23.png">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview24.jpeg">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview25.jpeg">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview26.jpeg">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/virtualization-overview27.jpeg">
-<meta property="og:updated_time" content="2017-03-01T09:20:35.000Z">
+<meta property="og:updated_time" content="2017-03-02T08:30:14.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="虚拟化技术大观">
 <meta name="twitter:description" content="作者：Bojie Li 来源：http://ring0.me/2014/12/virtualization-overview/
@@ -197,7 +197,7 @@ CSysSec注： 本文是一篇虚拟机技术的科普文，从虚拟化历史，
 
 <p>Fabrice Bellard 的 QEMU（Quick EMUlator）是目前最流行的采用动态二进制翻译技术的虚拟化软件。它可以模拟 x86、x86_64、ARM、MIPS、SPARC、<br>PowerPC 等多种处理器架构，无修改地运行这些架构上的操作系统。当我们享受视听的乐趣，当我们流畅地运行各种架构的虚拟机系统时，不应忘记 ffmpeg 和 qemu 的创造者 Fabrice Bellard 大神。</p>
 <p>以我们最熟悉的 Intel x86 架构为例，分为四个特权级 0~3。一般情况下，操作系统内核（特权代码）运行在 ring 0（最高特权级），而用户进程（非特权代码）运行在 ring 3（最低特权级）。（即使你是 root，你的进程也在 ring 3！只有进了内核才是 ring 0，无上的权力意味着巨大的责任，内核编程的限制很多，吐槽一下）</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview6.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overvie6.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview6.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview6.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
 
 <p>使用了虚拟机之后，虚拟机（Guest OS）运行在 ring 1，主机操作系统（VMM，Virtual Machine Monitor）运行在 ring 0。比如在 Windows 上装个 Linux 虚拟机，Windows 内核运行在 ring 0，而被虚拟的 Linux 内核运行在 ring 1，Linux 系统里的应用程序则运行在 ring 3。</p>
 <p>当虚拟机系统需要执行特权指令时，虚拟机管理器（VMM）就会立即捕<br>获它（谁让 ring 0 比 ring 1的特权级高呢！）并模拟执行这条特权指令，再返回到虚拟机系统。为了提高系统调用、中断处理的性能，有时会利用动态二进制翻译的技术，在运行前把这些特权指令替换成调用虚拟机管理器 API 的指令。如果所有特权指令都模拟得天衣无缝，虚拟机系统就像运行在物理机器上一样，完全不能发现自己运行在虚拟机里。（当然，事实上还是有一些破绽的）</p>
@@ -233,7 +233,7 @@ CSysSec注： 本文是一篇虚拟机技术的科普文，从虚拟化历史，
 <p>为了方便半虚拟化（paravirtualization）中用 API 调用替代 CPU 异常捕获，Intel 还提供了从虚拟机（Non-root Mode）到虚拟机管理器（Root Mode）的 “系统调用”：VMCALL 指令。</p>
 <p>看起来很美好，不是吗？事实上，对刚刚开始支持硬件辅助虚拟化的<br>CPU，使用这个方式未必比动态二进制翻译性能高。因为硬件辅助虚拟化模式对每条特权指令，需要切换到 Root Mode，处理完后再返回，这个模式切换就像实模式和保护模式切换一样，需要初始化很多寄存器，还要保存和恢复现场，更不用说对TLB、高速缓存的影响了。不过，Intel 和 AMD 的工程师也不是吃白饭的，在较新的 CPU 里，硬件辅助虚拟化的性能开销已经比动态二进制翻译做得更好了。</p>
 <p>最后说点实用的：在大多数 BIOS 里，硬件辅助虚拟化都是有开关选项的。只有使能了 Intel Virtualization Technology 这样的选项，虚拟机管理器才能用上硬件加速。因此在使用虚拟机的时候，不要忘了进 BIOS 检查一下。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview10.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview10.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview10.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview10.png" width="400"></a><br>    <figcaption></figcaption><br></figure>
 
 <p>CPU 虚拟化不是一切前面说了这么多，给大家一种假象：只要虚拟了 CPU 指令就万事大吉了。CPU 固然是计算机的大脑，但计算机的其他组件也不容忽略。这些组件包括与 CPU 朝夕共处的内存和硬盘、显卡、网卡等形形<em>*</em>的外设。</p>
 <h3 id="内存虚拟化"><a href="#内存虚拟化" class="headerlink" title="内存虚拟化"></a>内存虚拟化</h3><p>前面讲虚拟化的鼻祖 IBM M44/44X 的时候，提到它提出了 “分页”<br>的概念。也就是每个任务（虚拟机）似乎独占所有内存空间，分页机制负责把不同任务的内存地址映射到物理内存。如果物理内存不够了，操作系统就会把不常用的任务的内存交换到磁盘之类的外部存储，等那个不常用任务需要执行时再加载回来（当然，这种机制是后来才发明的）。这样，程序的开发者就不需要考虑物理内存空间有多大，也不需要考虑不同任务的内存地址是否会冲突。</p>
@@ -249,7 +249,7 @@ CSysSec注： 本文是一篇虚拟机技术的科普文，从虚拟化历史，
 <li>如果虚拟机访问一个页面时它被换出到外部存储了，就会触发缺页异常，虚拟化层要负责把缺页异常分发到该虚拟机的操作系统。</li>
 </ul>
 <p>每个对页表的操作都从虚拟化层那里绕一圈是不小的开销。作为硬件辅助虚拟化的一部分，Intel 从 Nehalem 架构开始引入了 EPT (Extent Page Table) 技术，AMD 也引入了 NPT (Nest Page Table)，让内存管理单元（MMU）支持二级内存翻译（Second Level Address Translation，SLAT）：给虚拟化层提供另一套页表，首先根据虚拟地址（VA）查原来的页表得到物理地址（PA），再查新的页表得到机器地址（MA）。这样就不再需要 “影子页表” 了。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview12.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview12.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview12.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview12.png" width="400"></a><br>    <figcaption></figcaption><br></figure>
 
 <p>有人也许会担心增加的一级映射关系会减慢内存访问速度，事实上不论是否启用二级内存翻译（SLAT），页表高速缓存（Translation Lookaside Buffer，TLB）都会存储虚拟地址（VA）到机器地址（MA）的映射。如果 TLB 的命中率较高，则增加的一级内存翻译不会显著影响内存访问性能。</p>
 <figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview13.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview13.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
@@ -279,7 +279,7 @@ CSysSec注： 本文是一篇虚拟机技术的科普文，从虚拟化历史，
 
 <p>设备虚拟化也有 “全虚拟化” 和 “半虚拟化” 之分。如果虚拟机系统里的驱动程序能够修改，就可以直接调用虚拟机管理器（VMM）的 API，减少模拟硬件设备的开销，这种修改虚拟机内的驱动程序来提高性能的行为就属于半虚拟化。</p>
 <p>通过在虚拟机系统里安装额外的驱动程序，还可以实现一些主机与虚拟机之间的交互（如共享剪贴板、拖动传文件）。这些驱动程序会在虚拟机系统中加载钩子，调用虚拟化管理器提供的 API 完成与主机系统的交互。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview18.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview18.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview18.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview18.png" width="400"></a><br>    <figcaption></figcaption><br></figure>
 
 <p>在虚拟机里安装额外的驱动程序做个小结，大家可以去喝杯茶，回味一下：</p>
 <ul>
@@ -318,7 +318,7 @@ CSysSec注： 本文是一篇虚拟机技术的科普文，从虚拟化历史，
 <figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview22.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview22.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
 
 <p>Docker、LXC 与内核组件的关系Docker 的虚拟化则是基于 libcontainer（上图比较老了，那时还是基于 LXC）。libcontainer 和 LXC 事实上都是基于 Linux 内核提供的 cgroups 资源审计、chroot 文件系统隔离、命名空间隔离等机制。<br>插播：Freeshell 是如何启动的我们知道 freeshell 采用的是 OpenVZ 虚拟化技术，经常有人问能不能换内核，还有人问 freeshell 系统是从哪里启动的。事实上，跟普通的 Linux 系统一样，freeshell 是从虚拟机里的 /sbin/init 开始运行的（看看是不是 1 号进程？），后面就是虚拟机系统自己的启动过程了。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview23.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview23.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview23.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview23.png" width="400"></a><br>    <figcaption></figcaption><br></figure>
 
 <p>Freeshell 控制面板一角事实上，不同类型的虚拟化技术是从不同的地方开始引导虚拟机系统的：</p>
 <ul>
