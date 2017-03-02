@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>虚拟机监控-drakvuf | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="[译文] 来源：https://drakvuf.com/ 
+
+转载本文请务必注明，文章出处：《虚拟机监控-DRAKVUF》
+
+介绍DRAKVUF是一款无 Agent 的恶意软件动态分析系统，它基于Xen、LibVMI、Volatility、Rekall。它能深度追踪病毒样本，从内存中提取被删除的文件，并且无需在虚拟机里安装别的分析软件。
+硬件要求DRAKVUF使用Intel CPU 中的硬件虚拟">
+<meta property="og:type" content="article">
+<meta property="og:title" content="虚拟机监控-DRAKVUF">
+<meta property="og:url" content="http://yoursite.com/20170302/drakvuf/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="[译文] 来源：https://drakvuf.com/ 
+
+转载本文请务必注明，文章出处：《虚拟机监控-DRAKVUF》
+
+介绍DRAKVUF是一款无 Agent 的恶意软件动态分析系统，它基于Xen、LibVMI、Volatility、Rekall。它能深度追踪病毒样本，从内存中提取被删除的文件，并且无需在虚拟机里安装别的分析软件。
+硬件要求DRAKVUF使用Intel CPU 中的硬件虚拟">
+<meta property="og:updated_time" content="2017-03-02T08:58:00.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="虚拟机监控-DRAKVUF">
+<meta name="twitter:description" content="[译文] 来源：https://drakvuf.com/ 
+
+转载本文请务必注明，文章出处：《虚拟机监控-DRAKVUF》
+
+介绍DRAKVUF是一款无 Agent 的恶意软件动态分析系统，它基于Xen、LibVMI、Volatility、Rekall。它能深度追踪病毒样本，从内存中提取被删除的文件，并且无需在虚拟机里安装别的分析软件。
+硬件要求DRAKVUF使用Intel CPU 中的硬件虚拟">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">FROM 0 TO 1</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">体系结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/celebrity">工业大咖</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/donation">打赏支持</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-drakvuf" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      虚拟机监控-DRAKVUF
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170302/drakvuf/" class="article-date">
+	  <time datetime="2017-03-02T08:56:54.000Z" itemprop="datePublished">三月 2, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p> <strong>[译文]</strong> 来源：<a href="https://drakvuf.com/" target="_blank" rel="external">https://drakvuf.com/</a> </p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170302/drakvuf/" target="_blank" rel="external">虚拟机监控-DRAKVUF</a>》</p>
+<hr>
+<h3 id="介绍"><a href="#介绍" class="headerlink" title="介绍"></a>介绍</h3><p>DRAKVUF是一款无 Agent 的恶意软件动态分析系统，它基于Xen、LibVMI、Volatility、Rekall。它能深度追踪病毒样本，从内存中提取被删除的文件，并且无需在虚拟机里安装别的分析软件。</p>
+<h3 id="硬件要求"><a href="#硬件要求" class="headerlink" title="硬件要求"></a>硬件要求</h3><p>DRAKVUF使用Intel CPU 中的硬件虚拟化扩展技术。你需要支持虚拟化(VT-x)和EPT(ExtendedPage Tables)的Intel CPU。DRAKVUF不能在其他CPU上运行(如AMD)或者不支持虚拟化扩展的CPU。</p>
+<h3 id="支持系统"><a href="#支持系统" class="headerlink" title="支持系统"></a>支持系统</h3><p>DRAKVUF目前支持Windows 7，32位和64位系统演示使用DRAKVUF追踪Windows内部内核函数，包括堆分配。</p>
+<p><a href="https://www.youtube.com/watch?v=ZJPHfpDiN4o" target="_blank" rel="external">DRAKVUF追踪Windows内部内核函数</a></p>
+<p>这个演示展示的是DRAKVUF中的进程注入组件，它能够在客机中执行任意可执行文件，不需要任何在客机中安装的帮助程序。演示中我们劫持了Windows任务管理器来执行我们的任务。</p>
+<p><a href="https://www.youtube.com/watch?v=0Dk5RehrA-Q" target="_blank" rel="external">劫持了Windows任务管理器</a></p>
+<p>从内存中提取被删除的文件。很多病毒droppes的文件只会出现在内存中，不会在硬盘出现。</p>
+<p><a href="https://www.youtube.com/watch?v=sOmD9tDU3lM" target="_blank" rel="external">从内存中提取被删除的文件</a></p>
+<h3 id="报告展示"><a href="#报告展示" class="headerlink" title="报告展示"></a>报告展示</h3><p><a href="http://www.slideshare.net/slideshow/embed_code/key/72sSuElfARSGhI" target="_blank" rel="external">这是</a>2014年年度计算机安全应用会议(ACSAC)的展示</p>
+<p>这是2014年在Hacktivity上的<a href="https://www.youtube.com/watch?v=EZPXy314q3E" target="_blank" rel="external">展示</a></p>
+<h3 id="目前状态"><a href="#目前状态" class="headerlink" title="目前状态"></a>目前状态</h3><p>目前有以下的核心功能：</p>
+<pre><code>无Agent执行恶意软件
+无Agent监控Windows内部内核函数
+客机多vCPU支持
+追踪堆分配
+追踪被访问的文件
+在文件被删除前从内存中提取文件
+通过写时拷贝内存和硬盘来克隆分析虚拟机
+</code></pre><p>注意DRAKVUF仍在早期开发阶段，因此缺少其他恶意软件分析器具备的功能。还有很多的提升空间，例如：</p>
+<pre><code>生成JSON/MySQL/MongoDB的结构化的日志
+将提取的文件自动提交到VirusTotal
+Linux支持
+使用Run-time重复数据删除技术删除Xen共享内存中未使用的内存
+整合恶意软件分析功能，如[CRITS](https://crits.github.io/)
+</code></pre><h3 id="安装指导"><a href="#安装指导" class="headerlink" title="安装指导"></a>安装指导</h3><p>12/31/2015更新</p>
+<p>如果安装了旧版本的DRAKVUF，阅读指导打开系统中的Xen altp2m！</p>
+<p>要在基于Debian 的Linux上buildXen和DRAKVUF就需要安装以下的包。以下内容在Debian Jessie和Ubuntu14.04 LTS上测试通过。</p>
+<pre><code>sudo apt-get install wget git bcc bin86 gawk bridge-utilsiproute libcurl3 libcurl4-openssl-dev bzip2 module-init-tools pciutils-devbuild-essential make gcc clang libc6-dev libc6-dev-i386 linux-libc-devzlib1g-dev python python-dev python-twisted python-gevent python-setuptoolslibncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-deve2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlibxz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev cabextractlibglib2.0-dev autoconf automake libtool check libjson-c-dev libfuse-devlibsystemd-daemon-dev
+</code></pre><p>你可以从repository安装Xen，但是我们还是建议用源码build。</p>
+<pre><code>wget http://bits.xensource.com/oss-xen/release/4.6.1/xen-4.6.1.tar.gz 
+wget http://bits.xensource.com/oss-xen/release/4.6.1/xen-4.6.1.tar.gz.sig
+gpg --keyserver pgp.mit.edu --recv-keys 0x83fe14c957e82bd9
+gpg --verify xen-4.6.1.tar.gz.sig
+</code></pre><p>安装Xen dom0，分配4GB RAM和两个专用的CPU内核：</p>
+<pre><code>sudo su make -j4 install-xen make -j4 install-tools
+echo&quot;GRUB_CMDLINE_XEN_DEFAULT=\&quot;dom0_mem=4096M,max:4096M dom0_max_vcpus=4dom0_vcpus_pin=true hap_1gb=false hap_2mb=false altp2m=1\&quot;&quot; &gt;&gt;/etc/default/grub
+echo &quot;/usr/local/lib&quot; &gt;/etc/ld.so.conf.d/xen.conf
+ldconfig
+update-grub
+echo &quot;none /proc/xen xenfs defaults,nofail 0 0&quot;&gt;&gt;         /etc/fstab
+echo &quot;xen-evtchn&quot; &gt;&gt; /etc/modules
+echo &quot;xen-privcmd&quot; &gt;&gt; /etc/modules
+update-rc.d xencommons defaults 19 18
+update-rc.d xendomains defaults 21 20
+update-rc.d xen-watchdog defaults 22 23
+reboot
+</code></pre><p>还要确保你的内核相对较新(版本大于3.8应该就行了)</p>
+<pre><code>uname -r
+</code></pre><p>进入Xen之后，验证一切是否正常：</p>
+<pre><code>sudo xen-detect
+</code></pre><p>输出的结果应该是：Running in PV context on Xen v4.6</p>
+<pre><code>xl list
+</code></pre><p>输出的结果应该类似于：</p>
+<pre><code>Name                                        ID   Mem VCPUs           State     Time(s)
+Domain-0                                     0  4096    2     r-----     614.0
+</code></pre><p>建立一个LVM卷组存档虚拟机磁盘，然后创建卷：</p>
+<pre><code>lvcreate -L20G -n windows7-sp1 vg
+</code></pre><p>用ISO安装Windows 7：</p>
+<pre><code>arch = &apos;x86_64&apos;
+name = &quot;windows7-sp1&quot;
+maxmem = 3000
+memory = 3000
+vcpus = 1
+maxcpus = 1
+builder = &quot;hvm&quot;
+boot = &quot;cd&quot;
+hap = 1
+acpi = 1
+on_poweroff = &quot;destroy&quot;
+on_reboot = &quot;destroy&quot;
+on_crash = &quot;destroy&quot;
+vnc=1
+vnclisten=&quot;0.0.0.0&quot;
+usb = 1
+usbdevice = &quot;tablet&quot;
+altp2mhvm = 1
+shadow_memory = 16
+vif =[&apos;type=ioemu,model=e1000,bridge=xenbr0,mac=00:06:5B:BA:7C:01&apos;]
+disk = [
+ &apos;phy:/dev/vg/windows7-sp1,xvda,w&apos;,
+ &apos;file:/path/to/your/windows7.iso,hdc:cdrom,r&apos;
+]
+</code></pre><p>下载LibVMI 的DRAKVUF分支，并准备build：</p>
+<pre><code>git clone -b drakvuf https://github.com/tklengyel/libvmi
+cd libvmi
+./autogen.sh
+./configure --enable-xen         --enable-xen-events--disable-address-cache
+</code></pre><p>输出的结果应该类似于：</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Option</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Xen Support</td>
+<td>–enable-xen=yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Xen Events</td>
+<td>–enable-xen-events=yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>KVM Support</td>
+<td>–enable-kvm=no</td>
+<td>libvirt missing</td>
+</tr>
+<tr>
+<td>File Support</td>
+<td>–enable-file=yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Shm-snapshot</td>
+<td>–enable-shm-snapshot=no</td>
+<td>no</td>
+</tr>
+<tr>
+<td>————-</td>
+<td>—————————</td>
+<td>—————————-</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Tools</th>
+<th>Option</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Examples</td>
+<td>–enable-examples=yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>VMIFS</td>
+<td>–enable-vmifs=yes</td>
+<td>yes</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Extra features</strong><br>Support of Rekall profiles: yes</p>
+<p>Build并安装LibVMI：</p>
+<pre><code>make
+sudo make install
+echo &quot;exportLD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/usr/local/lib&quot; &gt;&gt; ~/.bashrc
+cd tools/pyvmi
+python setup.py build
+sudo python setup.py install
+cd ../../..
+</code></pre><p>下载Volatility：</p>
+<pre><code>git clone https://github.com/volatilityfoundation/volatility
+cd volatility
+cp ../libvmi/tools/pyvmi/pyvmiaddressspace.pyvolatility/plugins/addrspaces
+python setup.py build
+sudo python setup.py install
+cd ..
+</code></pre><p>下载Rekall并安装：</p>
+<pre><code>git clone --branch v1.4.1     https://github.com/google/rekall
+cd rekall/rekall-core
+python setup.py build
+sudo python setup.py install
+cd ../..
+</code></pre><p>接下来我们要为Windows域创建Rekall档案，首先我们要用LibVMI win-guid工具获得WIndows内核的调试信息。例如：</p>
+<pre><code>$ xl list
+Name             ID   Mem   VCPUs   State     Time(s)
+Domain-0         0    4024    4     r-----     848.8
+windows7-sp1-x86 7    3000    1     -b----      94.7
+$ win-guid name windows7-sp1-x86
+Windows Kernel found @ 0x2604000
+            Version:32-bit Windows 7
+            PEGUID: 4ce78a09412000
+            PDBGUID: 684da42a30cc450f81c535b4d18944b12
+            Kernelfilename: ntkrpamp.pdb
+            Multi-processorwith PAE (version 5.0 and higher)
+            Signature:17744.
+            Machine:332.
+            # ofsections: 22.
+            # ofsymbols: 0.
+            Timestamp:1290242569.
+            Characteristics:290.
+            Optionalheader size: 224.
+            Optionalheader type: 0x10b
+            Section1: .text
+            Section2: _PAGELK
+            Section3: POOLMI
+            Section4: POOLCODE
+            Section5: .data
+            Section6: ALMOSTRO
+            Section7: SPINLOCK
+            Section8: PAGE
+            Section9: PAGELK
+            Section10: PAGEKD
+            Section11: PAGEVRFY
+            Section12: PAGEHDLS
+            Section13: PAGEBGFX
+            Section14: PAGEVRFB
+            Section15: .edata
+            Section16: PAGEDATA
+            Section17: PAGEKDD
+            Section18: PAGEVRFC
+            Section19: PAGEVRFD
+            Section20: INIT
+            Section21: .rsrc
+            Section22: .reloc
+</code></pre><p>关键的地方：</p>
+<pre><code>PDB GUID: 684da42a30cc450f81c535b4d18944b12
+Kernel filename: ntkrpamp.pdb
+</code></pre><p>生成Rekall档案：</p>
+<pre><code>cd /tmp
+rekall fetch_pdb --pdb_filename ntkrpamp.pdb --guid684da42a30cc450f81c535b4d18944b12
+rekall parse_pdb ntkrpamp.pdb &gt; windows7-sp1.rekall.json
+sudo mv windows7-sp1.rekall.json /root
+</code></pre><p>档案生成后我们可以创建LibVMI config：</p>
+<pre><code>sudo su
+printf &quot;windows7-sp1 { \n\
+ostype =\&quot;Windows\&quot;; \n\
+sysmap =\&quot;/root/windows7-sp1.rekall.json\&quot;; \n\
+}&quot; &gt; /etc/libvmi.conf
+</code></pre><p>用进程列表查看LibVMI是否在运行</p>
+<pre><code>process-list windows7-sp1
+</code></pre><p>输出结果应该类似于：</p>
+<pre><code>Process listing for VM windows7-sp1-x86 (id=7)
+[    4] System (structaddr:84aba980)
+[  220] smss.exe(struct addr:85a44020)
+[  300] csrss.exe(struct addr:85f67a68)
+[  336] wininit.exe(struct addr:8601e030)
+[  348] csrss.exe(struct addr:84ba4030)
+[  384] winlogon.exe(struct addr:85966d40)
+[  444] services.exe(struct addr:8614c030)
+[  460] lsass.exe(struct addr:86171030)
+[  468] lsm.exe(struct addr:8617b4f8)
+[  564] svchost.exe(struct addr:861d9bc8)
+[  628] svchost.exe(struct addr:863fb8a8)
+[  816] sppsvc.exe(struct addr:86426838)
+[  856] svchost.exe(struct addr:854abd40)
+[  880] svchost.exe(struct addr:854c5030)
+[  916] svchost.exe(struct addr:854d7a70)
+[ 1240] svchost.exe (struct addr:8614cb80)
+[ 1280] svchost.exe (struct addr:854f7d40)
+[ 1608] spoolsv.exe (struct addr:85578660)
+[ 1636] svchost.exe (struct addr:85554af0)
+[  792] SearchIndexer.(struct addr:8562ac08)
+[ 1128] taskhost.exe (struct addr:858d9d40)
+[ 1524] dwm.exe (struct addr:857f3a60)
+[ 1728] explorer.exe (struct addr:858d9180)
+[ 1720] regsvr32.exe (struct addr:8605f398)
+[  248] svchost.exe(struct addr:863ed030)
+[ 1024] svchost.exe (struct addr:86420390)
+[  256] WmiPrvSE.exe (structaddr:854014a0)
+</code></pre><p>开始build并安装DRAKVUF：</p>
+<pre><code>git clone https://github.com/tklengyel/drakvuf
+cd drakvuf
+autoreconf -vi
+./configure
+make
+</code></pre><p>追踪系统的执行：</p>
+<pre><code>./src/drakvuf -r &lt;rekall profile&gt; -d &lt;domid&gt;
+</code></pre><p>例如：</p>
+<pre><code>./src/drakvuf -r /root/windows7-sp1.rekall.json -d 7
+</code></pre><hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170302/drakvuf/" target="_blank" rel="external">虚拟机监控-DRAKVUF</a>》</p>
+<hr>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Introspection/">Introspection</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/XEN/">XEN</a></li></ul>
+
+      
+        
+	<div id="comment">
+	
+	<!-- 多说评论框 start -->
+	 <div class="ds-thread" data-thread-key="/20170302/drakvuf/" data-title="虚拟机监控-DRAKVUF" data-url="http://yoursite.com/20170302/drakvuf/"></div>
+	<!-- 多说评论框 end -->
+	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+	<script type="text/javascript">
+	var duoshuoQuery = {short_name:"csyssec"};
+	  (function() {
+	    var ds = document.createElement('script');
+	    ds.type = 'text/javascript';ds.async = true;
+	    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+	    ds.charset = 'UTF-8';
+	    (document.getElementsByTagName('head')[0] 
+	     || document.getElementsByTagName('body')[0]).appendChild(ds);
+	  })();
+	  </script>
+	<!-- 多说公共JS代码 end -->
+	
+	</div>
+	<link rel="stylesheet" href="/css/comment.css">
+
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+  
+    <a href="/20170301/virtualization-overview/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">虚拟化技术大观</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+      <ol class="toc"><li class="toc-item toc-level-3"><a class="toc-link" href="#介绍"><span class="toc-number">1.</span> <span class="toc-text">介绍</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#硬件要求"><span class="toc-number">2.</span> <span class="toc-text">硬件要求</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#支持系统"><span class="toc-number">3.</span> <span class="toc-text">支持系统</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#报告展示"><span class="toc-number">4.</span> <span class="toc-text">报告展示</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#目前状态"><span class="toc-number">5.</span> <span class="toc-text">目前状态</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#安装指导"><span class="toc-number">6.</span> <span class="toc-text">安装指导</span></a></li></ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+       <!--  自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a> --> 
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/celebrity" class="mobile-nav-link">Celebrity</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/donation" class="mobile-nav-link">Donation</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>
