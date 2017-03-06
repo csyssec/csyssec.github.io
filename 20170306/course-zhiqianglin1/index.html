@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>名人课堂-高级数字取证与数据逆向工程 | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="CSysSec注： 本系列文章在于收集知名海外教授在计算机系统与安全领域的授课信息，会包含课程详细信息以及slides。转载本文请务必注明，文章出处：《名人课堂-高级数字取证与数据逆向工程》与作者信息：CSysSec
+
+教授Zhiqiang Lin 
+课程简介CS 6V81 is a graduate level, research oriented, system security cours">
+<meta property="og:type" content="article">
+<meta property="og:title" content="名人课堂-高级数字取证与数据逆向工程">
+<meta property="og:url" content="http://yoursite.com/20170306/course-zhiqianglin1/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="CSysSec注： 本系列文章在于收集知名海外教授在计算机系统与安全领域的授课信息，会包含课程详细信息以及slides。转载本文请务必注明，文章出处：《名人课堂-高级数字取证与数据逆向工程》与作者信息：CSysSec
+
+教授Zhiqiang Lin 
+课程简介CS 6V81 is a graduate level, research oriented, system security cours">
+<meta property="og:updated_time" content="2017-03-06T13:07:23.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="名人课堂-高级数字取证与数据逆向工程">
+<meta name="twitter:description" content="CSysSec注： 本系列文章在于收集知名海外教授在计算机系统与安全领域的授课信息，会包含课程详细信息以及slides。转载本文请务必注明，文章出处：《名人课堂-高级数字取证与数据逆向工程》与作者信息：CSysSec
+
+教授Zhiqiang Lin 
+课程简介CS 6V81 is a graduate level, research oriented, system security cours">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">FROM 0 TO 1</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">体系结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/celebrity">工业大咖</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/donation">打赏支持</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+  <div style="background:#fff;width: 100%;">
+
+      <div style="max-height:600px; overflow: hidden;">
+        <img width="100%" alt="Hike News" src="/css/images/pose.jpg">
+      </div>
+
+  </div>
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-course-zhiqianglin1" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      名人课堂-高级数字取证与数据逆向工程
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170306/course-zhiqianglin1/" class="article-date">
+	  <time datetime="2017-03-06T13:05:25.000Z" itemprop="datePublished">三月 6, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <hr>
+<p><strong>CSysSec注：</strong> 本系列文章在于收集知名海外教授在计算机系统与安全领域的授课信息，会包含课程详细信息以及slides。<br><strong>转载本文请务必注明</strong>，文章出处：<a href="http://www.csyssec.org/20170306/course-zhiqianglin1/" target="_blank" rel="external">《名人课堂-高级数字取证与数据逆向工程》</a>与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<h3 id="教授"><a href="#教授" class="headerlink" title="教授"></a>教授</h3><p><a href="https://www.utdallas.edu/~zxl111930/" target="_blank" rel="external">Zhiqiang Lin</a> </p>
+<h3 id="课程简介"><a href="#课程简介" class="headerlink" title="课程简介"></a>课程简介</h3><p>CS 6V81 is a graduate level, research oriented, system security course. Our focus is digital forensics and data reverse engineering, which tackles the problem of what information is stored in a computer system and how this information can be extracted and used. There are a wide range of applications of data reverse engineering, including digital forensics, crash analysis, game hacking, kernel rootkit defense, and malware analysis. The overall goal of this course is to introduce students to the current techniques used in both research and practice.</p>
+<p>In particular, we will cover the underline technical details (including the most recent techniques) of digital forensics and data reverse engineering, discuss various security applications, analyze potential limitations of existing systems, and propose/develop more secure systems. In the first a few lectures, the instructor will introduce the techniques, foundations, and applications of digital forensics and data reverse engineering. After that, in each class students will read current and seminal research papers from the reading materials. Students are encouraged to prepare a short summary/review of the paper of their choosing and submit it to the discussion board in UT Dallas elearning system. Students will lead and prepare for presentations explaining to others.</p>
+<p>Students will also need to perform research, and will pick a semester-long research topic of their choosing. In addition, this course will have one hands-on challenge.</p>
+<h3 id="课程安排"><a href="#课程安排" class="headerlink" title="课程安排"></a>课程安排</h3><table>
+<thead>
+<tr>
+<th>Date</th>
+<th style="text-align:left">Topic To Be Covered</th>
+<th style="text-align:left">Presenter</th>
+<th style="text-align:left">Slides</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>08/26 A</td>
+<td style="text-align:left">Course Overview</td>
+<td style="text-align:left">Instructor</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec1.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td><strong>Foundations</strong></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td>08/26 B</td>
+<td style="text-align:left">OS (Memory Data Management), File System (Disk Data Management)</td>
+<td style="text-align:left">Instructor</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec2.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td><strong>Techniques, Tools, and Applications</strong></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td>09/02 A</td>
+<td style="text-align:left">Data Structure Reverse Engineering: REWARDS [1], TIE [2], and HOWARD [3]</td>
+<td style="text-align:left">Instructor</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec3.pdf" target="_blank" rel="external">pdf</a> </td>
+</tr>
+<tr>
+<td>09/02 B</td>
+<td style="text-align:left">Kernel Rootkit Defense I: SigGraph [10], KOP [11], Crash tool[5], Memory graph [4]</td>
+<td style="text-align:left">Instructor</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec4.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td>09/09 A</td>
+<td style="text-align:left">Vulnerability Analysis I: Exploit Hardening [Q], Surgically Returning to Randomized lib(c) [58], Pointer corruption [7], Non-control data attack[8], and Data flow integrity [9]</td>
+<td style="text-align:left">Mitchell Adair</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec5.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td>09/09 B</td>
+<td style="text-align:left">Vulnerability Analysis II: Crash dump analysis using Bitblaze [6]</td>
+<td style="text-align:left">Kevin Weaver</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec6.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td>09/16 A</td>
+<td style="text-align:left">Protocol Reverse Engineering: Discoverer [12], Polyglot [13], AutoFormat [14], Protocol Analysis [15] …</td>
+<td style="text-align:left">Yangchun Fu</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec9.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td>09/16 B</td>
+<td style="text-align:left">Digital Forensics I: Research problem and roadmap [16], the next 10 years [17]</td>
+<td style="text-align:left">Kevin Weaver</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec8.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td>09/23 A</td>
+<td style="text-align:left">Digital Forensics II: Metadata extraction [18][19][20]</td>
+<td style="text-align:left">Junyuan Zeng</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec9.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td>09/23 B</td>
+<td style="text-align:left">Digital Forensics III: File carving [21][22][23]</td>
+<td style="text-align:left">Kevin Hulin</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec10.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td>09/30 A</td>
+<td style="text-align:left">Digital Forensics IV: Cell phone forensics [24][25][26][27][28]</td>
+<td style="text-align:left">Donald Talkington</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec11.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td>09/30 B</td>
+<td style="text-align:left">Digital Forensics V: Network Forensics [29] (Wireshark/TCPdump, IP prefix hijacking[30], OS Fingerprinting[31])</td>
+<td style="text-align:left">Scott Hand</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec12.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td>10/07 A</td>
+<td style="text-align:left">Digital Forensics VI: Crypto key discovery [32], and extraction [33]</td>
+<td style="text-align:left">Tom Hill</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec13.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td>10/07 B</td>
+<td style="text-align:left">Digital Forensics VII: Windows Memory Analysis[34][35][36][37][38]</td>
+<td style="text-align:left">Camron Quitugua</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec14.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td>10/14 A</td>
+<td style="text-align:left">Digital Forensics VIII: Legal and ethical issues [39]</td>
+<td style="text-align:left">Donald Talkington</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec15.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td>10/14 B</td>
+<td style="text-align:left">Game Hacking I: Differentiating human and bots [59]</td>
+<td style="text-align:left">Nathan McDaniel</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec16.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td>10/21</td>
+<td style="text-align:left">Working on your project (instructor on leave for a conference)</td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td>10/28 A</td>
+<td style="text-align:left">Malicious Code Analysis I: Using data structure as program signature (Laika[40]), Data structure layout randomization ([DSLR])</td>
+<td style="text-align:left">Scott Hand</td>
+<td style="text-align:left">[pdf] [handout]</td>
+</tr>
+<tr>
+<td>10/28 B</td>
+<td style="text-align:left">Malicious Code Analysis II: String analysis for PHP [41, x86 binary [42]</td>
+<td style="text-align:left">Mitchell Adair</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec17.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td>11/04 A</td>
+<td style="text-align:left">Program Analysis I: Value-invariant discovery (Daikon[43][44]), Robust signatures using value-invariant [52]</td>
+<td style="text-align:left">Junyuan Zeng</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec19.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td>11/04 B</td>
+<td style="text-align:left">Program Analysis II: Server-side verification of client behavior in online games [60]</td>
+<td style="text-align:left">Nathan McDaniel</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec20.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td>11/11 A</td>
+<td style="text-align:left">Kernel Rootkit Defense II: data centric approach [46]</td>
+<td style="text-align:left">Camron Quitugua</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec21.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td>11/11 B</td>
+<td style="text-align:left">Using Reverse Engineering Practices to Improve Systems-of-Systems Understanding</td>
+<td style="text-align:left">Tom Hill</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec22.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td>11/18 A</td>
+<td style="text-align:left">Game Hacking II: Preventing map hacks [50]</td>
+<td style="text-align:left">Kevin Hulin</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec23.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td>11/18 B</td>
+<td style="text-align:left">Cloud Computing: Information leakage in 3rd party cloud [51]</td>
+<td style="text-align:left">Yangchun Fu</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec24.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td>11/25</td>
+<td style="text-align:left">Thanksgiving Hollidays. No Class</td>
+</tr>
+<tr>
+<td>**Hands on Challenge: Participating UCSB iCTF</td>
+<td style="text-align:left"><a href="http://ictf.cs.ucsb.edu/**" target="_blank" rel="external">http://ictf.cs.ucsb.edu/**</a></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+<td></td>
+</tr>
+<tr>
+<td>12/02 A</td>
+<td style="text-align:left">UCSB iCTF (10AM - 7PM)</td>
+<td style="text-align:left">ECSS 4.619    </td>
+</tr>
+<tr>
+<td>12/02 B</td>
+<td style="text-align:left">UCSB iCTF (10AM - 7PM)</td>
+<td style="text-align:left">ECSS 4.619    </td>
+</tr>
+<tr>
+<td><strong>Project Presentation</strong></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td>12/09 A</td>
+<td style="text-align:left">Project Presentation</td>
+<td style="text-align:left">Adair, Fu, Hand, Hill, Hulin, McDaniel    </td>
+</tr>
+<tr>
+<td>12/09 B</td>
+<td style="text-align:left">Project Presentation</td>
+<td style="text-align:left">Talkington, Quitugua, Weaver, Zeng</td>
+</tr>
+</tbody>
+</table>
+<h3 id="阅读列表"><a href="#阅读列表" class="headerlink" title="阅读列表"></a>阅读列表</h3><p>We do not have a text book, but we have the following reading list. Students are requied to read all of these papers (at least of their choosing) and encouraged to submit their summary on each paper.</p>
+<p>[1] Z. Lin, X. Zhang, and D. Xu. “Automatic Reverse Engineering of Data Structures from Binary Execution,” In NDSS 2010</p>
+<p>[2] J. Lee, T. Avgerinos, and D. Brumley. “TIE: Principled Reverse Engineering of Types in Binary Programs,” In NDSS 2011</p>
+<p>[3] A. Slowinska, T. Stancescu, and H. Bos. “Howard: A Dynamic Excavator for Reverse Engineering Data Structures,” In NDSS 2011</p>
+<p>[4] T. Zimmermann and A. Zeller. “Visualizing memory graphs,” In Revised Lectures on Software Visualization, International Seminar, 2002</p>
+<p>[5] Mission Critical Linux – Crash Core Analysis Suite <a href="http://mclx.com/projects/crash/" target="_blank" rel="external">http://mclx.com/projects/crash/</a></p>
+<p>[6] Charlie Miller, Juan Caballero, Noah M. Johnson, Min Gyung Kang, Stephen McCamant, Pongsin Poosankam, and Dawn Song. “Crash Analysis with Bitblaze,” In Blackhat 2010</p>
+<p>[7] Shuo Chen, Jun Xu, Nithin Nakka, Zbigniew Kalbarczyk, and Ravishankar K. Iyer, “Defeating Memory Corruption Attacks via Pointer Taintedness Detection,” In DSN 2005</p>
+<p>[8] Shuo Chen, Jun Xu, Emre C. Sezer, Prachi Gauriar, and Ravishankar K. Iyer, “Non-Control-Data Attacks Are Realistic Threats,” In USENIX Security 2005</p>
+<p>[9] Miguel Castro, Manuel Costa, and Tim Harris. “Securing software by enforcing data-flow integrity,” In OSDI 2006</p>
+<p>[10] Z. Lin, X. Zhang, D.Xu, and X. Jiang. “SigGraph: Brute Force Scanning of Kernel Data Structure Instances Using Graph-based Signatures,” In NDSS 2011</p>
+<p>[11] M. Carbone, W. Cui, L. Lu, W. Lee, M. Peinado, and X. Jiang. “Mapping kernel objects to enable systematic integrity checking,” In CCS 2009</p>
+<p>[12] W. Cui, J. Kannan, and H. J. Wang. “Discoverer: Automatic protocol reverse engineering from network traces,” In USENIX Security 2007</p>
+<p>[13] J. Caballero and D. Song. “Polyglot: Automatic extraction of protocol format using dynamic binary analysis,” In CCS 2007</p>
+<p>[14] Z. Lin, X. Jiang, D. Xu, and X. Zhang. “Automatic protocol format reverse engineering through context-aware monitored execution,” In NDSS 2008</p>
+<p>[15] G. Wondracek, P. M. Comparetti, C. Kruegel, and E. Kirda. “Automatic Network Protocol Analysis,” In NDSS 2008</p>
+<p>[16] “A Road Map for Digital Forensic Research,” Report From the First Digital Forensic Research Workshop (DFRWS). 2001</p>
+<p>[17] Simson L. Garfinkel. “Digital forensics research: The next 10 years”. In DFRWS 2010</p>
+<p>[18] Metadata Extraction Tool, <a href="http://meta-extractor.sourceforge.net/" target="_blank" rel="external">http://meta-extractor.sourceforge.net/</a></p>
+<p>[19] Hachoir <a href="https://bitbucket.org/haypo/hachoir/wiki/Home" target="_blank" rel="external">https://bitbucket.org/haypo/hachoir/wiki/Home</a></p>
+<p>[20] Sleuthkit <a href="http://www.sleuthkit.org/" target="_blank" rel="external">http://www.sleuthkit.org/</a></p>
+<p>[21] Mikus, Nicholas A. “An analysis of disc carving techniques,” MS Thesis. Naval Postgraduate School, 2006</p>
+<p>[22] Golden G. Richard and Vassil Roussev. “Scalpel: A Frugal, High Performance File Carver,” In DFRWS 2005</p>
+<p>[23] Anandabrata Pal and Nasir Memon. “The Evolution of File Carving,” IEEE Signal Processing Magazine, Vol26(2) March 2009</p>
+<p>[24] Vrizlynn L.L. Thing, Kian-Yong Ng, Ee-Chien Chang. “Live memory forensics of mobile phones,” In DFRWS 2010</p>
+<p>[25] Guidelines on Cell Phone Forensics (NIST SP 800-101), May 2007</p>
+<p>[26] Cell Phone Forensic Tools: An Overview and Analysis (NISTIR 7250)</p>
+<p>[27] PDA Forensic Tools: An Overview and Analysis (NISTIR 7100)</p>
+<p>[28] R Ahmed. “Mobile forensics: an overview, tools, future trends and challenges from law enforcement perspective”. 6th International Conference on E-Governance. 2008</p>
+<p>[29] <a href="http://en.wikipedia.org/wiki/Network_forensics" target="_blank" rel="external">http://en.wikipedia.org/wiki/Network_forensics</a></p>
+<p>[30] Hitesh Ballani, Paul Francis, and Xinyang Zhang. “A study of prefix hijacking and interception in the internet,” In SIGCOMM 2007</p>
+<p>[31] Techniques in OS-Fingerprinting, <a href="http://nostromo.joeh.org/osf.pdf" target="_blank" rel="external">http://nostromo.joeh.org/osf.pdf</a></p>
+<p>[32] J. Halderman, S. Schoen, N. Heninger, W. Clarkson, W. Paul, J. Calandrino, A. Feldman, J. Appelbaum, E. Felton. “Lest We Remember: Cold Boot Attacks on Encryption Keys,” In USENIX Security 2008</p>
+<p>[33] Carsten Maartmann-Moe, Steffen E. Thorkildsen, Andre Arnes. “The persistence of memory: Forensic identification and extraction of cryptographic keys,” In DFRWS 2009</p>
+<p>[34] Andreas Schuster. “Searching for Processes and Threads in Microsoft Windows Memory Dumps,” In DFRWS 2006</p>
+<p>[35] Ali Reza Arasteh and Mourad Debbabi. “Forensic Memory Analysis: From Stack and Code to Execution History,” In DFRWS 2007</p>
+<p>[36] Mariusz Burdach. “Finding Digital Evidence In Physical Memory,” In Black Hat Federal 2008</p>
+<p>[37] Brendan Dolan-Gavitt. “Forensic Analysis of the Windows Registry in Memory,” In DFRWS 2008</p>
+<p>[38] Andreas Schuster. “The impact of Microsoft Windows pool allocation strategies on memory forensics,” In DFRWS 2008</p>
+<p>[39] Aaron J. Burstein, “Toward a Culture of Cybersecurity Research,” UC Berkeley Public Law Research Paper No. 1113014, 2008</p>
+<p>[40] A. Cozzie, F. Stratton, H. Xue, and S. T. Kin. “Digging for Data Structures,” In OSDI 2008</p>
+<p>[41]Fang Yu, Muath Alkhalaf, Tevfik Bultan. “Stranger: An Automata-based String Analysis Tool for PHP.” [Tool paper <a href="http://www.cs.ucsb.edu/~vlab/stranger/" target="_blank" rel="external">http://www.cs.ucsb.edu/~vlab/stranger/</a>]. In TACAS 2010</p>
+<p>[42] Mihai Christodorescu, Nicholas Kidd, and Wen-Han Goh. “String analysis for x86 binaries,” In PASTE 2005</p>
+<p>[43] Michael D. Ernst, Jeff H. Perkins, Philip J. Guo, Stephen McCamant, Carlos Pacheco, Matthew S. Tschantz, and Chen Xiao. “The Daikon system for dynamic detection of likely invariants,” Science of Computer Programming, 2007</p>
+<p>[44] Michael D. Ernst, Jake Cockrell, William G. Griswold, and David Notkin. “Dynamically discovering likely program invariants to support program evolution,” IEEE Transactions on Software Engineering, 27(2) 2001</p>
+<p>[45] Y. Jhi, X. Wang, X. Jia, S. Zhu, P. Liu, and D. Wu. “Value-Based Program Characterization and Its Application to Software Plagiarism Detection,” In ICSE 2011</p>
+<p>[46] Junghwan Rhee, Ryan Riley, Dongyan Xu, and Xuxian Jiang. “Kernel malware analysis with un-tampered and temporal views of dynamic kernel memory. In RAID 2010</p>
+<p>[47] A. Baliga, V. Ganapathy, and L. Iftode. “Automatic inferenceand enforcement of kernel data structure invariants,” In ACSAC 2008</p>
+<p>[48] An architecture for specification-based detection of semantic integrity violations in kernel dynamic data. In USENIX Security 2006</p>
+<p>[49] Copilot - a coprocessor-based kernel runtime integrity monitor. In USENIX Security 2004</p>
+<p>[50] E. Bursztein, J. Lagarenne, M. Hamburg, D. Boneh. “OpenConflict: Preventing Real Time Map Hacks in Online Games,” In IEEE S&amp;P (Oakland) 2011</p>
+<p>[51] Thomas Ristenpart, Eran Tromer, Hovav Shacham, Stefan Savage. “Hey, You, Get Off of My Cloud! Exploring Information Leakage in Third-Party Compute Clouds,” In CCS 2009</p>
+<p>[52] B. Dolan-Gavitt, A. Srivastava, P. Traynor, and J. Giffin. “Robust signatures for kernel data structures,” In CCS 2009</p>
+<p>[53] Zhi Wang, Xuxian Jiang, Weidong Cui, Xinyuan Wang. “Countering Persistent Kernel Rootkits Through Systematic Hook Discovery”. In RAID 2008</p>
+<p>[54] Zhi Wang, Xuxian Jiang, Weidong Cui, and Peng Ning. “Countering Kernel Rootkits with Lightweight Hook Protection”. In CCS 2009</p>
+<p>[55] Heng Yin, Pongsin Poosankam, Steve Hanna, and Dawn song. “HookScout: Proactive and Binary-Centric Hook Detection”. In DIMVA 2010</p>
+<p>[56] Zhiqiang Lin, Ryan Riley, and Dongyan Xu. “Polymorphing Software by Randomizing Data Structure Layout”. In DIMVA 2009</p>
+<p>[57] Edward J. Schwartz, Thanassis Avgerinos, and David Brumley. “Q: Exploit Hardening Made Easy “. In USENIX Security 2011</p>
+<p>[58] Giampaolo Fresi Roglia, Lorenzo Martignoni, Roberto Paleari, Danilo Bruschi “Surgically Returning to Randomized lib(c)”. In ACSAC 2009</p>
+<p>[59] Steven Gianvecchio, Zhenyu Wu, Mengjun Xie, and Haining Wang, “Battle of Botcraft: Fighting Bots in Online Games with Human Observational Proofs”. In ACM CCS 2009</p>
+<p>[60] D. Bethea, R. A. Cochran and M. K. Reiter, “Server-side verification of client behavior in online games”. In NDSS 2010</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：<a href="http://www.csyssec.org/20170306/course-zhiqianglin1/" target="_blank" rel="external">《名人课堂-高级数字取证与数据逆向工程》</a>与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/名人课堂/">名人课堂</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Course/">Course</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Forensics/">Forensics</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/RE/">RE</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
+
+      
+        
+	<div id="comment">
+	
+	<!-- 多说评论框 start -->
+	 <div class="ds-thread" data-thread-key="/20170306/course-zhiqianglin1/" data-title="名人课堂-高级数字取证与数据逆向工程" data-url="http://yoursite.com/20170306/course-zhiqianglin1/"></div>
+	<!-- 多说评论框 end -->
+	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+	<script type="text/javascript">
+	var duoshuoQuery = {short_name:"csyssec"};
+	  (function() {
+	    var ds = document.createElement('script');
+	    ds.type = 'text/javascript';ds.async = true;
+	    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+	    ds.charset = 'UTF-8';
+	    (document.getElementsByTagName('head')[0] 
+	     || document.getElementsByTagName('body')[0]).appendChild(ds);
+	  })();
+	  </script>
+	<!-- 多说公共JS代码 end -->
+	
+	</div>
+	<link rel="stylesheet" href="/css/comment.css">
+
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+  
+    <a href="/20170302/drakvuf/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">虚拟机监控-DRAKVUF</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+      <ol class="toc"><li class="toc-item toc-level-3"><a class="toc-link" href="#教授"><span class="toc-number">1.</span> <span class="toc-text">教授</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#课程简介"><span class="toc-number">2.</span> <span class="toc-text">课程简介</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#课程安排"><span class="toc-number">3.</span> <span class="toc-text">课程安排</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#阅读列表"><span class="toc-number">4.</span> <span class="toc-text">阅读列表</span></a></li></ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+       <!--  自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a> --> 
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/celebrity" class="mobile-nav-link">Celebrity</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/donation" class="mobile-nav-link">Donation</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>
