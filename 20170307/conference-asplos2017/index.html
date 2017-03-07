@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>asplos 2017 accepted papers | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="CSysSec注： 本系列文章旨在收集主流会议每年录用的文章信息，并做相关的总结，持续更新。
+转载请注明： 主流会议-ASPLOS 2017 Accepted Papers与作者信息：CSysSec
+
+ASPLOS Highlights I
+Determining Application-specific Peak Power and Energy Requirements for Ultra-">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ASPLOS 2017 Accepted Papers">
+<meta property="og:url" content="http://yoursite.com/20170307/conference-asplos2017/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="CSysSec注： 本系列文章旨在收集主流会议每年录用的文章信息，并做相关的总结，持续更新。
+转载请注明： 主流会议-ASPLOS 2017 Accepted Papers与作者信息：CSysSec
+
+ASPLOS Highlights I
+Determining Application-specific Peak Power and Energy Requirements for Ultra-">
+<meta property="og:updated_time" content="2017-03-07T11:44:47.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="ASPLOS 2017 Accepted Papers">
+<meta name="twitter:description" content="CSysSec注： 本系列文章旨在收集主流会议每年录用的文章信息，并做相关的总结，持续更新。
+转载请注明： 主流会议-ASPLOS 2017 Accepted Papers与作者信息：CSysSec
+
+ASPLOS Highlights I
+Determining Application-specific Peak Power and Energy Requirements for Ultra-">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">FROM 0 TO 1</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">体系结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/celebrity">工业大咖</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/donation">打赏支持</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+  <div style="background:#fff;width: 100%;">
+
+      <div style="max-height:600px; overflow: hidden;">
+        <img width="100%" alt="Hike News" src="/css/images/pose.jpg">
+      </div>
+
+  </div>
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-conference-asplos2017" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      ASPLOS 2017 Accepted Papers
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170307/conference-asplos2017/" class="article-date">
+	  <time datetime="2017-03-07T11:43:44.000Z" itemprop="datePublished">三月 7, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <hr>
+<p><strong>CSysSec注</strong>： 本系列文章旨在收集主流会议每年录用的文章信息，并做相关的总结，持续更新。</p>
+<p><strong>转载请注明</strong>： <a href="http://www.csyssec.org/20170307/conference-asplos2017/" target="_blank" rel="external">主流会议-ASPLOS 2017 Accepted Papers</a>与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<h3 id="ASPLOS-Highlights-I"><a href="#ASPLOS-Highlights-I" class="headerlink" title="ASPLOS Highlights I"></a>ASPLOS Highlights I</h3><ul>
+<li><p><strong>Determining Application-specific Peak Power and Energy Requirements for Ultra-low-power Processors</strong>, Hari Cherupalli (University of Minnesota); Henry Duwe (University of Illinois); Weidong Ye (University of Illinois); Rakesh Kumar (University of Illinois); John Sartori (University of Minnesota)</p>
+</li>
+<li><p><strong>Prophet: Precise QoS Prediction on Non-Preemptive Accelerators to Improve Utilization in Warehouse Scale Computers</strong>, Quan chen (Shanghai Jiao Tong University); Hailong Yang (Beihang University); Minyi Guo (Shanghai Jiao Tong University); Ram Srivatsa Kannan (University of Michigan - Ann Arbor); Jason Mars; Lingjia Tang (University of Michigan - Ann Arbor)</p>
+</li>
+<li><p><strong>Mallacc: Accelerating Memory Allocation</strong>, Svilen Kanev; Sam Likun Xi; Gu-Yeon Wei; David Brooks (Harvard University)</p>
+</li>
+<li><strong>REDSPY: Exploring Value Locality in Software</strong>, Shasha Wen (College of William and Mary); Milind Chabbi (Hewlett-Packard Enterprise); Xu Liu (College of William and Mary)</li>
+<li><strong>Translation-Triggered Prefetching</strong>, Abhishek Bhattacharjee (Rutgers University)</li>
+<li><strong>Typed Architectures: Architectural Support for Lightweight Scripting</strong>, Channol Kim (Sungkyunkwan University); Sungmin Kim (Sungkyunkwan University); Jaehyeok Kim (Samsung Electronics); Dooyoung Kim (Sungkyunkwan University); Namho Kim (Sungkyunkwan University); Gitae Na (Sungkyunkwan University); Young H. Oh (Sungkyunkwan University); Hyeon Gyu Cho (Sungkyunkwan University); Jae W. Lee (Sungkyunkwan University and Seoul National University); Channel Kim (SungKyunKwan University)</li>
+</ul>
+<h3 id="Memory"><a href="#Memory" class="headerlink" title="Memory"></a>Memory</h3><ul>
+<li><strong>Failure-Atomic Slotted Paging for Persistent Memory,</strong> Jihye Seo; Wook-hee Kim; Woongki Baek; Beomseok Nam; Sam H. Noh (UNIST)</li>
+<li>W<strong>hat Scalable Programs Need from Transactional Memory,</strong> Donald Nguyen (Synthace Limited); Keshav Pingali (The University of Texas at Austin)</li>
+<li><strong>TriCheck: Memory Model Verification at the Trisection of Software, Hardware, and ISA</strong>, Caroline Trippel (ctrippel@princeton.edu); Yatin A. Manerkar (Princeton University); Michael Pellauer (NVIDIA Research); Daniel Lustig (NVIDIA Research); Margaret Martonosi (Princeton University)</li>
+<li><strong>An Analysis of Persistent Memory Use with WHISPER</strong>, Sanketh Nalli (University of Wisconsin-Madison); Swapnil Haria (University of Wisconsin-Madison); Michael M. Swift (University of Wisconsin-Madison); Mark D. Hill (University of Wisconsin-Madison); Haris Volos; Kimberly Keeton</li>
+</ul>
+<h3 id="Verification-and-Testing"><a href="#Verification-and-Testing" class="headerlink" title="Verification and Testing"></a>Verification and Testing</h3><ul>
+<li><strong>ProRace: Practical Data Race Detection for Production Use,</strong> Tong Zhang; Changhee Jung; Dongyoon Lee (Virginia Tech)</li>
+<li><strong>Crossing Guard: Mediating Host-Accelerator Coherence Interactions,</strong> Lena E. Olson; Mark D. Hill; David A. Wood (University of Wisconsin-Madison)</li>
+<li><strong>An Architecture Supporting Formal and Compositional Binary Analysis</strong>, Joseph McMaHan (University of California, Santa Barbara); Michael Christensen (University of California, Santa Barbara); Lawton Nichols (University of California, Santa Barbara); Jared Roesch (University of Washington, Seattle); Sung-Yee Guo (University of California, Santa Barbara); Ben Hardekopf (University of California, Santa Barbara); Tim Sherwood (University of California, Santa Barbara)</li>
+<li><strong>AsyncClock: Scalable Inference of Asynchronous Event Causality</strong>, Chun-Hung Hsiao (University of Michigan); Satish Narayanasamy (University of Michigan); Essam Muhammad Idris (University of Michigan); Cristiano L. Pereira (Intel, Inc); Gilles A. Pokam (Intel, Inc)</li>
+</ul>
+<h3 id="Distributed-Systems"><a href="#Distributed-Systems" class="headerlink" title="Distributed Systems"></a>Distributed Systems</h3><ul>
+<li><strong>Black-box Concurrent Data Structures for NUMA Architectures,</strong> Irina Calciu (VMware Research Group); Siddhartha Sen (Microsoft Research); Mahesh Balakrishnan (Yale University); Marcos K. Augilera (VMware Research Group)</li>
+<li><strong>CoRAL: Confined Recovery in Distributed Asynchronous Graph Processing</strong>, Keval Vora (University of California, Riverside); Chen Tian (Huawei US R&amp;D Center); Rajiv Gupta (University of California, Riverside); Ziang Hu (Huawei US R&amp;D Center)</li>
+<li><strong>KickStarter: Fast and Accurate Computations on Streaming Graphs via Trimmed Approximations</strong>, Keval Vora (University of California, Riverside); Rajiv Gupta (University of California, Riverside); Guoqing (Harry) Xu (University of California, Irvine)</li>
+<li><strong>Browsix: Bridging the Gap Between Unix and the Browser</strong>, Bobby Powers; John Vilk; Emery D. Berger (University of Massachusetts Amherst)</li>
+</ul>
+<h3 id="Compiler-Optimizations"><a href="#Compiler-Optimizations" class="headerlink" title="Compiler Optimizations"></a>Compiler Optimizations</h3><ul>
+<li><strong>Optimizing CNNs on Multicores for Scalability, Performance and Goodput</strong>, Samyam Rajbhandari (The Ohio State University); Yuxiong He (Microsoft Research); Olatunji Ruwase (Microsoft Research); Michael Carbin (Microsoft Research); Trishul Ochilimbi (Microsoft Research)</li>
+<li><strong>Locality Transformations for Nested Recursive Iteration Spaces,</strong> Kirshanthan Sundararajah; Laith Sakka; Milind Kulkarni (Purdue University)</li>
+<li><strong>Locality-Aware CTA Clustering For Modern GPUs</strong>, Ang Li (Pacific Northwest National Lab); Shuaiwen Leon Song (Pacific Northwest National Lab); Weifeng Liu (University of Copenhagen); Xu Liu (College of William and Mary); Akash Kumar (Technische University Dresden); Henk Corporaal (Eindhoven University of Technology)</li>
+<li><strong>Sound Loop Superoptimization for Google Native Client</strong>, Berkeley Churchill; Rahul Sharma; Jean-Francois Bastien; Alex Aiken (Stanford University)</li>
+</ul>
+<h3 id="Storage"><a href="#Storage" class="headerlink" title="Storage"></a>Storage</h3><ul>
+<li><p><strong>DudeTM: Building Durable Transactions with Decoupling for Persistent Memory</strong>, Mengxing Liu (Tsinghua University); Mingxing Zhang (Tsinghua University); Kang Chen (Tsinghua University); Xuehai Qian (University of Southern California); Yongwei Wu (Tsinghua University); Weimin Zheng (Tsinghua University); Jinglei Ren (Tsinghua University)</p>
+</li>
+<li><p><strong>ReFlex: Remote Flash == Local Flash</strong>, Ana Klimovic (Stanford University); Heiner Litz (Stanford University); Christos Kozyrakis (Stanford University)</p>
+</li>
+<li><p><strong>Approximate Storage of Compressed and Encrypted Videos</strong>, Djordje Jevdjic (University of Washington); Karin Strauss (Microsoft Research); Luis Ceze (University of Washington); Henrique Malvar (Microsoft Research)</p>
+</li>
+<li><p><strong>Exploiting Intra-Request Slack to Improve SSD Performance,</strong> Nima Elyasi (Pennsylvania State University); Mohammad Arjomand (Pennsylvania State University); Anand Sivasubramaniam (Pennsylvania State University); Mahmut T. Kandemir (Pennsylvania State University); Chita R. Das (Pennsylvania State University); Myoungsoo Jung (Yonsei University)</p>
+</li>
+</ul>
+<h3 id="IOT-and-Applications"><a href="#IOT-and-Applications" class="headerlink" title="IOT and Applications"></a>IOT and Applications</h3><ul>
+<li><p><strong>Graspan: A Single-machine Disk-based Graph System for Interprocedural Static Analyses of Large-scale Systems Code</strong>, Kai Wang; Aftab Hussain; Zhiqiang Zuo; Guoqing (Harry) Xu; Ardalan Amiri (University of California, Irvine)</p>
+</li>
+<li><p><strong>SC-DCNN: Highly-Scalable Deep Convolutional Neural Network using Stochastic Computing</strong>, Ao Ren (Syracuse University); Ji Li (University of Southern California); Zhe Li (Syracuse University); Caiwen Ding (Syracuse University); Xuehai Qian (University of Southern California); Qinru Qiu (Syracuse University); Bo Yuan (The City College of New York); Yanzhi Wang (Syracuse University)</p>
+</li>
+<li><p><strong>3DGates: An Instruction-Level Energy Analysis and Optimization of 3D Printers</strong>, Jerry Ajay; Chen Song; Aditya Singh Rathore; Chi Zhou; Wenyao Xu (University at Buffalo)</p>
+</li>
+</ul>
+<h3 id="Virtualization"><a href="#Virtualization" class="headerlink" title="Virtualization"></a>Virtualization</h3><ul>
+<li><p><strong>Efficient Address Translation for Architectures with Multiple Page Sizes</strong>, Guilherme Cox; Abhishek Bhattacharjee (Rutgers University)</p>
+</li>
+<li><p><strong>Page Fault Support for Network Controllers</strong>, Ilya Lesokhin (Technion and Mellanox); Haggai Eran (Technion and Mellanox); Shachar Raindel (Mellanox); Guy Shapiro (Mellanox); Sagi Grimberg (Mellanox); Liran Liss (Mellanox); Muli Ben-Yehuda (Technion); Nadav Amit (Technion and VMware Research); Dan Tsafrir (Technion)</p>
+</li>
+<li><p><strong>Towards “Full Containerization” in Containerized Network Function Virtualization</strong>, Yang Hu (University of Florida); Tao Li (NSF/University of Florida)</p>
+</li>
+</ul>
+<h3 id="Accelerators-GPUs-ASICs-and-Heterogeneous-Systems"><a href="#Accelerators-GPUs-ASICs-and-Heterogeneous-Systems" class="headerlink" title="Accelerators: GPUs, ASICs, and Heterogeneous Systems"></a>Accelerators: GPUs, ASICs, and Heterogeneous Systems</h3><ul>
+<li><p><strong>FLEP: Enabling Flexible and Efficient Preemption on GPUs</strong>, Bo Wu (Colorado School of Mines); Xu Liu (College of William and Mary); Xiaobo Zhou (University of Colorado, Colorado Springs); Changjun Jiang (Tongji University)</p>
+</li>
+<li><p><strong>SaberLDA: Sparsity-Aware Learning of Topic Models on GPUs</strong>, Kaiwei Li; Jianfei Chen; Wengguan Chen; Jun Zhu (Tsinghua University)</p>
+</li>
+<li><p><strong>Moonwalk: NRE Optimization in ASIC Clouds</strong>, Moein Khazraee; Lu Zhang; Luis Vega; Michael Bedford; Moein Khazraee</p>
+</li>
+<li><p><strong>Dynamic Resource Management for Efficient Utilization of Multitasking GPUs</strong>, Jason Jong Kyu Park (University of Michigan); Yongjun Park (Hongik University); Scott Mahlke (University of Michigan)</p>
+</li>
+</ul>
+<h3 id="Security"><a href="#Security" class="headerlink" title="Security"></a>Security</h3><ul>
+<li><p><strong>Identifying Security Critical Properties for the Dynamic Verification of a Processor</strong>, Rui Zhang; Natalie Stanley; Christopher Griggs; Andrew Chi; Cynthia Sturton (UNC Chapel Hill)</p>
+</li>
+<li><p><strong>Verification of a Practical Hardware Security Architecture Through Static Information Flow Analysis</strong>, Andrew Ferraiuolo (Cornell University); Rui Xu (Cornell University); Danfeng Zhang (Pennsylvania State University); Andrew C. Myers (Cornell University); G. Edward Suh (Cornell Universiy)</p>
+</li>
+<li><p><strong>CHERI JNI: Sinking the Java Security Model into the C</strong>, David Chisnall (University of Cambridge); Brooks Davis (SRI International); Khilan Gudka; Alexandre Joannou (University of Cambridge); Robert N. M. Waston (University of Cambridge); David Brazdil; Jonathan Woodruff; A. Theodore Markettos (University of Cambridge); J. Edward Maste; Robert Norton (University of Cambridge); Stacey Son; Michael Roe (University of Cambridge); Simon W. Moore (University of Cambridge); Peter G. Neumann (SRI International); Ben Laurie (Google)</p>
+</li>
+<li><p><strong>GRIFFIN: Guarding Control Flows Using Intel Processor</strong> Trace, Xinyang Ge (The Pennsylvania State University); Weidong Cui (Microsoft Research); Trent Jaeger (The Pennsylvania State University)</p>
+</li>
+</ul>
+<h3 id="Cloud"><a href="#Cloud" class="headerlink" title="Cloud"></a>Cloud</h3><ul>
+<li><p><strong>Bolt: I Know What You Did Last Summer… In the Cloud</strong>, Christina Delimitrou (Cornell University); Christos Kozyrakis (Stanford University)</p>
+</li>
+<li><p><strong>Neurosurgeon: Collaborative Intelligence Between Cloud and the Mobile Edge</strong>, Yiping Kang; Johann Hauswald; Cao Gao; Austin Rovinski; Trevor Mudge; Jason Mars; Lingjia Tang;</p>
+</li>
+<li><p><strong>Thermostat: Application-transparent Page Management for Two-tiered Main Memory</strong>, Neha Agarwal; Thomas Wenisch (University of Michigan)</p>
+</li>
+<li><p><strong>Breaking the Boundaries in Heterogeneous-ISA Datacenters</strong>, Antonio Barbalace; Robert Lyerly; Christopher Jelesnianski; Anthony Carno; Ho-ren Chuang; Vincent Legout; Binoy Ravindran</p>
+</li>
+</ul>
+<h3 id="Debugging"><a href="#Debugging" class="headerlink" title="Debugging"></a>Debugging</h3><ul>
+<li><p><strong>Automated Synthesis of Comprehensive Memory Model Litmus Test Suites</strong>, Daniel Lustig (NVIDIA); Andrew Wright (MIT); Alexanders Papakonstantinou (NVIDIA); Olivier Giroux (NVIDIA)</p>
+</li>
+<li><p><strong>DCatch: Automatically Detecting Distributed Concurrency Bugs in Cloud Systems</strong>, Haopeng Liu (University of Chicago); Guangpu Li (University of Chicago); Jeffrey F. Lukman (University of Chicago); Jiaxin Li (University of Chicago); Shan Lu (University of Chicago); Haryadi S. Gunawi (University of Chicago); Chen Tian (Huawei US R&amp;D Center)</p>
+</li>
+<li><p><strong>Towards Practical Default-On Multi-Core Record/Replay,</strong> Ali Jose Mashtizadeh (Stanford University); Tal Garfinkel (N/A); David Terei (Stanford University); David Mazieres (Stanford University/Intrinsic); Mendel Rosenblum (Stanford University/Google)</p>
+</li>
+<li><p><strong>Pallas: Semantic-Aware Checking for Finding Deep Bugs in Fast Path</strong>, Jian Huang (Georgia Tech); Michael R. Allen-Bond (Washington State University); Xuechen Zhang (Washington State University)</p>
+</li>
+</ul>
+<h3 id="Memory-II"><a href="#Memory-II" class="headerlink" title="Memory II"></a>Memory II</h3><ul>
+<li><p><strong>Hardware-Software Co-design to Mitigate DRAM Refresh Overheads: A Case for Refresh-Aware Process Scheduling,</strong> Jagadish B. Kotra (The Pennsylvania State University); Narges Shahidi (The Pennsylvania State University); Zeshan A. Chishti (Intel Corporation); Mahmut T. Kandemir (The Pennsylvania State University)</p>
+</li>
+<li><p><strong>Kill the Program Counter: Reconstructing Program Behavior in the Processor Cache Hierarchy,</strong> Jinchun Kim (Texas A&amp;M University); Elvira Teran (Texas A&amp;M University); Paul V. Gratz (Texas A&amp;M University); Daniel A. Jimenez (Texas A&amp;M University); Seth H. Pugsley (Intel Labs); Chris Wilkerson (Intel Labs); Daniel A. Jimanez (Texas A&amp;M University);</p>
+</li>
+<li><p><strong>TETRIS:Scalable and Efficient Neural Network Acceleration with 3D Memory</strong>, Mingyu Gao; Jing Pu; Xuan Yang; Mark Horowitz; Christos Kozyrakis(Stanford University)</p>
+</li>
+<li><p><strong>History-Based Arbitration for Fairness in Processor-Interconnect of NUMA Servers</strong> , Wonjun Song (KAIST); Gwangsun Kim (KAIST); Hyungjoon Jung (KAIST); Jongwook Chung (Seoul National University); Jung Ho Ahn (Seoul National University); Jae W Lee (Seoul National University); John Kim (KAIST); John Kim (KAIST)</p>
+</li>
+</ul>
+<h3 id="Data-Center-Architectures-amp-Power-Management"><a href="#Data-Center-Architectures-amp-Power-Management" class="headerlink" title="Data Center Architectures &amp; Power Management"></a>Data Center Architectures &amp; Power Management</h3><ul>
+<li><p><strong>Enabling Lightweight Transactions with Precision Time</strong>, Pulkit A. Misra (Duke University); Jeffrey S. Chase (Microsoft); Johannes Gehrke (Duke University); Alvin R. Lebeck (Duke University)</p>
+</li>
+<li><p><strong>IncBricks: Toward In-Network Computation with an In-Network Cache,</strong> Ming Liu (University of Washington); Liang Luo (University of Washington); Kishore Atreya (Cavium); Luis Ceze (University of Washington); Arvind Krishnamurthy (University of Washington); Jacob Nelson (Microsoft Research)</p>
+</li>
+<li><p><strong>AMNESIAC: Amnesic Automatic Computer, Ismail Akturk;</strong> Ulya R. Karpuzcu (University of Minnesota)</p>
+</li>
+<li><p><strong>Voltage Regulator Efficiency Aware Power Management</strong>, Yuxin Bai (Apple); Victor W. Lee (Intel); Engin Ipek (University of Rochester)</p>
+</li>
+</ul>
+<hr>
+<p><strong>转载请注明</strong>： <a href="http://www.csyssec.org/20170307/conference-asplos2017/" target="_blank" rel="external">主流会议-ASPLOS 2017 Accepted Papers</a>与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/主流会议/">主流会议</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/ASPLOS/">ASPLOS</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Conference/">Conference</a></li></ul>
+
+      
+        
+	<div id="comment">
+	
+	<!-- 多说评论框 start -->
+	 <div class="ds-thread" data-thread-key="/20170307/conference-asplos2017/" data-title="ASPLOS 2017 Accepted Papers" data-url="http://yoursite.com/20170307/conference-asplos2017/"></div>
+	<!-- 多说评论框 end -->
+	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+	<script type="text/javascript">
+	var duoshuoQuery = {short_name:"csyssec"};
+	  (function() {
+	    var ds = document.createElement('script');
+	    ds.type = 'text/javascript';ds.async = true;
+	    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+	    ds.charset = 'UTF-8';
+	    (document.getElementsByTagName('head')[0] 
+	     || document.getElementsByTagName('body')[0]).appendChild(ds);
+	  })();
+	  </script>
+	<!-- 多说公共JS代码 end -->
+	
+	</div>
+	<link rel="stylesheet" href="/css/comment.css">
+
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+  
+    <a href="/20170307/conference-ndss2017/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">NDSS 2017 Accepted Papers</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+      <ol class="toc"><li class="toc-item toc-level-3"><a class="toc-link" href="#ASPLOS-Highlights-I"><span class="toc-number">1.</span> <span class="toc-text">ASPLOS Highlights I</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Memory"><span class="toc-number">2.</span> <span class="toc-text">Memory</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Verification-and-Testing"><span class="toc-number">3.</span> <span class="toc-text">Verification and Testing</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Distributed-Systems"><span class="toc-number">4.</span> <span class="toc-text">Distributed Systems</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Compiler-Optimizations"><span class="toc-number">5.</span> <span class="toc-text">Compiler Optimizations</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Storage"><span class="toc-number">6.</span> <span class="toc-text">Storage</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#IOT-and-Applications"><span class="toc-number">7.</span> <span class="toc-text">IOT and Applications</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Virtualization"><span class="toc-number">8.</span> <span class="toc-text">Virtualization</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Accelerators-GPUs-ASICs-and-Heterogeneous-Systems"><span class="toc-number">9.</span> <span class="toc-text">Accelerators: GPUs, ASICs, and Heterogeneous Systems</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Security"><span class="toc-number">10.</span> <span class="toc-text">Security</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Cloud"><span class="toc-number">11.</span> <span class="toc-text">Cloud</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Debugging"><span class="toc-number">12.</span> <span class="toc-text">Debugging</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Memory-II"><span class="toc-number">13.</span> <span class="toc-text">Memory II</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Data-Center-Architectures-amp-Power-Management"><span class="toc-number">14.</span> <span class="toc-text">Data Center Architectures & Power Management</span></a></li></ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+       <!--  自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a> --> 
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/celebrity" class="mobile-nav-link">Celebrity</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/donation" class="mobile-nav-link">Donation</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>
