@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>名人课堂-系统安全与二进制代码分析(上) | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="来源：https://www.utdallas.edu/~zxl111930/spring2012.html
+
+CSysSec注： 本系列文章在于收集知名海外教授在计算机系统与安全领域的授课信息，会包含课程详细信息以及slides。转载本文请务必注明，文章出处：《名人课堂-系统安全与二进制代码分析(上)》与作者信息：CSysSec
+
+###教授
+Zhiqiang Lin
+课程简介CS-6V81 i">
+<meta property="og:type" content="article">
+<meta property="og:title" content="名人课堂-系统安全与二进制代码分析(上)">
+<meta property="og:url" content="http://yoursite.com/20170307/course-zhiqianglin2/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="来源：https://www.utdallas.edu/~zxl111930/spring2012.html
+
+CSysSec注： 本系列文章在于收集知名海外教授在计算机系统与安全领域的授课信息，会包含课程详细信息以及slides。转载本文请务必注明，文章出处：《名人课堂-系统安全与二进制代码分析(上)》与作者信息：CSysSec
+
+###教授
+Zhiqiang Lin
+课程简介CS-6V81 i">
+<meta property="og:updated_time" content="2017-03-07T01:10:39.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="名人课堂-系统安全与二进制代码分析(上)">
+<meta name="twitter:description" content="来源：https://www.utdallas.edu/~zxl111930/spring2012.html
+
+CSysSec注： 本系列文章在于收集知名海外教授在计算机系统与安全领域的授课信息，会包含课程详细信息以及slides。转载本文请务必注明，文章出处：《名人课堂-系统安全与二进制代码分析(上)》与作者信息：CSysSec
+
+###教授
+Zhiqiang Lin
+课程简介CS-6V81 i">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">FROM 0 TO 1</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">体系结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/celebrity">工业大咖</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/donation">打赏支持</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+  <div style="background:#fff;width: 100%;">
+
+      <div style="max-height:600px; overflow: hidden;">
+        <img width="100%" alt="Hike News" src="/css/images/pose.jpg">
+      </div>
+
+  </div>
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-course-zhiqianglin2" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      名人课堂-系统安全与二进制代码分析(上)
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170307/course-zhiqianglin2/" class="article-date">
+	  <time datetime="2017-03-07T01:09:30.000Z" itemprop="datePublished">三月 7, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>来源：<a href="https://www.utdallas.edu/~zxl111930/spring2012.html" target="_blank" rel="external">https://www.utdallas.edu/~zxl111930/spring2012.html</a></p>
+<hr>
+<p><strong>CSysSec注：</strong> 本系列文章在于收集知名海外教授在计算机系统与安全领域的授课信息，会包含课程详细信息以及slides。<br><strong>转载本文请务必注明</strong>，文章出处：<a href="http://www.csyssec.org/20170307/course-zhiqianglin2/" target="_blank" rel="external">《名人课堂-系统安全与二进制代码分析(上)》</a>与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>###教授</p>
+<p><a href="https://www.utdallas.edu/~zxl111930" target="_blank" rel="external">Zhiqiang Lin</a></p>
+<h3 id="课程简介"><a href="#课程简介" class="headerlink" title="课程简介"></a>课程简介</h3><p>CS-6V81 is a graduate level, research oriented, system and software security course.</p>
+<p>The goal of this course is to explain the low-level system details from compiler, linker, loader, to OS kernel and computer architectures, examine the weakest link in each system component, explore the left bits and bytes after all these transformations, and study the state-of-the-art offenses and defenses.</p>
+<p>The learning outcome is students shall be able to understand how an attack is launched (e.g., how an expoit is created), and how to do the defense (e.g., developing OS patches, analyzing the binary code, and detecting intrusions)</p>
+<p>In particular, we will cover</p>
+<p>Memory exploits. We will investigate the unsafe but widely used system programming language C, cover typical vulnerabilities such as buffer overflows, format strings, integer overflows, etc. How to create robust shell code using such as ROP, HeapSpray.<br>OS Kernel Internals. What’s the behavior when a program is running on top of OS. Why we use paging. How virtual to physical address translation is performed. How MMU (e.g., TLB) helps this. How OS manage files, and disks. How can we model the program behavior when sitting at OS layer. We will use both Linux and Windows as working kernel.<br>Linker and Loader Internals. How a program can be dynamically linked, and what an attacker can do to cheat the system and meanwhile what we can do to protect the system.<br>Kernel-level Defense, how can we defend against the common exploits, techniques including such as ASR, and DEP, NX-bits.<br>User-level Defense. Safe library, Compiler extension, Binary Transformation/Rewriting, Runtime Verification.<br>Binary code reverse engineering. Static binary code analysis. Dynamic Binary code instrumentation. Data flow analysis, and control flow analysis. Malware packing and unpacking.<br>The class will also have a heavy-hands on project. Students could choose either to perform research (will work on a semester-long research topic of their choosing), or perform an engineering project.</p>
+<h3 id="课程安排"><a href="#课程安排" class="headerlink" title="课程安排"></a>课程安排</h3><table>
+<thead>
+<tr>
+<th style="text-align:left">Date</th>
+<th style="text-align:left">Topic To Be Covered</th>
+<th style="text-align:left">Presenter</th>
+<th>Slides</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">01/18</td>
+<td style="text-align:left">Course Overview</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec1.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>System and Software Security Foundations: Understanding Binary Code Analysis</strong></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align:left">01/23</td>
+<td style="text-align:left">Binary Code/Data Representation    Instructor</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec2.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">01/25</td>
+<td style="text-align:left">Program Representation</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec3.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">01/30</td>
+<td style="text-align:left">Dynamic Binary Instrumentation (PIN, Valgrind, Qemu)</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec4.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/01</td>
+<td style="text-align:left">Principles of Program Analysis</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec5.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/06</td>
+<td style="text-align:left">Guest Lecture: Recent Cyber Attacks and Implications</td>
+<td style="text-align:left">Jon Shapiro</td>
+<td><a href="http://oij0laovn.bkt.clouddn.com/lec6.pptx" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/08</td>
+<td style="text-align:left">Guest Lecture: Web Vulnerability (SQL injection, Cross-site scripting) Analysis</td>
+<td style="text-align:left">Duong Ngo</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td style="text-align:left">02/13</td>
+<td style="text-align:left">Design and Implementation of a Data Flow Analysis (taint analysis)</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec6.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>System and Software Security Foundations: Understanding the OS Kernel</strong></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left">02/15</td>
+<td style="text-align:left">Understanding the OS Architecture and Linux History</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec7.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/20</td>
+<td style="text-align:left">An Overview of Linux and Windows Kernel</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec8.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/22</td>
+<td style="text-align:left">Process Management</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec9.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/27</td>
+<td style="text-align:left">Virtual Memory (I)</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec10.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/29</td>
+<td style="text-align:left">Virtual Memory (II)</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec11.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/05</td>
+<td style="text-align:left">File System (I)</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec12.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/07</td>
+<td style="text-align:left">File System (II)</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec13.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/12*</td>
+<td style="text-align:left">No-class (Spring-break)</td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left">03/14*</td>
+<td style="text-align:left">No-class (Spring-break)</td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>System and Software Security Foundations: Beyond OS Kernel</strong></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left">03/19</td>
+<td style="text-align:left">Revealing Internals of Executable File Format</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec14.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/21</td>
+<td style="text-align:left">Revealing Internals of Compiler (gcc)</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec15.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/26</td>
+<td style="text-align:left">Revealing Internals of Linker (ld)</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec16.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/28</td>
+<td style="text-align:left">Revealing Internals of Loader (ld-linux.so)</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec17.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>System and Software Security: Techniques, Tools, and Applications</strong></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left">04/02</td>
+<td style="text-align:left">Library Interposition</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec18.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">04/04</td>
+<td style="text-align:left">Virtual Machine Monitor (QEMU/VirtualBox/Xen/KVM)</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec19.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">04/09</td>
+<td style="text-align:left">Symbolic Execution and Whitebox Fuzzing</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec20.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">04/11</td>
+<td style="text-align:left">Exploits: Buffer Overflows, Heap Overflow, Integer Overflow</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec21.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">04/16</td>
+<td style="text-align:left">Robust Exploits: ROP shellcode, Heap Spray</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec22.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">04/18</td>
+<td style="text-align:left">Fighting for Malware: Unpack, Disassemble, Decompile</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec23.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">04/23</td>
+<td style="text-align:left">Binary Code Reusing</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec24.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">Student Presentation (15 minutes)</td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Vulnerability, Exploit, Malware</strong></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left">01/23</td>
+<td style="text-align:left">Smashing the stack for fun and profit</td>
+<td style="text-align:left">Mitch Adair</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec2.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">01/25</td>
+<td style="text-align:left">Smashing the stack in 2011</td>
+<td style="text-align:left">Andrew Folloder</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec3.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">01/30</td>
+<td style="text-align:left">Exploiting Format String Vulnerabilities</td>
+<td style="text-align:left">Sanjay Bysani</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec4.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/01</td>
+<td style="text-align:left">English Shellcode</td>
+<td style="text-align:left">Shwetha Gopalan</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec5.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/13</td>
+<td style="text-align:left">Return-oriented programming    Scott Hand</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec8.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/15</td>
+<td style="text-align:left">ASLR Smack and Laugh Reference    Mohammed</td>
+<td style="text-align:left">Andaleeb Iftekhar</td>
+<td><a href="http://oij0laovn.bkt.clouddn.com/lec9.pptx" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/20</td>
+<td style="text-align:left">Automated Exploit Generation</td>
+<td style="text-align:left">Matthew Stephen</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec10.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/22</td>
+<td style="text-align:left">How to Shop for Free Online - Security Analysis of Cashier-as-a-Service Based Web Stores</td>
+<td style="text-align:left">Isaac Strohl,Avinash Joshi</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec11.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>System Defenses: Architecture, OS, Compilation Extension, Code Transformation, Runtime Verification</strong></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left">02/27</td>
+<td style="text-align:left">Traps and Pitfalls: Practical Problems in System Call Interposition Based Security Tools</td>
+<td style="text-align:left">Vinay Gangasani</td>
+<td><a href="http://oij0laovn.bkt.clouddn.com/lec12.pptx" target="_blank" rel="external">ppt</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/29</td>
+<td style="text-align:left">Control Flow Integrity</td>
+<td style="text-align:left">Murugesan, Sureshbabu</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec13.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/05</td>
+<td style="text-align:left">On the Effectiveness of Address Space Randomization</td>
+<td style="text-align:left">Brian Ricks,Vasundhara Chimmad</td>
+<td><a href="http://oij0laovn.bkt.clouddn.com/lec14.pptx" target="_blank" rel="external">ppt</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/07</td>
+<td style="text-align:left">Dynamic Taint Analysis for Automatic Detection, Analysis, and Signature Generation of Exploits on Commodity Software</td>
+<td style="text-align:left">Sheikh Qumruzzaman, Khaled Al-Naami</td>
+<td><a href="http://oij0laovn.bkt.clouddn.com/taint.pptx" target="_blank" rel="external">ppt</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/19</td>
+<td style="text-align:left">Efficient and Accurate Detection of Integer-based Attacks</td>
+<td style="text-align:left">Allen Helton, Nishant Chithambaram</td>
+<td><a href="http://oij0laovn.bkt.clouddn.com/lec15.pptx" target="_blank" rel="external">ppt</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/21</td>
+<td style="text-align:left">Bouncer: Securing Software by Blocking Bad Input</td>
+<td style="text-align:left">Yufei Gu,Sathish Kuppuswamy</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec16.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/26</td>
+<td style="text-align:left">Static detection of C++ vtable escape vulnerabilities in binary</td>
+<td style="text-align:left">Huseyin Ulusoy</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/vtable.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/28</td>
+<td style="text-align:left">Kruiser: Semi-synchronized Non-blocking Concurrent Kernel Heap Buffer Overflow</td>
+<td style="text-align:left">Shishir K Prasad</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec17.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">04/02</td>
+<td style="text-align:left">Native Client: A Sandbox for Portable, Untrusted x86 Native Code</td>
+<td style="text-align:left">Gil Lundquist</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec18.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">04/04</td>
+<td style="text-align:left">Software fault isolation with API integrity and multi-principal modules.</td>
+<td style="text-align:left">Junyuan Zeng</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec19.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">04/09</td>
+<td style="text-align:left">A Virtual Machine Introspection Based Architecture for Intrusion Detection</td>
+<td style="text-align:left">Donald Talkington,sundarajan srinivasan</td>
+<td>[ppt]</td>
+</tr>
+<tr>
+<td style="text-align:left">04/16</td>
+<td style="text-align:left">Robust Defenses for Cross-Site Request</td>
+<td style="text-align:left">Forgery    Saravana M Subramanian</td>
+<td><a href="http://oij0laovn.bkt.clouddn.com/csr.pptx" target="_blank" rel="external">ppt</a></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Malicious Code Analysis</strong></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left">04/18</td>
+<td style="text-align:left">Deobfuscation of virtualization-obfuscated software</td>
+<td style="text-align:left">Selvakumar Gopal Rajendran</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/de.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">04/23</td>
+<td style="text-align:left">Who Wrote This Code? Identifying the Authors of Program Binaries</td>
+<td style="text-align:left">Camron</td>
+<td>[ppt]</td>
+</tr>
+<tr>
+<td style="text-align:left">04/25</td>
+<td style="text-align:left">Measuring Pay-per-Install: The Commoditization of Malware Distribution</td>
+<td style="text-align:left">Kevin Hulin</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/kevin.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Project Presentation</strong></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left">04/30</td>
+<td style="text-align:left">Project Presentation        </td>
+</tr>
+<tr>
+<td style="text-align:left">05/02</td>
+<td style="text-align:left">Project Presentation        </td>
+</tr>
+</tbody>
+</table>
+<h3 id="阅读列表"><a href="#阅读列表" class="headerlink" title="阅读列表"></a>阅读列表</h3><p>We do not have a text book, but we have the following reading list. Students are required to read all of these papers.</p>
+<p>Smashing the Stack for Fun and Profit<br>Smashing the Stack in 2011<br>Exploiting Format String Vulnerabilities<br>English Shellcode<br>On the Effectiveness of Address Space Randomization<br>Return-oriented programming<br>Backwards-Compatible Array Bound Checking for C<br>ASLR Smack and Laugh Reference<br>Control Flow Integrity<br>Robust Defenses for Cross-Site Request Forgery<br>All you ever wanted to know about dynamic taint analysis and symbolic execution<br>Dynamic Taint Analysis for Automatic Detection, Analysis, and Signature Generation of Exploits on Commodity Software<br>Automated Exploit Generation<br>Traps and Pitfalls: Practical Problems in System Call Interposition Based Security Tools<br>Native Client: A Sandbox for Portable, Untrusted x86 Native Code<br>Deobfuscation of virtualization-obfuscated software<br>BitShred: Fast, Scalable Code Reuse Detection in Binary Code<br>Kruiser: Semi-synchronized Non-blocking Concurrent Kernel Heap Buffer Overflow<br>How to Shop for Free Online - Security Analysis of Cashier-as-a-Service Based Web Stores<br>Differential Slicing: Identifying Causal Execution Differences for Security Applications<br>Efficient and Accurate Detection of Integer-based Attacks<br>Bouncer: Securing Software by Blocking Bad Input<br>Semantics-aware Malware Detection<br>Static detection of C++ vtable escape vulnerabilities in binary<br>Identifying and Analyzing Pointer Misuses for Sophisticated Memory-corruption Exploit<br>A Virtual Machine Introspection Based Architecture for Intrusion Detection<br>Software fault isolation with API integrity and multi-principal modules.<br>Measuring Pay-per-Install: The Commoditization of Malware Distribution<br>A Study of the Packer Problem and Its Solutions</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：<a href="http://www.csyssec.org/20170307/course-zhiqianglin2/" target="_blank" rel="external">《名人课堂-系统安全与二进制代码分析(上)》</a>与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/名人课堂/">名人课堂</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Binary/">Binary</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Course/">Course</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
+
+      
+        
+	<div id="comment">
+	
+	<!-- 多说评论框 start -->
+	 <div class="ds-thread" data-thread-key="/20170307/course-zhiqianglin2/" data-title="名人课堂-系统安全与二进制代码分析(上)" data-url="http://yoursite.com/20170307/course-zhiqianglin2/"></div>
+	<!-- 多说评论框 end -->
+	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+	<script type="text/javascript">
+	var duoshuoQuery = {short_name:"csyssec"};
+	  (function() {
+	    var ds = document.createElement('script');
+	    ds.type = 'text/javascript';ds.async = true;
+	    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+	    ds.charset = 'UTF-8';
+	    (document.getElementsByTagName('head')[0] 
+	     || document.getElementsByTagName('body')[0]).appendChild(ds);
+	  })();
+	  </script>
+	<!-- 多说公共JS代码 end -->
+	
+	</div>
+	<link rel="stylesheet" href="/css/comment.css">
+
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+  
+    <a href="/20170306/course-zhiqianglin1/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">名人课堂-高级数字取证与数据逆向工程</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+      <ol class="toc"><li class="toc-item toc-level-3"><a class="toc-link" href="#课程简介"><span class="toc-number">1.</span> <span class="toc-text">课程简介</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#课程安排"><span class="toc-number">2.</span> <span class="toc-text">课程安排</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#阅读列表"><span class="toc-number">3.</span> <span class="toc-text">阅读列表</span></a></li></ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+       <!--  自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a> --> 
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/celebrity" class="mobile-nav-link">Celebrity</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/donation" class="mobile-nav-link">Donation</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>
