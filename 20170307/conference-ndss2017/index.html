@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>ndss 2017 accepted papers | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="来源：https://www.internetsociety.org/events/ndss-symposium/ndss-symposium-2017/ndss-2017-programme/ndss-2017-accepted-papers
+
+CSysSec注： 本系列文章旨在收集主流会议每年录用的文章信息，并做相关的总结，持续更新。
+转载请注明： 主流会议-NDSS 2017录用文章与作者信">
+<meta property="og:type" content="article">
+<meta property="og:title" content="NDSS 2017 Accepted Papers">
+<meta property="og:url" content="http://yoursite.com/20170307/conference-ndss2017/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="来源：https://www.internetsociety.org/events/ndss-symposium/ndss-symposium-2017/ndss-2017-programme/ndss-2017-accepted-papers
+
+CSysSec注： 本系列文章旨在收集主流会议每年录用的文章信息，并做相关的总结，持续更新。
+转载请注明： 主流会议-NDSS 2017录用文章与作者信">
+<meta property="og:updated_time" content="2017-03-07T09:04:24.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="NDSS 2017 Accepted Papers">
+<meta name="twitter:description" content="来源：https://www.internetsociety.org/events/ndss-symposium/ndss-symposium-2017/ndss-2017-programme/ndss-2017-accepted-papers
+
+CSysSec注： 本系列文章旨在收集主流会议每年录用的文章信息，并做相关的总结，持续更新。
+转载请注明： 主流会议-NDSS 2017录用文章与作者信">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">FROM 0 TO 1</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">体系结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/celebrity">工业大咖</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/donation">打赏支持</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-conference-ndss2017" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      NDSS 2017 Accepted Papers
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170307/conference-ndss2017/" class="article-date">
+	  <time datetime="2017-03-07T09:02:45.000Z" itemprop="datePublished">三月 7, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>来源：<a href="https://www.internetsociety.org/events/ndss-symposium/ndss-symposium-2017/ndss-2017-programme/ndss-2017-accepted-papers" target="_blank" rel="external">https://www.internetsociety.org/events/ndss-symposium/ndss-symposium-2017/ndss-2017-programme/ndss-2017-accepted-papers</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本系列文章旨在收集主流会议每年录用的文章信息，并做相关的总结，持续更新。</p>
+<p><strong>转载请注明</strong>： <a href="http://www.csyssec.org/20170307/conference-ndss2017/" target="_blank" rel="external">主流会议-NDSS 2017录用文章</a>与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<ul>
+<li>Indiscreet Logs: Diffie-Hellman Backdoors in TLS<br>(Kristen Dorey, Nicholas Chang-Fong, Aleksander Essex)</li>
+<li>On the Safety and Efficiency of Virtual Firewall Elasticity Control<br>(Juan Deng, Hongda Li, Hongxin Hu, Kuang-Ching Wang, - Gail-Joon Ahn, Siming Zhao, Wonkyu Han)</li>
+<li>Fake Co-visitation Injection Attacks to Recommender Systems<br>(Guolei Yang, Neil Zhenqiang Gong, Ying Cai)</li>
+<li>KEH-Gait: Towards a Mobile Healthcare User Authentication System by Kinetic Energy Harvesting<br>(Weitao Xu, Guohao Lan, Qi Lin, Sara Khalifa, Neil - Bergmann, Mahbub Hassan, Wen Hu)</li>
+<li>Dynamic Virtual Address Range Adjustment for Intra-Level Privilege Separation on ARM<br>(Yeongpil Cho, Donghyun Kwon, Hayoon Yi, Yunheung Paek)</li>
+<li>Automated Analysis of Privacy Requirements for Mobile Apps<br>(Sebastian Zimmeck, Ziqi Wang, Lieyong Zou, Roger Iyengar, Bin Liu, Florian Schaub, Shomir Wilson, Norman Sadeh, Steven M. Bellovin, Joel Reidenberg)</li>
+<li>SGX-Shield: Enabling Address Space Layout Randomization for SGX Programs<br>(Jaebaek Seo, Byoungyoung Lee, Seongmin Kim, Ming-Wei Shih, Insik Shin, Dongsu Han, Taesoo Kim)</li>
+<li>ContexIoT: Towards Providing Contextual Integrity to Appified IoT Platforms<br>(Yunhan Jack Jia, Qi Alfred Chen, Shiqi Wang, Amir Rahmati, Earlence Fernandes, Z. Morley Mao, Atul Prakash)</li>
+<li>Constant Round Maliciously Secure 2PC with Function-independent Preprocessing using LEGO<br>(Jesper Buus Nielsen, Thomas Schneider, Roberto Trifiletti)</li>
+<li>A Large-scale Analysis of the Mnemonic Password Advice<br>(Johannes Kiesel, Benno Stein, Stefan Lucks)</li>
+<li>TumbleBit: An Untrusted Bitcoin-Compatible Anonymous Payment Hub<br>(Ethan Heilman, Leen Alshenibr, Foteini Baldimtsi, Alessandra Scafuro, Sharon Goldberg)</li>
+<li>Fast Actively Secure OT Extension for Short Secrets<br>(Arpita Patra, Pratik Sarkar, Ajith Suresh)</li>
+<li>Show Me the Money! Finding Flawed Implementations of Third-party In-app Payment in Android Apps<br>(Wenbo Yang, Juanru Li, Hui Liu, Qing Wang, Yueheng Zhang, Yuanyuan Zhang, Dawu Gu)</li>
+<li>MARX: Uncovering Class Hierarchies in C++ Programs<br>(Andre Pawlowski, Moritz Contag, Victor van der Veen, Chris Ouwehand, Thorsten Holz, Herbert Bos, Elias Athanasopoulos, Cristiano Giuffrida)</li>
+<li>Pushing the Communication Barrier in Secure Computation using Lookup Tables<br>(Ghada Dessouky, Farinaz Koushanfar, Ahmad-Reza Sadeghi, Thomas Schneider, Shaza Zeitouni, Michael Zohner)</li>
+<li>FBS-Radar: Uncovering Fake Base Stations at Scale in the Wild<br>(Zhenhua Li, Weiwei Wang, Christo Wilson, Jian Chen, Chen Qian, Taeho Jung, Lan Zhang, Kebin Liu, Xiangyang Li, Yunhao Liu)</li>
+<li>Enabling Reconstruction of Attacks on Users via Efficient Browsing Snapshots<br>(Phani Vadrevu, Jienan Liu, Bo Li, Babak Rahbarinia, Kyu Hyung Lee, Roberto Perdisci)</li>
+<li>A Call to ARMs: Understanding the Costs and Benefits of JIT Spraying Mitigations<br>(Wilson Lian, Hovav Shacham, Stefan Savage)</li>
+<li>Using Fully Homomorphic Encryption for Statistical Analysis of Categorical, Ordinal and Numerical Data<br>(Wen-jie Lu, Shohei Kawasaki, Jun Sakuma)</li>
+<li>Are We There Yet? On RPKI’s Deployment and Security<br>(Yossi Gilad, Avichai Cohen, Amir Herzberg, Michael Schapira, Haya Shulman)</li>
+<li>Cracking Android Pattern Lock in Five Attempts<br>(Guixin Ye, Zhanyong Tang, Dingyi Fang, Xiaojiang Chen, Kwang In Kim, Ben Taylor, Zheng Wang)</li>
+<li>Internet-scale Probing of CPS: Inference, Characterization and Orchestration Analysis<br>(Claude Fachkha, Elias Bou-Harb, Anastasis Keliris, Nasir Memon, Mustaque Ahamad)</li>
+<li>(Cross-)Browser Fingerprinting via OS and Hardware Level Features<br>(Yinzhi Cao, Song Li, Erik Wijmans)</li>
+<li>WireGuard: Next Generation Kernel Network Tunnel<br>(Jason A. Donenfeld)</li>
+<li>Dial One for Scam: A Large-Scale Analysis of Technical Support Scams<br>(Najmeh Miramirkhani, Oleksii Starov, Nick Nikiforakis)</li>
+<li>Measuring small subgroup attacks against Diffie-Hellman<br>(Luke Valenta, David Adrian, Antonio Sanso, Shaanan Cohney, Joshua Fried, Marcella Hastings, J. Alex Halderman, Nadia Heninger)</li>
+<li>SafeInit: Comprehensive and Practical Mitigation of Uninitialized Read Vulnerabilities<br>(Alyssa Milburn, Herbert Bos, Cristiano Giuffrida)</li>
+<li>ObliviSync: Practical Oblivious File Backup and Synchronization<br>(Adam J. Aviv, Seung Geol Choi, Travis Mayberry, Daniel S. Roche)</li>
+<li>T-SGX: Eradicating Controlled-Channel Attacks Against Enclave Programs<br>(Ming-Wei Shih, Sangho Lee, Taesoo Kim, Marcus Peinado)</li>
+<li>An Evil Copy: How the Loader Betrays You<br>(Xinyang Ge, Mathias Payer, Trent Jaeger)</li>
+<li>PSI: Precise Security Instrumentation for Enterprise Networks<br>(Tianlong Yu, Seyed K. Fayaz, Michael Collins, Vyas Sekar, Srinivasan Seshan)</li>
+<li>Catching Worms, Trojan Horses and PUPs: Unsupervised Detection of Silent Delivery Campaigns<br>(Bum Jun Kwon, Virinchi Srinivas, Amol Deshpande, Tudor Dumitras)</li>
+<li>Dachshund: Digging for and Securing (Non-)Blinded Constants in JIT Code<br>(Giorgi Maisuradze, Michael Backes, Christian Rossow)</li>
+<li>Ramblr: Making Reassembly Great Again<br>(Ruoyu Wang, Yan Shoshitaishvili, Antonio Bianchi, Aravind Machiry, John Grosen, Paul Grosen, Christopher Kruegel, Giovanni Vigna)</li>
+<li>BOOMERANG: Exploiting the Semantic Gap in Trusted Execution Environments<br>(Aravind Machiry, Eric Gustafson, Chad Spensky, - Christopher Salls, Nick Stephens, Ruoyu Wang, Antonio Bianchi, Yung Ryn Choe, Christopher Kruegel, Giovanni Vigna)</li>
+<li>Dynamic Differential Location Privacy with Personalized Error Bounds<br>(Lei Yu, Ling Liu, Calton Pu)</li>
+<li>A Broad View of the Ecosystem of Socially Engineered Exploit Documents<br>(Stevens Le Blond, Cedric Gilbert, Utkarsh Upadhyay, Manuel Gomez Rodriguez, David Choffnes)</li>
+<li>Dark Hazard: Learning-based, Large-Scale Discovery of Hidden Sensitive Operations in Android Apps<br>(Xiaorui Pan, Xueqiang Wang, Yue Duan, XiaoFeng Wang, Heng Yin)</li>
+<li>ASLR on the Line: Practical Cache Attacks on the MMU<br>(Ben Gras, Kaveh Razavi, Erik Bosman, Herbert Bos, Cristiano Giuffrida)</li>
+<li>Stack Bounds Protection with Low Fat Pointers<br>(Gregory J. Duck, Roland H.C. Yap, Lorenzo Cavallaro)</li>
+<li>Towards Implicit Visual Memory-Based Authentication<br>(Claude Castelluccia, Markus Duermuth, Maximilian Golla, Fatma Imamoglu)</li>
+<li>Hello from the Other Side: SSH over Robust Cache Covert Channels in the Cloud<br>(Clementine Maurice, Manuel Weber, Michael Schwarz, Lukas Giner, Daniel Gruss, Carlo Alberto Boano, Stefan Mangard, Kay Rœmer)</li>
+<li>Avoiding The Man on the Wire: Improving Tor’s Security with Trust-Aware Path Selection<br>(Aaron Johnson, Rob Jansen, Aaron D. Jaggard, Joan Feigenbaum Paul Syverson)</li>
+<li>The Effect of DNS on Tor’s Anonymity<br>(Benjamin Greschbach, Tobias Pulls, Laura M. Roberts, Philipp Winter, Nick Feamster)</li>
+<li>Hey, My Malware Knows Physics! Attacking PLCs with Physical Model Aware Rootkit<br>(Luis Garcia, Ferdinand Brasser, Mehmet H. Cintuglu, Ahmad-Reza Sadeghi, Osama Mohammed, Saman A. Zonouz)</li>
+<li>Wi-Fly?: Detecting Privacy Invasion Attacks by Consumer Drones<br>(Simon Birnbach, Richard Baker, Ivan Martinovic)</li>
+<li>Dissecting Tor Bridges: a Security Evaluation of their Private and Public Infrastructures<br>(Srdjan Matic, Carmela Troncoso, Juan Caballero)</li>
+<li>HOP: Hardware makes Obfuscation Practical<br>(Kartik Nayak, Christopher Fletcher, Ling Ren, Nishanth Chandran, Satya Lokam, Elaine Shi, Vipul Goyal)</li>
+<li>MaMaDroid: Detecting Android Malware by Building Markov Chains of Behavioral Models<br>(Enrico Mariconti, Lucky Onwuzurike, Panagiotis Andriotis, Emiliano De Cristofaro, Gordon Ross, Gianluca Stringhini)</li>
+<li>TenantGuard: Scalable Runtime Verification of Cloud-Wide VM-Level Network Isolation<br>(Yushun Wang, Taous Madi, Suryadipta Majumdar, Yosr Jarraya, Amir Alimohammadifar, Makan Pourzandi, Lingyu Wang, Mourad Debbabi)</li>
+<li>Automated Synthesis of Semantic Malware Signatures using Maximum Satisfiability<br>(Yu Feng, Osbert Bastani, Ruben Martins, Isil Dillig, Saswat Anand)</li>
+<li>Unleashing Use-Before-Initialization Vulnerabilities in the Linux Kernel Using Targeted Stack Spraying<br>(Kangjie Lu, Marie-Therese Walter, David Pfaff, Stefan Nuernberger, Wenke Lee, Michael Backes)</li>
+<li>IO-DSSE: Scaling Dynamic Searchable Encryption to Millions of Indexes By Improving Locality<br>(Ian Miers, Payman Mohassel)</li>
+<li>VUzzer: Application-aware Evolutionary Fuzzing<br>(Sanjay Rawat, Vivek Jain, Ashish Kumar, Lucian Cojocar, Cristiano Giuffrida, Herbert Bos)</li>
+<li>Broken Hearted: How To Attack ECG Biometrics<br>(Simon Eberz, Nicola Paoletti, Marc Roeschlin, Andrea Patane, marta Kwiatkowska, Ivan Martinovic)</li>
+<li>HisTorε: Differentially Private and Robust Statistics Collection for Tor<br>(Akshaya Mani, Micah Sherr)</li>
+<li>Thou Shalt Not Depend on Me: Analysing the Use of Outdated JavaScript Libraries on the Web<br>(Tobias Lauinger, Abdelberi Chaabane, Sajjad Arshad, William Robertson, Christo Wilson, Engin Kirda)</li>
+<li>P2P Mixing and Unlinkable Bitcoin Transactions<br>(Tim Ruffing, Pedro Moreno-Sanchez, Aniket Kate)</li>
+<li>PT-Rand: Practical Mitigation of Data-only Attacks against Page Tables<br>(Lucas Davi, David Gens, Christopher Liebchen, Ahmad-Reza Sadeghi)</li>
+<li>SilentWhispers: Enforcing Security and Privacy in Decentralized Credit Networks<br>(Giulio Malavolta, Pedro Moreno-Sanchez, Aniket Kate, Matteo Maffei)</li>
+<li>Deconstructing Xen<br>(Lei Shi, Yuming Wu, Yubin Xia, Nathan Dautenhahn, Haibo Chen, Binyu Zang, Haibing Guan, Jinming Li)</li>
+<li>The Security Impact of HTTPS Interception<br>(Zakir Durumeric, Zane Ma, Drew Springall, Richard Barnes, Nick Sullivan, Elie Bursztein, Michael Bailey, J. Alex Halderman, Vern Paxson)</li>
+<li>DELTA: A Security Assessment Framework for Software-Defined Networks<br>(Seungsoo Lee, Changhoon Yoon, Chanhee Lee, Seungwon Shin, Vinod Yegneswaran, Phillip Porras)</li>
+<li>Obfuscation-Resilient Privacy Leak Detection for Mobile Apps Through Differential Analysis<br>(Andrea Continella, Yanick Fratantonio, Martina Lindorfer, Alessandro Puccetti, Ali Zand, Christopher Kruegel, Giovanni Vigna)</li>
+<li>A2C: Self Destructing Exploit Executions via Input Perturbation<br>(Yonghwi Kwon, Brendan Saltaformaggio, I Luk Kim, Kyu Hyung Lee, Xiangyu Zhang, Dongyan Xu)</li>
+<li>Address Oblivious Code Reuse: On the Effectiveness of Leakage Resilient Diversity<br>(Robert Rudd, Richard Skowyra, David Bigelow, Veer Dedhia, Thomas Hobson, Stephen Crane, Christopher Liebchen, Per Larsen, Lucas Davi, Michael Franz, Ahmad-Reza Sadeghi, Hamed Okhravi)</li>
+<li>Panoply: Low-TCB Linux Applications With SGX Enclaves<br>(Shweta Shinde, Dat Le Tien, Shruti Tople, Prateek Saxena)<br>WindowGuard: Systematic Protection of GUI Security in Android<br>(Chuangang Ren, Peng Liu, Sencun Zhu)</li>
+</ul>
+<hr>
+<p><strong>转载请注明</strong>： <a href="http://www.csyssec.org/20170307/conference-ndss2017/" target="_blank" rel="external">主流会议-NDSS 2017录用文章</a>与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/主流会议/">主流会议</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Conference/">Conference</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Paper/">Paper</a></li></ul>
+
+      
+        
+	<div id="comment">
+	
+	<!-- 多说评论框 start -->
+	 <div class="ds-thread" data-thread-key="/20170307/conference-ndss2017/" data-title="NDSS 2017 Accepted Papers" data-url="http://yoursite.com/20170307/conference-ndss2017/"></div>
+	<!-- 多说评论框 end -->
+	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+	<script type="text/javascript">
+	var duoshuoQuery = {short_name:"csyssec"};
+	  (function() {
+	    var ds = document.createElement('script');
+	    ds.type = 'text/javascript';ds.async = true;
+	    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+	    ds.charset = 'UTF-8';
+	    (document.getElementsByTagName('head')[0] 
+	     || document.getElementsByTagName('body')[0]).appendChild(ds);
+	  })();
+	  </script>
+	<!-- 多说公共JS代码 end -->
+	
+	</div>
+	<link rel="stylesheet" href="/css/comment.css">
+
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+  
+    <a href="/20170307/introspection-papers/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">虚拟机监控论文推荐</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+    <ol class="toc">无</ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+       <!--  自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a> --> 
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/celebrity" class="mobile-nav-link">Celebrity</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/donation" class="mobile-nav-link">Donation</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>
