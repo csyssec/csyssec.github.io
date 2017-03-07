@@ -116,6 +116,67 @@
         
           <section id="main">
   
+    <article id="post-kernel-malloc"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170301/kernel-malloc/">深入理解Linux内存分配</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170301/kernel-malloc/" class="article-date">
+	  <time datetime="2017-03-01T05:22:46.000Z" itemprop="datePublished">三月 1, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        
+
+          
+            <div class="entry-summary" style="margin-left:0;">
+            作者：Diting0x
+
+CSysSec注： 本文来自Diting0x的个人博客，主要介绍了Linux内核中一系列的内存分配函数及其原理转载本文请务必注明，文章出处：《深入理解Linux内核分配》与作者信息：Diting0x
+
+为了写一个用户层程序，你也许会声明一个全局变量，这个全局变量可能是一个int类型也可能是一个数组，而声明之后你有可能会先初始化它，也有可能放在之后用到它的时候再初始化。除此之外，你有可能会选择在函数内部去声明局部变量，又或者为变量动态申请内存。
+
+不管你在用户程序中采取哪种方式申请内存，这些都对应着不同的内存分配方式以及不同的数据段，如果再加上代码段，就构成了一个完整的进程。由此可见，一个完整的进程在内存空间中对应着不同的数据区，具体来说，对应着五种不同的数据区...
+          
+
+        
+          <p class="article-more-link">
+            <a href="/20170301/kernel-malloc/#more">阅读全文</a>
+          </p>
+        </div>
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统内核/">系统内核</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-pvops"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -689,58 +750,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-byoungyounglee"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170224/byoungyounglee/">Purdue大学助理教授Byoungyoung Lee</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170224/byoungyounglee/" class="article-date">
-	  <time datetime="2017-02-24T06:21:39.000Z" itemprop="datePublished">二月 24, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <hr>
-<p><strong>CSysSec注</strong>： 本系列文章旨在介绍计算机系统与安全领域著名教授与学者</p>
-<p><strong>转载请注明</strong>： 文章出处：《<a href="http://www.csyssec.org/20170224/byoungyounglee/" target="_blank" rel="external">Purdue大学助理教授Byoungyoung Lee</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<h3 id="个人简介"><a href="#个人简介" class="headerlink" title="个人简介"></a>个人简介</h3><p>Byoungyoung Lee，11-16年在佐治亚理工大学获得博士学位，师从<a href="">Prof. Wenke Lee</a>和<a href="">Prof. Taesoo Kim</a>. 16年以助理教授身份加入Purdue大学计算机系.</p>
-<h3 id="研究兴趣"><a href="#研究兴趣" class="headerlink" title="研究兴趣"></a>研究兴趣</h3><p>集中关注系统安全：在操作系统、编译器以及应用程序中设计与实现安全的系统。在NDSS,Security,CCS,ATC发表多篇论文，曾获CSAW, DEFCON, Facebook, Usenix等多项大奖</p>
-<h3 id="论文标签"><a href="#论文标签" class="headerlink" title="论文标签"></a>论文标签</h3><p>[ASLR],[SGX],[Code reuse attack], [Use-after-free],[Data Flow Integrity]</p>
-<h3 id="个人主页"><a href="#个人主页" class="headerlink" title="个人主页"></a>个人主页</h3><p><a href="https://lifeasageek.github.io/" target="_blank" rel="external">Byoungyoung Lee</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/学术专家/">学术专家</a>
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Professor/">Professor</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -833,6 +842,18 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170307/conference-veetenyears/">VEE十年录用论文</a></h6>
+          <!--  <span>三月 7, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -1014,18 +1035,6 @@
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170224/migration/">云平台高可用之虚拟机迁移</a></h6>
-          <!--  <span>二月 24, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -1046,7 +1055,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 11.82px;">Conference</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.27px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 16.36px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 15.45px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 10.91px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.91px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15.45px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 10px;">Rootkit</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/Virtualization/" style="font-size: 18.18px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 10px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.73px;">Conference</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.27px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 16.36px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 15.45px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 10.91px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.91px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15.45px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 10px;">Rootkit</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/Virtualization/" style="font-size: 18.18px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 10px;">XEN</a>
     </div>
   </div>
 
