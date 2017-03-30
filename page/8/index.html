@@ -116,6 +116,89 @@
         
           <section id="main">
   
+    <article id="post-kvmsource-intro"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170104/kvmsource-intro/">KVM源码分析之基本工作原理</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170104/kvmsource-intro/" class="article-date">
+	  <time datetime="2017-01-04T05:46:19.000Z" itemprop="datePublished">一月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://www.oenhan.com/about" target="_blank" rel="external">Oen Han</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本KVM源码分析系列文章来自系Intel中国Linux内核与虚拟化开发工程师Oen Han的<a href="http://www.oenhan.com/kvm-src-1" target="_blank" rel="external">博客</a>,Oen Han 在虚拟化领域有丰富的开发经验，其写的KVM源码分析系列是本人目前见过最好最详细的，值得推荐。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/kvmsource-intro/" target="_blank" rel="external">KVM源码分析之基本工作原理</a>》</p>
+<hr>
+<blockquote>
+<ul>
+<li>0X01 KVM模型结构</li>
+<li>0X02 KVM工作原理</li>
+<li>0X03 CPU虚拟化</li>
+<li>0X04 Memory虚拟化</li>
+</ul>
+</blockquote>
+<p>13年的时候准备挖“KVM源代码分析”的坑，陆陆续续2年过去了，坑也没有填上，当时是因为对KVM了解的肤浅，真正的理解必然要深入到代码级别，所谓“摈弃皮毛，看到血肉，看到真相”，当时计划写KVM基本工作原理、虚拟机的创建、VCPU调度原理、KVM内存管理、KVM设备管理等，实际发现代码过程还是很多，估计后续会针对于不同的点专门来写。</p>
+<p>需要假定读者有一定的内核基础，和虚拟化基础，原理性的东西估计会一笔带过，我在知乎上写过一些基础入门的书籍：1.首先有OS基础，随便操作系统大学课本；2.对Linux kernel有全面了解，关键模块有理解，推荐书籍：深入Linux内核架构（+1）或者深入理解LINUX内核；3.Hypervisor虚拟化，Intel的《系统虚拟化-原理与实现》，赶时间的建议先把第3步完成。</p>
+<p>进入正题：</p>
+<h3 id="0X01-KVM模型结构"><a href="#0X01-KVM模型结构" class="headerlink" title="0X01 KVM模型结构"></a>0X01 KVM模型结构</h3><p>为什么有OS虚拟化？随着CPU计算能力的提高，单独的OS已不能充分利用CPU的计算能力，1.很多应用的执行需要单独占用一个OS环境，如安全测试等；2.而IAAS云计算厂商也是以OS为范围销售计算能力。那么在所有虚拟化方案中，都是由hypervisor取代原生的OS去控制具体硬件资源，而同时hypervisor将资源分配具体的VM，VM中运行的是没有修改过的OS，如果让VM中的OS能正常运行，hypervisor的任务就是模拟具体的硬件资源，让OS不能识别出是真是假。</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/kvmsource101.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/kvmsource101.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p>当然上面的模型是Xen示例，OS对应用而言是硬件资源管理中心，那么hypervisor就是具体VM的OS了，KVM是就利用了这一点，利用现有的kernel代码，构建了一个hypervisor，这个样子内存分配，进程调度等就无需重写代码，如此hypervisor就是所谓的host，VM中的OS就是guest。</p>
+<p>guest OS保证具体运行场景中的程序正常执行，而KVM的代码则部署在HOST上，Userspace对应的是QEMU，Kernel对应的是KVM Driver，KVM Driver负责模拟虚拟机的CPU运行，内存管理，设备管理等；QEMU则模拟虚拟机的IO设备接口以及用户态控制接口。QEMU通过KVM等fd进行IOCTL控制KVM驱动的运行过程。</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/kvmsource102.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/kvmsource102.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p>如上图所示，guest自身有自己的用户模式和内核模式；guest是在host中是作为一个用户态进程存在的，这个进程就是qemu，qemu本身就是一个虚拟化程序，只是纯软件虚拟化效率很低，它被KVM进行改造后，作为KVM的前端存在，用来进行<a href="http://www.oenhan.com/cpu-load-balance" target="_blank" rel="external">创建进程</a>或者IO交互等；而KVM Driver则是Linux内核模式，它提供KVM fd给qemu调用，用来进行cpu虚拟化，内存虚拟化等。QEMU通KVM提供的fd接口，通过ioctl系统调用创建和运行虚拟机。KVM Driver使得整个Linux成为一个虚拟机监控器，负责接收qemu模拟效率很低的命令。</p>
+<h3 id="0X02-KVM工作原理"><a href="#0X02-KVM工作原理" class="headerlink" title="0X02 KVM工作原理"></a>0X02 KVM工作原理</h3><figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/kvmsource103.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/kvmsource103.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>上图是一个执行过程图，首先启动一个虚拟化管理软件qemu，开始启动一个虚拟机，通过ioctl等系统调用向内核中申请指定的资源，搭建好虚拟环境，启动虚拟机内的OS，执行 VMLAUCH 指令，即进入了guest代码执行过程。如果 Guest OS 发生外部中断或者影子页表缺页之类的事件，暂停 Guest OS 的执行，退出QEMU即guest VM-exit，进行一些必要的处理，然后重新进入客户模式，执行guest代码；这个时候如果是io请求，则提交给用户态下的qemu处理，qemu处理后再次通过IOCTL反馈给KVM驱动。</p>
+<h3 id="0X03-CPU虚拟化"><a href="#0X03-CPU虚拟化" class="headerlink" title="0X03 CPU虚拟化"></a>0X03 CPU虚拟化</h3><p>X86体系结构CPU虚拟化技术的称为 Intel VT-x 技术，引入了VMX，提供了两种处理器的工作环境。 VMCS 结构实现两种环境之间的切换。 VM Entry 使虚拟机进去guest模式，VM Exit 使虚拟机退出guest模式。</p>
+<p>VMM调度guest执行时，qemu 通过 ioctl 系统调用进入内核模式，在 KVM Driver中获得当前物理 CPU的引用。之后将guest状态从VMCS中读出， 并装入物理CPU中。执行 VMLAUCH 指令使得物理处理器进入非根操作环境，运行guest OS代码。</p>
+<p>当 guest OS 执行一些特权指令或者外部事件时， 比如I/O访问，对控制寄存器的操作，MSR的读写等， 都会导致物理CPU发生 VMExit， 停止运行 Guest OS，将 Guest OS保存到VMCS中， Host 状态装入物理处理器中， 处理器进入根操作环境，KVM取得控制权，通过读取 VMCS 中 VM_EXIT_REASON 字段得到引起 VM Exit 的原因。 从而调用kvm_exit_handler 处理函数。 如果由于 I/O 获得信号到达，则退出到userspace模式的 Qemu 处理。处理完毕后，重新进入guest模式运行虚拟 CPU。</p>
+<h3 id="0X04-Mem虚拟化"><a href="#0X04-Mem虚拟化" class="headerlink" title="0X04 Mem虚拟化"></a>0X04 Mem虚拟化</h3><p>OS对于物理内存主要有两点认识：1.物理地址从0开始；2.内存地址是连续的。VMM接管了所有内存，但guest OS的对内存的使用就存在这两点冲突了，除此之外，一个guest对内存的操作很有可能影响到另外一个guest乃至host的运行。VMM的内存虚拟化就要解决这些问题。</p>
+<p>在OS代码中，应用也是占用所有的逻辑地址，同时不影响其他应用的关键点在于有线性地址这个中间层；解决方法则是添加了一个中间层：guest物理地址空间；guest看到是从0开始的guest物理地址空间（类比从0开始的线性地址），而且是连续的，虽然有些地址没有映射；同时guest物理地址映射到不同的host逻辑地址，如此保证了VM之间的安全性要求。</p>
+<p>这样MEM虚拟化就是GVA-&gt;GPA-&gt;HPA的寻址过程，传统软件方法有影子页表，硬件虚拟化提供了EPT支持。</p>
+<p>总体描述到此，后面代码里面见真相。</p>
+<p>《<a href="http://www.csyssec.org/20170104/kvmsource-create/" target="_blank" rel="external">KVM源码分析之虚拟机的创建与运行</a>》</p>
+<p>-结束-</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/kvmsource-intro/" target="_blank" rel="external">KVM源码分析之基本工作原理</a>》</p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟化原理/">虚拟化原理</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/QEMU/">QEMU</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-bypassaslr-gotgor"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -689,84 +772,6 @@ pip install distorm3
 <!-- Table of Contents -->
 
   
-    <article id="post-kvmqemuintro"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170102/kvmqemuintro/">KVM/QEMU虚拟化简介</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170102/kvmqemuintro/" class="article-date">
-	  <time datetime="2017-01-02T07:53:39.000Z" itemprop="datePublished">一月 2, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
-<p><strong>CSysSec注</strong>： 本文来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/01/02/kvm-qemu-bytalk/" target="_blank" rel="external">个人博客</a>，主要介绍KVM/QEMU虚拟化基础，对认识KVM与QEMU之间的关系有很大帮助。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/kvmqemuintro/" target="_blank" rel="external">KVM/QEMU虚拟化简介</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
-<blockquote>
-<ul>
-<li>0X01 KVM/Qemu选择与部署</li>
-<li>0X02 KVM/Qemu原理概览</li>
-</ul>
-</blockquote>
-<h3 id="0X01-KVM-Qemu选择与部署"><a href="#0X01-KVM-Qemu选择与部署" class="headerlink" title="0X01 KVM/Qemu选择与部署"></a>0X01 KVM/Qemu选择与部署</h3><p>KVM作为虚拟机监控器VMM，分为两部分，分别是运行于kernel模式的KVM内核模块（kvm-kmod)和运行于user模式的Qemu模块。KVM的具体实现下文会作简单介绍。先来看kvm-kmod部分，linux kernel从2.6版本开始便开始集成了KVM模块，如果你只想简单的使用KVM，只需简单编译和配置内科即可使用KVM的一切特性，这里不作介绍，如果你想基于KVM做开发，还是老老实实去<a href="http://sourceforge.net/projects/kvm/files/" target="_blank" rel="external">kvm官网</a>下载，自己源码安装吧，在选择KVM版本之前，可以打开任意一个版本例如kvm-kmod-3.8里面的configure文件，可看到以下代码：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line"># minimum is 2.6.x</div><div class="line">min_kernel_version=24</div><div class="line"># maximum is 3.x</div><div class="line">max_kernel_version=8</div><div class="line">kernel_version=`echo $kernel_version_str | sed &apos;s/\([0-9]*\)\.[0-9]*\.[0-9]*.*/\1/&apos;`</div><div class="line">kernel_patchlevel=`echo $kernel_version_str | sed &apos;s/[0-9]*\.\([0-9]*\)\.[0-9]*.*/\1/&apos;`</div><div class="line">kernel_sublevel=`echo $kernel_version_str | sed &apos;s/[0-9]*\.[0-9]*\.\([0-9]*\).*/\1/&apos;`</div><div class="line">if [ ! -n &quot;$force_build&quot; ]; then</div><div class="line">	if [ $kernel_version -eq 2 ] &amp;&amp; [ $kernel_sublevel -lt $min_kernel_version ]; then</div><div class="line">		echo</div><div class="line">		echo &quot;Error: kernel is too old for this kvm-kmod release.&quot;</div><div class="line">		echo</div><div class="line">		exit 1</div><div class="line">	elif [ $kernel_version -eq 3 ] &amp;&amp; [ $kernel_patchlevel -gt $max_kernel_version ]; then</div><div class="line">		echo</div><div class="line">		echo &quot;Error: kernel is more recent than KVM modules delivered with this release.&quot;</div><div class="line">		echo &quot;You probably want to use the KVM support that is already part of your kernel.&quot;</div><div class="line">		echo</div><div class="line">		exit 1</div><div class="line">	fi</div><div class="line">fi</div></pre></td></tr></table></figure></p>
-<p>这段代码仔细看看，就不难看出kvm-kmod版本的每个数字和kernel版本号都是有关联的，kvm-kmod毕竟是一个内核模块，必须去适应内核，大家如果在安装kvm-kmod时出现kernel is too old 或者kernel is more recent等错误就应该静下来好好看看这段代码了。下载后匹配的kvm-kmod后，安装很简单，只需要执行<code>./configure
-make $$ make install</code>即可</p>
-<p>安装之后，有两个模块<code>kvm.ko kvm-intel.ko</code>便会生成在./kvm/x86文件夹中，执行<code>insmod kvm.ko kvm-intel.ko</code> 或者<code>modprobe kvm.ko kvm-intel.ko</code>，便成功将kvm模块加载到内核了，<br>如果期间出现错误，可执行<code>lsmod | grep kvm</code> 看kvm是否成功加载，或执行<code>dmesg | grep kvm</code>查看具体执行信息。<br>这里强调，kvm-kmod是内核的一个模块，可随时加载随时删除，因此基于kvm的开发，修改kvm的源码之后，编译与运行起来都很方便。</p>
-<p>qemu-kvm是为兼容kvm基于qemu模拟器开发出来的一个分支版本，安装qemu-kvm之前，检查是否有以下依赖包： <code>linux-kernel-headers zlib1g-dev libglib2.0-dev</code>，如果没有<code>apt-get install</code>一下。<br>之后,执行：</p>
-<pre><code>./configure --prefix=/usr/local/kvm 
-make &amp;&amp; make install
-</code></pre><p>即可，qemu-kvm便会安装到/usr/local/kvm路径下，安装成功后，会在此路径的/bin文件夹下出现qemu-img, qemu-system-x86_64等二进制文件,自己也可以选择将这些二进制文件拷贝到根目录下的/bin文件夹中，这样在执行这些二进制文件的时候就不用加前缀/usr/local/kvm/bin了。<br>执行：</p>
-<pre><code>/usr/local/kvm/bin/qemu-img create -f qcow2 imgname.img 10G 
-</code></pre><p>创建一个qcow2格式的空虚拟机img文件<br>执行： </p>
-<pre><code>/usr/local/kvm/bin/qemu-system-x86_64 -hda imgname.img -m 1024 -vnc :1 -cdrom imgname.iso -boot d     
-</code></pre><p>将imgname.iso系统安装到imgname.img中<br>之后利用xvnc4viewer等vnc软件连接虚拟机完成安装过程，安装完后，执行:</p>
-<pre><code>/usr/local/kvm/bin/qemu-system-x86_64 -hda imgname.img -vnc :1 -m 1024 -monitor stdio  
-</code></pre><p>登陆到虚拟机。具体细节可自行摸索。</p>
-<h3 id="0X02-KVM-Qemu原理概览"><a href="#0X02-KVM-Qemu原理概览" class="headerlink" title="0X02 KVM/Qemu原理概览"></a>0X02 KVM/Qemu原理概览</h3><p>说说kvm与qemu的关系，借用实验室某大神给的一张图：</p>
-<p><img src="http://7xppf1.com1.z0.glb.clouddn.com/kvm-qemu.png" alt="kvm-qemu-rela"></p>
-<p>可以看到，这里有三种模式，第一是客户机执行时所处的Guest模式，也就是虚拟化技术VMX中的非Root模式；第二是KVM运行的Kernel模式，即VMX中的Root模式，此时特权级为0；第三是Qemu运行的User模式，处于VMX Root模式中的特权级3.有关VMX技术，以及非Root模式如何通过VM Exit进入到Root模式，Root模式如何通过VM Entry进入到非Root模式，可参考Intel系统编程手册。</p>
-<p>简单说说Qemu所在的User模式如何与KVM所在的kernel模式交互，虚拟化中的VT-x技术的支持，使得KVM可以虚拟出多个虚拟处理器VCPU, 而这些VCPU对应每一个Qemu线程，VCPU的创建、初始化、运行以及退出都是在Qemu线程的上下文中进行，这些过程都是通过Qemu向KVM发送一个I/O通道管理函数ioctl来完成，以qemu-kvm-1.1.2为例，qemu-kvm中首先会在<code>./linux-header/linux/kvm.h</code>注册相应的ioctl,如<code>#define KVM_GET_REGS              _IOR(KVMIO,  0x81, struct kvm_regs)</code>，各参数含义可以具体去了解ioctl的实现方式，之后调用<code>kvm_vcpu_ioctl(env,KVM_GET_REGS,&amp;regs)</code>（有些也会调用kvm_vm_ioctl），KVM-Kmod中也会注册相应的ioctl，之后真正执行时会调用KVM_Kmod的相应函数，一般会在<code>kvm_main.c</code>文件中定义。如果想自定义自己的函数，需要分别在qemu-kvm与kvm-kmod注册相应的ioctl，只要编号不重复即可，注册后再调用自己定义的函数。</p>
-<p>备注：Qemu 线程以 ioctl 的方式向 KVM 内核模块发出指 示,后者执行 VM entry 操作,将处理器由 kernel 模式切换到 Guest 模式,中止宿主机软件, 转而运行客户软件。注意,宿主机软件被中止时,正处于 Qemu 线程上下文,且正在执行 ioctl 系统调用的 kernel 模式处理程序。客户软件在运行过程中,如发生异常或外部中断等事件, 或执行 I/O 操作,可能导致 VM exit,将处理器状态由 Guest 模式切换回 Kernel 模式。KVM 内核模块检查发生 VM exit 的原因,如果 VM exit 由于 I/O 操作导致,则执行系统调用返回操 作,将 I/O 操作交给处于 User 模式的 Qemu 线程来处理,Qemu 线程在处理完 I/O 操作后再 次执行 ioctl,指示 KVM 切换处理器到 Guest 模式,恢复客户软件的运行;如果 VM exit 由于 其它原因导致,则由 KVM 内核模块负责处理,并在处理后切换处理器到 Guest 模式,恢复 客户机的运行。</p>
-<p>完</p>
-<p>作者@<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<p>于2016年1月1日West Lafayette, Lawson Computer Science Building.</p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/kvmqemuintro/" target="_blank" rel="external">KVM/QEMU虚拟化简介</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟化基础/">虚拟化基础</a>
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/QEMU/">QEMU</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -859,6 +864,18 @@ make &amp;&amp; make install
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170330/poker/">内核Rootkit行为的多方面解析</a></h6>
+          <!--  <span>三月 30, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -1040,18 +1057,6 @@ make &amp;&amp; make install
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170226/course-fengweizhang1/">名人课堂-计算机安全</a></h6>
-          <!--  <span>二月 26, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -1072,7 +1077,7 @@ make &amp;&amp; make install
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.73px;">Conference</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.27px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.91px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 16.36px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 15.45px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 10.91px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.91px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.91px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15.45px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 10px;">Rootkit</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 18.18px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 10px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.73px;">Conference</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.27px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.91px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 16.36px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 15.45px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 11.82px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.91px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.91px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15.45px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 10.91px;">Rootkit</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 18.18px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 10px;">XEN</a>
     </div>
   </div>
 
