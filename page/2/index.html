@@ -99,6 +99,14 @@
 </header>
 
 
+  <div style="background:#fff;width: 100%;">
+
+      <div style="max-height:600px; overflow: hidden;">
+        <img width="100%" alt="Hike News" src="/css/images/pose.jpg">
+      </div>
+
+  </div>
+
 
 
   <div id="container">
@@ -107,6 +115,73 @@
       <div id="content" class="outer">
         
           <section id="main">
+  
+    <article id="post-paperwriting-collaboration"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170312/paperwriting-collaboration/">On collaborative (remote) paper writing</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170312/paperwriting-collaboration/" class="article-date">
+	  <time datetime="2017-03-12T11:28:17.000Z" itemprop="datePublished">三月 12, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>来源：<a href="http://nebelwelt.net/blog/category/academia.html" target="_blank" rel="external">http://nebelwelt.net/blog/category/academia.html</a><br>作者: <a href="http://nebelwelt.net/" target="_blank" rel="external">Mathias Payer</a></p>
+<hr>
+<p>Writing scientific conference or journal papers is an art by itself. This article is not about writing great papers as there already are many good articles that focus on paper writing itself and cover technical aspects, structural aspects, or writing style aspects. In this article I want to give an overview of collaborative writing and some experiences I had during the last couple of scientific paper submissions.</p>
+<p>Simple collaborative writing starts in a sequential mode where always one party is writing and another party gives feedback or carries out slight changes to the paper. This simple model fits the adviser and grad student model fairly well, where the grad student produces individual drafts of a paper and the adviser gives feedback on each draft. The draft can start off with a vague description of the actual research project and many research questions might only be answered along the way, yet the model is very simple and also easy to coordinate: either push based, where the adviser explicitly asks for feedback or pull based, where the adviser periodically pulls for progress from the student.</p>
+<p>But as soon as either (i) more people join the project, (ii) not all team members are at the same physical location (i.e., all hands on meetings are no longer possible or easily possible), or (iii) the collaboration becomes more interactive it gets more complicated. Some of the questions that arise are:</p>
+<pre><code>* How can we write concurrently on different sections?
+* How can we coordinate a common goal or structural changes?
+* How do we stay focuesed and on track?
+</code></pre><p>In my (limited and still very short) experience it makes sense to group the collaborative writing process into three phases: (i) the brainstorming and research phase when the project is still very volatile, (ii) the distributed paper writing phase where the key points are shaped, and (iii) the freeze phase where individual sections are finished and closed off before the final submission.</p>
+<h2 id="Brainstorming-and-research-phase"><a href="#Brainstorming-and-research-phase" class="headerlink" title="Brainstorming and research phase"></a><strong>Brainstorming and research phase</strong></h2><p>During this phase the project is still fresh and very volatile: not all research questions have to be fully defined yet. A shared document (a wiki page or a shared Google document) is crucial to fast track this process as it offers a convenient way to write down notes and a rough design section of the project. An additional section can cover related work and key differences between the current project and all other related projects. At this point in time it does not make sense to write abstract, introduction, conclusion yet, as the direction of the project might still change.</p>
+<p>As time progresses, the first results of the evaluation can be added into their own section. This is also a great time to do weekly (or bi-weekly) status meetings, either via phone call, skype/hangout, or email. This phase progresses until a couple of weeks before the submission deadline and the results in the evaluation should improve continuously.</p>
+<h2 id="Distributed-paper-writing-phase"><a href="#Distributed-paper-writing-phase" class="headerlink" title="Distributed paper writing phase"></a><strong>Distributed paper writing phase</strong></h2><p>The “hot” paper writing phase starts a couple of weeks (at least 2, ideally 3-5) before the paper deadline. The existing text is moved from the wiki page (or Google document) into a source repository and formatted according to the submission guidelines of the conference (or journal).</p>
+<p>To produce a great final paper I propose a weekly build cycle but you can obviously adjust the time for each sub task to your needs. Each cycle consists of the following sub tasks: (i) 4 days of concurrent modifications with (sub-)section-level locks, (ii) 1 day reading pass, and (iii) asking for external feedback.</p>
+<h3 id="Concurrent-modification"><a href="#Concurrent-modification" class="headerlink" title="Concurrent modification"></a>Concurrent modification</h3><p>During this task all team members collaborate on the paper and update individual sections of the paper concurrently. The paper and all files are already in a source revision system. Most of these systems like git or svn handle partial concurrent textual changes and simple conflicts even in monolithic files fairly well (e.g., person A changes the first section while person B changes the second section concurrently). The discussion of using a single monolithic file versus per section files is almost religious (just like vim versus emacs) but I like monolithic files due to, e.g., the simplicity of moving text around, and the ease of global string replacement.</p>
+<p>But as soon as two persons change the same section concurrently it becomes very hard to resolve conflicts. To reduce the risk of conflicts it helps if we use explicit locks (i.e., only the person that currently holds the lock for a specific section is allowed to edit and change that section). Depending on the size of the team different lock strategies are possible. For small teams it can be advantageous to send explicit emails to all team members, thereby pushing explicit lock information. If the teams are larger then the amount of emails explodes and it becomes confusing who currently holds which locks. The wiki page (or Google document) from the first phase comes to the rescue again: the shared document can be used to keep track (on a per section basis) who holds which locks and if all team members acquire/release their locks as they work on their sections the risk for conflicts is eliminated. The shared document also allows queues on who requires the lock when it is released, depending on the protocol the releasing team member can send a direct push email to the person that continues on that section.</p>
+<h3 id="Bookkeeping-and-full-passes"><a href="#Bookkeeping-and-full-passes" class="headerlink" title="Bookkeeping and full passes"></a>Bookkeeping and full passes</h3><p>Every couple of days it makes sense to temporarily freeze all sections to allow a synchronized reading pass. Team members concurrently read the paper from beginning to end. In this pass there are only two kinds of changes allowed: (i) typos, phrasing, and wording and (ii) adding todo notes to individual sections that are then handled by the team member who is responsible for this section in the next concurrent modification pass.</p>
+<p>After the reading passes each team member commits a list of remaining task to the shared document and lists open questions that are discussed during the next meeting.</p>
+<h3 id="External-reviews"><a href="#External-reviews" class="headerlink" title="External reviews"></a>External reviews</h3><p>At the end of each bookkeeping pass it makes sense to generate a draft and send it to (i) advisers or more remote team members so that they can give feedback on the progress as well, (ii) friends who never read the paper to get valuable first-hand comments, and, as soon as the paper is mature enough, (iii) send it to external reviewers that can give detailed and harsh feedback.</p>
+<p>Depending on the amount of passes you can do (i.e., how many weeks you have left until the deadline) you can stretch out your friends and send different papers to different sets of friends, but remember that you should not overburden your colleagues as they might work towards the same deadline (and always return the favor of reviewing papers for them as well) and that each person can only read a paper for the first time once (this step is very important as a potential reviewer will read the paper as a first time reader without any prior knowledge about the idea, design, or other background information).</p>
+<p>The feedback from this task is then applied concurrently during the next concurrent writing phase. Individual reviews will dribble in asynchronously and can be discussed on demand.</p>
+<h3 id="Freeze-phase"><a href="#Freeze-phase" class="headerlink" title="Freeze phase"></a>Freeze phase</h3><p>One to two days before the deadline the lead author should start to freeze sections by marking sections as frozen in the shared locking document. A frozen section indicates that only the lead author may change any text in this section and only after a second person has reviewed this change.</p>
+<p>The last hours before the deadline are always very stressful and human mistakes tend to pile up. Freezing sections and requiring a two person review reduces the risk of human errors and makes the submission process smoother. Also remember to submit individual versions of the paper after every couple of changes, best start submitting the first versions when you start freezing sections.</p>
+<h2 id="Conclusion"><a href="#Conclusion" class="headerlink" title="Conclusion"></a><strong>Conclusion</strong></h2><p>Writing papers is fun and writing in a big collaboration that is remote can be fun too! Collaboration and team work always includes additional challenges but if you prepare well and are willing to adhere to a strict regimen: (i) synchronization is crucial and you should know what the other team members are doing, (ii) lock pages only work if people actually keep track of the logs, and (iii) you must keep track of the schedule to send out the drafts for external reviews. So enjoy your next collaborative research project!</p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/博士之路/">博士之路</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Ph-D/">Ph.D</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Ppaerwriting/">Ppaerwriting</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
   
     <article id="post-conference-veetenyears"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
@@ -849,434 +924,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-course-zhiqianglin2"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170307/course-zhiqianglin2/">名人课堂-系统安全与二进制代码分析(上)</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170307/course-zhiqianglin2/" class="article-date">
-	  <time datetime="2017-03-07T01:09:30.000Z" itemprop="datePublished">三月 7, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>来源：<a href="https://www.utdallas.edu/~zxl111930/spring2012.html" target="_blank" rel="external">https://www.utdallas.edu/~zxl111930/spring2012.html</a></p>
-<hr>
-<p><strong>CSysSec注：</strong> 本系列文章在于收集知名海外教授在计算机系统与安全领域的授课信息，会包含课程详细信息以及slides。<br><strong>转载本文请务必注明</strong>，文章出处：<a href="http://www.csyssec.org/20170307/course-zhiqianglin2/" target="_blank" rel="external">《名人课堂-系统安全与二进制代码分析(上)》</a>与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<h3 id="教授"><a href="#教授" class="headerlink" title="教授"></a>教授</h3><p><a href="https://www.utdallas.edu/~zxl111930" target="_blank" rel="external">Zhiqiang Lin</a></p>
-<h3 id="课程简介"><a href="#课程简介" class="headerlink" title="课程简介"></a>课程简介</h3><p>CS-6V81 is a graduate level, research oriented, system and software security course.</p>
-<p>The goal of this course is to explain the low-level system details from compiler, linker, loader, to OS kernel and computer architectures, examine the weakest link in each system component, explore the left bits and bytes after all these transformations, and study the state-of-the-art offenses and defenses.</p>
-<p>The learning outcome is students shall be able to understand how an attack is launched (e.g., how an expoit is created), and how to do the defense (e.g., developing OS patches, analyzing the binary code, and detecting intrusions)</p>
-<p>In particular, we will cover</p>
-<p>Memory exploits. We will investigate the unsafe but widely used system programming language C, cover typical vulnerabilities such as buffer overflows, format strings, integer overflows, etc. How to create robust shell code using such as ROP, HeapSpray.<br>OS Kernel Internals. What’s the behavior when a program is running on top of OS. Why we use paging. How virtual to physical address translation is performed. How MMU (e.g., TLB) helps this. How OS manage files, and disks. How can we model the program behavior when sitting at OS layer. We will use both Linux and Windows as working kernel.<br>Linker and Loader Internals. How a program can be dynamically linked, and what an attacker can do to cheat the system and meanwhile what we can do to protect the system.<br>Kernel-level Defense, how can we defend against the common exploits, techniques including such as ASR, and DEP, NX-bits.<br>User-level Defense. Safe library, Compiler extension, Binary Transformation/Rewriting, Runtime Verification.<br>Binary code reverse engineering. Static binary code analysis. Dynamic Binary code instrumentation. Data flow analysis, and control flow analysis. Malware packing and unpacking.<br>The class will also have a heavy-hands on project. Students could choose either to perform research (will work on a semester-long research topic of their choosing), or perform an engineering project.</p>
-<h3 id="课程安排"><a href="#课程安排" class="headerlink" title="课程安排"></a>课程安排</h3><table>
-<thead>
-<tr>
-<th style="text-align:left">Date</th>
-<th style="text-align:left">Topic To Be Covered</th>
-<th style="text-align:left">Presenter</th>
-<th>Slides</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:left">01/18</td>
-<td style="text-align:left">Course Overview</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec1.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left"><strong>System and Software Security Foundations: Understanding Binary Code Analysis</strong></td>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align:left">01/23</td>
-<td style="text-align:left">Binary Code/Data Representation</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec2.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">01/25</td>
-<td style="text-align:left">Program Representation</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec3.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">01/30</td>
-<td style="text-align:left">Dynamic Binary Instrumentation (PIN, Valgrind, Qemu)</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec4.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">02/01</td>
-<td style="text-align:left">Principles of Program Analysis</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec5.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">02/06</td>
-<td style="text-align:left">Guest Lecture: Recent Cyber Attacks and Implications</td>
-<td style="text-align:left">Jon Shapiro</td>
-<td><a href="http://oij0laovn.bkt.clouddn.com/lec6.pptx" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">02/08</td>
-<td style="text-align:left">Guest Lecture: Web Vulnerability (SQL injection, Cross-site scripting) Analysis</td>
-<td style="text-align:left">Duong Ngo</td>
-<td>N/A</td>
-</tr>
-<tr>
-<td style="text-align:left">02/13</td>
-<td style="text-align:left">Design and Implementation of a Data Flow Analysis (taint analysis)</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec6.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left"><strong>System and Software Security Foundations: Understanding the OS Kernel</strong></td>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
-</tr>
-<tr>
-<td style="text-align:left">02/15</td>
-<td style="text-align:left">Understanding the OS Architecture and Linux History</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec7.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">02/20</td>
-<td style="text-align:left">An Overview of Linux and Windows Kernel</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec8.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">02/22</td>
-<td style="text-align:left">Process Management</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec9.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">02/27</td>
-<td style="text-align:left">Virtual Memory (I)</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec10.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">02/29</td>
-<td style="text-align:left">Virtual Memory (II)</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec11.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">03/05</td>
-<td style="text-align:left">File System (I)</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec12.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">03/07</td>
-<td style="text-align:left">File System (II)</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec13.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">03/12*</td>
-<td style="text-align:left">No-class (Spring-break)</td>
-<td style="text-align:left"></td>
-</tr>
-<tr>
-<td style="text-align:left">03/14*</td>
-<td style="text-align:left">No-class (Spring-break)</td>
-<td style="text-align:left"></td>
-</tr>
-<tr>
-<td style="text-align:left"><strong>System and Software Security Foundations: Beyond OS Kernel</strong></td>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
-</tr>
-<tr>
-<td style="text-align:left">03/19</td>
-<td style="text-align:left">Revealing Internals of Executable File Format</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec14.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">03/21</td>
-<td style="text-align:left">Revealing Internals of Compiler (gcc)</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec15.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">03/26</td>
-<td style="text-align:left">Revealing Internals of Linker (ld)</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec16.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">03/28</td>
-<td style="text-align:left">Revealing Internals of Loader (ld-linux.so)</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec17.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left"><strong>System and Software Security: Techniques, Tools, and Applications</strong></td>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
-</tr>
-<tr>
-<td style="text-align:left">04/02</td>
-<td style="text-align:left">Library Interposition</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec18.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">04/04</td>
-<td style="text-align:left">Virtual Machine Monitor (QEMU/VirtualBox/Xen/KVM)</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec19.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">04/09</td>
-<td style="text-align:left">Symbolic Execution and Whitebox Fuzzing</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec20.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">04/11</td>
-<td style="text-align:left">Exploits: Buffer Overflows, Heap Overflow, Integer Overflow</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec21.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">04/16</td>
-<td style="text-align:left">Robust Exploits: ROP shellcode, Heap Spray</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec22.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">04/18</td>
-<td style="text-align:left">Fighting for Malware: Unpack, Disassemble, Decompile</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec23.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">04/23</td>
-<td style="text-align:left">Binary Code Reusing</td>
-<td style="text-align:left">Instructor</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec24.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">Student Presentation (15 minutes)</td>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
-</tr>
-<tr>
-<td style="text-align:left"><strong>Vulnerability, Exploit, Malware</strong></td>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
-</tr>
-<tr>
-<td style="text-align:left">01/23</td>
-<td style="text-align:left">Smashing the stack for fun and profit</td>
-<td style="text-align:left">Mitch Adair</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec2.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">01/25</td>
-<td style="text-align:left">Smashing the stack in 2011</td>
-<td style="text-align:left">Andrew Folloder</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec3.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">01/30</td>
-<td style="text-align:left">Exploiting Format String Vulnerabilities</td>
-<td style="text-align:left">Sanjay Bysani</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec4.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">02/01</td>
-<td style="text-align:left">English Shellcode</td>
-<td style="text-align:left">Shwetha Gopalan</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec5.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">02/13</td>
-<td style="text-align:left">Return-oriented programming    Scott Hand</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec8.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">02/15</td>
-<td style="text-align:left">ASLR Smack and Laugh Reference    Mohammed</td>
-<td style="text-align:left">Andaleeb Iftekhar</td>
-<td><a href="http://oij0laovn.bkt.clouddn.com/lec9.pptx" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">02/20</td>
-<td style="text-align:left">Automated Exploit Generation</td>
-<td style="text-align:left">Matthew Stephen</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec10.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">02/22</td>
-<td style="text-align:left">How to Shop for Free Online - Security Analysis of Cashier-as-a-Service Based Web Stores</td>
-<td style="text-align:left">Isaac Strohl,Avinash Joshi</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec11.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left"><strong>System Defenses: Architecture, OS, Compilation Extension, Code Transformation, Runtime Verification</strong></td>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
-</tr>
-<tr>
-<td style="text-align:left">02/27</td>
-<td style="text-align:left">Traps and Pitfalls: Practical Problems in System Call Interposition Based Security Tools</td>
-<td style="text-align:left">Vinay Gangasani</td>
-<td><a href="http://oij0laovn.bkt.clouddn.com/lec12.pptx" target="_blank" rel="external">ppt</a></td>
-</tr>
-<tr>
-<td style="text-align:left">02/29</td>
-<td style="text-align:left">Control Flow Integrity</td>
-<td style="text-align:left">Murugesan, Sureshbabu</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec13.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">03/05</td>
-<td style="text-align:left">On the Effectiveness of Address Space Randomization</td>
-<td style="text-align:left">Brian Ricks,Vasundhara Chimmad</td>
-<td><a href="http://oij0laovn.bkt.clouddn.com/lec14.pptx" target="_blank" rel="external">ppt</a></td>
-</tr>
-<tr>
-<td style="text-align:left">03/07</td>
-<td style="text-align:left">Dynamic Taint Analysis for Automatic Detection, Analysis, and Signature Generation of Exploits on Commodity Software</td>
-<td style="text-align:left">Sheikh Qumruzzaman, Khaled Al-Naami</td>
-<td><a href="http://oij0laovn.bkt.clouddn.com/taint.pptx" target="_blank" rel="external">ppt</a></td>
-</tr>
-<tr>
-<td style="text-align:left">03/19</td>
-<td style="text-align:left">Efficient and Accurate Detection of Integer-based Attacks</td>
-<td style="text-align:left">Allen Helton, Nishant Chithambaram</td>
-<td><a href="http://oij0laovn.bkt.clouddn.com/lec15.pptx" target="_blank" rel="external">ppt</a></td>
-</tr>
-<tr>
-<td style="text-align:left">03/21</td>
-<td style="text-align:left">Bouncer: Securing Software by Blocking Bad Input</td>
-<td style="text-align:left">Yufei Gu,Sathish Kuppuswamy</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec16.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">03/26</td>
-<td style="text-align:left">Static detection of C++ vtable escape vulnerabilities in binary</td>
-<td style="text-align:left">Huseyin Ulusoy</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/vtable.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">03/28</td>
-<td style="text-align:left">Kruiser: Semi-synchronized Non-blocking Concurrent Kernel Heap Buffer Overflow</td>
-<td style="text-align:left">Shishir K Prasad</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec17.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">04/02</td>
-<td style="text-align:left">Native Client: A Sandbox for Portable, Untrusted x86 Native Code</td>
-<td style="text-align:left">Gil Lundquist</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec18.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">04/04</td>
-<td style="text-align:left">Software fault isolation with API integrity and multi-principal modules.</td>
-<td style="text-align:left">Junyuan Zeng</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec19.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">04/09</td>
-<td style="text-align:left">A Virtual Machine Introspection Based Architecture for Intrusion Detection</td>
-<td style="text-align:left">Donald Talkington,sundarajan srinivasan</td>
-<td>[ppt]</td>
-</tr>
-<tr>
-<td style="text-align:left">04/16</td>
-<td style="text-align:left">Robust Defenses for Cross-Site Request</td>
-<td style="text-align:left">Forgery    Saravana M Subramanian</td>
-<td><a href="http://oij0laovn.bkt.clouddn.com/csr.pptx" target="_blank" rel="external">ppt</a></td>
-</tr>
-<tr>
-<td style="text-align:left"><strong>Malicious Code Analysis</strong></td>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
-</tr>
-<tr>
-<td style="text-align:left">04/18</td>
-<td style="text-align:left">Deobfuscation of virtualization-obfuscated software</td>
-<td style="text-align:left">Selvakumar Gopal Rajendran</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/de.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left">04/23</td>
-<td style="text-align:left">Who Wrote This Code? Identifying the Authors of Program Binaries</td>
-<td style="text-align:left">Camron</td>
-<td>[ppt]</td>
-</tr>
-<tr>
-<td style="text-align:left">04/25</td>
-<td style="text-align:left">Measuring Pay-per-Install: The Commoditization of Malware Distribution</td>
-<td style="text-align:left">Kevin Hulin</td>
-<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/kevin.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td style="text-align:left"><strong>Project Presentation</strong></td>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
-</tr>
-<tr>
-<td style="text-align:left">04/30</td>
-<td style="text-align:left">Project Presentation        </td>
-</tr>
-<tr>
-<td style="text-align:left">05/02</td>
-<td style="text-align:left">Project Presentation        </td>
-</tr>
-</tbody>
-</table>
-<h3 id="阅读列表"><a href="#阅读列表" class="headerlink" title="阅读列表"></a>阅读列表</h3><p>We do not have a text book, but we have the following reading list. Students are required to read all of these papers.</p>
-<p>Smashing the Stack for Fun and Profit<br>Smashing the Stack in 2011<br>Exploiting Format String Vulnerabilities<br>English Shellcode<br>On the Effectiveness of Address Space Randomization<br>Return-oriented programming<br>Backwards-Compatible Array Bound Checking for C<br>ASLR Smack and Laugh Reference<br>Control Flow Integrity<br>Robust Defenses for Cross-Site Request Forgery<br>All you ever wanted to know about dynamic taint analysis and symbolic execution<br>Dynamic Taint Analysis for Automatic Detection, Analysis, and Signature Generation of Exploits on Commodity Software<br>Automated Exploit Generation<br>Traps and Pitfalls: Practical Problems in System Call Interposition Based Security Tools<br>Native Client: A Sandbox for Portable, Untrusted x86 Native Code<br>Deobfuscation of virtualization-obfuscated software<br>BitShred: Fast, Scalable Code Reuse Detection in Binary Code<br>Kruiser: Semi-synchronized Non-blocking Concurrent Kernel Heap Buffer Overflow<br>How to Shop for Free Online - Security Analysis of Cashier-as-a-Service Based Web Stores<br>Differential Slicing: Identifying Causal Execution Differences for Security Applications<br>Efficient and Accurate Detection of Integer-based Attacks<br>Bouncer: Securing Software by Blocking Bad Input<br>Semantics-aware Malware Detection<br>Static detection of C++ vtable escape vulnerabilities in binary<br>Identifying and Analyzing Pointer Misuses for Sophisticated Memory-corruption Exploit<br>A Virtual Machine Introspection Based Architecture for Intrusion Detection<br>Software fault isolation with API integrity and multi-principal modules.<br>Measuring Pay-per-Install: The Commoditization of Malware Distribution<br>A Study of the Packer Problem and Its Solutions</p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：<a href="http://www.csyssec.org/20170307/course-zhiqianglin2/" target="_blank" rel="external">《名人课堂-系统安全与二进制代码分析(上)》</a>与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/名人课堂/">名人课堂</a>
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Binary/">Binary</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Course/">Course</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -1369,6 +1016,18 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170331/raid/">RAID十年录用论文</a></h6>
+          <!--  <span>三月 31, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -1550,18 +1209,6 @@
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170301/kernel-malloc/">深入理解Linux内存分配</a></h6>
-          <!--  <span>三月 1, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -1582,7 +1229,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.73px;">Conference</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.27px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.91px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 16.36px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 15.45px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 12.73px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.91px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.91px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15.45px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.82px;">Rootkit</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 18.18px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 10px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.73px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.27px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.91px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 16.36px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 15.45px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 12.73px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.91px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.91px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.91px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15.45px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.82px;">Rootkit</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 18.18px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 10px;">XEN</a>
     </div>
   </div>
 
