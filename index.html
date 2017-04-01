@@ -116,6 +116,70 @@
         
           <section id="main">
   
+    <article id="post-buildsandbox"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170401/buildsandbox/">如何构建一个有效地恶意代码分析沙盒</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170401/buildsandbox/" class="article-date">
+	  <time datetime="2017-04-01T02:26:11.000Z" itemprop="datePublished">四月 1, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Source: <a href="https://www.lastline.com/labsblog/different-sandboxing-techniques-to-detect-advanced-malware/" target="_blank" rel="external">https://www.lastline.com/labsblog/different-sandboxing-techniques-to-detect-advanced-malware/</a><br>Author: <a href="https://www.lastline.com/author/christopher/" target="_blank" rel="external">Dr. Christopher Kruegel</a></p>
+<pre><code>Currently on leave from his position as Professor of Computer Science at UC Santa Barbara, Christopher Kruegel’s research interests focus on computer and communications security, with an emphasis on malware analysis and detection, web security, and intrusion detection. Christopher previously served on the faculty of the Technical University Vienna, Austria. He has published more than 100 peer-reviewed papers in top computer security conferences and has been the recipient of the NSF CAREER Award, MIT Technology Review TR35 Award for young innovators, IBM Faculty Award, and several best paper awards. He regularly serves on program committees of leading computer security conferences. Christopher was the Program Committee Chair of the Usenix Workshop on Large Scale Exploits and Emergent Threats (LEET, 2011), the International Symposium on Recent Advances in Intrusion Detection (RAID, 2007), and the ACM Workshop on Recurring Malcode (WORM, 2007). He was also the head of a working group that advised the European Commission (EC) on defenses to mitigate future threats against the Internet and Europe&apos;s cyber-infrastructure.
+</code></pre><hr>
+<p>Automated malware analysis systems (or sandboxes) are one of the latest weapons in the arsenal of security vendors. Such systems execute an unknown malware program in an instrumented environment and monitor their execution. While such systems have been used as part of the manual analysis process for a while, they are increasingly used as the core of automated detection processes. The advantage of the approach is clear: It is possible to identify previously unseen (zero day) malware, as the observed activity in the sandbox is used as the basis for detection.</p>
+<p>For a high level overview of this topic, please read <a href="http://www.csyssec.org/20170401/sandbox/" target="_blank" rel="external">Next-Generation Sandbox Offers Comprehensive Detection of Advanced Malware</a>.</p>
+<h2 id="Goals-of-a-dynamic-analysis-system-sandbox"><a href="#Goals-of-a-dynamic-analysis-system-sandbox" class="headerlink" title="Goals of a dynamic analysis system (sandbox)"></a>Goals of a dynamic analysis system (sandbox)</h2><p>A good malware analysis sandbox has to achieve three goals: Visibility, resistance to detection, and scalability.</p>
+<p>First, a sandbox has to see as much as possible of the execution of a program. Otherwise, it might miss relevant activity and cannot make solid deductions about the presence or absence of malicious behaviors. Second, a sandbox has to perform monitoring in a  fashion that makes it difficult to detect. Otherwise, it is easy for malware to identify the presence of the sandbox and, in response, alter its behavior to evade detection. The third goal captures the desire to run many samples through a sandbox, in a way that the execution of one sample does not interfere with the execution of subsequent malware programs. Also, scalability means that it must be possible to analyze many samples in an automated fashion.</p>
+<h2 id="What-information-should-a-sandbox-collect"><a href="#What-information-should-a-sandbox-collect" class="headerlink" title="What information should a sandbox collect?"></a>What information should a sandbox collect?</h2><p>In this post, we discuss different ways in which a sandbox can monitor the execution of malware that runs in user mode (either as a regular user or administrator). This leaves out malicious code that tampers with the kernel, such as rootkits. We leave those for a future post. Also, the vast majority of malware runs as regular user mode processes, and even rootkits typically leverage user mode components to install kernel drivers or to modify the operating system code.</p>
+<p>When monitoring the behavior of a user mode process, almost all sandboxes look at the system call interface or the Windows API. System calls are functions that the operating system exposes to user mode processes so that they can interact with their environment and get stuff done, such as reading from files, sending packets over the network, and reading a registry entry on Windows. Monitoring system calls (and Windows API function calls) makes sense, but it is only one piece of the puzzle. The problem is that a sandbox that monitors only such invocations is blind to everything that happens in between these calls. That is, a sandbox might see that a malware program reads from a file, but it cannot determine how the malware actually processes the data that it has just read. A lot of interesting information can be gathered from looking deeper into the execution of a program. Thus, some sandboxes go one step further than just hooking function calls (such as system calls or Windows API functions), and also monitor the instructions that a program executes between these invocations.</p>
+<h2 id="Emulation-versus-virtualization"><a href="#Emulation-versus-virtualization" class="headerlink" title="Emulation versus virtualization"></a>Emulation versus virtualization</h2><p>Now that we know what information we want to collect, the next question is how we can build a sandbox that can collect this data in a way that makes it difficult for malware to detect. The two main options are virtualization and emulation.</p>
+<p>An emulator is a software program that simulates the functionality of another program or a piece of hardware. Since an emulator implements functionality in software, it provides great flexibility. For example, consider an emulator that simulates the system hardware (such as the CPU and physical memory). When you run a guest program P on top of this emulated hardware, the system can collect very detailed information about the execution of P. The guest program might even be written for a different CPU architecture than the actual CPU that the emulator runs on. This mechanism allows, for example, to run an Android program, written for ARM, on top of an emulator that runs on an x86 host. The drawback of emulation is that the software layer incurs a performance penalty. The potential performance impact has to be carefully addressed to make the analysis system scalable.</p>
+<p>With virtualization, the guest program P actually runs on the underlying hardware. The virtualization software (the hypervisor) only controls and mediates the accesses of different programs (or different virtual machines) to the underlying hardware. In this fashion, the different virtual machines are independent and isolated from each other. However, when a program in a virtual machine is executing, it is occupying the actual physical resources, and as a result, the hypervisor (and the malware analysis system) cannot run simultaneously. This makes detailed data collection challenging. Moreover, it is hard to entirely hide the hypervisor from the prying eyes of malware programs. The advantage is that programs in virtual machines can run at essentially native speed.</p>
+<h2 id="Leveraging-emulation-and-virtualization-for-malware-analysis"><a href="#Leveraging-emulation-and-virtualization-for-malware-analysis" class="headerlink" title="Leveraging emulation and virtualization for malware analysis"></a>Leveraging emulation and virtualization for malware analysis</h2><p>As mentioned previously, the task of an emulator is to provide a simulated (runtime) environment in which a malware program can execute. There are two main options for this environment. First, one can emulate the operating system (this is called OS emulation). Intuitively, this makes sense. A program runs in user mode and needs to make system calls to interact with its environment. So, why not simply emulate these systems calls? While the malware is running, one can get a close look at its activity (one can see every instruction). When the malware tries to make a system call, this information can be easily recorded. At this point, the emulator simply pretends that the system call was successfully executed and returns the proper result to the program.</p>
+<p>This sounds simple enough in theory, but it is not quite as easy in practice. One problem is that the (native) system call interface in Windows is not documented, and Microsoft reserves the right to change it at will. Thus, an emulator would typically target the Windows API, a higher-level set of library functions on top of the native system calls. Unfortunately, there are tens of thousands of these Windows API functions. Moreover, the Windows OS is a huge piece of software, and emulating it faithfully requires an emulator that has a comparable complexity of Windows itself! Since faithful emulation is not practical, emulators typically focus on a popular subset of functionality that works “reasonably well” for most programs. Of course, malware authors know about this. They can simply invoke less frequently used functions and check whether the system behaves as expected (that is, like a real Windows OS). OS emulators invariably fail to behave as expected, and such sandboxes are quite easy for malware to detect and evade. Security vendors that leverage OS emulation are actually well aware of this limitations. They typically include OS emulation only as one part of their solution, complemented by other detection techniques.</p>
+<p>As the second option for an emulator, one can simulate the hardware (in particular, CPU and physical memory). This is called (whole) system emulation. System emulation has several advantages. First, one can install and run an actual operating system on top of the emulator. Thus, the malware is executed inside a real OS, making the analysis environment much more difficult to detect for malware. The second advantage is that the interface offered by a processor is (much) simpler than the interface provided by Windows. Yes, there are hundreds of instructions, but they are very well documented, and they essentially never change. After all, Intel, AMD and ARM want an operating system (or application) developer to know exactly what to expect when she targets their platform. Finally, and most importantly, a system emulator has great visibility. A sandbox based on system emulation sees every instruction that a malware program executes on top of the emulated processor, and it can monitor every single access to emulated memory.</p>
+<p>Virtualization platforms provides significantly fewer options for collecting detailed information. The easiest way is to record the system calls that programs perform. This can be done in two different ways. First, one could instrument the guest operating system. This has the obvious drawback that a malware program might be able to detect the modified OS environment. Alternatively, one can perform system call monitoring in the hypervisor. System calls are privileged operations. Thus, when a program in a guest VM performs such an operation, the hypervisor is notified. At this point, control passes back to the sandbox, which can then gather the desired data. The big challenge is that it is very hard to efficiently record the individual instructions that a guest process executes without being detected. After all, the sandbox relinquishes control to this process between the system calls. This is a fundamental limitation for any sandbox that uses virtualization technology.</p>
+<h2 id="How-is-our-sandbox-built"><a href="#How-is-our-sandbox-built" class="headerlink" title="How is our sandbox built?"></a>How is our sandbox built?</h2><p>We think that more visibility is better, especially facing malware that becomes increasingly aware of virtual machines and sandbox analysis. We have seen malware that tries to detect the presence of VMware for many years. Even if one builds a custom sandbox based on virtualization technology, the fundamental visibility limitations remain. Of course, when a malware program checks for specific files or processes that a well-known hypervisor like VMware introduces, these checks will fail, and the custom sandbox will be successful in seeing malicious activity. However, virtualization, by definition, means that malicious code is run directly on the underlying hardware. And while the malicious code is running, the sandbox is paused. It is only woken up at specific points, such as system calls. This is a problem, and a major reason why we decided to implement our sandbox as a system emulator.</p>
+<p>Why does not everybody use system emulation, since it seems such a great idea? The reason is that one needs to overcome two technical challenges to make a system emulator work in practice. One challenge is called the semantic gap, the other one is performance. The semantic gap is related to the problem that a system emulator sees instructions executed on the CPU, as well as the physical memory that the guest OS uses. However, it is not immediately clear how to connect CPU instructions and bytes in memory to objects that make sense in the context of the guest OS. After all, we want to know about the files that a process creates, or the Windows registry entries that it reads. To bridge the semantic gap, one needs to gain a deep understanding into the inner workings of the guest operating system. By doing this, we can then map the detailed, low level view of our system to high level information about files, processes and network traffic that are shown in our report.</p>
+<p>The second question is about performance. Isn’t emulation terribly slow? The answer is yes, if implemented in a naive way. If we emulated every instruction in software, the system would indeed not scale very well. However, we have done many clever things to speed up emulation, to a level where it is (almost) as fast as native execution. For example, one does not need to emulate all code. A lot of code can be trusted, such as Windows itself. Well, we can trust the kernel most of the time – of course, it can be compromised by rootkits. Only the malicious program (and code that this program interacts with) needs to be analyzed in detail. Also, one can perform dynamic translation. With dynamic translation, every instruction is examined in software once, and then translated into a much more efficient form that can be run directly.</p>
+<h2 id="Summary"><a href="#Summary" class="headerlink" title="Summary"></a>Summary</h2><p>A sandbox offers the promise of zero day detection capabilities. As a result, most security vendors offer some kind of sandbox as part of their solutions. However, not all sandboxes are alike, and the challenge is not to build a sandbox, but rather to build a good one. Most sandboxes leverage virtualization and rely on system calls for their detection. This is not enough, since these tools fundamentally miss a significant amount of potentially relevant behaviors. Instead, we believe that a sandbox must be an analysis platform that sees all instructions that a malware program executes, thus being able to see and react to attempts by malware authors to fingerprint and detect the runtime environment. As far as we know, Lastline is the only vendor that uses a sandbox based on system emulation, combining the visibility of an emulator with the resistance to detection (and evasion) that one gets from running the malware inside the real operating system.</p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/恶意代码/">恶意代码</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Sandbox/">Sandbox</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-sandbox"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -1051,202 +1115,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-poker"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170330/poker/">内核Rootkit行为的多方面解析</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170330/poker/" class="article-date">
-	  <time datetime="2017-03-30T04:11:52.000Z" itemprop="datePublished">三月 30, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>论文来源： <a href="http://friends.cs.purdue.edu/pubs/eurosys09.pdf" target="_blank" rel="external">R. Riley, X. Jiang, and D. Xu. Multi-aspect proling of kernel rootkit behavior.In EuroSys, pages 47-60, 2009</a></p>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170330/poker" target="_blank" rel="external">内核Rootkit行为的多方面解析</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-<p><strong>摘要</strong></p>
-<p>内核rootkit是一种恶意软件，用于破坏运行的操作系统内核。由于其难以捕获、种类繁多、行为复杂、运行在特权层，我们很难分析和了解内核rootkit。然而，全面的rootkit解析能够揭示内核rootkit的主要行为，有助于研究专家的人工详细分析。在本文中我们介绍PoKeR，PoKeR是一种内核rootkit分析器，能够用于多方面的rootkit分析，包括rootkit挂钩行为、目标内核对象（静态和动态）、用户层面的影响评估、以及内核rootkit代码提取。该系统的目的是部署在可以接受高负载的场景下，如蜜罐。我们采用了大量真实内核rootkit进行评估，评估结果表明PoKeR能够准确地分析各种rootkit，包括传统的系统调用挂钩rootkit以及更先进的直接内核对象操作rootkit。所获得的分析结果帮助我们以独特的视角了解rootkit的特征，并证明了PoKeR是一个有用的rootkit分析工具。</p>
-<p><strong>类别和主题描述</strong> </p>
-<p> D.4.6 [操作系统]：安全与保护—攻击软件<br> 一般术语   安全</p>
-<p> <strong>关键词</strong>   内核 Rootkit，恶意代码，解析</p>
-<h2 id="1-简介"><a href="#1-简介" class="headerlink" title="1 简介"></a>1 简介</h2><p>内核rootkit针对操作系统内核，被认为是最隐秘的计算机恶意代码之一，严重威胁计算机系统的完整性。它们在受害计算机中以最高权限运行，劫持操作系统内核的控制权，并提供“增值”服务以允许其他恶意活动或未授权访问—这些行为和访问都是在系统管理员和用户不知情的情况下进行的。例如，内核rootkit曾被用来隐藏僵尸程序或其他后门软件，从而最大限度地延长僵尸网络的存活时间。</p>
-<p>尽管最近在内核rootkit检测[Garfinkel 2003, Petroni 2004; 2006; 2007]和内核rootkit预防[Seshadri 2007, Riley 2008]方面有诸多研究，对于内核rootkit行为的关键特征的分析仍然比较少。我们更希望在动态的“现场”系统（如蜜罐）中进行这样的分析。内核rootkit特征分析对形成有效的内核rootkit检测方法、破坏预防方法以及内核完整性保护方法是很有价值的。在本文中，我们定义了内核rootkit的特征，包括以下四个方面：</p>
-<ul>
-<li>挂钩行为：即在rootkit安装过程中，内核rootkit劫持控制流的方法（在劫持的情况下）。通常情况下，rootkit通过修改内核挂钩（例如函数指针）实现劫持。请注意，rootkit经常将挂钩安装在各种内核对象中，包括内核代码或动态分配的内核对象[Hoglund 2006]。</li>
-</ul>
-<ul>
-<li><p>目标内核对象：即rootkit访问的内核对象，例如rootkit读取或修改对象。与挂钩行为类似，目标内核对象可以是动态的。典型的例子是all-task列表，此列表由操作系统内核控制，用于计算；但是经常被rootkit操控用于隐藏目的。</p>
-</li>
-<li><p>用户级的影响：即受影响的用户级应用程序，这些程序的执行可能直接受rootkit代码的影响。请注意，我们的目的并不是要获得完整的受影响程序的列表；而是常用系统工具（例如ps, ls, netstat等）集。这些工具能用于检索重要的系统，因此往往是内核rootkit的目标</p>
-</li>
-<li><p>注入代码：即注入内核内存地址空间并执行的内核rootkit代码。必须在运行时准确定位和提取注入的代码，以用于后续的取证分析。</p>
-</li>
-</ul>
-<p>近来，研究人员做了大量的工作来分析内核rootkit的特征 [Yin 2007; 2008, Wang 2008, Lanzi 2009]。虽然这些研究是有效的，但是目前的研究方法仍然不足以全面地分析rootkit的功能：（1）一些方法需要事先提供内核rootkit代码并确定rootkit攻击将要发生。这样的要求使得我们难以现场分析零日内核rootkit。（2）当前分析技术只集中在rootkit行为的一个方面（例如挂钩行为）或rootkit生命周期的一个阶段（例如，安装或执行，而非这两个阶段）。（3）现有方法的关键技术，例如全系统破坏或限制，存在一些众所周知的很难克服的局限性和挑战。例如，基于污点的信息流跟踪会被多种控制流规避方法所规避[Cavallaro 2008 ]。</p>
-<p>为克服上述局限性，我们推出了PoKeR（Profiler of Kernel Rootkits），这是一种基于虚拟化的内核rootkit分析器，能够在rootkit执行时多方面地分析内核rootkit。PoKeR的设计目的是部署在可以接受高负载的系统中，如蜜罐，这些系统易受rootkit攻击。基于PoKeR的系统会正常运行，直至内核rootkit安装在系统中并准备执行其注入内核的恶意代码。此时，PoKeR将系统（虚拟机）切换到rootkit解析模式并采用“作战跟踪” 策略，以自动跟踪并确定内核rootkit的目标内核对象（静态或动态）。此外，当目标内核对象被控制时，PoKeR会记录相关系统调用背景并推断对用户级应用程序产生的影响。</p>
-<p>我们已经研发出PoKeR原型，并用其分析了10个有代表性的真实内核rootkit，这些rootkit代表了很大一部分rootkit的攻击方法，包括基本系统调用表挂钩，更先进的直接内核对象操控技术[Silberman 2006]，动态内核数据对象的函数指针操控 [Hoglund 2006 ]以及其他方法。PoKeR的分析涵盖rootkit行为的多方面以及每个rootkit的特征。我们测量了基于QEMU的原型的性能，发现它在分析过程中使虚拟化系统的性能降低3倍到6倍，而虚拟系统本身也会使物理主机的性能降低3.8倍以上。</p>
-<p>本研究的贡献如下：</p>
-<ul>
-<li><p>我们确定了内核rootkit行为的四个关键方面，并用其分析现有内核rootkit。</p>
-</li>
-<li><p>我们定义了瞬时rootkit检测系统的概念；讨论了如何升级现有的内核rootkit防御系统，以生成检测点来触发rootkit解析。</p>
-</li>
-<li><p>我们提出作战跟踪技术，以确定rootkit的目标内核对象的身份和类型，甚至是在内核堆中动态分配的对象。</p>
-</li>
-<li><p>我们开发了PoKeR原型，给出了10个有代表性的真实内核rootkit的分析结果。获得了rootkit行为的有用信息。如果没有PoKeR，即使进行深入分析，其中一些信息也是难以获得的。</p>
-</li>
-</ul>
-<h2 id="2-假设"><a href="#2-假设" class="headerlink" title="2 假设"></a>2 假设</h2><p>在本研究中，我们假设内核rootkit与操作系统内核具有相同的内存访问权限。如果操作系统可以读取或写入到一个内存位置，则rootkit也可以。这也意味着rootkit不会拥有高于操作系统的权限，例如虚拟机监视器（VMM）的权限。Rootkit能够任意地修改静态或动态的内核对象。</p>
-<p>我们假设rootkit需要在内核权限级别下执行注入的代码，但是注入代码并不需要持续在rootkit攻击的整个生命周期。我们将需要在内核权限级别下执行注入代码的内核rootkit称为代码注入内核rootkit。为了便于说明，在本文中我们将使用术语“内核rootkit”来指代代码注入内核rootkit。这一假设是成立的。Petroni等人[Petroni 2007]研究了25个内核rootkit，我们的假设同以上任何内核rootkit都不冲突。特别是，所有25个内核rootkit利用内核中的注入代码，而其中24个需要注入代码持续在rootkit的整个生命周期。</p>
-<p>我们认为PoKeR能够利用操作系统内核源代码进行静态分析，或将调试符号和类型信息用于已编译的内核二进制代码。我们也认为PoKeR可以运行于能够接受高性能费用的系统中。</p>
-<h2 id="3-设计"><a href="#3-设计" class="headerlink" title="3 设计"></a>3 设计</h2><p> 图1显示了PoKeR的整体结构。如图中加粗部分所示，PoKeR有两个主要模块：</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/poker01.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/poker01.png" width="450"></a><br>    <figcaption>图1基于VMM的PoKeR架构</figcaption><br></figure>
-
-<ul>
-<li><p>记录和背景跟踪模块驻留在虚拟机监视器（VMM）中，一旦激活就会收集恶意rootkit代码运行时的痕迹。运行痕迹保存在目标虚拟机之外，包含rootkit执行指令、相应内存读取和写入、以及相关的运行背景等信息。运行背景的记录将有助于我们评估rootkit攻击导致的用户级影响。请注意，激活这个模块需要一个检测点，我们将在第3.1章节中简要介绍。</p>
-</li>
-<li><p>内核对象解析模块处理收集的运行时痕迹，并将目标地址读取或写入rootkit读取或操控的内核对象。相关内核对象的动态特征使得解析程序非常复杂。</p>
-</li>
-</ul>
-<p>PoKeR的设计面临三个关键的挑战和技术难点，我们将在下面三个小节中予以介绍。</p>
-<h3 id="3-1-切换到解析模式"><a href="#3-1-切换到解析模式" class="headerlink" title="3.1 切换到解析模式"></a>3.1 切换到解析模式</h3><p>在第1章中提到，PoKeR主要用于能够接受高负载的环境中。PoKeR系统有两种操作模式：一种是检测模式，即其初始状态，在检测模式下，瞬时rootkit检测系统（在下文中介绍）监视内核rootkit的运行，PoKeR的多数rootkit解析特征都会失效；另一种是解析模式，此模式在检测点生成时激活（即当瞬时rootkit检测系统上报rootkit进攻即将发生时）。在解析模式下，PoKeR激活其解析特征并细粒度地记录rootkit的行为，例如执行指令、系统调用、内存读取和写入等。之后，PoKeR根据第1章中介绍的4个方面生成rootkit分析结果。</p>
-<p>为了确保对rootkit的所有行为进行适当分析，我们必须保证rootkit即将在内核中执行第一个指令时生成检测点，我们将能够满足这种严格的时间限制的检测系统称为瞬时检测系统。Rootkit防御领域的现有研究结果可以用作瞬时检测系统，例如Livewire [Garfinkel2003]，SecVisor [Seshadri 2007]，以及我们之前的研究NICKLE [Riley 2008]。这些系统是基于多种虚拟技术开发的。例如，SecVisor利用硬件虚拟化支撑来防止恶意内核代码的运行，而Livewire和NICKLE则是利用软件虚拟化来保证只有合法的内核代码能够在内核中运行。PoKeR的设计使得它能够利用所有这些系统来生成rootkit检测点。</p>
-<h4 id="3-1-1-NICKLE作为瞬时检测系统"><a href="#3-1-1-NICKLE作为瞬时检测系统" class="headerlink" title="3.1.1 NICKLE作为瞬时检测系统"></a>3.1.1 NICKLE作为瞬时检测系统</h4><p>在本研究中，我们将NICKLE用作瞬时检测系统来生成PoKeR的内核rootkit检测点。下面，我们将简要介绍NICKLE。有兴趣的读者可参照我们之前的论文[Riley 2008 ]以了解更多信息。</p>
-<p>简言之，NICKLE在虚拟机监视器中运行，保护用户的操作系统。NICKLE为运行的虚拟机保留两个独立的内存空间。一个是标准内存，功能与正常的存储空间相同，用于存储内核和用户级的代码和数据；另一个是影子内存，只存储已被NICKLE验证的内核代码，这是通过动态技术实现的，即用已知的良好内核代码的哈希值来验证，并将验证后的内核代码从标准内存复制到影子内存。运行时，所有虚拟机操作系统执行的内核指令读取被透明地传送到影子内存，而其他所有的内存访问则被传送到标准内存。因此，内核rootkit无法在内核中执行未经授权的注入代码。未能通过NICKLE的内核代码认证的注入代码将只能驻留在标准内存，而无法被影子内存读取。所有这些操作对虚拟机操作系统都是透明的，且不需要修改。</p>
-<p>下一步就是将原始的NICKLE转化为PoKeR的瞬时检测系统。该系统不是简单地阻止rootkit代码的执行，而是允许代码在标准内存中不受阻碍地执行。在虚拟机内核指令读取时，系统比较标准内存和影子内存的内容，以确定两者中是否存在相同的指令。如果一个将要被读取的内核指令存在于标准内存而不存在于影子内存（简单地说就是两者内容不同），则未经授权的代码将在内核层面执行。这就是PoKeR的检测点，系统也将切换到解析模式。</p>
-<p>因为在指令执行前我们就知道它是恶意指令，所以我们就有绝好的机会来确定和提取恶意rootkit代码，然后对其进行分析，例如进行静态分析。我们还可以记录指令执行顺序。此外，系统的恶意代码识别功能允许解析模式不时地打开和关闭，即在rootkit指令执行时打开，在已验证的内核指令执行时关闭。检测模式（较快）和解析模式（较慢）之间的动态切换带来更高效的rootkit解析。</p>
-<h3 id="3-2-跟踪目标内核对象"><a href="#3-2-跟踪目标内核对象" class="headerlink" title="3.2 跟踪目标内核对象"></a>3.2 跟踪目标内核对象</h3><p>一旦检测到内核rootkit运行且PoKeR的解析模式打开，我们需要跟踪内核rootkit操控的所有内核对象。例如，rootkit可能会遍历整个进程列表，寻找特定PID的项，并将其删除；或者可能改变内核中的TCP数据结构的键值，以掩饰其向远程地址发送数据。重要的是，PoKeR能够在rootkit指令执行时确定被读取或修改的内核对象。这颇具挑战性，因为PoKeR运作于虚拟机监视器层面，并不直接提供虚拟机内核对象的语义视图。不幸的是，目前的虚拟机自省技术[Garfinkel 2003, Jiang 2007, Payne 2007]不支持这种“反向查找”（即给定一个内存地址，来确定相应的内核对象）。</p>
-<p>PoKeR的记录和背景跟踪模块记录了rootkit代码的所有读取和写入行为，利用这一模块，我们能够很容易地获取rootkit读取和写入列表，然而，大量的内核对象是动态分配的，这使得我们难以确定rootkit修改的内核对象。例如，我们能够检测到rootkit在内存地址0xc6600856处进行修改，但如果地址定位在内核堆中，我们就无法简单地确定对象了（这就是为什么简单的符号调试器不能用来跟踪内核对象的一个原因）。而静态分配的内核对象的地址则可以在编译时很容易地确定。为了确定动态分配的内核对象，我们需要创建地址—动态对象映射，用它将内存地址转换为相应的内核对象。</p>
-<p>创建此地址—动态对象映射的一个关键点是所有的内核对象必须是可以以某种方式存取的，包括全局变量或寄存器。如果将内核对象想象为一个图，图的边缘是指针，那么所有对象至少可以暂时地从一个全局变量存取。如果对象无法用此方法存取，那么内核本身也将不能够访问对象，因此无法使用对象。垃圾收集[Boehm 1988 ]和基于状态的控制流完整性[Petroni 2007 ]方面也有类似的研究。蛮力地址动态对象映射法需要搜索整个内存图，这将是非常低效的，无法满足我们的需要。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/poker2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/poker2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>为了更高效地支持地址—动态对象映射法，我们提出了“作战跟踪”技术。作战跟踪技术的关键点是：内核rootkit会首先遍历静态分配的内核对象地址从而找到动态分配的内核对象的地址。Rootkit与PoKeR很相似，本身不知道动态内核对象的分布，因此需要通过一系列的内核内存读取以获取对象。通过跟踪rootkit的一系列读取，我们可以动态地创建地址—动态对象映射，在一个给定内存地址时，PoKeR可以利用此映射查找相应的动态内核对象。</p>
-<p>算法1展示了PoKeR内核对象解析模块的作战跟踪算法。该算法假设初始静态对象映射可用，结合rootkit读取，即时创建动态对象映射（在我们的原型中，静态内核对象映射和对象类型定义来自调试符号编译的内核副本）。算法的第一步是确定被读取的地址的数据类型。我们首先查询静态对象映射，如果不是全局对象，我们则检查动态对象映射，确定我们是否已经将此地址添加到映射。一旦发现被读取的对象，我们需要确定它是否是指针。我们考虑指针的原因是：如果指针对象被读取，则读取的值与内核对象的地址对应。这可能是我们没见过的内核对象，可以用来进一步创建动态映射。鉴于此，当rootkit确实读取指针时，我们确定rootkit读取的值（新对象的地址）以及间接引用的指针类型（新对象的类型），并将此信息添加到动态映射中。这样我们根据rootkit读取逐步建立地址—动态对象映射。</p>
-<p>为了说明作战跟踪，我们举个例子。图2简单展示了Linux内核的进程列表。地址0xc03 00000处是一个全局数据结构；初始化任务（init task）位于动态分配的struct task_struct头部。如果rootkit试图在task_struct搜索pid 3，它会执行以下操作。首先，它读取地址0xc0300004以找到全局task_struct中的next_task指针。它将获取下一个结构的地址0xc11a0000。然后，它读取地址0xc11a0000处下一个结构的pid，如果发现pid不是3，它会读取0xc11a0004搜索下一个task_struct。它重复这个过程直到在地址0xc11c0000处的task_struct中找到pid 3。之后，它在数据结构（例如地址0xc11c0008）处修改变量，以操控内核对象。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/poker0.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/poker0.png" width="450"></a><br>    <figcaption>图2 Linux进程列表的简单图示</figcaption><br></figure>
-
-
-
-<p>如果不采用作战跟踪技术，我们只知道rootkit在地址0xc11c0008处写入，无法获取此地址处的数据类型。采用作战跟踪技术，根据整个读取链，我们能够创建动态映射：当rootkit读取init task的next task时，初始静态映射显示此读取对应struct task struct<em>对象。鉴于此，结合rootkit读取0xc11a0000的事实，我们知道地址0xc11a0000包含struct task_struct，并将其添加到我们的动态映射。之后木马从动态数据结构读取next_task指针时，我们知道（根据之前读取的经验）读取的是struct task_struct</em>的另一个指针，并将此链表元素添加到动态映射。我们继续以这种方式创建动态映射，直到rootkit读取的所有数据结构都被添加到映射中。之后，当出现地址0xc11c0008写入时，我们可以检查动态映射，确定地址是否是task_struct的一部分，并确定数据结构的哪些元素被修改。</p>
-<p>我们不跟踪内核对象的生命周期，当某项去分配后，将该项从动态映射中删除。该项仍然存在于映射中，只是其位置上已经没有对象。因为rootkit不会访问去分配的内核对象（如果访问，很可能是编程错误），这种“陈旧项”不会影响正常操作。如果一个新对象分配了之前使用的地址，则rootkit的新对象读取链将导致陈旧项被替换为与新对象相对应的项。</p>
-<h3 id="3-3-发现rootkit挂钩和用户级影响"><a href="#3-3-发现rootkit挂钩和用户级影响" class="headerlink" title="3.3 发现rootkit挂钩和用户级影响"></a>3.3 发现rootkit挂钩和用户级影响</h3><p>对很多内核rootkit来讲，操控内核对象特定子集的一个关键目的是最终劫持内核的控制流，以便影响内核的运行状态。Rootkit通常通过修改函数指针来劫持控制流，其中很多指针可能存储在内核堆中动态分配的对象中。要揭示rootkit的挂钩行为，至关重要的是在安装时找到这些挂钩。Rootkit也可能直接修改合法代码，迫使对rootkit代码的调用。所幸，这两种修改都可以视为内核对象跟踪问题（第3.2章节）。跟踪现有代码的修改类似于跟踪静态对象的修改；而跟踪函数指针的修改则属于使用作战跟踪技术跟踪对象修改，主要原因是修改后的函数指针属于特定的内核对象。</p>
-<p>举个例子，基于Linux内核模块（LKM）的rootkit 的目标是确保扩展名为“hacker”的文件对用户不可见。攻击者采用insmod命令将恶意rootkit作为内核模块安装。系统将恶意模块复制到内存，运行模块的init()函数。init()的第一条指令执行之前，瞬时rootkit检测系统生成检测点，检测点激活PoKeR的解析模式。之后，rootkit初始化函数修改系统调用表，使得原本检索目录列表的系统调用更改为指向确保.hacker文件不出现在列表的恶意函数。系统调用表写入被记录和解析。因此，我们能够发现代码的挂钩点并分析rootkit所执行的控制流修改。</p>
-<p>  除了确定哪些函数指针被内核rootkit劫持，我们也迫切地需要确定被修改的内核控制流如何影响用户级程序的系统调用。这可能有助于确定特定rootkit的目标用户级程序，并大致了解rootkit试图隐藏的内容。对修改系统调用表的内核rootkit来说，这种影响是相当明显的：当执行相应的系统调用时，被修改的调用表项将导致控制流劫持。然而，对不直接修改系统调用表项的rootkit来说，不太容易确定哪些系统调用会受影响。</p>
-<p>为了确定哪些系统调用导致运行时控制流劫持，我们需要将恶意rootkit代码的运行与相应的系统调用结合起来。为做到这一点，PoKeR将跟踪系统调用的执行并利用虚拟机内省技术[Jiang 2007]以确定当前的进程背景，即哪个进程执行系统调用。注意：通过记录系统调用的起始点以及系统调用结束点，PoKeR可以有效地跟踪系统调用的整个运行周期。如果检测到恶意代码运行，PoKeR会推断恶意代码运行的当前进程背景，并确定是否有系统调用运行于相同的进程背景下。如果存在这样的系统调用，则说明此系统调用的控制流已被劫持。</p>
-<h2 id="4-实施"><a href="#4-实施" class="headerlink" title="4 实施"></a>4 实施</h2><p>为了验证我们的设计，我们开发了PoKeR原型。在本章中，我们介绍PoKeR的实施。</p>
-<h3 id="4-1-瞬时rootkit检测"><a href="#4-1-瞬时rootkit检测" class="headerlink" title="4.1 瞬时rootkit检测"></a>4.1 瞬时rootkit检测</h3><p>在3.1.1章节中提到，我们采用NICKLE作为瞬时检测系统。NICKLE已在多个虚拟机监视器平台下测试和实施，例如QEMU [Bellard 2005]，VirtualBox[Innotek]，以及VMware Workstation [VMware]。在本研究中，我们选择了NICKLE的QEMU端口以便于实施。</p>
-<h3 id="4-2-记录和背景跟踪"><a href="#4-2-记录和背景跟踪" class="headerlink" title="4.2 记录和背景跟踪"></a>4.2 记录和背景跟踪</h3><p>一旦NICKLE检测到恶意内核rootkit代码并发出信号，PoKeR切换到解析模式。在解析模式下，PoKeR采用QEMU内置的动态再编译器（一种虚拟化技术，能够将虚拟机代码高效动态地转化为主机代码）解析所有的内核指令，以便细粒度地记录rootkit的行为。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/poker3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/poker3.png" width="450"></a><br>    <figcaption>图3PoKeR生成的样本日志项</figcaption><br></figure>
-
-
-<p>图3是一个日志样本，展示了七种不同类型的日志项。R和W日志行（第2和第4行）意味着恶意rootkit代码正在读取或写入。通过扩展QEMU转换虚拟机内存访问指令，使PoKeR检测指令规定的访问是否为恶意，从而捕获读取和写入。图中的第一行是读取或写入的内存地址，第二行是相应的内存内容。E日志行（第6行）由PoKeR在恶意指令转换运行时生成，表示rootkit代码的执行。图中的日志行分别代表恶意指令的地址和指令运行的进程环境的pid。每当内核模块加载时，M日志行（第1行）会被省略，如NICKLE的虚拟机内省部分；M日志行表示模块内核数据结构的地址（该日志行是检测点生成之前的记录项）。C日志行（第3行）是当前运行的进程（Linux中的current）任务结构的地址，以及读取或写入任务结构之前的输出。 SC和SR日志行（第5行和第7行）分别表示系统调用的起始和终止。SC日志行包含pid，程序名，和系统调用的信息，通过扩展系统调用程序名称，通过内核-用户模式转换生成。</p>
-<p>SC，SR和E帮助我们确定内核rootkit劫持的系统调用控制流，这是通过关联系统调用日志项和rootkit代码执行项（利用进程背景信息）实现的。我们解析日志文件，跟踪当前运行的系统调用（以SC开始，以SR结束），以获取运行过程。如果某个进程出现E日志行，而进程中存在开放的系统调用，则可以知道该系统调用的控制流已被劫持。</p>
-<p>如前所述，PoKeR根据执行顺序记录恶意rootkit指令的执行。之后，我们采用定制的反汇编器[libdisasm]来结合这两部分信息并根据执行顺序生成此rootkit执行代码的副本。</p>
-<h3 id="4-3-内核对象解析"><a href="#4-3-内核对象解析" class="headerlink" title="4.3 内核对象解析"></a>4.3 内核对象解析</h3><p>一旦内存访问的日志文件可用，将这些访问转换为相应内核对象的名称和类型是很重要的。为了跟踪第3.2章节中所述的静态和动态内核对象，我们必须在内核中执行静态分析。PoKeR可以利用此信息以及rootkit的内核读取来示例作战跟踪技术。</p>
-<p>Linux内核是一个大型的复杂的代码库，使得传统的静态分析难以进行。然而，通过调试符号（标识-g至gcc）编译内核副本，GNU的调试器（gdb）[免费软件基金会]可以用来提取所有静态内核对象的类型，名称和地址。我们修改gdb以此信息的访问以及查询静态内核对象信息。</p>
-<p>PoKeR的内核对象解析模块用Python编写，能够执行作战跟踪。它采用gdb处理静态信息并利用第3.2章节中提到的算法处理rootkit读取，从而逐步建立动态内核对象的内部映射。之后，解析rootkit内存写入，查询静态和动态内核对象映射，以生成Rootkit内核对象的分析。我们的方法能够更加方便地手动分析以确定共用数据类型（union）。目前，由用户事先确定采用何种类型的数据。另一种方法是将所有可能性插入动态映射以分别确定共用数据类型。但是，这可能导致映射搜索区域的膨胀。我们利用自动类型确定领域的新兴研究[Cozzie 2008 ]来自动化处理共用数据类型。</p>
-<h2 id="5-评估"><a href="#5-评估" class="headerlink" title="5 评估"></a>5 评估</h2><p>在本节中，我们将展示利用PoKeR分析10个真实内核rootkit的结果，并简要评估PoKeR的性能。在我们的实验中，主机是一个英特尔计算机，内核2-2.4GHz桌面运行Ubuntu8.10。虚拟机监视器（VMM）是QEMU 0.9.0的升级版，运行KQEMU 。我们的虚拟机操作系统是Red-Hat 8.0 ，运行Linux 2.4.18-14。生成带有调试符号（第4.3章节）的版本需要再编译。</p>
-<p>表1显示了分析结果的概要。对每个内核rootkit的分析包含第1章中介绍的四个部分。第一部分是挂钩的行为，由表1中某些内核对象的已修改函数指针揭示。第二部分是目标内核对象，显示rootkit感兴趣的对象。读取而未修改的内核对象属于此部分，由于其数量庞大以及表1的空间不足，我们在此不做列举。</p>
-<p>第三部分是用户级程序的潜在影响。鉴于大多数rootkit的主要目标是改变一个系统管理员的操作系统，我们运行10个系统程序，检索内核rootkit试图隐藏的系统信息。其中四个程序w，who，uptime，和 finger能够显示当前登录用户的相关信息。两个程序netstat 和ifconfig显示网络使用信息。另两个程序ls和bash可以揭示文件的存在。Ps能够获取运行程序的有关信息。最后，ismod能够显示安装的内核模块的列表。</p>
-<p>我们运行并测试这10个程序，以确定它们的多少系统调用会导致rootkit代码的执行，不过它们并不能代表所有可能的系统调用的执行。如果一个程序可以被写入以执行所有的系统调用，则会生成大量日志和日志触发的控制路径，这会使得我们无法确定次程序是否遵守所有挂钩rootkit代码路径。通过利用rootkit试图向其隐藏信息的程序，我们希望至少可以确定将被触发恶意rootkit代码的一部分。执行这10个程序时，39个不同的系统调用运行，导致rootkit代码运行的系统调用如表1所示。第四部分是分析提取的内核rootkit代码，如表1所示，只列出了提取的rootkit指令的数量。这有助于确定内核rootkit的体积，PoKeR还会将代码用于进一步分析，在第5.2.2章节介绍。</p>
-<h3 id="5-1-基于解析的rootkit行为研究"><a href="#5-1-基于解析的rootkit行为研究" class="headerlink" title="5.1 基于解析的rootkit行为研究"></a>5.1 基于解析的rootkit行为研究</h3><p>作为一个内核rootkit的研究工具，PoKeR使得专家能够迅速确定并划分rootkit的攻击方法，而不必完全依靠人工分析rootkit二进制代码、源代码、或被损害的操作系统。在下文中，我们将总结利用PoKeR所获取的rootkit分析结果。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/poker4.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/poker4.png" width="450"></a><br>    <figcaption>表1利用PoKeR获取的内核rootkit分析结果</figcaption><br></figure>
-
-
-<p> 根据“挂钩行为”分析，我们可以概括rootkit的三个挂钩策略：修改现有的内核代码、挂钩系统调用项、以及挂钩数据结构的函数指针。以rootkit SucKIT为例，它修改现有的内核代码；5个rootkit（rial, rkit, knark, kbdv3, adore 0.42）将syscall挂钩用作主要攻击向量；两个rootkit（SucKIT 和adore 0.53）采用syscall挂钩以及其他的攻击技术；另外两个rootkit（adore 0.53 和adore-ng 0.56）挂钩静态和动态内核对象的函数指针。</p>
-<p>根据“目标内核对象”分析，我们可以识别更容易被rootkit直接操纵的内核对象，这也称为直接内核对象操控（DKOM）。例如，进程控制块的一些关键字段（例如，uid和euid）会被某些rootkit（例如，kbdv3 rootkit）作为攻击目标，以提高某些进程权限，而rootkit的代码则运行于这些进程中。有些rootkit（例如linuxfu 和hp rootkit）则操控任务列表以隐藏进程。此外，内核rootkit劫持的函数指针的相关语义也能够揭示rootkit的意图。例如，函数指针get_info 和lookup会被rootkit（例如adore 0.53和adore-ng 0.56）劫持，以筛选出敏感信息，因此rootkit在被感染的系统中不会被发现。</p>
-<p>利用PoKeR分析rootkit的另一个有趣的优点是它能够揭示同一个rootkit的各个版本之间的不同。以表1中的adore rootkit为例，版本0.42只依赖系统调用挂钩攻击。之后的版本0.53降低了对系统调用挂钩的依赖，而是会挂钩两个内核对象。一旦adore成为adore-ng，它会完全依赖于内核对象中的挂钩。PoKeR清晰地分析了adore攻击行为的演变。</p>
-<h3 id="5-2-三个代表性rootkit的详细分析"><a href="#5-2-三个代表性rootkit的详细分析" class="headerlink" title="5.2 三个代表性rootkit的详细分析"></a>5.2 三个代表性rootkit的详细分析</h3><p>当深入分析内核rootkit时，PoKeR能够向专家提供内核rootkit行为相关的有用信息，使专家能够更快速地确定它这样做的目的。在本节中，我们将给出3个内核rootkit的详细分析结果，这三个rootkit分别代表了不同的攻击方法。在以下描述中，我们将给出（1）基于Linux和PoKeR多方面解析的每个rootkit的分析，（2）基于rootkit源代码（我们将源代码用于实验）的手动分析。由分析（1）所得的发现和说明以正常文本显示；而基于分析（2）的说明则缩进排版并以MUNUAL INSPECTIONRESULTS（人工检测结果）开始。我们的目的是展示专家在没有源代码的情况下，如何利用PoKeR迅速分析rootkit的行为。该说明还揭示了由分析（1）和（2）的结果很匹配，特别是在PoKeR能或不能捕获的数据方面。</p>
-<h3 id="5-2-1-adore-ng-0-56"><a href="#5-2-1-adore-ng-0-56" class="headerlink" title="5.2.1 adore-ng 0.56"></a>5.2.1 adore-ng 0.56</h3><p>挂钩行为：对adore-ng的挂钩分析很有趣，这是因为它并不挂钩任何系统调用。此外，它的一个挂钩需要作战跟踪技术（第3.2章节）来揭示。该rootkit修改各种内核对象的函数指针，对proc文件系统尤其感兴趣，并修改该系统的三个函数指针。其中一个指针，proc_net -&gt;（……）-&gt;get_info位于动态分配于内核堆的一个对象中（通过作战跟踪技术发现）。另外两个指针，proc_root_inode_operations-&gt;lookup和proc_root_operations-&gt;readdir则与proc的文件操作有关。Proc文件系统从内核区输出信息到用户区，并被检索系统信息的应用程序所使用。例如，ps检索进程列表，而netstat获取打开网络连接的信息。proc挂钩最可能的原因是隐藏进程和网络连接。</p>
-<p>人工检测结果：快速的adore-ng源代码搜索可以确定proc_net挂钩是为了隐藏特定端口存在网络连接，readdir挂钩则是为了隐藏运行的进程。然而，Lookup挂钩是为了揭示adore-ng内核组件的信息。以上的分析并没有包含这一点。</p>
-<p> Adore-ng也影响主要的ext 3文件系统。第一个函数ext3_dir_operations-&gt;用来生成目录列表。第二个函数ext3_file_operations-&gt;write用于文件写入。在主要文件系统挂钩readdir的最明显的原因是隐藏某些文件。写入操作则是执行一层过滤，从而隐藏rootkit相关的信息。</p>
-<p>人工检测结果：源代码审查可以确认readdir是用来隐藏文件的。Rootkit劫持写入以确保隐藏进程不写入任何系统日志文件in/ var。</p>
-<p>最终，adore-ng劫持unix_dgram_ops-&gt;recvmsg函数指针，从而拦截域接口信息（一种进程间通信）。这相当令人费解，拦截和终止进程间通信的方式看起来很奇怪。</p>
-<p>人工检测结果：源代码分析表明，它用来拦截并删除系统日志保护进程的信息。</p>
-<p>目标内核对象：根据PoKeR的分析结果，adore-ng看来并不修改任何内核对象，只修改相应的函数指针，并通过劫持控制流执行相关操作。在此方面，adore-ng并不比许多系统调用挂钩rootkit高级。然而，必须指出的是，虽然它不修改任何其他内核对象，其恶意代码仍然可以修改返回给用户级程序的系统调用结果。</p>
-<p> 人工检测结果：源代码审查确证实了这些结论的正确性。</p>
-<p>用户级进程的影响：adore-ng不直接修改任何系统调用表项，但是在系统调用时它仍然执行恶意有效载荷。考虑到它修改的函数指针可能用于多个系统调用，这是合乎逻辑的。我们的结果表明，数据库中的5个系统调用执行adore-ng代码。</p>
-<p>提取的代码：adore-ng导致785个指令被提取。</p>
-<h4 id="5-2-2-SucKIT-1-3b"><a href="#5-2-2-SucKIT-1-3b" class="headerlink" title="5.2.2 SucKIT 1.3b"></a>5.2.2 SucKIT 1.3b</h4><p>挂钩行为：SucKIT是另一个有趣的rootkit，主要是因为它只修改系统调用表中的一项，即59。这一项甚至不怎么有趣；它相当于oldolduname（我们可以想象，它不受青睐也不经常使用）。我们假设用户区控制程序利用此系统调用激活某些内核级函数。</p>
-<p>人工检测结果：源代码审查说明上述假说基本正确。SucKIT利用系统调用项生成内核函数kmalloc，此函数可以从用户区调用。这允许它在用户区为其内核组件分配区域，并通过/dev/kmem安装。</p>
-<p>目标内核对象：目标内核对象是非常有趣的，带给我们一些重要的发现。首先，PoKeR的内存读取日志表明SucKIT读取整个系统调用表。其次，它修改了两个内核函数system_call和tracesys的代码。这两个函数可用于调度系统调用。例如，当接收到一个软件中断0x80，system_call函数从调用表读取函数指针，从而将系统调用指向适当的内核处理程序。根据这些发现，我们推测SucKIT复制系统调用表，并修改调度函数，从而用新表代替旧表。</p>
-<p>人工检测结果：源代码审查证实了上述假设的正确性。</p>
-<p>用户级进程的影响：在SucKIT分析中，我们没有发现任何相关函数指针的修改，只发现一个奇怪的系统调用。然而，由于SucKIT直接重写Linux系统调用调度程序的内核代码，它仍然利用备用表劫持关键系统调用的控制流。在我们的测试中，我们发现，SucKIT试图劫持39个系统调用的其中10个。</p>
-<p>提取的代码：提取代码的其中一小部分很有趣。表2显示了SucKIT rootkit执行的前几十个指令、代码的虚拟地址、以及指令执行的顺序，这些都是由PoKeR提供的。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/poker5.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/poker5.png" width="450"></a><br>    <figcaption>表2 PoKeR提取的SucKIT代码片段</figcaption><br></figure>
-
-
-<p> 从这些指令中，我们可以看到SucKIT一个独特的性质：它用巧妙的方法创建全局变量。SucKIT将其恶意有效载荷目录写入到内存块kmalloc’d，从而安装到内核并运行有效载荷。编译时，rootkit作者并不知道SucKIT驻留内存的地址。全局变量（编译时必须知道内存地址）对rootkit作者来说是不可用的。安装为内核模块的rootkit则不存在这个问题，因为内核会重新动态迁移rootkit代码和数据，然后执行。鉴于SucKIT并不能动态迁移，它采用一个技巧来使用全局变量（当变量的地址无法推测时）。表2中的指令21（lcall0xFFFFE40B）调用函数到当前页面的偏移处，在这种情况下是一个负数。这一调用导致指令22（表2的最上方）执行。从指令22开始的内存布局非常有趣，我们可以看到布局如下：指令22，之后是4个字节的数据，其次是指令23和24。当指令22执行（另一个本地调用），lcall之后的内存地址后立即被推送到堆栈。这是返回地址，但在这里它对应4字节数据的地址。之后运行的pop指令将该地址移到寄存器eax并执行返回，将控制流返回主代码。在这一点上，寄存器eax包含4个字节的地址。这一机制允许攻击者实现全局变量的功能，而不必担心动态迁移。</p>
-<p>人工检测结果：源代码审查证实了上述分析的正确性。</p>
-<h4 id="5-2-3-hide-pid-hp-1-0-0"><a href="#5-2-3-hide-pid-hp-1-0-0" class="headerlink" title="5.2.3 hide pid (hp) 1.0.0"></a>5.2.3 hide pid (hp) 1.0.0</h4><p> 挂钩行为：hp rootkit不修改函数指针，事实上也并不劫持控制流，也不安装持久性代码。这与前两个rootkit大不相同。</p>
-<p>人工检测结果：源代码审查证实了这些结论的正确性。</p>
-<p>目标内核对象：hp访问的内核对象是pid哈希表（pidhash基本上是一个任务结构表，用pid计算散列。它允许内核函数利用pid搜索进程而不需要遍历整个进程列表，不过哈希表中的项仍然是进程列表的一部分）。通过下述对象访问日志的片段，我们可以看出rootkit的意图。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/poker6.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/poker6.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>可以从日志中看到，rootkit读取上表中的pidhash [600]，通过检查pid证实它是一个正确的表项，然后通过修改其相邻表项的指针删除这一项。可以看到这些任务结构是动态分配的，我们的作战跟踪技术能够准确地识别它们。</p>
-<p>人工检测结果：源代码审查证实了上述分析的正确性。</p>
-<p>用户级进程的影响：如上所述，在我们执行数据库时，hp rootkit不执行任何恶意代码。因此我们可以推断，它没有在内核中安装持久性代码，不会影响系统调用。</p>
-<p>人工检测结果：源代码审查证实了上述分析的正确性。</p>
-<p>提取的代码：hp提取的代码非常小，只有100条指令。考虑到hp似乎只是从进程列表中删除一个项，这是有道理的。因此我们推断hp可能不执行其他操作。</p>
-<p>人工检测结果：源代码审查证实了上述分析的正确性。</p>
-<h4 id="5-2-4-总结"><a href="#5-2-4-总结" class="headerlink" title="5.2.4 总结"></a>5.2.4 总结</h4><p>我们利用PoKeR分析以上3个内核rootkit，得到13个关于rootkit行为的结论，其中12个已经通过rootkit源代码分析得以验证（另外一个基本正确）。我们强调PoKeR的高精度仅基于一个执行模块，rootkit的源代码和原始二进制代码都不用手动分析。我们的比较也说明：即使可以获取rootkit的源代码，使用PoKeR能够更方便、快速地了解rootkit的行为。</p>
-<h3 id="5-3-性能"><a href="#5-3-性能" class="headerlink" title="5.3 性能"></a>5.3 性能</h3><p>虽然性能并不是蜜罐系统首要考虑的因素，但是我们认为有必要介绍一下PoKeR各个组件的运行速度。</p>
-<p>运行时PoKeR模块：我们通过两个基本测试来确定PoKeR运行组件（生成日志项）的性能，所有的测试都在第5章中所介绍的系统中进行。我们在标准QEMU下，QEMU+PoKeR（无rootkit分析），以及QEMU + PoKeR（adore-ng rootkit分析）这几种情况下运行Unixbench 4.1.0并测试内核编译模块。如图4所示，以标准QEMU的速度为标准（越低越好）。在解析模式下，PoKeR的内核编译测试速度比标准QEMU的速度慢2.96倍，而在Unixbench测试下则慢5.88倍。在非解析模式下（但是等待检测攻击），PoKeR的内核编译测试速度比标准QEMU的速度慢1.77倍，而在Unixbench测试下则慢1.28倍。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/poker7.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/poker7.png" width="450"></a><br>    <figcaption>图4PoKeR性能结果</figcaption><br></figure>
-
-
-<p>QEMU：QEMU使PoKeR原型负载大大增加。在本文中，我们不完整地介绍QEMU，但是会介绍基本的QEMU准则，以帮助大家理解PoKeR的整体性能。为了测试QEMU的负载，我们采用QEMU0.9.1（最新版本），并比较本地安装Ubuntu 8.10的性能和QEMU + KQEMU虚拟副本的性能。两者能够访问相同大小的内存（512MB）和一个处理器核心。内核编译基准显示3.8倍的负载。鉴于NICKLE能够移植到其他动态的基于转换的虚拟机监视器，例如VMware [Riley2008]，我们相信通过更高效的虚拟机监视器平台，这部分负载可以降低。</p>
-<p>日志处理：为了展示日志处理的效率，我们测定了处理10个rootkit日志项所用的时间，并在表1中列出。最长的处理时间为3分钟36秒；最短的时间为0.7秒；平均时间为37秒。</p>
-<h2 id="6-讨论"><a href="#6-讨论" class="headerlink" title="6 讨论"></a>6 讨论</h2><p>在本章中，我们将讨论PoKeR面临的潜在攻击，以及它的一些局限性和未来的改进方法。</p>
-<h3 id="6-1-攻击"><a href="#6-1-攻击" class="headerlink" title="6.1 攻击"></a>6.1 攻击</h3><p>Rootkit可能会利用很多潜在的攻击方法来规避PoKeR。</p>
-<p>我们目前的原型依赖于NICKLE来传递内核rootkit代码执行的信息。然而，如果内核rootkit利用内存访问设备（例如/dev/kmem）在用户区直接修改内核数据， PoKeR则无法解析此rootkit。我们已经合成了这样的一个rootkit，不过由于不能执行自己的内核代码，它的功能有限。一个相关的攻击只使用现有的内核代码，与针对内核的高级return-to-libc攻击[Shacham 2007, Buchanan 2008]类似。NICKLE可能无法生成PoKeR需要的检测点。现有的方法，如控制流完整性[Abadi 2005]能够检测这些类型的攻击，PoKeR可以使用这些方法来生成检测点。</p>
-<p>作战跟踪基于一个事实：rootkit必须在静态数据对象启动读取链以获得动态内核对象的地址。然而rootkit可能不需要这样做，它可能调用现有的内核代码来检索一个数据结构的地址。在这种情况下，读取链会从合法内核代码产生，因此将不会被记录。PoKeR处理这种情况的方法是：简单地跟踪所有的内核读取而不仅是rootkit读取，但是这样会导致性能损失。另一个潜在的方法是：只要当前内核堆栈中有指向恶意代码的指针，则PoKeR监控所有的内核读取。这一指针可能是rootkit代码的返回地址，它被称为有效的内核代码。</p>
-<p>另一种情况是: rootkit安装代码挂钩，并使用它来检查堆栈，找到堆栈上的内核对象地址（如果rootkit作者在挂钩之前已经知道被调用的函数，他可以很容易地导出堆栈中的函数类型信息）。在这种情况下，作战跟踪技术不能正确识别所读取数据的类型。我们可以扩展PoKeR的功能，使其监视堆栈中各项的类型信息，类似gdb。</p>
-<p> 最后，rootkit可以扫描内核内存并猜测内核对象的身份，并有较高的成功率。防御该攻击的一种可能的方法是周期性地创建完整的内核对象映射（类似于SBCFI [Petroni 2007]）。假设这种周期性映射定期创建，则PoKeR能够高概率地识别任何动态内核对象，甚至不需要读取链。</p>
-<h3 id="6-2-局限性"><a href="#6-2-局限性" class="headerlink" title="6.2 局限性"></a>6.2 局限性</h3><p>我们目前的PoKeR原型有一些限制。首先，我们目前的分析结果尚不能完全充分地确定rootkit的所有方面的行为；我们只是专注于rootkit的行为的四个方面。这种完整性的缺失也存在于其他基于动态分析的系统中[Moser2007, Lanzi 2009]。</p>
-<p>第二，目前的原型在揭示rootkit操控内核对象的运行背景方面功能仍然有限。例如，在adore-ng实验中我们看到IPC数据表接收函数被劫持，然而PoKeR生成的分析却不能告诉我们原因。而人工检测adore-ng源代码得到的结论是：这是用来过滤发送到syslogd的消息。因此，如果可以提高PoKeR的功能，使其能够自动显示此类信息，这将是一个巨大的优势。与此同时，我们也意识到，PoKeR的用户级影响分析仍然是较为简单的，我们计划扩展此功能，使PoKeR能够确定运行时可能被劫持的所有系统调用。修改后的内核对象、内核调用图的静态分析以及多路径探索[Moser 2007]是这方面研究的潜在途径。</p>
-<p>最后，rootkit可能会够检测出虚拟化或PoKeR的解析模式，并据此相应地改变行为。请注意，随着虚拟机中越来越普遍，它们迅速成为攻击目标，而rootkit作者也不用费力地躲避它们。虽然我们可以努力掩饰虚拟化的存在，使其不被攻击者发现，但是从一般意义上来说，这是一个无法解决的问题[Garfinkel 2007]。</p>
-<h2 id="7-相关的工作"><a href="#7-相关的工作" class="headerlink" title="7 相关的工作"></a>7 相关的工作</h2><p>分析内核级恶意代码：相关工作的第一个领域包括最近对于内核恶意代码行为的研究。例如，基于污点的分析，Panorama [Yin 2007]进行系统范围的信息流跟踪，以了解恶意代码如何窃取或操纵敏感的数据（例如用户的击键信息）。不幸的是，基本的基于污点的信息流技术遭受了控制流规避攻击[Cavallaro 2008]，这一攻击直接打断了污点传播。从另一个角度来看，K-Tracer [Lanzi 2009]结合了向后和向前的切片技术来分析内核rootkit的行为。然而，切片操作需要事先确定敏感数据的位置，以执行切片分析。因此，虽然切片技术能够处理常规的劫持系统调用表项的内核rootkit，它并不能有效地处理高级rootkit，如直接内核对象操控（DKOM）rootkit。通过比较跟踪静态和动态内核对象的能力，我们发现PoKeR不必事先知道敏感数据的位置，也可以处理DKOM rootkit（例如，在第5.2.3章节提到的hp rootkit）。</p>
-<p>最近研究人员提出了一些其他方法来分析rootkit的挂钩行为。HookFinder [Yin2008]分析了给定的rootkit样本，并给出了rootkit使用的内核挂钩的列表。HookMap [Wang 2008]旨在系统地列举所有被劫持的内核挂钩（劫持挂钩的目的是隐藏rootkit）。这些方法主要集中于rootkit行为的一方面，即挂钩行为。但是，rootkit其他方面的分析也很重要。</p>
-<p>检测Rootkit的存在：相关工作的第二个领域是基于rootkit相关特性检测内核rootkit。例如，Copilot [Petroni2004]利用受信硬件收集运行时操作系统内存图像，并通过检测任何内核代码的完整性破坏来推断rootkit是否存在。这一概念已经扩展到识别其他类型的破坏：包括动态内核数据[Petroni 2006]的语义完整性，以及基于状态的内核代码控制流完整性[Petroni 2007]。其他的解决方案，如VMwatcher [Jiang 2007]和Strider GhostBuster [Wang2005]利用rootkit的自我隐藏来推断它们是否存在，即从不同的角度检测同一系统，如果检测到差异，则存在rootkit。请注意，上述所有检测rootkit存在的方法都是基于rootkit表现出的某些症状。然而，这些系统都不是用来分析内核rootkit行为的。在原则上，其中的一些系统可以用作PoKeR检测点的生成器。然而，由于这些系统是在rootkit发起攻击之后才检测rootkit的存在的，可能会漏掉一些rootkit行为。</p>
-<p>防止rootkit运行：很多研究旨在防止内核rootkit的运行。例如，Livewire [Garfinkel 2003]是基于软件虚拟的入侵检测系统，旨在保护虚拟机操作系统内核代码和关键数据结构不被修改。SecVisor [Seshadri 2007] 利用硬件虚拟化支持保护内核代码的完整性。NICKLE [Riley2008]提出了一种内存跟踪方案，确保只有经过验证的内核代码才能在内核空间中获取和执行。其他保护内核完整性的方法也被提出，例如驱动程序签名[微软]和各种驱动器验证[Kruegel2004, Wilhelm 2007]。有趣的是，虽然这些系统的主要是用于保护内核完整性，它们也可作为瞬时rootkit检测系统。恶意代码即时仿真的概念[Portokalidis 2008]也获得用户级别研究。在本研究中，我们将这一概念运用于内核级rootkit的分析。</p>
-<h2 id="8-结论"><a href="#8-结论" class="headerlink" title="8 结论"></a>8 结论</h2><p>在本文中，我们介绍了PoKeR的设计、实施和评估。PoKeR是一种内核rootkit分析器，能够生成rootkit的多方面分析：包括rootkit挂钩行为、目标内核对象、用户级影响、以及执行的rootkit代码。特别是，通过作战跟踪技术，PoKeR能够创建动态内核对象映射，这使得它能够准确地确定哪些内核对象已被rootkit修改。PoKeR也能够提取执行的rootkit代码并推断其对用户级程序产生的潜在影响。我们通过10个真实内核rootkit来评估PoKeR的性能，PoKeR的分析揭示了rootkit的各种攻击方法并证明了PoKeR的有效性。</p>
-<h2 id="9-致谢"><a href="#9-致谢" class="headerlink" title="9 致谢"></a>9 致谢</h2><p>我们要感谢我们的导师U´lfarErlingsson，以及匿名审稿人。他们大量的有见地的意见帮助我们改进</p>
-<hr>
-<p> <strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170330/poker" target="_blank" rel="external">内核Rootkit行为的多方面解析</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/恶意代码/">恶意代码</a>
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Rootkit/">Rootkit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -1339,6 +1207,18 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170401/buildsandbox/">如何构建一个有效地恶意代码分析沙盒</a></h6>
+          <!--  <span>四月 1, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -1520,18 +1400,6 @@
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170301/virtualization-overview/">虚拟化技术大观</a></h6>
-          <!--  <span>三月 1, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -1552,7 +1420,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.67px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.83px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.5px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.33px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.5px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.83px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.83px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 15px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 16.67px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 16.67px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.33px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.33px;">Linux</a> <a href="/tags/Malware/" style="font-size: 14.17px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.33px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.83px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.83px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.83px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.83px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.5px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15.83px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.67px;">Rootkit</a> <a href="/tags/Sandbox/" style="font-size: 10px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.83px;">Stack</a> <a href="/tags/System/" style="font-size: 19.17px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.67px;">Systemcall</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 18.33px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 10px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.73px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.27px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.91px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 16.36px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 16.36px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 14.55px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.91px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.91px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.91px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15.45px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.82px;">Rootkit</a> <a href="/tags/Sandbox/" style="font-size: 10.91px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 18.18px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 10px;">XEN</a>
     </div>
   </div>
 

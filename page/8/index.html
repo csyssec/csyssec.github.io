@@ -116,6 +116,96 @@
         
           <section id="main">
   
+    <article id="post-pinintro"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170104/pinintro/">二进制代码注入PIN</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170104/pinintro/" class="article-date">
+	  <time datetime="2017-01-04T06:16:14.000Z" itemprop="datePublished">一月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本文来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2015/12/19/pin-for-dynamic-binary-instrumentation/" target="_blank" rel="external">个人博客</a>，讲述如何利用PIN进行二进制代码注入，值得推荐。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/pinintro/" target="_blank" rel="external">二进制代码注入PIN</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<hr>
+<blockquote>
+<ul>
+<li>什么是注入（Instrumentation)</li>
+<li>PIN初探</li>
+<li>PIN框架</li>
+<li>Pintools Example</li>
+</ul>
+</blockquote>
+<hr>
+<h2 id="什么是注入（Instrumentation"><a href="#什么是注入（Instrumentation" class="headerlink" title="什么是注入（Instrumentation)"></a>什么是注入（Instrumentation)</h2><p>每一个写过代码的人都调试过程序，最简单的无非就是手动在源代码中插入printf语句，当然大部分还是会选择一些调试工具如GDB。注入技术也类似，不过注入的对象是可执行二进制文件。简单来说，在你的程序中插入额外的代码来分析程序的运行时信息就称为注入技术。但就广义来说，在源代码中注入代码也可称之为注入，只是为了区分，注入技术一般特指对象为可执行二进制文件。</p>
+<p>进一步说明，注入一般又分为静态二进制注入（Static Binary Instrumentation) 与动态二进制注入 （Dynamic Binary Instrumentation). 看定义可知，SBI技术工作在程序运行前，DBI则工作在运行过程中。相比SBI，DBI技术有以下优势：</p>
+<ul>
+<li>不需要重新编译、重新链接</li>
+<li>在运行时发现代码</li>
+<li>能处理动态产生的代码</li>
+<li>能附加到正在运行时的进程中</li>
+</ul>
+<p>目前，研究较多的都属DBI技术，前文提到，DBI的工作方式有点类似编译器，只不过分析例程（analysis routine)是可编程化的。DBI技术广泛应用在程序分析中，如逆向工程（reverse engineering), 程序调试（program debug)， 恶意代码分析（malware analysis)等。</p>
+<h2 id="Pin初探"><a href="#Pin初探" class="headerlink" title="Pin初探"></a>Pin初探</h2><p>对DBI技术有个大致了解之后，进入本文主题,  Pin是Intel 与University of Colorado合作研究出的一款用来动态分析二进制程序的注入工具，发表在系统顶会PLDI’2005,有兴趣的可以读读这篇文章，其它DBI技术还有Valgrind, DYNAMORIO, QEMU.</p>
+<p>开门见山，首先来看一段代码：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div></pre></td><td class="code"><pre><div class="line">    counter++;</div><div class="line">             sub  $0xff, %edx</div><div class="line">    counter++;</div><div class="line">             cmp  %esi, %edx</div><div class="line">    counter++;</div><div class="line">             jle &lt;L1&gt;</div><div class="line">    counter++;</div><div class="line">             mov  $0x1, %edi</div><div class="line">    counter++;</div><div class="line">             add  $0x10, %eax</div><div class="line">```             </div><div class="line"></div><div class="line">这段代码很简单，只是在每条指令前加了一个计数器</div><div class="line">那么如果使用PIN, 该如何实现？ 看下面代码：</div><div class="line"></div><div class="line">``` C</div><div class="line">#include &lt;iostream&gt;</div><div class="line">#include &quot;pin.h&quot;</div><div class="line"></div><div class="line">UINT64 icount = 0;</div><div class="line"></div><div class="line">void docount() &#123; icount++; &#125;</div><div class="line">    </div><div class="line">void Instruction(INS ins, void *v) </div><div class="line">&#123;</div><div class="line">    INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)docount, IARG_END);</div><div class="line">&#125;</div><div class="line"></div><div class="line">void Fini(INT32 code, void *v) </div><div class="line">&#123; std::cerr &lt;&lt; &quot;Count &quot; &lt;&lt; icount &lt;&lt; endl; &#125;</div><div class="line"></div><div class="line">int main(int argc, char * argv[])</div><div class="line">&#123;</div><div class="line">    PIN_Init(argc, argv);</div><div class="line">    INS_AddInstrumentFunction(Instruction, 0);</div><div class="line">    PIN_AddFiniFunction(Fini, 0);</div><div class="line">    PIN_StartProgram();</div><div class="line">    return 0;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>现在对这段实现代码一一解释：<br><code>void docount() {icount+;}</code> 用户可自定义<code>docount()</code> 函数，PIN称之为分析例程 （Analysis routine),先对这个概念保持一点印象。再看void Instruction（）函数，PIN 称之为注入例程（Instrumentation routine), 关注其中两个参数，<code>IPOINT_BEFORE</code> 表示在每条指令之前执行，<code>（AFUNPTR)docount</code>便是要注入的分析例程。<code>main()</code> 函数调用<code>INS_AddInstrumentFunction（Instruction,0)</code>,便会触发注入例程以及分析例程，这些参数都可以根据自己需求修改。<br>只需这么几行简单的代码，PIN便能帮你分析正在运行的二进制文件执行过的指令条数了。这么简单？ PIN只能做这些吗？ 当然不是！ 下文再介绍一些PIN的框架以及使用过程。</p>
+<p>##PIN框架<br>可以把PIN理解为实时编译器（just in time complier).只不过输入进PIN的不是二进制代码，而是可执行的二进制文件，PIN能拦截可执行文件的第一条指令，然后从这条指令开始产生新的代码序列，之后将控制权交给产生的代码序列，此刻用户就有机会注入自己的代码，这个过程就是Instrumentation.<br>如果你只想使用PIN来分析自己的二进制代码，内部实现原理 (可阅读PLDI’2005)大可不必关心，关注的应该是PIN为用户提供的上层接口，使用这个接口来编写自己的Pintools. 版权原因，本文也不会深入去介绍PIN是如何实现的。</p>
+<p>下面就来聊聊这个Pintools. Pintools实际上就是用户要实现的Instrumentation过程，可以把Pintools想象成能修改内部PIN的代码产生过程的插件（Plugins),PIN官网会提供一些sample教你怎么写Pintools,大部分还得靠用户自己去写。<br>总的来说，instrumentation包括两个部分：</p>
+<ul>
+<li>第一，决定在哪注入代码，注入什么代码的一种机制</li>
+<li>第二，在注入点要执行的代码</li>
+</ul>
+<p>第一个部分被称之为 <strong>instrumentation routine</strong>,第二个部分被称之为 <strong>analysis routine</strong>. Pintools会向PIN注册一个注入回调函数，如上文提到的<code>INS_AddInstrumentFunction（）</code>，该函数会代表instrumentation routine观察要产生的代码，分析代码的静态属性，来决定是否以及在哪里调用analysis routine. Analysis routine再收集被分析程序的数据。</p>
+<p>注意，前文中的例子对每条指令分析，带来的开销太大，因此，PIN提供不同的粒度对程序进行分析，供用户根据不同需求选择：</p>
+<ul>
+<li>Instruction</li>
+<li>Basic block: 包含一些指令序列，终止于控制流改变指令;单入口单出口。</li>
+<li>Trace:包含一些Basic block序列，终止于无条件控制流改变指令；单入口多出口。 </li>
+</ul>
+<p>##Pintools example<br>最后，以一个Pintools 的完整例子结束本文</p>
+ <figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div></pre></td><td class="code"><pre><div class="line"> </div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;iostream&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;fstream&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"pin.H"</span></span></div><div class="line"></div><div class="line">ofstream OutFile;</div><div class="line"></div><div class="line"><span class="comment">// The running count of instructions is kept here</span></div><div class="line"><span class="comment">// make it static to help the compiler optimize docount</span></div><div class="line"><span class="keyword">static</span> UINT64 icount = <span class="number">0</span>;</div><div class="line"></div><div class="line"><span class="comment">// This function is called before every instruction is      executed</span></div><div class="line"><span class="function">VOID <span class="title">docount</span><span class="params">()</span> </span>&#123; icount++; &#125;</div><div class="line"></div><div class="line"><span class="comment">// Pin calls this function every time a new instruction     is encountered</span></div><div class="line"><span class="function">VOID <span class="title">Instruction</span><span class="params">(INS ins, VOID *v)</span></span></div><div class="line">&#123;</div><div class="line">    <span class="comment">// Insert a call to docount before every            instruction, no arguments are passed</span></div><div class="line">  INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)docount, IARG_END);</div><div class="line">&#125;</div><div class="line"></div><div class="line">KNOB&lt;<span class="built_in">string</span>&gt; KnobOutputFile(KNOB_MODE_WRITEONCE, <span class="string">"pintool"</span>,</div><div class="line"><span class="string">"o"</span>, <span class="string">"inscount.out"</span>, <span class="string">"specify output file name"</span>);</div><div class="line"></div><div class="line"><span class="comment">// This function is called when the application exits</span></div><div class="line"><span class="function">VOID <span class="title">Fini</span><span class="params">(INT32 code, VOID *v)</span></span></div><div class="line">&#123;</div><div class="line">    <span class="comment">// Write to a file since cout and cerr maybe closed     by the application</span></div><div class="line">  OutFile.setf(ios::showbase);</div><div class="line">  OutFile &lt;&lt; <span class="string">"Count "</span> &lt;&lt; icount &lt;&lt; <span class="built_in">endl</span>;</div><div class="line">  OutFile.close();</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="comment">/* =====================================================     ================ */</span></div><div class="line"><span class="comment">/* Print Help Message                                                        */</span></div><div class="line"><span class="comment">/* =====================================================     ================ */</span></div><div class="line"></div><div class="line"><span class="function">INT32 <span class="title">Usage</span><span class="params">()</span></span></div><div class="line">&#123;</div><div class="line">   <span class="built_in">cerr</span> &lt;&lt; <span class="string">"This tool counts the number of dynamic          instructions executed"</span> &lt;&lt; <span class="built_in">endl</span>;</div><div class="line">   <span class="built_in">cerr</span> &lt;&lt; <span class="built_in">endl</span> &lt;&lt; KNOB_BASE::StringKnobSummary() &lt;&lt;      <span class="built_in">endl</span>;</div><div class="line">    <span class="keyword">return</span> <span class="number">-1</span>;</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="comment">/* =====================================================     ================ */</span></div><div class="line"><span class="comment">/* Main                                                                      */</span></div><div class="line"><span class="comment">/* =====================================================     ================ */</span></div><div class="line"><span class="comment">/*   argc, argv are the entire command line: pin -t      &lt;toolname&gt; -- ...    */</span></div><div class="line"><span class="comment">/* =====================================================     ================ */</span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span> * argv[])</span></span></div><div class="line">&#123;</div><div class="line">   <span class="comment">// Initialize pin</span></div><div class="line">   <span class="keyword">if</span> (PIN_Init(argc, argv)) <span class="keyword">return</span> Usage();</div><div class="line"></div><div class="line">   OutFile.open(KnobOutputFile.Value().c_str());</div><div class="line"></div><div class="line">  <span class="comment">// Register Instruction to be called to instrument      instructions</span></div><div class="line">    INS_AddInstrumentFunction(Instruction, <span class="number">0</span>);</div><div class="line"></div><div class="line">   <span class="comment">// Register Fini to be called when the application      exits</span></div><div class="line">    PIN_AddFiniFunction(Fini, <span class="number">0</span>);</div><div class="line"></div><div class="line">    <span class="comment">// Start the program, never returns</span></div><div class="line">    PIN_StartProgram();</div><div class="line"></div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="http://www.cs.virginia.edu/kim/docs/pldi05.pdf" target="_blank" rel="external">PLDI’2005</a></p>
+<p><a href="https://software.intel.com/sites/landingpage/pintool/docs/65163/Pin/html/" target="_blank" rel="external">PIN User Manual</a></p>
+<p><a href="https://software.intel.com/en-us/articles/pin-a-dynamic-binary-instrumentation-tool" target="_blank" rel="external">PIN Intel Tutorials</a></p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/pinintro/" target="_blank" rel="external">二进制代码注入PIN</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/二进制分析/">二进制分析</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Binary/">Binary</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Instrumentation/">Instrumentation</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/PIN/">PIN</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-kvmsource-io"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -603,89 +693,6 @@ KVM：https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git v4
 <!-- Table of Contents -->
 
   
-    <article id="post-kvmsource-intro"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170104/kvmsource-intro/">KVM源码分析之基本工作原理</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170104/kvmsource-intro/" class="article-date">
-	  <time datetime="2017-01-04T05:46:19.000Z" itemprop="datePublished">一月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者：<a href="http://www.oenhan.com/about" target="_blank" rel="external">Oen Han</a></p>
-<hr>
-<p><strong>CSysSec注</strong>： 本KVM源码分析系列文章来自系Intel中国Linux内核与虚拟化开发工程师Oen Han的<a href="http://www.oenhan.com/kvm-src-1" target="_blank" rel="external">博客</a>,Oen Han 在虚拟化领域有丰富的开发经验，其写的KVM源码分析系列是本人目前见过最好最详细的，值得推荐。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/kvmsource-intro/" target="_blank" rel="external">KVM源码分析之基本工作原理</a>》</p>
-<hr>
-<blockquote>
-<ul>
-<li>0X01 KVM模型结构</li>
-<li>0X02 KVM工作原理</li>
-<li>0X03 CPU虚拟化</li>
-<li>0X04 Memory虚拟化</li>
-</ul>
-</blockquote>
-<p>13年的时候准备挖“KVM源代码分析”的坑，陆陆续续2年过去了，坑也没有填上，当时是因为对KVM了解的肤浅，真正的理解必然要深入到代码级别，所谓“摈弃皮毛，看到血肉，看到真相”，当时计划写KVM基本工作原理、虚拟机的创建、VCPU调度原理、KVM内存管理、KVM设备管理等，实际发现代码过程还是很多，估计后续会针对于不同的点专门来写。</p>
-<p>需要假定读者有一定的内核基础，和虚拟化基础，原理性的东西估计会一笔带过，我在知乎上写过一些基础入门的书籍：1.首先有OS基础，随便操作系统大学课本；2.对Linux kernel有全面了解，关键模块有理解，推荐书籍：深入Linux内核架构（+1）或者深入理解LINUX内核；3.Hypervisor虚拟化，Intel的《系统虚拟化-原理与实现》，赶时间的建议先把第3步完成。</p>
-<p>进入正题：</p>
-<h3 id="0X01-KVM模型结构"><a href="#0X01-KVM模型结构" class="headerlink" title="0X01 KVM模型结构"></a>0X01 KVM模型结构</h3><p>为什么有OS虚拟化？随着CPU计算能力的提高，单独的OS已不能充分利用CPU的计算能力，1.很多应用的执行需要单独占用一个OS环境，如安全测试等；2.而IAAS云计算厂商也是以OS为范围销售计算能力。那么在所有虚拟化方案中，都是由hypervisor取代原生的OS去控制具体硬件资源，而同时hypervisor将资源分配具体的VM，VM中运行的是没有修改过的OS，如果让VM中的OS能正常运行，hypervisor的任务就是模拟具体的硬件资源，让OS不能识别出是真是假。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/kvmsource101.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/kvmsource101.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-<p>当然上面的模型是Xen示例，OS对应用而言是硬件资源管理中心，那么hypervisor就是具体VM的OS了，KVM是就利用了这一点，利用现有的kernel代码，构建了一个hypervisor，这个样子内存分配，进程调度等就无需重写代码，如此hypervisor就是所谓的host，VM中的OS就是guest。</p>
-<p>guest OS保证具体运行场景中的程序正常执行，而KVM的代码则部署在HOST上，Userspace对应的是QEMU，Kernel对应的是KVM Driver，KVM Driver负责模拟虚拟机的CPU运行，内存管理，设备管理等；QEMU则模拟虚拟机的IO设备接口以及用户态控制接口。QEMU通过KVM等fd进行IOCTL控制KVM驱动的运行过程。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/kvmsource102.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/kvmsource102.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-<p>如上图所示，guest自身有自己的用户模式和内核模式；guest是在host中是作为一个用户态进程存在的，这个进程就是qemu，qemu本身就是一个虚拟化程序，只是纯软件虚拟化效率很低，它被KVM进行改造后，作为KVM的前端存在，用来进行<a href="http://www.oenhan.com/cpu-load-balance" target="_blank" rel="external">创建进程</a>或者IO交互等；而KVM Driver则是Linux内核模式，它提供KVM fd给qemu调用，用来进行cpu虚拟化，内存虚拟化等。QEMU通KVM提供的fd接口，通过ioctl系统调用创建和运行虚拟机。KVM Driver使得整个Linux成为一个虚拟机监控器，负责接收qemu模拟效率很低的命令。</p>
-<h3 id="0X02-KVM工作原理"><a href="#0X02-KVM工作原理" class="headerlink" title="0X02 KVM工作原理"></a>0X02 KVM工作原理</h3><figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/kvmsource103.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/kvmsource103.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>上图是一个执行过程图，首先启动一个虚拟化管理软件qemu，开始启动一个虚拟机，通过ioctl等系统调用向内核中申请指定的资源，搭建好虚拟环境，启动虚拟机内的OS，执行 VMLAUCH 指令，即进入了guest代码执行过程。如果 Guest OS 发生外部中断或者影子页表缺页之类的事件，暂停 Guest OS 的执行，退出QEMU即guest VM-exit，进行一些必要的处理，然后重新进入客户模式，执行guest代码；这个时候如果是io请求，则提交给用户态下的qemu处理，qemu处理后再次通过IOCTL反馈给KVM驱动。</p>
-<h3 id="0X03-CPU虚拟化"><a href="#0X03-CPU虚拟化" class="headerlink" title="0X03 CPU虚拟化"></a>0X03 CPU虚拟化</h3><p>X86体系结构CPU虚拟化技术的称为 Intel VT-x 技术，引入了VMX，提供了两种处理器的工作环境。 VMCS 结构实现两种环境之间的切换。 VM Entry 使虚拟机进去guest模式，VM Exit 使虚拟机退出guest模式。</p>
-<p>VMM调度guest执行时，qemu 通过 ioctl 系统调用进入内核模式，在 KVM Driver中获得当前物理 CPU的引用。之后将guest状态从VMCS中读出， 并装入物理CPU中。执行 VMLAUCH 指令使得物理处理器进入非根操作环境，运行guest OS代码。</p>
-<p>当 guest OS 执行一些特权指令或者外部事件时， 比如I/O访问，对控制寄存器的操作，MSR的读写等， 都会导致物理CPU发生 VMExit， 停止运行 Guest OS，将 Guest OS保存到VMCS中， Host 状态装入物理处理器中， 处理器进入根操作环境，KVM取得控制权，通过读取 VMCS 中 VM_EXIT_REASON 字段得到引起 VM Exit 的原因。 从而调用kvm_exit_handler 处理函数。 如果由于 I/O 获得信号到达，则退出到userspace模式的 Qemu 处理。处理完毕后，重新进入guest模式运行虚拟 CPU。</p>
-<h3 id="0X04-Mem虚拟化"><a href="#0X04-Mem虚拟化" class="headerlink" title="0X04 Mem虚拟化"></a>0X04 Mem虚拟化</h3><p>OS对于物理内存主要有两点认识：1.物理地址从0开始；2.内存地址是连续的。VMM接管了所有内存，但guest OS的对内存的使用就存在这两点冲突了，除此之外，一个guest对内存的操作很有可能影响到另外一个guest乃至host的运行。VMM的内存虚拟化就要解决这些问题。</p>
-<p>在OS代码中，应用也是占用所有的逻辑地址，同时不影响其他应用的关键点在于有线性地址这个中间层；解决方法则是添加了一个中间层：guest物理地址空间；guest看到是从0开始的guest物理地址空间（类比从0开始的线性地址），而且是连续的，虽然有些地址没有映射；同时guest物理地址映射到不同的host逻辑地址，如此保证了VM之间的安全性要求。</p>
-<p>这样MEM虚拟化就是GVA-&gt;GPA-&gt;HPA的寻址过程，传统软件方法有影子页表，硬件虚拟化提供了EPT支持。</p>
-<p>总体描述到此，后面代码里面见真相。</p>
-<p>《<a href="http://www.csyssec.org/20170104/kvmsource-create/" target="_blank" rel="external">KVM源码分析之虚拟机的创建与运行</a>》</p>
-<p>-结束-</p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/kvmsource-intro/" target="_blank" rel="external">KVM源码分析之基本工作原理</a>》</p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟化原理/">虚拟化原理</a>
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/QEMU/">QEMU</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -778,6 +785,18 @@ KVM：https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git v4
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170401/buildsandbox/">如何构建一个有效地恶意代码分析沙盒</a></h6>
+          <!--  <span>四月 1, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -959,18 +978,6 @@ KVM：https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git v4
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170301/virtualization-overview/">虚拟化技术大观</a></h6>
-          <!--  <span>三月 1, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -991,7 +998,7 @@ KVM：https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git v4
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.67px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.83px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.5px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.33px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.5px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.83px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.83px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 15px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 16.67px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 16.67px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.33px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.33px;">Linux</a> <a href="/tags/Malware/" style="font-size: 14.17px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.33px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.83px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.83px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.83px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.83px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.5px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15.83px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.67px;">Rootkit</a> <a href="/tags/Sandbox/" style="font-size: 10px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.83px;">Stack</a> <a href="/tags/System/" style="font-size: 19.17px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.67px;">Systemcall</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 18.33px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 10px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.73px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.27px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.91px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 16.36px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 16.36px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 14.55px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.91px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.91px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.91px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15.45px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.82px;">Rootkit</a> <a href="/tags/Sandbox/" style="font-size: 10.91px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 18.18px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 10px;">XEN</a>
     </div>
   </div>
 
