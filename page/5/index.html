@@ -108,6 +108,86 @@
         
           <section id="main">
   
+    <article id="post-compile-link"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170301/compile-link/">理清编译链接的那些事儿</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170301/compile-link/" class="article-date">
+	  <time datetime="2017-03-01T05:26:03.000Z" itemprop="datePublished">三月 1, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本文来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/05/25/lib-compile-link/" target="_blank" rel="external">个人博客</a>，主要介绍了Linux内核中一系列的内存分配函数及其原理<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170301/compile-link/" target="_blank" rel="external">理清编译链接的那些事儿</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<p>当你在linux下写C/C++代码的时候，是不是会遇到许多编译链接的问题？ 时不时报个glibc,gcc，g++等相关的错误？ 很多时候都无从下手，而且比较混乱。 这也是编译链接过程中经常出现的问题。</p>
+<p>这篇文章不是去介绍如何编译链接，而是理清编译链接过程中碰到的一些概念和出现的问题。尤其是，libc,,glib,glibc,eglibc，libc++，libstdc++，gcc,g++。 </p>
+<p>从libc说起。<br>libc是Linux下原来的标准C库，也就是当初写hello world时包含的头文件#include &lt; stdio.h> 定义的地方。 </p>
+<p>后来逐渐被glibc取代，也就是传说中的GNU C Library,在此之前除了有libc，还有klibc,uclibc。现在只要知道用的最多的是glibc就行了，主流的一些linux操作系统如 Debian, Ubuntu，Redhat等用的都是glibc（或者其变种，下面会说到).</p>
+<p>那glibc都做了些什么呢？ glibc是Linux系统中最底层的API，几乎其它任何的运行库都要依赖glibc。 glibc最主要的功能就是对系统调用的封装，你想想看，你怎么能在C代码中直接用fopen函数就能打开文件？ 打开文件最终还是要触发系统中的sys_open系统调用，而这中间的处理过程都是glibc来完成的。<a href="http://www.chongh.wiki/blog/2016/04/08/linux-syscalls/" target="_blank" rel="external">这篇文章</a>详细介绍了glibc是如何与上层应用程序和系统调用交互的。除了封装系统调用，glibc自身也提供了一些上层应用函数必要的功能,如string,malloc,stdlib,linuxthreads,locale,signal等等。</p>
+<p>好了，那eglibc又是什么？ 这里的e是Embedded的意思，也就是前面说到的变种glibc。eglibc的主要特性是为了更好的支持嵌入式架构，可以支持不同的shell(包括嵌入式)，但它是二进制兼容glibc的，就是说如果你的代码之前依赖eglibc库，那么换成glibc后也不需要重新编译。ubuntu系统用的就是eglibc（而不是glibc）,不信，你执行 ldd –version 或者 /lib/i386-linux-gnu/libc.so.6<br>(64位系统运行/lib/x86_64-linux-gnu）看看，便会显示你系统中eglibc/glibc的版本信息。  这里提到了libc.so.6,这个文件就是eglibc/glibc编译后的生成库文件。</p>
+<p>好了，还有一个glib看起来也很相似，那它又是什么呢？glib也是个c程序库，不过比较轻量级，glib将C语言中的数据类型统一封装成自己的数据类型，提供了C语言常用的数据结构的定义以及处理函数，有趣的宏以及可移植的封装等(注：glib是可移植的，说明你可以在linux下，也可以在windows下使用它）。那它跟glibc有什么关系吗？其实并没有，除非你的程序代码会用到glib库中的数据结构或者函数，glib库在ubuntu系统中并不会默认安装(可以通过apt-get install libglib2.0-dev手动安装)，著名的GTK+和Gnome底层用的都是glib库。想更详细了解glib？ 可以参考 <a href="https://developer.gnome.org/glib/" target="_blank" rel="external">这里</a></p>
+<p>看到这里，你应该知道这些库有多重要了吧？ 你写的C代码在编译的过程中有可能出现明明是这些库里面定义的变,却量还会出现’Undefined’, ‘Unreference’等错误，这时候你可能会怀疑是不是这些库出问题了？ 是不是该动手换个gilbc/eglibc了？ 这里强调一点，在你准备更换/升级这些库之前，你应该好好思考一下，你真的要更换/升级吗？你要知道你自己在做什么！你要时刻知道glibc/eglibc的影响有多大，不管你之前部署的什么程序，linux系统的ls,cd,mv,ps等等全都得依赖它，很多人在更换/升级都有过惨痛的教训，甚至让整个系统奔溃无法启动。所以，强烈不建议更换/升级这些库！</p>
+<p>当然如果你写的是C++代码，还有两个库也要非常重视了，libc++/libstdc++,这两个库有关系吗？有。两个都是C++标准库。libc++是针对clang编译器特别重写的C++标准库，那libstdc++自然就是gcc的事儿了。libstdc++与gcc的关系就像clang与libc++. 其中的区别这里不作详细介绍了。</p>
+<p>再说说libstdc++，glibc的关系。 libstdc++与gcc是捆绑在一起的，也就是说安装gcc的时候会把libstdc++装上。 那为什么glibc和gcc没有捆绑在一起呢？<br>相比glibc，libstdc++虽然提供了c++程序的标准库，但它并不与内核打交道。对于系统级别的事件，libstdc++首先是会与glibc交互，才能和内核通信。相比glibc来说，libstdc++就显得没那么基础了。</p>
+<p>说完了这些库，这些库最终都是拿来干嘛的？当然是要将它们与你的程序链接在一起！ 这时候就不得不说说gcc了(当然还有前文提到的clang以及llvm等编译器，本文就不细说它们的区别了)。</p>
+<p>你写的C代码.c文件通过gcc首先转化为汇编.S文件，之后汇编器as将.S文件转化为机器代码.o文件，生成的.o文件再与其它.o文件，或者之前提到的libc.so.6库文件通过ld链接器链接在一块生成可执行文件。当然，在你编译代码使用gcc的时候，gcc命令已经帮你把这些细节全部做好了。</p>
+<p>那g++是做什么的? 慢慢说来，不要以为gcc只能编译C代码，g++只能编译c++代码。 后缀为.c的，gcc把它当作是C程序，而g++当作是c++程序；后缀为.cpp的，两者都会认为是c++程序，注意，虽然c++是c的超集，但是两者对语法的要求是有区别的。在编译阶段，g++会调用gcc,对于c++代码，两者是等价的，但是因为gcc命令不能自动和C++程序使用的库联接，需要这样，gcc -lstdc++, 所以如果你的Makefile文件并没有手动加上libstdc++库，一般就会提示错误，要求你安装g++编译器了。</p>
+<p>好了，就说到这，理清这些库与编译器之间的关系，相信会对你解决编译链接过程中遇到的错误起到一点帮助。</p>
+<p>如果你的编译器不支持一些新的C/C++特性，想升级gcc/g++, 这里也给出一个基于ubuntu系统的参考方法。</p>
+<p>添加ppa</p>
+<pre><code>sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+sudo apt-get update
+</code></pre><p>添加ppa，是因为你所用的ubuntu版本的更新源中可能并没有你想要的gcc/g++版本。</p>
+<p>安装新版gcc/g++</p>
+<pre><code>sudo apt-get install gcc-4.8
+sudo apt-get install g++-4.8
+</code></pre><p>可以到/usr/bin/gcc查看新安装的gcc,g++</p>
+<p>配置系统gcc/g++</p>
+<p>使用update-alternatives,统一更新gcc/g++</p>
+<pre><code>sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.6 60 --slave /usr/bin/g++ g++ /usr/bin/g++-4.6
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8 80 --slave /usr/bin/g++ g++ /usr/bin/g++-4.8
+sudo update-alternatives --config gcc
+</code></pre><p>数字优先级(如60，80)高的会被系统选择为默认的编译器,也可以执行第三条命令就是来手动配置系统的gcc,此处按照提示,选择4.8版本的即可。</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170301/compile-link/" target="_blank" rel="external">理清编译链接的那些事儿</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统内核/">系统内核</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Compiler/">Compiler</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-kernel-malloc"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -680,68 +760,6 @@ CSysSec注： 本文来自Diting0x的个人博客，主要介绍了Linux内核�
 <!-- Table of Contents -->
 
   
-    <article id="post-migration-papers"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170225/migration-papers/">虚拟机迁移论文推荐</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170225/migration-papers/" class="article-date">
-	  <time datetime="2017-02-25T08:32:16.000Z" itemprop="datePublished">二月 25, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <hr>
-<p><strong>CSysSec注</strong>： 本系列文章旨在收集相关领域经典论文阅读列表，持续更新中。<br><strong>转载请注明：</strong> <a href="http://www.csyssec.org/20170225/migration-papers/" target="_blank" rel="external">《虚拟机迁移技术阅读列表》</a></p>
-<hr>
-<h3 id="Virtual-Machine-Migration-Reading-List"><a href="#Virtual-Machine-Migration-Reading-List" class="headerlink" title="Virtual Machine Migration Reading List"></a>Virtual Machine Migration Reading List</h3><ul>
-<li>Abe,Y.,Geambasu,R., Joshi, K., Satyanarayanan,M:Urgent virtual machine evictionwith enlightened post-copy. In: Proceedings of the 12th ACM SIGPLAN/SIGOPS International Conference on Virtual Execution Environments, pp. 51–64, Atlanta, GA, USA (2016)</li>
-<li>Nathan, S., Bellur, U.,Kulkarni, P.:.On selecting the right optimizations for virtual machinemigration. In: Proceedings of the12th ACM SIGPLAN/SIGOPS International Conference on Virtual Execution Environments, pp. 37–49, Atlanta, GA, USA (2016)</li>
-<li>Jo, C., Gustafsson, E., Son, J., Egger, B.: Efficient livemigration of virtual machines using shared stor- age. In:Proceedings of the 9thACMSIGPLAN/SIGOPSInternationalConference onVirtualExecution Environments, pp. 41–50, Houston, Texas, USA (2013)</li>
-<li>Song, X., Shi, J ., Liu, R., Yang, J., Chen, H.: Parallelizing live migration of virtual machines. In: Proceedings of the 9thACMSIGPLAN/SIGOPS International Conference onVirtual Execution Envi- ronments, pp. 85–96, Houston, Texas, USA (2013)</li>
-<li>Chiang, J.-H., Li, H. -L., Chiueh, T-C.: Introspection-based memory de-duplication and migration. In: Proceedings of the 9th ACM SIGPLAN/SIGOPS International Conference on Virtual Execution Environments, pp. 51-62, Houston, Texas, USA (2013)</li>
-<li>Svard,P.,Hudzia, B.,Tordsson, J.,Elmroth,E.:Evaluation of delta compression techniques for efficient live migration of large virtual machines. In: Proceedings of the 7th ACMSIG- PLAN/SIGOPS Inter- national Conference on Virtual Execution Environments, pp. 111–120, New York, NY, USA (2011)</li>
-<li>Zhang, X., Huo, Z.,Ma, J.,Meng, D.: Exploiting data de-duplication to accelerate live virtualmachine migration. In: Proceedings of IEEE International Conference on Cluster Computing, pp. 88–96 (2010)</li>
-<li>Liu, H., Jin, H., Liao, X., Hu, L., Yu, C.: Live migration of virtual machine based on full system trace and replay. In: Proceedings of the 18th ACM International Symposium on High Performance Distributed Computing, pp. 101–110, New York, NY, USA (2009)</li>
-<li>Jin, H., Deng, L., Wu, S., Shi, X., Pan X.: Live virtual machine migration with adaptive, memory compression. In: Proceedings of IEEE InternationalConference on Cluster Computing, pp. 1–10, New Orleans, LA, USA (2009)</li>
-<li>Hines, M.,Gopalan, K.: Post-copy based live virtualmachinemigration using adaptive pre-paging and dynamic self- ballooning. In: Proceedings of the 5th ACM SIGPLAN/SIGOPS International Confer- ence on Virtual execution environments, pp. 51–60, New York, NY, USA (2009)</li>
-<li>Clark, C., Fraser, K., Hand, S., Hansen, J., Jul, E., Limpach, C., Pratt, I.,Warfield, A.: Live migration of virtual machines. In: Proceedings of the 2nd Usenix Conference on Symposium on Networked Systems Design &amp; Implementation, pp. 273–286, Berkeley, CA, USA (2005)</li>
-</ul>
-<hr>
-<p><strong>转载请注明：</strong> <a href="http://www.csyssec.org/20170225/migration-papers/" target="_blank" rel="external">《虚拟机迁移技术阅读列表》</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机迁移/">虚拟机迁移</a>
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Migration/">Migration</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -834,6 +852,18 @@ CSysSec注： 本文来自Diting0x的个人博客，主要介绍了Linux内核�
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170401/keylogger/">Keylogger检测</a></h6>
+          <!--  <span>四月 1, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -1015,18 +1045,6 @@ CSysSec注： 本文来自Diting0x的个人博客，主要介绍了Linux内核�
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170306/course-zhiqianglin1/">名人课堂-高级数字取证与数据逆向工程</a></h6>
-          <!--  <span>三月 6, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -1047,7 +1065,7 @@ CSysSec注： 本文来自Diting0x的个人博客，主要介绍了Linux内核�
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.67px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.83px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.5px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.33px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.5px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.83px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.83px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.17px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 15.83px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 16.67px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.33px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.33px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.33px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.83px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.83px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.83px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.83px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.5px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.67px;">Rootkit</a> <a href="/tags/Sandbox/" style="font-size: 10.83px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.83px;">Stack</a> <a href="/tags/System/" style="font-size: 19.17px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.67px;">Systemcall</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 18.33px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 10px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.67px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.83px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.5px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.33px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.5px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.83px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.83px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.17px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 15.83px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 16.67px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.33px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.33px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.83px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.33px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.83px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.83px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.83px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.83px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.5px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.67px;">Rootkit</a> <a href="/tags/Sandbox/" style="font-size: 10.83px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.83px;">Stack</a> <a href="/tags/System/" style="font-size: 19.17px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.67px;">Systemcall</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 18.33px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 10px;">XEN</a>
     </div>
   </div>
 

