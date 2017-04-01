@@ -99,14 +99,6 @@
 </header>
 
 
-  <div style="background:#fff;width: 100%;">
-
-      <div style="max-height:600px; overflow: hidden;">
-        <img width="100%" alt="Hike News" src="/css/images/pose.jpg">
-      </div>
-
-  </div>
-
 
 
   <div id="container">
@@ -115,6 +107,77 @@
       <div id="content" class="outer">
         
           <section id="main">
+  
+    <article id="post-kernelmalware"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170330/kernelmalware/">内核层恶意代码分析</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170330/kernelmalware/" class="article-date">
+	  <time datetime="2017-03-30T06:13:41.000Z" itemprop="datePublished">三月 30, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <hr>
+<p>作者：<a href="http://weibo.com/diting0x/profile?rightmod=1&amp;wvr=6&amp;mod=personinfo&amp;is_all=1" target="_blank" rel="external">Diting0x</a></p>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170330/kernelmalware" target="_blank" rel="external">内核层恶意代码分析</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<p>本文旨在收集Linux下内核层恶意代码并进行分析，持续更新。</p>
+<ul>
+<li>来源于论文<a href="https://www.cerias.purdue.edu/assets/pdf/bibtex_archive/2010-02.pdf" target="_blank" rel="external">LiveDM: Temporal Mapping of Dynamic Kernel Memory for Dynamic Kernel Malware Analysis and Debugging, </a>rootkit操纵内核动态对象的分析结果：</li>
+</ul>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/livedm1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/livedm1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<ul>
+<li>来源于论文<a href="http://friends.cs.purdue.edu/pubs/eurosys09.pdf" target="_blank" rel="external">Multi-Aspect Profiling of Kernel Rootkit Behavior, EuroSys’09</a>中PoKeR系统对rootkit行为的分析结果：</li>
+</ul>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/pokerresult.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/pokerresult.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<ul>
+<li>来源于论文<a href="http://www.cs.umd.edu/~mwh/papers/sbcfi.pdf" target="_blank" rel="external">Automated Detection of Persistent Kernel<br>Control-Flow Attacks,CCS’07</a>对内核层恶意代码的行为以及利用的机制分析结果：</li>
+</ul>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/sbcfi.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/sbcfi.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<ul>
+<li>部分用于研究目的的内核层恶意代码源码分享，可以参考<a href="https://github.com/chonghw/research-malware" target="_blank" rel="external">这里</a></li>
+</ul>
+<hr>
+<p>作者：<a href="http://weibo.com/diting0x/profile?rightmod=1&amp;wvr=6&amp;mod=personinfo&amp;is_all=1" target="_blank" rel="external">Diting0x</a></p>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170330/kernelmalware" target="_blank" rel="external">内核层恶意代码分析</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/恶意代码/">恶意代码</a>
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Rootkit/">Rootkit</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
   
     <article id="post-poker"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
@@ -564,403 +627,6 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
 <!-- Table of Contents -->
 
   
-    <article id="post-conference-veetenyears"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170307/conference-veetenyears/">VEE十年录用论文</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170307/conference-veetenyears/" class="article-date">
-	  <time datetime="2017-03-07T12:49:28.000Z" itemprop="datePublished">三月 7, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <hr>
-<p><strong>CSysSec注</strong>： 本系列文章旨在收集主流会议每年录用的文章信息，并做相关的总结，持续更新。</p>
-<p><strong>转载请注明</strong>： <a href="http://www.csyssec.org/20170307/conference-veetenyears/" target="_blank" rel="external">主流会议-VEE十年录用论文</a>与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<h2 id="2017"><a href="#2017" class="headerlink" title="2017"></a>2017</h2><ul>
-<li>“Dancing with Wolves: Towards Practical Event-driven VMM Monitoring”, Liang Deng, Peng Liu, Jun Xu, Ping Chen</li>
-<li>“Flexible Page-level Memory Access Monitoring Based on Virtualization Hardware”, Kai Lu, Wenzhe Zhang, Xiaoping Wang, Mikel LujÃ¡n</li>
-<li>“RERANZ: A Light-Weight Virtual Machine to Mitigate Memory Disclosure Attacks”, Zhe Wang</li>
-<li>“MigVisor: Accurate Prediction of VM Live Migration Behavior using a Working-Set Pattern Model”, Jinshi Zhang, Eddie Dong, Jian Li, Haibing Guan</li>
-<li>“One Process to Reap Them All: Garbage Collection As A Service”, Ahmed Hussein, Mathias Payer, Antony L. Hosking, Christopher A. Vick</li>
-<li>“Improving Virtualized Storage Services with Sky”, Leo Arulra, Andrea C. Arpaci-Dusseau, Remzi H. Arpaci-Dusseau</li>
-<li>“HyperMAMBO: Using Virtualization to Support High-performance Transparent Binary Translation”, Amanieu d’Antras, Cosmin Gorgovan, Jim Garside, John Goodacre, MIkel Lujan</li>
-<li>“Unikernels Everywhere: The Case for Ephemeral CDNs”, Simon Kuenzer, Anton Ivanov, Filipe Manco, Jose Mendes, Iurii Volchkov, Florian Schmidt, Kenichi Yasukata, Michio Honda, Felipe Huici</li>
-<li>“Swift Birth and Quick Death: Enabling Fast Parallel Guest Boot and Destruction in the Xen Hypervisor”, Vlad Nitu, Pierre Olivier, Alain Tchana, Daniel Chiba, Antonio Barbalace, Daniel Hagimont, Binoy Ravindran</li>
-<li>“Using OS Design Patterns to Provide Reliability and Security as-a-Service for VM-based Clouds”, Zachary J. Estrada, Read Sparbery, Lok Yan, Zhongzhi Yu, Roy Campbell, Zbigniew Kalbarczyk</li>
-<li>“Catalyst: GPU-assisted rapid memory deduplication in virtualization environments”, Anshuj Garg, Debadatta Mishra, Purushottam Kulkarni</li>
-<li>“Just-In-Time GPU Compilation for Interpreted Languages with Partial Evaluation”, Juan Fumero, Michel Steuwer, Lukas Stadler, Christophe Dubach</li>
-<li>“Content Look-Aside Buffer for Redundancy-Free Virtual Disk I/O and Caching”, Chun Yang, Xianhua Liu, Xu Cheng</li>
-<li>“Security analysis of encrypted virtual machines”, Felicitas Hetzelt, Robert Buhren</li>
-<li>“Heterogeneous Managed Runtime Systems: A Computer Vision Case Study”, Christos Kotselidis, James Clarkson, Andrey Rodchenko, Andy Nisbet, John Mawer, Mikel Lujan</li>
-<li>“Designing Locality and NUMA Aware MPI Runtime for Nested Virtualization based HPC Cloud with SR-IOV Enabled InfiniBand”, Jie Zhang, Xiaoyi Lu, Dhabaleswar K. Panda</li>
-<li>“Safe Inspection of Live Virtual Machines”, Sahil Suneja, Ricardo Koller, Canturk Isci, Eyal de Lara, Ali Hashemi, Arnamoy Bhattacharyya, Cristiana Amza</li>
-<li>“HA-VMSI: A Lightweight Virtual Machine Isolation Approach with Commodity Hardware for ARM”, Min Zhu, Bibo Tu, Wei Wei, Dan Meng</li>
-</ul>
-<h2 id="2016"><a href="#2016" class="headerlink" title="2016"></a>2016</h2><h3 id="Hardware-Aware-Hypervisor-Design"><a href="#Hardware-Aware-Hypervisor-Design" class="headerlink" title="Hardware-Aware Hypervisor Design"></a>Hardware-Aware Hypervisor Design</h3><ul>
-<li><strong>Building A KVM-based Hypervisor for A Heterogeneous System Architecture Compliant System</strong><br>Yu-Ju Huang (National Chiao Tung University, Taiwan), Hsuan-Heng Wu (National Taiwan University, Taiwan), Yeh-Ching Chung (National Tsing Hua University, Taiwan), and Wei-Chung Hsu (National Taiwan University, Taiwan) </li>
-<li><strong>Shoot4U: Using VMM Assists to Optimize TLB Operations on Preempted vCPUs</strong><br>Jiannan Ouyang, John R. Lange (University of Pittsburgh), and Haoqiang Zheng (VMware, Inc.) [Presentation]</li>
-<li><p><strong>Performance Implications of Extended Page Tables on Virtualized x86 Processors</strong><br>Timothy Merrifield (University of Illinois at Chicago) and Reza Taheri (VMWare, Inc.) </p>
-<h3 id="VM-Migration"><a href="#VM-Migration" class="headerlink" title="VM Migration"></a>VM Migration</h3></li>
-<li><p><strong>On Selecting the Right Optimizations for Virtual Machine Migration</strong><br>Senthil Nathan, Umesh Bellur, and Purushottam Kulkarni (IIT Bombay) </p>
-</li>
-<li><strong>Urgent Virtual Machine Eviction with Enlightened Post-Copy</strong><br>Yoshihisa Abe (Carnegie Mellon University), Roxana Geambasu (Columbia University), Kaustubh Joshi (AT&amp;T Research), and Mahadev Satyanarayanan (Carnegie Mellon University) </li>
-<li><strong>SRVM: Hypervisor Support for Live Migration with Pass-through SR-IOV Network Devices</strong><br>Xin Xu and Bhavesh Davda (VMware) </li>
-</ul>
-<h3 id="VM-Extensions"><a href="#VM-Extensions" class="headerlink" title="VM Extensions"></a>VM Extensions</h3><ul>
-<li><strong>Enabling Efficient Hypervisor-as-a-Service Clouds with Ephemeral Virtualization</strong><br>Dan Williams (IBM T.J. Watson Research Center), Yaohui Hu (Binghamton University), Umesh Deshpande (IBM Almaden Research Center), Piush K Sinha (Binghamton University), Nilton Bila (IBM T.J. Watson Research Center), Kartik Gopalan (Binghamton University), and Hani Jamjoom (IBM T.J.Watson Research Center) </li>
-<li><strong>Abstractions for Practical Virtual Machine Replay</strong><br>Anton Burtsev, David Johnson, Mike Hibler, Eric Eide, and John Regehr (University of Utah) </li>
-</ul>
-<h3 id="Memory-Management"><a href="#Memory-Management" class="headerlink" title="Memory Management"></a>Memory Management</h3><ul>
-<li><strong>Exploiting FIFO Scheduler to Improve Parallel Garbage Collection Performance</strong><br>Junjie Qian, Witawas Srisa-an, Sharad Seth (University of Nebraska Lincoln), Hong Jiang (University of Texas Arlington), Du Li (Carnegie Mellon University), and Pan Yi (University of Nebraska Lincoln) [Presentation]</li>
-<li><strong>Performance Analysis and Optimization of Full Garbage Collection in Memory-hungry Environments</strong><br>Yang Yu (Fudan University), Tianyang Lei, Haibo Chen, and Binyu Zang (Shanghai Jiao Tong University) [Presentation]</li>
-<li><strong>Leveraging Managed Runtime Systems to Build, Analyze, and Optimize Memory Graphs</strong><br>Rebecca Smith and Scott Rixner (Rice University) </li>
-</ul>
-<h3 id="Future-OS-Directions"><a href="#Future-OS-Directions" class="headerlink" title="Future OS Directions"></a>Future OS Directions</h3><ul>
-<li><strong>The nom Profit-Maximizing Operating System</strong><br>Muli Ben-Yehuda (Technion and LightBits Labs), Orna Agmon Ben-Yehuda, and Dan Tsafrir (Technion) [Presentation]</li>
-<li><strong>Enabling Hybrid Parallel Runtimes Through Kernel and Virtualization Support</strong><br>Kyle Hale and Peter Dinda (Northwestern University) </li>
-</ul>
-<h2 id="2015"><a href="#2015" class="headerlink" title="2015"></a>2015</h2><h3 id="Improving-and-Exploiting-I-O-Virtualization"><a href="#Improving-and-Exploiting-I-O-Virtualization" class="headerlink" title="Improving and Exploiting I/O Virtualization"></a>Improving and Exploiting I/O Virtualization</h3><ul>
-<li><p><strong>A Comprehensive Implementation and Evaluation of Direct Interrupt Delivery</strong><br>Cheng-Chun Tu (Oracle Labs), Michael Ferdman (Stony Brook University), Tzi-cker Chiueh, Chao-tung Lee (Industrial Technology Research Institute)</p>
-</li>
-<li><p><strong>A Hybrid I/O Virtualization Framework for RDMA-capable Network Interfaces</strong><br>Jonas Pfefferle, Patrick Stuedi, Animesh Trivedi, Bernard Metzler, Ioannis Koltsidas (IBM Research), Thomas R. Gross (ETH Zurich)</p>
-</li>
-<li><strong>Supporting High Performance Molecular Dynamics in Virtualized Clusters using IOMMU, SR-IOV, and GPUDirect</strong><br>Andrew J. Younge (Indiana University), John Paul Walters, Stephen P. Crago (University of Southern California), Geoffrey C. Fox (Indiana University)</li>
-</ul>
-<h3 id="Address-Space-Management"><a href="#Address-Space-Management" class="headerlink" title="Address Space Management"></a>Address Space Management</h3><ul>
-<li><p><strong>Proactively Breaking Large Pages to Improve Memory Overcommitment Performance in VMware ESXi</strong><br>Fei Guo, Seongbeom Kim, Yury Baskakov, Ishan Banerjee (VMware)</p>
-</li>
-<li><p><strong>HSPT: Practical Implementation and Efficient Management of Embedded Shadow Page Tables for Cross-ISA System Virtual Machines</strong><br>Zhe Wang, Jianjun Li, Chenggang Wu (Institute of Computing Technology), Dongyan Yang (IBM), Zhenjiang Wang (Institute of Computing Technology), Wei-Chung Hsu (National Taiwan University), Bin Li (Netease, Inc.), Yong Guan (Capital Normal University)</p>
-</li>
-<li><p><strong>GPUswap: Enabling Oversubscription of GPU Memory through Transparent Swapping</strong><br>Jens Kehne, Jonathan Metter, Frank Bellosa (Karlsruhe Institute of Technology (KIT))</p>
-</li>
-</ul>
-<h3 id="Managing-Virtual-Clusters"><a href="#Managing-Virtual-Clusters" class="headerlink" title="Managing Virtual Clusters"></a>Managing Virtual Clusters</h3><ul>
-<li><p><strong>HeteroVisor: Exploiting Resource Heterogeneity to Enhance the Elasticity of Cloud Platforms</strong><br>Vishal Gupta (VMware), Min Lee (Intel), Karsten Schwan (Georgia Institute of Technology)</p>
-</li>
-<li><p><strong>A-DRM: Architecture-aware Distributed Resource Management of Virtualized Clusters</strong><br>Hui Wang (Beihang University), Canturk Isci (IBM Thomas J. Watson Research Center), Lavanya Subramanian (Carnegie Mellon University), Jongmoo Choi (Dankook University), Depei Qian (Beihang University), Onur Mutlu (Carnegie Mellon University)</p>
-</li>
-<li><p><strong>Towards VM Consolidation Using a Hierarchy of Idle States</strong><br>Rayman Preet Singh, Tim Brecht, S. Keshav (University of Waterloo)</p>
-</li>
-</ul>
-<h3 id="VM-Testing-and-Introspection"><a href="#VM-Testing-and-Introspection" class="headerlink" title="VM Testing and Introspection"></a>VM Testing and Introspection</h3><ul>
-<li><p><strong>Application of Domain-aware Binary Fuzzing to Aid Android Virtual Machine Testing</strong><br>Stephen Kyle, Hugh Leather, Björn Franke (University of Edinburgh), Dave Butcher, Stuart Monteith (ARM Limited)</p>
-</li>
-<li><p><strong>Exploring VM Introspection: Techniques and Trade-offs</strong><br>Sahil Suneja (University of Toronto), Canturk Isci (IBM Research), Eyal de Lara (University of Toronto), Vasanth Bala (IBM Research)</p>
-</li>
-<li><p><strong>PEMU: A Pin Highly Compatible Out-of-VM Dynamic Binary Instrumentation Framework</strong><br>Junyuan Zeng, Yangchun Fu, Zhiqiang Lin (University of Texas at Dallas)</p>
-</li>
-</ul>
-<h3 id="User-facing-Applications"><a href="#User-facing-Applications" class="headerlink" title="User-facing Applications"></a>User-facing Applications</h3><ul>
-<li><p><strong>Improving Remote Desktopping Through Adaptive Record/Replay</strong><br>Shehbaz Jaffer (NetApp Inc.), Piyus Kedia (Microsoft Research Bangalore), Sorav Bansal (IIT Delhi)</p>
-</li>
-<li><p><strong>Migration of Web Applications with Seamless Execution</strong><br>JinSeok Oh, Jin-woo Kwon, Hyukwoo Park, Soo-Mook Moon (Seoul National University)</p>
-</li>
-</ul>
-<h3 id="Security-and-Reliability"><a href="#Security-and-Reliability" class="headerlink" title="Security and Reliability"></a>Security and Reliability</h3><ul>
-<li><p><strong>AppSec: A Safe Execution Environment for Security Sensitive Applications</strong><br>Jianbao Ren, Yong Qi, Yuehua Dai, Xiaoguang Wang, Yi Shi (Xi’an Jiaotong University)</p>
-</li>
-<li><p><strong>Hardware-Assisted Secure Resource Accounting under a Vulnerable Hypervisor</strong><br>Seongwook Jin, Jinho Seol, Jaehyuk Huh, Seungryoul Maeng (KAIST)</p>
-</li>
-<li><p><strong>PARS: A Page-Aware Replication System for Efficiently Storing Virtual Machine Snapshots</strong><br>Lei Cui, Tianyu Wo, Bo Li, Jianxin Li, Bin Shi, Jinpeng Huai (Beihang University)</p>
-</li>
-</ul>
-<h3 id="2014"><a href="#2014" class="headerlink" title="2014"></a>2014</h3><h3 id="Bridging-the-Semantic-Gap-Sat"><a href="#Bridging-the-Semantic-Gap-Sat" class="headerlink" title="Bridging the Semantic Gap Sat"></a>Bridging the Semantic Gap Sat</h3><ul>
-<li><strong>Real-Time Deep Virtual Machine Introspection and Its Applications</strong><br>Jennia Hizver (Stony Brook University), Tzi-cker Chiueh (Industrial Technology Research Institute, Taiwan)</li>
-<li><p><strong>Tesseract: Reconciling Guest I/O and Hypervisor Swapping in a VM</strong><br>Kapil Arya (Northeastern University), Yury Baskakov (VMware), Alex Garthwaite (Self)</p>
-</li>
-<li><p><strong>Virtual Asymmetric Multiprocessor for Interactive Performance of Consolidated Desktops</strong><br>Hwanju Kim, Sangwook Kim, Jinkyu Jeong, Joonwon Lee (Sungkyunkwan University)</p>
-</li>
-</ul>
-<h3 id="Memory"><a href="#Memory" class="headerlink" title="Memory"></a>Memory</h3><ul>
-<li><p><strong>Ginseng: Market-Driven Memory Allocation<br>Orna Agmon Ben-Yehuda,</strong> Eyal Posener (Technion), Muli Ben-Yehuda (Technion &amp; Stratoscale), Assaf Schuster (Technion), Ahuva Mu’alem (Ort Braude &amp; Technion)</p>
-</li>
-<li><p><strong>Mortar: Filling the Gaps in Data Center Memory</strong><br>Jinho Hwang (IBM T.J. Watson Research Center), Ahsen J. Uppal, Timothy Wood, H. Howie Huang (George Washington University)</p>
-</li>
-<li><p><strong>CMD: Classification-based Memory Deduplication through Page Access Characteristics</strong><br>Licheng Chen, Zhipeng Wei, Zehan Cui, Mingyu Chen, Haiyang Pan, Yungang Bao (Institute of Computing Technology, Chinese Academy of Sciences)</p>
-</li>
-</ul>
-<h3 id="Runtimes"><a href="#Runtimes" class="headerlink" title="Runtimes"></a>Runtimes</h3><ul>
-<li><p><strong>MuscalietJS: Rethinking Layered Dynamic Web Runtimes<br>Behnam Robatmili</strong>, Calin Cascaval (Qualcomm Research Silicon Valley), Mehrdad Reshadi (Instart Logic), Madhukar N. Kedlaya (University of California, Santa Barbara), Seth Fowler (Mozilla), Vrajesh Bhavsar, Michael Weber (Qualcomm Research Silicon Valley), Ben Hardekopf (University of California, Santa Barbara)</p>
-</li>
-<li><p><strong>A Fast Abstract Syntax Tree Interpreter for R</strong><br>Tomas Kalibera (Purdue University), Petr Maj (ReactorLabs), Floreal Morandat (University of Bordeaux), Jan Vitek (Purdue University)</p>
-</li>
-<li><p><strong>Deoptimization for Dynamic Language JITs on Typed, Stack-based Virtual Machines</strong><br>Madhukar N Kedlaya (University of California, Santa Barbara), Behnam Robatmili, Calin Cascaval (Qualcomm Research Silicon Valley), Ben Hardekopf (University of California, Santa Barbara) </p>
-</li>
-</ul>
-<h3 id="Keynote"><a href="#Keynote" class="headerlink" title="Keynote"></a>Keynote</h3><ul>
-<li>The case for the Three R’s of systems research: Repeatability, Reproducibility and Rigor<br>Jan Vitek (Purdue University)</li>
-</ul>
-<h3 id="Binary-Instrumentation"><a href="#Binary-Instrumentation" class="headerlink" title="Binary Instrumentation"></a>Binary Instrumentation</h3><ul>
-<li><p><strong>Efficient Memory Virtualization for Cross-ISA System Mode Emulation</strong><br>Chao-Jui Chang, Jan-Jan Wu (Academia Sinica), Wei-Chung Hsu, Pangfeng Liu (National Taiwan University), Pen-Chung Yew (University of Minnesota)</p>
-</li>
-<li><p><strong>A Platform for Secure Static Binary Instrumentation</strong><br>Mingwei Zhang, Rui Qiao, Niranjan Hasabnis, R. Sekar (Stony Brook University)</p>
-</li>
-<li><p><strong>DBILL: An Efficient and Retargetable Dynamic Binary Instrumentation Framework using LLVM Backend</strong><br>Yi-Hong Lyu, Ding-Yong Hong, Tai-Yi Wu, Jan-Jan Wu (Academia Sinica), Pangfeng Liu, Wei-Chung Hsu (National Taiwan University), Pen-Chung Yew (University of Minnesota)</p>
-</li>
-</ul>
-<h3 id="Optimizations"><a href="#Optimizations" class="headerlink" title="Optimizations"></a>Optimizations</h3><ul>
-<li><p><strong>COMMA: Coordinating the Migration of Multi-tier Applications</strong><br>Jie Zheng, T. S. Eugene Ng (Rice University), Kunwadee Sripanidkulchai (NECTEC, Thailand), Zhaolei Liu (Rice University)</p>
-</li>
-<li><p><strong>Friendly Barriers: Efficient Work-Stealing With Return Barriers</strong><br>Vivek Kumar, Steve Blackburn (Australian National University), David Grove (IBM T.J. Watson Research)</p>
-</li>
-<li><p><strong>String Deduplication for Java-based Middleware in Virtualized Environments</strong><br>Michihiro Horie, Kazunori Ogata, Kiyokuni Kawachiya, Tamiya Onodera (IBM Research - Tokyo)</p>
-</li>
-</ul>
-<h3 id="Reorganizing-amp-Debugging"><a href="#Reorganizing-amp-Debugging" class="headerlink" title="Reorganizing &amp; Debugging"></a>Reorganizing &amp; Debugging</h3><ul>
-<li><p><strong>Shrinking the Hypervisor One Subsystem at a Time: A Userspace Packet Switch for Virtual Machines</strong><br>Julian Stecklina (TU Dresden)</p>
-</li>
-<li><p><strong>A Virtualized Separation Kernel for Mixed Criticality Systems</strong><br>Ye Li, Richard West, Eric Missimer (Boston University)</p>
-</li>
-<li><p><strong>Composable Multi-Level Debugging with Stackdb</strong><br>David Johnson, Mike Hibler, Eric Eide (University of Utah)</p>
-</li>
-</ul>
-<h2 id="2013"><a href="#2013" class="headerlink" title="2013"></a>2013</h2><h3 id="Dynamic-binary-translation"><a href="#Dynamic-binary-translation" class="headerlink" title="Dynamic binary translation"></a>Dynamic binary translation</h3><ul>
-<li>Ning Jia, Chun Yang, Jing Wang, Dong Tong, Keyi Wang:<br><strong>SPIRE: improving dynamic binary translation through SPC-indexed indirect branch redirecting</strong>.</li>
-<li>Tobias J. K. Edler von Koch, Björn Franke:<br><strong>Limits of region-based dynamic binary parallelization.</strong> - Chun-Chen Hsu, Pangfeng Liu, Jan-Jan Wu, Pen-Chung Yew, Ding-Yong Hong, Wei-Chung Hsu, Chien-Min Wang:<br><strong>Improving dynamic binary optimization through early-exit guided code region formation.</strong> </li>
-<li>Marco Kaufmann, Rainer G. Spallek:<br><strong>Superblock compilation and other optimization techniques for a Java-based DPT machine emulator</strong>. </li>
-</ul>
-<h3 id="Migration-I"><a href="#Migration-I" class="headerlink" title="Migration I"></a>Migration I</h3><ul>
-<li>Changyeon Jo, Erik Gustafsson, Jeongseok Son, Bernhard Egger:<br><strong>Efficient live migration of virtual machines using shared storage</strong>.</li>
-<li>Jui-Hao Chiang, Han-Lin Li, Tzi-cker Chiueh:<br><strong>Introspection-based memory de-duplication and migration.</strong> </li>
-</ul>
-<h3 id="Migration-II"><a href="#Migration-II" class="headerlink" title="Migration II"></a>Migration II</h3><ul>
-<li>Lei Cui, Jianxin Li, Bo Li, Jinpeng Huai, Chunming Hu, Tianyu Wo, Hussain Al-Aqrabi, Lu Liu:<br><strong>VMScatter: migrate virtual machines to many hosts</strong>. </li>
-<li>Ruijin Zhou, Fang Liu, Chao Li, Tao Li:<br><strong>Optimizing virtual machine live storage migration in heterogeneous storage environment.</strong> </li>
-<li>Xiang Song, Jicheng Shi, Ran Liu, Jian Yang, Haibo Chen:<br><strong>Parallelizing live migration of virtual machines.</strong> </li>
-</ul>
-<h3 id="VMM-implementation"><a href="#VMM-implementation" class="headerlink" title="VMM implementation"></a>VMM implementation</h3><ul>
-<li>Yangchun Fu, Zhiqiang Lin:<br><strong>EXTERIOR: using a dual-VM based external shell for guest-OS introspection, configuration, and recovery.</strong> - Yue-hua Dai, Yong Qi, Jianbao Ren, Yi Shi, Xiaoguang Wang, Xuan Yu:<br><strong>A lightweight VMM on many core for high performance computing.</strong> </li>
-<li>Hiroshi Yamada, Kenji Kono:<br><strong>Traveling forward in time to newer operating systems using ShadowReboot.</strong> </li>
-</ul>
-<h3 id="VM-optimisation"><a href="#VM-optimisation" class="headerlink" title="VM optimisation"></a>VM optimisation</h3><ul>
-<li>Michael R. Jantz, Prasad A. Kulkarni:<br><strong>Performance potential of optimization phase selection during dynamic JIT compilation.</strong> </li>
-<li>Nurudeen Lameed, Laurie J. Hendren:<br><strong>A modular approach to on-stack replacement in LLVM</strong>. </li>
-<li>Michael R. Jantz, Carl Strickland, Karthik Kumar, Martin Dimitrov, Kshitij A. Doshi:<br><strong>A framework for application guidance in virtual memory systems.</strong> </li>
-</ul>
-<h3 id="VMM-optimisation"><a href="#VMM-optimisation" class="headerlink" title="VMM optimisation"></a>VMM optimisation</h3><ul>
-<li>Chen Chen, Petros Maniatis, Adrian Perrig, Amit Vasudevan, Vyas Sekar:<br><strong>Towards verifiable resource accounting for outsourced computation.</strong> </li>
-<li>Ruijin Zhou, Tao Li:<br><strong>Leveraging phase change memory to achieve efficient virtual machine execution.</strong> </li>
-<li>Jiannan Ouyang, John R. Lange:<br><strong>Preemptable ticket spinlocks: improving consolidated performance in the cloud.</strong> </li>
-</ul>
-<h2 id="2012"><a href="#2012" class="headerlink" title="2012"></a>2012</h2><h3 id="Modeling"><a href="#Modeling" class="headerlink" title="Modeling"></a>Modeling</h3><ul>
-<li><strong>Modeling Virtualized Applications using Machine Learning Techniques</strong>. Sajib Kundu (Florida International University), Raju Rangaswami (Florida International University), Ajay Gulati (VMware), Ming Zhao (Florida International University), Kaushik Dutta (National University of Singapore)</li>
-</ul>
-<h3 id="Multicore-and-Scale"><a href="#Multicore-and-Scale" class="headerlink" title="Multicore and Scale"></a>Multicore and Scale</h3><ul>
-<li><strong>Virtualization Challenges: A View from Server Consolidation Perspective.</strong> Hui Lv, Yaozu Dong, Jiangang Duan, Kevin Tian (Intel Asia-Pacific Research &amp; Development Ltd)</li>
-<li><strong>REEact: A Customizable Virtual Execution Manager for Multicore Platforms.</strong> Wei Wang (University of Virginia), Tanima Dey (University of Virginia) Ryan W. Moore (University of Pittsburgh), Mahmut Aktasoglu (Pennsylvania State University), Bruce R. Childers (University of Pittsburgh), Jack W. Davidson (University of Virginia), Mary Jane Irwin (Pennsylvania State University), Mahmut Kandemir (Pennsylvania State University), Mary Lou Soffa (University of Virginia)</li>
-<li><strong>DVM: Towards a Datacenter-Scale Virtual Machine</strong>. Zhiqiang Ma (Hong Kong University of Science and Technology), Zhonghua Sheng (Hong Kong University of Science and Technology), Lin Gu (Hong Kong University of Science and Technology), Liufei Wen (Huawei), Gong Zhang (Huawei)</li>
-</ul>
-<h3 id="Embedded-Systems-and-Light-weight-VMs"><a href="#Embedded-Systems-and-Light-weight-VMs" class="headerlink" title="Embedded Systems and Light-weight VMs"></a>Embedded Systems and Light-weight VMs</h3><ul>
-<li><strong>SimTester: A Controllable and Observable Testing Framework for Embedded Systems.</strong> Tingting Yu, Witawas Srisa-an, Gregg Rothermel (University of Nebraska-Lincoln)</li>
-<li><strong>Swift: A Register-based JIT Compiler for Embedded JVMs.</strong> Yuan Zhang, Min Yang, Bo Zhou, Zhemin Yang, Weihua Zhang, Binyu Zang (Fudan University)</li>
-<li><strong>Facilitating Inter-Application Interactions for OS-level Virtualization.</strong> Zhiyong Shan (Renmin University of China), Xin Wang (Stony Brook University), Tzi-cker Chiueh (Stony Brook University), Xiaofeng Meng (Renmin University of China)</li>
-</ul>
-<h3 id="Enabling-High-Availability"><a href="#Enabling-High-Availability" class="headerlink" title="Enabling High Availability."></a>Enabling High Availability.</h3><ul>
-<li><strong>Enhancing TCP Throughput of Highly Available Virtual Machines via Speculative Communication</strong>. Balazs Gerofi, Yutaka Ishikawa (University Of Tokyo)<br>SecondSite: Disaster Tolerance as a Service. Shriram Rajagopalan, Brendan Cully, Ryan O’Connor, Andrew Warfield (University of British Columbia)</li>
-<li><strong>CompSC: Live Migration with Pass-through Devices.</strong> Zhenhao Pan (Tsinghua University), Yaozu Dong (Intel Asia-Pacific Research &amp; Development Ltd), Yu Chen (Tsinghua University), Lei Zhang (Tsinghua University) Zhijiao Zhang (Tsinghua University)<h3 id="Keynote-Talk"><a href="#Keynote-Talk" class="headerlink" title="Keynote Talk"></a>Keynote Talk</h3></li>
-<li><strong>Virtual Smartphone Computing</strong>. Jason Nieh (Columbia University)</li>
-</ul>
-<h3 id="Instrumentation"><a href="#Instrumentation" class="headerlink" title="Instrumentation."></a>Instrumentation.</h3><ul>
-<li><strong>libdft: Practical Dynamic Data Flow Tracking for Commodity Systems.</strong>  Vasileios P. Kemerlis, Georgios Portokalidis, Kangkook Jee, Angelos D. Keromytis (Columbia University)</li>
-<li><strong>Transparent Dynamic Instrumentation</strong>. Derek Bruening (Google), Qin Zhao (Google), Saman Amarasinghe (Massachusetts Institute of Technology)</li>
-<li><strong>Execution Mining</strong>. Geoffrey Lefebvre, Brendan Cully, Christopher Head, Mark Spear, Norm Hutchinson, Mike Feeley, Andrew Warfield (University of British Columbia)</li>
-</ul>
-<h3 id="Dynamic-Analysis-and-Runtime"><a href="#Dynamic-Analysis-and-Runtime" class="headerlink" title="Dynamic Analysis and Runtime."></a>Dynamic Analysis and Runtime.</h3><ul>
-<li><strong>DDGacc: Boosting Dynamic DDG-based Binary Optimizations through Specialized Hardware Support</strong>. Demos Pavlou, Enric Gibert, Fernando Latorre, Antonio Gonzalez (Intel Barcelona Research Center (IBRC) &amp; Universitat Politecnica de Catalunya)</li>
-<li><strong>Adding Dynamically-Typed Language Support to a Statically-Typed Language Compiler: Performance Evaluation, Analysis, and Tradeoffs.</strong>  Kazuaki Ishizaki (IBM Research Tokyo), Takeshi Ogasawara (IBM Research Tokyo), Jose Castanos (IBM Thomas J. Watson Research Center), Priya Nagpurkar (IBM Thomas J. Watson Research Center), David Edelsohn (IBM Thomas J. Watson Research Center), Toshio Nakatani (IBM Research Tokyo)</li>
-<li><strong>Unpicking The Knot: Teasing Apart VM/Application Interdependencies</strong>. Yi Lin, Stephen M Blackburn, Daniel Frampton (Australian National University)</li>
-</ul>
-<h3 id="Security"><a href="#Security" class="headerlink" title="Security."></a>Security.</h3><ul>
-<li><strong>Block Storage Virtualization with Commodity Secure Digital Cards</strong>. Harvey Tuch, Cyprien Laplace, Kenneth C. Barr, Bi Wu (VMware)</li>
-<li><strong>Replacement Attacks against VM-protected Applications.</strong> Sudeep Ghosh, Jason Hiser, Jack W. Davidson (University of Virginia)</li>
-<li><strong>Protecting Applications against TOCTTOU Races by User-Space Caching of File Metadata.</strong> Mathias Payer, Thomas R. Gross (ETH Zurich)</li>
-<li><strong>V2E: Combing Hardware Virtualization and Software Emulation for Transparent and Extensible Malware Analysis</strong>. Lok-Kwong Yan (Syracuse University &amp; Air Force Research Laboratory), Manjukumar Jayachandra (Syracuse University), Mu Zhang (Syracuse University), Heng Yin (Syracuse University)</li>
-</ul>
-<h2 id="2011"><a href="#2011" class="headerlink" title="2011"></a>2011</h2><h3 id="Performance-Monitoring"><a href="#Performance-Monitoring" class="headerlink" title="Performance Monitoring"></a>Performance Monitoring</h3><ul>
-<li><strong>Performance Profiling of Virtual Machines</strong><br>Jiaqing Du, Nipun Sehrawat and Willy Zwaenepoel.</li>
-<li><strong>Perfctr-Xen: A Framework for Performance Counter Virtualization</strong><br>Ruslan Nikolaev and Godmar Back.</li>
-<li><strong>Dynamic Cache Contention Detection in Multi-threaded Applications</strong><br>Qin Zhao, David Koh, Syed Raza, Derek Bruening, Weng-Fai Wong and Saman Amarasinghe.</li>
-</ul>
-<h3 id="Configuration"><a href="#Configuration" class="headerlink" title="Configuration"></a>Configuration</h3><ul>
-<li><strong>Rethink the Virtual Machine Template</strong><br>Kun Wang, Chengzhong Xu and Jia Rao.</li>
-<li><strong>Dolly: Virtualization-driven Database Provisioning for the Cloud</strong><br>Emmanuel Cecchet, Rahul Singh, Upendra Sharma and Prashant Shenoy.</li>
-<li><strong>ReHype: Enabling VM Survival Across Hypervisor Failures<br>Michael Le and Yuval Tamir.</strong></li>
-</ul>
-<h3 id="Recovery"><a href="#Recovery" class="headerlink" title="Recovery"></a>Recovery</h3><ul>
-<li><strong>Fast and Space Efficient Virtual Machine Checkpointing</strong><br>Eunbyung Park, Bernhard Egger and Jaejin Lee.</li>
-<li><strong>Fast Restore of Checkpointed Memory using Working Set Estimation</strong><br>Irene Zhang, Yury Baskakov, Alex Garthwaite and Kenneth C. Barr.</li>
-<li><strong>Fast and Correct Performance Recovery of Operating Systems Using a Virtual Machine Monitor</strong><br>Kenichi Kourai.</li>
-</ul>
-<h3 id="Migration"><a href="#Migration" class="headerlink" title="Migration"></a>Migration</h3><ul>
-<li><strong>Evaluation of Delta Compression techniques for Efficient Live Migration of Large Virtual Machines</strong><br>Petter Svard, Benoit Hudzia,  Johan Tordsson and Erik Elmroth.</li>
-<li><strong>CloudNet: Dynamic Pooling of Cloud Resources by Live WAN Migration of Virtual Machines</strong><br>Timothy Wood, KK Ramakrishnan, Prashant Shenoy and Jacobus van der Merwe.</li>
-<li><strong>Workload-Aware Live Storage Migration for Clouds</strong><br>Jie Zheng, T. S. Eugene Ng and Kunwadee Sripanidkulchai. </li>
-</ul>
-<h3 id="Security-1"><a href="#Security-1" class="headerlink" title="Security"></a>Security</h3><ul>
-<li><strong>Patch Auditing in Infrastructure as a Service Clouds</strong><br>Lionel Litty and David Lie.</li>
-<li><strong>Fine-Grained User-Space Security Through Virtualization</strong><br>Mathias Payer and Thomas R. Gross.</li>
-</ul>
-<h3 id="Virtualization-Techniques"><a href="#Virtualization-Techniques" class="headerlink" title="Virtualization Techniques"></a>Virtualization Techniques</h3><ul>
-<li><strong>Minimal-overhead Virtualization of a Large Scale Supercomputer</strong><br>Jack Lange, Kevin Pedretti, Peter Dinda, Patrick Bridges, Chang Bae, Philip Soltero and Alexander Merritt.</li>
-<li><strong>Virtual WiFi: Bring Virtualization from Wired to Wireless</strong><br>Lei Xia, Sanjay Kumar, Xue Yang, Praveen Gopalakrishnan, York Liu, Sebastian Schoenberg and Xingang Guo.</li>
-<li><strong>SymCall: Symbiotic Virtualization Through VMM-to-Guest Upcalls</strong><br>Jack Lange and Peter Dinda.</li>
-</ul>
-<h3 id="Memory-Management-1"><a href="#Memory-Management-1" class="headerlink" title="Memory Management"></a>Memory Management</h3><ul>
-<li><strong>Overdriver: Handling Memory Overload in an Oversubscribed Cloud</strong><br>Dan Williams, Hani Jamjoom, Yew-Huey Liu and Hakim Weatherspoon.</li>
-<li><strong>Selective Hardware/Software Memory Virtualization</strong><br>Xiaolin Wang, Jiarui Zang, Zhenlin Wang, Yingwei Luo and Xiaoming Li.</li>
-<li><strong>Hybrid Binary Rewriting for Memory Access Instrumentation</strong><br>Amitabha Roy, Steven Hand and Tim Harris.</li>
-</ul>
-<h2 id="2010"><a href="#2010" class="headerlink" title="2010"></a>2010</h2><h3 id="Debugging-and-Replay"><a href="#Debugging-and-Replay" class="headerlink" title="Debugging and Replay"></a>Debugging and Replay</h3><ul>
-<li><p><strong>Capability Wrangling Made Easy: Debugging on a Microkernel with Valgrind</strong><br>Aaron Pohle (Technische Universität Dresden)<br>Björn Döbel (Technische Universität Dresden)<br>Michael Roitzsch (Technische Universität Dresden)<br>Hermann Härtig (Technische Universität Dresden)</p>
-</li>
-<li><p><strong>Multi-Stage Replay with Crosscut</strong><br>Jim Chow (VMware)<br>Dominic Lucchetti (VMware)<br>Tal Garfinkel (VMware)<br>Geoffrey Lefebvre (VMware)<br>Ryan Gardner (VMware)<br>Joshua Mason (VMware)<br>Sam Small (VMware)<br>Peter M. Chen (University of Michigan)</p>
-</li>
-<li><p><strong>Optimizing Crash Dump in Virtualized Environments</strong><br>Yijian Huang (Fudan University)<br>Haibo Chen (Fudan University)<br>Binyu Zang (Fudan University)</p>
-</li>
-</ul>
-<h3 id="Compiler-Infrastructure"><a href="#Compiler-Infrastructure" class="headerlink" title="Compiler Infrastructure"></a>Compiler Infrastructure</h3><ul>
-<li><p><strong>Improving Compiler-Runtime Separation with XIR</strong><br>Ben L. Titzer (Google)<br>Thomas Würthinger (Johannes Kepler University Linz)<br>Doug Simon (Sun Microsystems Laboratories)<br>Marcelo Cintra (University of California, Irvine)</p>
-</li>
-<li><p><strong>VMKit: A Substrate for Managed Runtime Environments</strong><br>Nicolas Geoffray (Université Pierre et Marie Curie)<br>Gaël Thomas (Université Pierre et Marie Curie)<br>Julia Lawall (University of Copenhagen)<br>Gilles Muller (Université Pierre et Marie Curie)<br>Bertil Folliot (Université Pierre et Marie Curie)</p>
-</li>
-</ul>
-<h3 id="Applications-of-Virtualization"><a href="#Applications-of-Virtualization" class="headerlink" title="Applications of Virtualization"></a>Applications of Virtualization</h3><ul>
-<li><p><strong>Neon: System Support for Derived Data Management</strong><br>Qing Zhang (University of California, San Diego)<br>John McCullough (University of California, San Diego)<br>Justin Ma (University of California, San Diego)<br>Nabil Schear (University of Illinois at Urbana-Champaign)<br>Michael Vrable (University of California, San Diego)<br>Amin Vahdat (University of California, San Diego)<br>Alex C. Snoeren (University of California, San Diego)<br>Geoffrey M. Voelker (University of California, San Diego)<br>Stefan Savage (University of California, San Diego)</p>
-</li>
-<li><p><strong>Energy-Efficient Storage in Virtual Machine Environments</strong><br>Lei Ye (University of Arizona)<br>Gen Lu (University of Arizona)<br>Sushanth Kumar (University of Arizona)<br>Chris Gniady (University of Arizona)<br>John H. Hartman (University of Arizona)</p>
-</li>
-</ul>
-<h3 id="Hypervisor-Scheduling"><a href="#Hypervisor-Scheduling" class="headerlink" title="Hypervisor Scheduling"></a>Hypervisor Scheduling</h3><ul>
-<li><p><strong>AASH: An Asymmetry-Aware Scheduler for Hypervisors</strong><br>Vahid Kazempour (Simon Fraser University)<br>Ali Kamali (Simon Fraser University)<br>Alexandra Fedorova (Simon Fraser University)</p>
-</li>
-<li><p><strong>Supporting Soft Real-Time Tasks in the Xen Hypervisor</strong><br>Min Lee (Georgia Institute of Technology)<br>A. S. Krishnakumar (Avaya Laboratories)<br>P. Krishnan (Avaya Laboratories)<br>Navjot Singh (Avaya Laboratories)<br>Shalini Yajnik (Avaya Laboratories)</p>
-</li>
-</ul>
-<h3 id="Java"><a href="#Java" class="headerlink" title="Java"></a>Java</h3><ul>
-<li><p><strong>Efficient Runtime Tracking of Allocation Sites in Java</strong><br>Rei Odaira (IBM Research - Tokyo)<br>Kazunori Ogata (IBM Research - Tokyo)<br>Kiyokuni Kawachiya (IBM Research - Tokyo)<br>Tamiya Onodera (IBM Research - Tokyo)<br>Toshio Nakatani (IBM Research - Tokyo)</p>
-</li>
-<li><p><strong>Evaluation of a Just-In-Time Compiler Retrofitted for PHP</strong><br>Michiaki Tatsubori (IBM Research - Tokyo)<br>Akihiko Tozawa (IBM Research - Tokyo)<br>Toyotaro Suzumura (IBM Research - Tokyo)<br>Scott Trent (IBM Research - Tokyo)<br>Tamiya Onodera (IBM Research - Tokyo)</p>
-</li>
-<li><p><strong>Novel Online Profiling for Virtual Machines</strong><br>Manjiri A. Namjoshi (University of Kansas)<br>Prasad A. Kulkarni (University of Kansas)</p>
-</li>
-</ul>
-<h3 id="Dynamic-Binary-Translation"><a href="#Dynamic-Binary-Translation" class="headerlink" title="Dynamic Binary Translation"></a>Dynamic Binary Translation</h3><ul>
-<li><p><strong>DBT Path Selection for Holistic Memory Efficiency and Performance</strong><br>Apala Guha (University of Virginia)<br>Kim Hazelwood (University of Virginia)<br>Mary Lou Soffa (University of Virginia)</p>
-</li>
-<li><p><strong>Dynamic Binary Translation Specialized for Embedded Systems</strong><br>Goh Kondoh (IBM Research - Tokyo)<br>Hideaki Komatsu (IBM Research - Tokyo)</p>
-</li>
-</ul>
-<h2 id="2009"><a href="#2009" class="headerlink" title="2009"></a>2009</h2><h3 id="Memory-Management-2"><a href="#Memory-Management-2" class="headerlink" title="Memory Management"></a>Memory Management</h3><ul>
-<li><strong>Architectural support for shadow memory in multiprocessors</strong><br>Vijay Nagarajan and Rajiv Gupta</li>
-<li><strong>A lock-free, concurrent, and incremental stack scanning for garbage collectors</strong><br>Gabi Kliot, Erez Petrank, and Bjarne Steensgaard</li>
-<li><strong>Dynamic memory balancing for virtual machines</strong><br>Weiming Zhao and Zhenlin Wang</li>
-</ul>
-<h3 id="Migration-in-the-Data-Center"><a href="#Migration-in-the-Data-Center" class="headerlink" title="Migration in the Data Center"></a>Migration in the Data Center</h3><ul>
-<li><strong>Memory buddies: Exploiting page sharing for smart colocation in virtualized data centers</strong><br>Timothy Wood, Gabriel Tarasuk-Levin, Prashant Shenoy, Peter Desnoyers, Emmanuel Cecchet, and Mark Corner</li>
-<li><strong>Entropy: A consolidation manager for clusters</strong><br>Fabien Hermenier, Xavier Lorca, Jean-Marc Menaud, Gilles Muller, and Julia Lawall</li>
-<li><strong>Post-copy based live virtual machine migration using adaptive pre-paging and dynamic self-ballooning</strong><br>Michael Hines and Kartik Gopalan</li>
-</ul>
-<h3 id="Breaking-Barriers"><a href="#Breaking-Barriers" class="headerlink" title="Breaking Barriers"></a>Breaking Barriers</h3><ul>
-<li><strong>Demystifying magic: High-level low-level programming</strong><br>Daniel Frampton, Stephen M Blackburn, Perry Cheng, Robin Garner, David P Grove, J Eliot B Moss, and Sergey I Salishev</li>
-<li><strong>Achieving 10Gbps using safe and transparent network interface virtualization</strong><br>Kaushik Kumar Ram, Jose Renato Santos, Yoshio Turner, Alan L Cox, and Scott Rixner</li>
-<li><strong>Tracing for Web 3.0 – Trace compilation for the next generation Web applications</strong><br>Mason Chang, Edwin Smith, Rick Reitmaier, Andreas Gal, Michael Bebenita, Christian Wimmer, Brendan Eich, and Michael Franz</li>
-</ul>
-<h3 id="Hybrid-Techniques"><a href="#Hybrid-Techniques" class="headerlink" title="Hybrid Techniques"></a>Hybrid Techniques</h3><ul>
-<li><strong>Influence of program inputs on the selection of garbage collectors</strong><br>Feng Mao, Eddy Zheng Zhang, and Xipeng Shen</li>
-<li><strong>Task-aware virtual machine scheduling for I/O performance</strong><br>Hwanju Kim, Hyeontaek Lim, Jinkyu Jeong, Heeseung Jo, and Joonwon Lee</li>
-<li><strong>The hybrid scheduling framework for virtual machine systems</strong><br>Chuliang Weng, Minglu Li, and Xinda Lu</li>
-</ul>
-<h3 id="Visors"><a href="#Visors" class="headerlink" title="Visors"></a>Visors</h3><ul>
-<li><strong>BitVisor: A thin hypervisor for enforcing I/O device security</strong><br>Takahiro Shinagawa, Hideki Eiraku, Kouichi Tanimoto, Kazumasa Omote, Syoichi Hasegawa, Takashi Horie, Manabu Hirano, Kenichi Kourai, Yoshihiro Ohyama, Eiji Kawai, Kenji Kono, Shigeru Chiba, Yasushi Shinjo, and Kazuhiko Kato</li>
-<li><strong>ClientVisor: Leverage COTS OS functionalities for power management in virtualized desktop environment</strong><br>Huacai Chen, Hai Jin, Zhiyuan Shao, Ke Yu, and Kevin Tian</li>
-</ul>
-<h2 id="2008"><a href="#2008" class="headerlink" title="2008"></a>2008</h2><h3 id="I-O"><a href="#I-O" class="headerlink" title="I/O"></a>I/O</h3><ul>
-<li><p><strong>Scheduling I/O in Virtual Machine Monitors ;</strong> Diego Ongaro, Alan Cox and Scott Rixner (Rice University) [slides]</p>
-</li>
-<li><p><strong>Inter-domain socket communications supporting high performance and full binary compatibility on Xen</strong> ;  Kangho Kim, Cheiyol Kim, Sung-In Jung (Electronics and Telecommunications Research Institute), Hyunsup Shin (ETRI/UST), and Jin-Soo Kim (KAIST) [slides]</p>
-</li>
-<li><p><strong>Characterization &amp; Analysis of a Server Consolidation</strong> Benchmark ; Padma Apparao, Ravi Iyer, Xiaomin Zhang, Don Newell and Tom Adelmeyer (Intel Corporation)</p>
-</li>
-<li><p><strong>Netchannel: A VMM-level Mechanism for Continuous, Transparent Device Access During VM Migration</strong> ; Sanjay Kumar and Karsten Schwan (Georgia Institute of Technology) [slides]</p>
-</li>
-</ul>
-<h3 id="Code-Management"><a href="#Code-Management" class="headerlink" title="Code Management"></a>Code Management</h3><ul>
-<li><p><strong>Trace Fragment Selection within Method-based JVMs</strong> ; Duane Merrill and Kim Hazelwood (University of Virginia) [slides]</p>
-</li>
-<li><p><strong>A Method Specialisation and Virtualised Execution Environment for Java</strong> ; Andrew Cheadle, Anthony Field and Johan Nystrom-Persson (Imperial College London) [slides]</p>
-</li>
-<li><p><strong>Process-Shared and Persistent Code Caches</strong> ; Derek Bruening and Vladimir Kiriansky (VMWare Inc.) [slides]</p>
-</li>
-</ul>
-<h3 id="Security-2"><a href="#Security-2" class="headerlink" title="Security"></a>Security</h3><ul>
-<li><p><strong>Using Hypervisor to Provide Application Data Secrecy on a Per-Page Basis</strong> ;  Jisoo Yang and Kang Shin (University of Michigan) [slides.gz]</p>
-</li>
-<li><p><strong>Virtual Machine-Provided Context Sensitive Page Mappings</strong> ;  Nathan Rosenblum, Gregory Cooksey and Barton Miller (University of Wisconsin - Madison) [slides]</p>
-</li>
-<li><p><strong>VMM-based Hidden Process Detection and Identification using Lycosid</strong> ; Stephen Jones, Andrea Arpaci-Dusseau and Remzi Arpaci-Dusseau (University of Wisconsin - Madison)</p>
-</li>
-</ul>
-<h3 id="Management-and-Debugging"><a href="#Management-and-Debugging" class="headerlink" title="Management and Debugging"></a>Management and Debugging</h3><ul>
-<li><p><strong>Policy Enforcement and Compliance Proofs for Xen Virtual Machines</strong> ; Bernhard Jansen (IBM Zurich Research Laboratory), HariGovind Ramasamy (IBM T. J. Watson Research Center) and Matthias Schunter (IBM Zurich Research Laboratory) [slides]</p>
-</li>
-<li><p><strong>Opening Black Boxes: Using Semantic Information to Combat Virtual Machine Image Sprawl ;</strong>  Darrell Reimer (IBM T. J. Watson Research Center), Arun Thomas (University of Virginia), Glenn Ammons, Todd Mummert, Bowen Alpern and Vasanth Bala (IBM T. J. Watson Research Center) [slides]</p>
-</li>
-<li><p><strong>Execution replay for multiprocessor virtual machines ;</strong> George Dunlap, Dominic Lucchetti (University of Michigan), Michael Fetterman (University of Cambridge) and Peter Chen (University of Michigan) [slides]</p>
-</li>
-</ul>
-<h3 id="Garbage-Collection"><a href="#Garbage-Collection" class="headerlink" title="Garbage Collection"></a>Garbage Collection</h3><ul>
-<li><p><strong>A Principled Approach to Nondeferred Reference-Counting Garbage Collection</strong> ; Pramod Joisha (Hewlett-Packard Laboratories) [slides]</p>
-</li>
-<li><p><strong>Using the Cell Synergistic Processing Unit as a Garbage Collection Coprocessor</strong> ; Chen-Yong Cher and Michael Gschwind (IBM T. J. Watson Research Center) [slides]</p>
-</li>
-</ul>
-<h3 id="System-Architectures"><a href="#System-Architectures" class="headerlink" title="System Architectures"></a>System Architectures</h3><ul>
-<li><p><strong>Improving Xen security through disaggregation ;</strong> Derek Murray, Grzegorz Milos and Steven Hand (University of Cambridge) [slides]</p>
-</li>
-<li><p><strong>Running a Java VM Inside an Operating System Kernel: a Networking case study</strong> ; Takashi Okumura, Bruce Childers and Daniel Mosse (University of Pittsburgh) [slides]</p>
-</li>
-<li><p><strong>Applications of a Feather-weight Virtual Machine</strong> ; Yang Yu, Hariharan Kolam_govindarajan, Lap-Chung Lam and Tzi-cker Chiueh (Stony Brook University) [slides]</p>
-</li>
-</ul>
-<hr>
-<p><strong>转载请注明</strong>： <a href="http://www.csyssec.org/20170307/conference-veetenyears/" target="_blank" rel="external">主流会议-VEE十年录用论文</a>与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/主流会议/">主流会议</a>
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Conference/">Conference</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -1053,6 +719,18 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170401/winkernelmal/">深入探索windows内核rootkit动态分析</a></h6>
+          <!--  <span>四月 1, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -1234,18 +912,6 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170302/drakvuf/">虚拟机监控-DRAKVUF</a></h6>
-          <!--  <span>三月 2, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -1266,7 +932,7 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.73px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.27px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.91px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 16.36px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 16.36px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 14.55px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.91px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.91px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.91px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15.45px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.82px;">Rootkit</a> <a href="/tags/Sandbox/" style="font-size: 10.91px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 18.18px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 10px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.67px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.83px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.5px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.33px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.5px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.83px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.83px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.17px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 15.83px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 16.67px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.33px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.33px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.33px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.83px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.83px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.83px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.83px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.5px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.67px;">Rootkit</a> <a href="/tags/Sandbox/" style="font-size: 10.83px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.83px;">Stack</a> <a href="/tags/System/" style="font-size: 19.17px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.67px;">Systemcall</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 18.33px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 10px;">XEN</a>
     </div>
   </div>
 
