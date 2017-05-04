@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>使用lrb(最近分支记录)特性检测idt hooking | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="Author：Bing Zhu 
+Source：http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html
+转载请注明：原作者信息以及CSysSec
+
+Thanks to Yushi who shared a presentation (ELI: Bare-Metal Performance">
+<meta property="og:type" content="article">
+<meta property="og:title" content="使用LRB(最近分支记录)特性检测IDT Hooking">
+<meta property="og:url" content="http://yoursite.com/20170504/lbr-idthooking/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="Author：Bing Zhu 
+Source：http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html
+转载请注明：原作者信息以及CSysSec
+
+Thanks to Yushi who shared a presentation (ELI: Bare-Metal Performance">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/VIDT.png">
+<meta property="og:updated_time" content="2017-05-04T10:28:36.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="使用LRB(最近分支记录)特性检测IDT Hooking">
+<meta name="twitter:description" content="Author：Bing Zhu 
+Source：http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html
+转载请注明：原作者信息以及CSysSec
+
+Thanks to Yushi who shared a presentation (ELI: Bare-Metal Performance">
+<meta name="twitter:image" content="http://oij0laovn.bkt.clouddn.com/VIDT.png">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">FROM 0 TO 1</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">系统结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/courses">名人课堂</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-lbr-idthooking" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      使用LRB(最近分支记录)特性检测IDT Hooking
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/lbr-idthooking/" class="article-date">
+	  <time datetime="2017-05-04T10:27:43.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
+<p>Source：<a href="http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html</a></p>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>Thanks to <a href="https://twitter.com/ysmoo" target="_blank" rel="external">Yushi</a> who shared a presentation (<a href="http://www.iolanes.eu/_docs/eli_asplos12_slides.pdf" target="_blank" rel="external">ELI: Bare-Metal Performance for I/O Virtualization</a>) with me. In that hypervisor (ELI), it innovates an idea of gust IDT shadow (or IDT virtualization) design for some specific usage models. I’m going to talk a little bit about this idea.</p>
+<p>This post firstly gives an introduction about IDT shadow in that paper, then talks about guest IDT hooking with this technique, and finally explains how to detect such a hooking with processor LBR feature. </p>
+<h3 id="IDT-Shadow-Virtualization"><a href="#IDT-Shadow-Virtualization" class="headerlink" title="IDT Shadow/Virtualization"></a><strong>IDT Shadow/Virtualization</strong></h3><p>See picture below (captured from that presentation), it presents an idea of <em>Exitess Interrupt Delivery.</em></p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/VIDT.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/VIDT.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>The basic ideas are as follows:</p>
+<ul>
+<li><strong><em>Setup a guest shadow IDT table. With hardware virtualization’s help, we can easily to cheat guest OS software by monitoring and trapping guest execution of LIDT and SIDT instruction.</em></strong><br>We can maintain a shadow IDT table (and keep it sync’ed with the original one), then let the real guest logical processor IDTR.base point to our shadow IDT table.</li>
+<li>And in shadow IDT table, it clears Present bit or reduces IDTR.limit to trap the wanted guest interrupts/exceptions.<br>The former idea is exactly the same with my idea in <a href="http://hypervsir.blogspot.com/2014/10/monitortrap-software-interrupt-int-08h.html" target="_blank" rel="external">previous post by generating #NP fault</a>. The later idea (triggering #GP) is not recommended in my opinion because decreasing DITR.limit will cause many false positives (please correct me if I am wrong). </li>
+</ul>
+<p>In that paper (see References at the end of this post for the link of this full paper), ELI utilizes the shadow IDT to implement a high-performance guest/host interrupt delivery solution without changes to guest OS kernel.</p>
+<p>And one of other benefits is that the guest OS kernel integrity check (like Windows x64 OS<a href="http://en.wikipedia.org/wiki/Kernel_Patch_Protection" target="_blank" rel="external"> PatchGuard</a>) cannot even detect it.<br><br></p>
+<h3 id="Guest-IDT-vector-entry-hooking"><a href="#Guest-IDT-vector-entry-hooking" class="headerlink" title="Guest IDT vector entry hooking"></a><strong>Guest IDT vector entry hooking</strong></h3><p>Another usage of shadow IDT is to <strong><em>hook any one of guest IDT ISRs by changing the corresponding ISR entry in the shadow IDT table</em></strong>. </p>
+<p>For example, to implement an interrupt filter for a particular interrupt, we can change the IDT entry in the shadow IDT table and let it point to our own hooking ISR entry. After that, whenever that particular interrupt is triggered, the processor will firstly pass on the control to our hooking ISR routine, and we can do something (e.g. filtering), then jump to original OS kernel ISR for further handling. And under some circumstance, we can even let the control be back to our routine after original ISR handling (see the patent in the References).</p>
+<p><strong><em>However, what if this kind guest IDT hooking is done by a malicious hypervisor? Then how to detect it in guest OS?</em></strong><br><br></p>
+<h3 id="Detect-IDT-hooking-with-LBR-Last-Branch-Record"><a href="#Detect-IDT-hooking-with-LBR-Last-Branch-Record" class="headerlink" title="Detect IDT hooking with LBR (Last Branch Record)"></a><strong>Detect IDT hooking with LBR (Last Branch Record)</strong></h3><p>Nowadays, all the x86/Intel processors have a feature: Last Branch Record. </p>
+<p>When it is enabled, the processor records a running trace of the most recent branches, <strong><em>interrupts, and/or exceptions</em></strong> taken by the processor in the last branch record (LBR) stack (could be in MSRs and/or Branch Trace Store (BTS) Buffer in DS save memory area). </p>
+<p>To be specific, when this feature is configured by guest OS kernel, the processor will capture the trace (e.g. LastBranchToIP address) in LBR stack whenever an interrupt is generated by processor. So <strong><em>when the OS original ISR gets executed, it can check the content of LastBranchToIP in LBR stack, to see if it matches with the OS original ISR entry. If there is a mismatch, then it indicates that the corresponding ISR entry is hooked by others, e.g. by a malicious hypervisor.</em></strong> </p>
+<p>But in a hypervisor environment, there are some solutions to prevent guest OS kernel from detecting IDT hooking with LBR feature, e.g.,</p>
+<ul>
+<li>Hide LBR and disabling this feature by trapping corresponding CPUID instruction (LBR capability check) and MSR read/write access to LBR control MSRs.</li>
+<li>Because LBR stack could be stored with some LBR MSRs, hypervisor must trap those MSRs, and return faked values.</li>
+<li>And hypervisor must also trap read access to Branch Trace Store (BTS) Buffer of DS-save memory area if guest OS configures the LBR stack to be also stored in BTS buffer. </li>
+</ul>
+<hr>
+<p><strong><em>References:</em></strong></p>
+<p>Ravi, et al.,Patent: Secure handling of interrupted events utilizing a virtual interrupt definition table (VIDT):<br><a href="http://patft.uspto.gov/netacgi/nph-Parser?Sect2=PTO1&amp;Sect2=HITOFF&amp;p=1&amp;u=/netahtml/PTO/search-bool.html&amp;r=1&amp;f=G&amp;l=50&amp;d=PALL&amp;RefSrch=yes&amp;Query=PN/8578080" target="_blank" rel="external">http://patft.uspto.gov/netacgi/nph-Parser?Sect2=PTO1&amp;Sect2=HITOFF&amp;p=1&amp;u=/netahtml/PTO/search-bool.html&amp;r=1&amp;f=G&amp;l=50&amp;d=PALL&amp;RefSrch=yes&amp;Query=PN/8578080</a></p>
+<p>The full paper for ELI presentation from IBM israel research lab: Abel Gordon, et al. ELI: Bare-Metal Performance for I/O Virtualization<br><a href="http://www.mulix.org/pubs/eli/eli.pdf" target="_blank" rel="external">http://www.mulix.org/pubs/eli/eli.pdf</a></p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">8</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Hardware/">Hardware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Hooking/">Hooking</a></li></ul>
+
+      
+        
+	<div id="comment">
+	
+	<!-- 多说评论框 start -->
+	 <div class="ds-thread" data-thread-key="/20170504/lbr-idthooking/" data-title="使用LRB(最近分支记录)特性检测IDT Hooking" data-url="http://yoursite.com/20170504/lbr-idthooking/"></div>
+	<!-- 多说评论框 end -->
+	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+	<script type="text/javascript">
+	var duoshuoQuery = {short_name:"csyssec"};
+	  (function() {
+	    var ds = document.createElement('script');
+	    ds.type = 'text/javascript';ds.async = true;
+	    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+	    ds.charset = 'UTF-8';
+	    (document.getElementsByTagName('head')[0] 
+	     || document.getElementsByTagName('body')[0]).appendChild(ds);
+	  })();
+	  </script>
+	<!-- 多说公共JS代码 end -->
+	
+	</div>
+	<link rel="stylesheet" href="/css/comment.css">
+
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/20170504/tsx-exploit/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">上一篇</strong>
+      <div class="article-nav-title">
+        
+          TSX处理器技术对漏洞利用意味着什么？
+        
+      </div>
+    </a>
+  
+  
+    <a href="/20170504/bitvisor/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">BitVisor- 一种实施I/O设备安全的轻量级Hypervisor</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+      <ol class="toc"><li class="toc-item toc-level-3"><a class="toc-link" href="#IDT-Shadow-Virtualization"><span class="toc-number">1.</span> <span class="toc-text">IDT Shadow/Virtualization</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Guest-IDT-vector-entry-hooking"><span class="toc-number">2.</span> <span class="toc-text">Guest IDT vector entry hooking</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Detect-IDT-hooking-with-LBR-Last-Branch-Record"><span class="toc-number">3.</span> <span class="toc-text">Detect IDT hooking with LBR (Last Branch Record)</span></a></li></ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+       <!--  自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a> --> 
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/courses" class="mobile-nav-link">Courses</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>

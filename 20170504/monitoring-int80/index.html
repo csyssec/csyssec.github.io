@@ -21,7 +21,7 @@ In an unix-like system, before syscall/sysret and/or sysenter/sysexit instr">
 <meta property="og:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/10/monitortrap-software-interrupt-int-08h.html转载请注明：原作者信息以及CSysSec
 
 In an unix-like system, before syscall/sysret and/or sysenter/sysexit instr">
-<meta property="og:updated_time" content="2017-05-04T08:13:08.000Z">
+<meta property="og:updated_time" content="2017-05-04T10:07:31.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="X86/Intel虚拟化技术监控/陷入软件中断INT80H系统调用">
 <meta name="twitter:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/10/monitortrap-software-interrupt-int-08h.html转载请注明：原作者信息以及CSysSec
@@ -161,7 +161,7 @@ In an unix-like system, before syscall/sysret and/or sysenter/sysexit instr">
 </ul>
 <p>With this idea, whenever a system call through INT 0x80 is made by user application software, VMM software can get notified immediately. <br></p>
 <hr>
-<p>####<strong><em>Update:</em></strong><br>The same idea can apply to any external interrupt (vector 32~255) traps, e.g. ATA device, Audio interrupts. </p>
+<h4 id="Update"><a href="#Update" class="headerlink" title="Update:"></a><strong><em>Update:</em></strong></h4><p>The same idea can apply to any external interrupt (vector 32~255) traps, e.g. ATA device, Audio interrupts. </p>
 <hr>
 <p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 
@@ -209,6 +209,15 @@ In an unix-like system, before syscall/sysret and/or sysenter/sysexit instr">
     
 <nav id="article-nav">
   
+    <a href="/20170504/armtrustzone/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">上一篇</strong>
+      <div class="article-nav-title">
+        
+          ARM TrustZone安全扩展和虚拟化扩展 vs X86虚拟化技术
+        
+      </div>
+    </a>
+  
   
     <a href="/20170504/unpriviledged-ins/" id="article-nav-older" class="article-nav-link-wrap">
       <strong class="article-nav-caption">下一篇</strong>
@@ -226,7 +235,7 @@ In an unix-like system, before syscall/sysret and/or sysenter/sysexit instr">
     <div id="toc" class="toc-article">
     <strong class="toc-title">文章目录</strong>
     
-    <ol class="toc">无</ol>
+      <ol class="toc"><li class="toc-item toc-level-4"><a class="toc-link" href="#Update"><span class="toc-number">1.</span> <span class="toc-text">Update:</span></a></li></ol>
     
     </div>
   </aside>

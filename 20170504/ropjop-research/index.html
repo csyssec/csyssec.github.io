@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>rop/jop攻击与防御最新研究进展 | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="Author：Bing Zhu 
+Source：http://hypervsir.blogspot.com/2014/11/latest-researching-status-of-ropjop.html
+转载请注明：原作者信息以及CSysSec
+
+Control Flow Hijacking, like ROP, becomes a hot topic in recent years since">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ROP/JOP攻击与防御最新研究进展">
+<meta property="og:url" content="http://yoursite.com/20170504/ropjop-research/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="Author：Bing Zhu 
+Source：http://hypervsir.blogspot.com/2014/11/latest-researching-status-of-ropjop.html
+转载请注明：原作者信息以及CSysSec
+
+Control Flow Hijacking, like ROP, becomes a hot topic in recent years since">
+<meta property="og:updated_time" content="2017-05-04T10:43:39.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="ROP/JOP攻击与防御最新研究进展">
+<meta name="twitter:description" content="Author：Bing Zhu 
+Source：http://hypervsir.blogspot.com/2014/11/latest-researching-status-of-ropjop.html
+转载请注明：原作者信息以及CSysSec
+
+Control Flow Hijacking, like ROP, becomes a hot topic in recent years since">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">FROM 0 TO 1</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">系统结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/courses">名人课堂</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-ropjop-research" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      ROP/JOP攻击与防御最新研究进展
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/ropjop-research/" class="article-date">
+	  <time datetime="2017-05-04T10:42:57.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
+<p>Source：<a href="http://hypervsir.blogspot.com/2014/11/latest-researching-status-of-ropjop.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/latest-researching-status-of-ropjop.html</a></p>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>Control Flow Hijacking, like ROP, becomes a hot topic in recent years since ever DEP(W^X enforcement) and SMEP were introduced in h/w processor. Based upon the papers that I read recently, this post just gives a brief introduction on the recent researching status (though incomplete) about control flow attacks and defenses. </p>
+<p>When code injection attacks become more and more difficult, attackers start to seek other opportunities to execute arbitrary code with completely re-using existing executable code in application image and/or shared libraries.</p>
+<p>Typically, for example, those techniques without code injection could be return-to-libc, ROP (Return Oriented Programming), JOP (Jump Oriented Programming), or even SROP (Sigreturn Oriented Programming, see <a href="https://www.cs.vu.nl/~herbertb/papers/srop_sp14.pdf" target="_blank" rel="external">Framing Signals—A Return to Portable Shellcode</a>). </p>
+<p>Regarding techniques that defend against those control flow hijackings, here below are the lists (also incomplete).</p>
+<ul>
+<li>Change existing compilers to re-generate the code binaries. There are some typical solutions like, generate return-less binary code, generate control flow friendly binary (with extra IDs/labels for CFG hardening), modify all the control flow (ret, jmp, call) instructions to a well-known center redirection table, etc.</li>
+<li>Without binary changes, make static binary instrument and dynamic control flow tracing. For instance, build control flow graph, and enforce the control flow execution exactly aligning with the known CFG paths.</li>
+<li>Hardware assisted CFI. CFI(Control-Flow Integrity) is an efficient way to defend against ROP/JOP attacks. However, due to performance issue, complete CFI enforcement is impossible in practice. So, there are some lightweight CFI checks with the help of latest processor LBR (last branch record) to examine the control flow behaviors base upon the experience (rather than the full CFG analysis).</li>
+<li>THere are some specific solutions, like stack shadowing (to check if the target “ret” is call-preceding instruction), code section shadowing. But most of them are not a generic solution, but have many assumptions and limitations. </li>
+</ul>
+<p>Regarding to the defenses with CFI, there are many papers that focus on the policy of checking whether or not the history control flow instructions behave as a malicious software. Typically, for example:</p>
+<ul>
+<li>Some solutions to <strong><em>check the length of each one of ROP gadgets</em></strong>. If it is very short (e.g. less than 5~6 instructions), it might be suspected. If there are consecutive chain of gadgets with “short” instruction sequences in a control flow, then it might be a ROP attack.</li>
+<li>Some of them to <strong><em>check whether if the target of “ret” is a Call-Preceded instruction</em></strong> (the instruction immediately preceding is a CALL instruction), this is because normally, every “ret” instruction returns back to an instruction that immediately follows a corresponding “call” instruction. </li>
+<li>Or check if <strong><em>the target of all the indirect call/jmp instructions are the “entry-point” functions</em></strong>. This is also normally true for a legitimate application, because generally an indirect “jmp” or “call” won’t be calling into a certain middle location in a function. </li>
+</ul>
+<p>However, just as those papers (see the links in References below) indicate, all the current CFI solutions based upon above assumptions can be bypassed with advanced ROP gadgets. </p>
+<p>For example, in Nicholas’s paper, he just used some call-preceded ROP gadgets and long termination gadgets for flushing attacking history to bypass checks of the famous kBouncer and ROPecker CFI solutions.</p>
+<p>But his solution has an assumption for kBounce/ROPecker: the last branch records (LBR) can be stored in only 16 (at most) pairs of LBR MSRs. </p>
+<p>As a matter of fact, if appropriately configured, the last branch records can also be stored into a variable-sized memory-resident branch trace store (BTS) buffer specified by DS(Debug Store) save area pointed by the IA32_DS_AREA MSR . And processor doesn’t restrict how many pairs of last branch records could be stored in that BTS buffer, it also allows us to make processor generate an interrupt before the count of records reaches to the max records configured (or when the BTS buffer is nearly full). This means that we will never miss history LBR records. If we don’t consider performance cost when enforcing CFI check at run time, this could be a good solution to trace all the control flow information. </p>
+<p><strong>However, even if we can get all the control flow traces (to defend against Nicholas’s “history flushing” solution), does it mean that we can completely defend against control flow attacks?</strong> Unless that we can make full CFI checks with CFG, one of another problems that we might always encounter is how to design a better policy to reduce “false positive”, and at the same time to catch all the ROP attacks at run time with acceptable performance cost in practice. </p>
+<hr>
+<p><strong><em>References:</em></strong></p>
+<ul>
+<li>Nicholas Carlini, David Wagner, ROP is Still Dangerous: Breaking Modern Defenses<br><a href="http://www.cs.berkeley.edu/~daw/papers/rop-usenix14.pdf" target="_blank" rel="external">http://www.cs.berkeley.edu/~daw/papers/rop-usenix14.pdf</a></li>
+<li>Enes Gökta¸s, Size Does Matter - Why Using Gadget-Chain Length to Prevent Code-Reuse Attacks is Hard<br><a href="http://www.cs.columbia.edu/~mikepo/papers/chainlength.sec14.pdf" target="_blank" rel="external">http://www.cs.columbia.edu/~mikepo/papers/chainlength.sec14.pdf</a></li>
+<li>Out Of Control: Overcoming Control-Flow Integrity:  <a href="http://www.ieee-security.org/TC/SP2014/papers/OutOfControl_c_OvercomingControl-FlowIntegrity.pdf" target="_blank" rel="external">http://www.ieee-security.org/TC/SP2014/papers/OutOfControl_c_OvercomingControl-FlowIntegrity.pdf</a></li>
+<li>Technical Report TR-HGI-2014-001:<br><a href="http://www.hgi.ruhr-uni-bochum.de/media/emma/veroeffentlichungen/2014/05/09/TR-HGI-2014-001_1_1.pdf" target="_blank" rel="external">http://www.hgi.ruhr-uni-bochum.de/media/emma/veroeffentlichungen/2014/05/09/TR-HGI-2014-001_1_1.pdf</a></li>
+</ul>
+<hr>
+<p> 转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">14</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Attack/">Attack</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li></ul>
+
+      
+        
+	<div id="comment">
+	
+	<!-- 多说评论框 start -->
+	 <div class="ds-thread" data-thread-key="/20170504/ropjop-research/" data-title="ROP/JOP攻击与防御最新研究进展" data-url="http://yoursite.com/20170504/ropjop-research/"></div>
+	<!-- 多说评论框 end -->
+	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+	<script type="text/javascript">
+	var duoshuoQuery = {short_name:"csyssec"};
+	  (function() {
+	    var ds = document.createElement('script');
+	    ds.type = 'text/javascript';ds.async = true;
+	    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+	    ds.charset = 'UTF-8';
+	    (document.getElementsByTagName('head')[0] 
+	     || document.getElementsByTagName('body')[0]).appendChild(ds);
+	  })();
+	  </script>
+	<!-- 多说公共JS代码 end -->
+	
+	</div>
+	<link rel="stylesheet" href="/css/comment.css">
+
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/20170504/rop-intel/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">上一篇</strong>
+      <div class="article-nav-title">
+        
+          因特尔发布新的技术规范去防御 ROP 攻击
+        
+      </div>
+    </a>
+  
+  
+    <a href="/20170504/nmi-virtual/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">虚拟化技术的NMI窗口退出</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+    <ol class="toc">无</ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+       <!--  自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a> --> 
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/courses" class="mobile-nav-link">Courses</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>

@@ -21,7 +21,7 @@ x86 and ARM processors both provide many hardware enforced security features, e.
 <meta property="og:description" content="作者：Bing Zhu来源：http://hypervsir.blogspot.com/2014/10/introduction-on-hardware-security.html转载请注明：原作者信息以及CSysSec
 
 x86 and ARM processors both provide many hardware enforced security features, e.g. NX (N">
-<meta property="og:updated_time" content="2017-05-04T07:44:36.000Z">
+<meta property="og:updated_time" content="2017-05-04T10:05:14.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="X86&ARM架构处理器硬件安全特性">
 <meta name="twitter:description" content="作者：Bing Zhu来源：http://hypervsir.blogspot.com/2014/10/introduction-on-hardware-security.html转载请注明：原作者信息以及CSysSec
@@ -138,8 +138,7 @@ x86 and ARM processors both provide many hardware enforced security features, e.
 <hr>
 <p>x86 and ARM processors both provide many hardware enforced security features, e.g. NX (No-eXecute) for executable space protection, to help system software engineers to build a secure computing environment. </p>
 <p>This article summaries those security features for both x86/Intel and ARM architectures, and explains how are they used by Operating System.</p>
-<p>####<strong><em>X86/INTEL PROCESSOR ARCHITECTURE:</em></strong></p>
-<ol>
+<h4 id="X86-INTEL-PROCESSOR-ARCHITECTURE"><a href="#X86-INTEL-PROCESSOR-ARCHITECTURE" class="headerlink" title="X86/INTEL PROCESSOR ARCHITECTURE:"></a><strong><em>X86/INTEL PROCESSOR ARCHITECTURE:</em></strong></h4><ol>
 <li><p><strong>Protection rings or privilege levels</strong>. In computer science, it is called hierarchical protection domains. In x86 architecture, it has 4 levels or layers of rings, from ring 0 through ring 3, which are arranged in a hierarchy from most privileged to least privileged. </p>
 <p>On most modern operating systems, Ring 0 mode is often referred to as <strong><em>Kernel mode</em></strong>, and Ring 3 mode is called <strong><em>User mode</em></strong>. Ring 1 and Ring 2 mode are often not used except that some hypervisors use it as called ring compression for software virtualization. The privilege level of the currently executing program or task is indicated by the value of CPL (Current Privilege Level, in CS and SS segment registers).</p>
 <p>Some rules are defined and enforced by protection rings: </p>
@@ -172,8 +171,7 @@ x86 and ARM processors both provide many hardware enforced security features, e.
 </li>
 </ol>
 <p><br></p>
-<p>####<strong><em>ARM Architecture</em></strong></p>
-<p>Like x86/Intel processor architecture, ARM also provides some equivalent hardware-enforced security features.</p>
+<h4 id="ARM-Architecture"><a href="#ARM-Architecture" class="headerlink" title="ARM Architecture"></a><strong><em>ARM Architecture</em></strong></h4><p>Like x86/Intel processor architecture, ARM also provides some equivalent hardware-enforced security features.</p>
 <p>ARM architecture defines different levels of execution privilege: <strong>PL0(unprivileged, for user, application), PL1 (privileged, for all modes other than User mode and Hyp mode. Normally operating system software executes at this level), PL2 (Hyp mode, normally used by a hypervisor for Hardware Virtualization, and only Non-Secure State has this privilege level).</strong> </p>
 <p>Normally when the processor running at higher privilege level can access the resource (memory, register) available at the same and lower privilege levels. A Data Abort Exception is generated if the processor attempts a data access that the access rights do not permit. For example, a Data Abort exception is generated if the processor is at PL0 and attempts to access a memory region that is marked as only accessible to privileged (PL1) memory accesses.</p>
 <p>However, in an ARM processor including <strong><em>Security Extension</em></strong>, note that Non-secure Hyp mode executes at PL2 does not indicate that it is more privileged than the Secure PL1 modes. Secure PL1 modes can change the configuration and control settings for Non-secure operation in all modes, but Non-secure modes (even PL2) can never change the configuration and control settings for Secure operation.</p>
@@ -195,11 +193,10 @@ x86 and ARM processors both provide many hardware enforced security features, e.
 <p>For example, <strong><em>how to restrict the read or/and write access to PL0 memory when a system software executes at PL1?</em></strong></p>
 <p>The AP (Access Permission) bits of page translation table descriptors in ARMv7 VMSA (Virtual Memory System Architecture), or AP bits of DRACR or IRACR (Data/Instruction Region Access Control Register) in ARMv7 PMSA (Protected Memory System Architecture) provide some kinds of memory read &amp; write protections, but all the definitions indicate that PL1 always has higher access permission than PL0.  </p>
 <hr>
-<p>####<strong>[Update]:</strong><br>See the Memory <strong><em>Protection Keys</em></strong> mechanism:<br><a href="http://en.wikipedia.org/wiki/Memory_protection#Protection_keys" target="_blank" rel="external">http://en.wikipedia.org/wiki/Memory_protection#Protection_keys</a> </p>
+<h4 id="Update"><a href="#Update" class="headerlink" title="[Update]:"></a><strong>[Update]:</strong></h4><p>See the Memory <strong><em>Protection Keys</em></strong> mechanism:<br><a href="http://en.wikipedia.org/wiki/Memory_protection#Protection_keys" target="_blank" rel="external">http://en.wikipedia.org/wiki/Memory_protection#Protection_keys</a> </p>
 <p><strong><em>Intel MPX</em></strong><br>Intel MPX (Memory Protection Extensions, <a href="http://en.wikipedia.org/wiki/Intel_MPX" target="_blank" rel="external">http://en.wikipedia.org/wiki/Intel_MPX</a>) is a set of extensions to the x86 instruction set architecture. With compiler, runtime library and operating system support, Intel MPX brings increased security to software by checking pointer references whose normal compile-time intentions are maliciously exploited at runtime due to buffer overflows. Intel MPX will introduce new registers, and new instruction set extensions that operate on these registers.</p>
 <hr>
-<p>####<strong><em>REFERENCES:</em></strong></p>
-<ol>
+<h4 id="REFERENCES"><a href="#REFERENCES" class="headerlink" title="REFERENCES:"></a><strong><em>REFERENCES:</em></strong></h4><ol>
 <li><a href="http://en.wikipedia.org/wiki/Protection_ring" target="_blank" rel="external">http://en.wikipedia.org/wiki/Protection_ring</a></li>
 <li>SMEP, What is It, and How to Beat It on Linux: <a href="http://vulnfactory.org/blog/2011/06/05/smep-what-is-it-and-how-to-beat-it-on-linux/" target="_blank" rel="external">http://vulnfactory.org/blog/2011/06/05/smep-what-is-it-and-how-to-beat-it-on-linux/</a></li>
 <li>Supervisor mode access prevention: <a href="http://lwn.net/Articles/517475/" target="_blank" rel="external">http://lwn.net/Articles/517475/</a></li>
@@ -214,7 +211,7 @@ x86 and ARM processors both provide many hardware enforced security features, e.
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">3</span></a>
+    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">8</span></a>
 
 
       
@@ -279,7 +276,7 @@ x86 and ARM processors both provide many hardware enforced security features, e.
     <div id="toc" class="toc-article">
     <strong class="toc-title">文章目录</strong>
     
-    <ol class="toc">无</ol>
+      <ol class="toc"><li class="toc-item toc-level-4"><a class="toc-link" href="#X86-INTEL-PROCESSOR-ARCHITECTURE"><span class="toc-number">1.</span> <span class="toc-text">X86/INTEL PROCESSOR ARCHITECTURE:</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#ARM-Architecture"><span class="toc-number">2.</span> <span class="toc-text">ARM Architecture</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#Update"><span class="toc-number">3.</span> <span class="toc-text">[Update]:</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#REFERENCES"><span class="toc-number">4.</span> <span class="toc-text">REFERENCES:</span></a></li></ol>
     
     </div>
   </aside>

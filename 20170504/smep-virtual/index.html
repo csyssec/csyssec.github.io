@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>如何利用虚拟化技术实现基于软件的smep(监督模式执行) | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="Author：Bing Zhu 
+Source：http://hypervsir.blogspot.com/2014/11/how-to-implement-software-based.html
+转载请注明：原作者信息以及CSysSec
+
+As my previous post indicated, SMEP is a powerful security feature, and easy to">
+<meta property="og:type" content="article">
+<meta property="og:title" content="如何利用虚拟化技术实现基于软件的SMEP(监督模式执行)">
+<meta property="og:url" content="http://yoursite.com/20170504/smep-virtual/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="Author：Bing Zhu 
+Source：http://hypervsir.blogspot.com/2014/11/how-to-implement-software-based.html
+转载请注明：原作者信息以及CSysSec
+
+As my previous post indicated, SMEP is a powerful security feature, and easy to">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/secvisor1.png">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/secvisor2.png">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/secvisor3.png">
+<meta property="og:updated_time" content="2017-05-04T10:31:56.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="如何利用虚拟化技术实现基于软件的SMEP(监督模式执行)">
+<meta name="twitter:description" content="Author：Bing Zhu 
+Source：http://hypervsir.blogspot.com/2014/11/how-to-implement-software-based.html
+转载请注明：原作者信息以及CSysSec
+
+As my previous post indicated, SMEP is a powerful security feature, and easy to">
+<meta name="twitter:image" content="http://oij0laovn.bkt.clouddn.com/secvisor1.png">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">FROM 0 TO 1</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">系统结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/courses">名人课堂</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-smep-virtual" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      如何利用虚拟化技术实现基于软件的SMEP(监督模式执行)
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/smep-virtual/" class="article-date">
+	  <time datetime="2017-05-04T10:31:10.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
+<p>Source：<a href="http://hypervsir.blogspot.com/2014/11/how-to-implement-software-based.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/how-to-implement-software-based.html</a></p>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>As <a href="http://hypervsir.blogspot.com/2014/10/introduction-on-hardware-security.html" target="_blank" rel="external">my previous post</a> indicated, SMEP is a powerful security feature, and easy to deploy in modern commodity OS. However this feature requires H/W processor’s support, for those processors that are not SMEP-capable, this post presents a software-based solution to emulate SMEP functionality with the help of Virtualization/Hypervisor technology. </p>
+<p>When x86 processor CR4.SMEP bit is set, the system software executing in kernel mode (CPL&lt;3) cannot fetch instructions from any linear address with a translation for which the U/S flag is 1 (User) in every paging-structure entries controlling the translation. In other words, If SMEP is enabled, software operating in supervisor mode cannot fetch instructions from linear addresses that are accessible in user mode. When such an instruction fetch occurs, a #PF exception will be generated by SMEP-capable processor.</p>
+<p>So, how to implement a software-based SMEP feature? </p>
+<p>This paper (<a href="https://www.cs.cmu.edu/~arvinds/pubs/secvisor.pdf" target="_blank" rel="external">SecVisor: A Tiny Hypervisor to Provide Lifetime Kernel Code Integrity for Commodity OSes</a> from CyLab/CMU) presents an great idea: <strong>Create two separate EPT protection memory views for guest kernel (ring 0) and user (ring 3) mode respectively, with different EPT permissions for corresponding GPA-&gt;HPA translations, and then switch these two EPT page table views by intercepting kernel&lt;-&gt;kernel mode switches</strong>. In x86/Intel processor, hypervisor can configure different VMCS EPTP pointers (which points to different Extended Page Tables) and switch among them at appropriate time.</p>
+<p>To make the discussion easier, we can call these two guest memory translation tables (pointed by two different EPTP pointers) as protected memory views: <strong>one is used in guest Kernel mode, named as <em>Kernel View</em> ; the other is for User mode, named as <em>User View</em></strong>. </p>
+<p>Besides, as that paper indicates, for both views, the identity map (GPA=HPA) is created in both EPT page tables by default. But EPT page table entry permissions may be different for the same GPA addresses. The latter is the key part for emulating SMEP behaviors, I will talk about it later.</p>
+<p>By intercepting guest kernel/user mode switches, we can do this below in hypervisor:</p>
+<ol>
+<li>Switch to use <strong><em>Kernel View</em></strong> when guest logical processor entering Kernel mode;<br>As we know that, in x86 processor, there are several ways to cause logical processor enter Kernel mode, for example in Windows OS, interrupt/fault/trap (through IDT table), syscall instructions. Based upon my previous project experience, some others like task gate (only NMI on 32bit OS), call gate, are not never used in Windows OS.</li>
+<li>Switch to use <strong><em>User View</em></strong>  when guest logical processor leaving kernel (or entering User mode);</li>
+</ol>
+<p>So, the question now is that - how to get hypervisor be notified whenever a kernel/user mode switch happens?</p>
+<p>The SecVisor does it like pictures below (snapshots from this <a href="http://quning.org/self/cmu_secvisor_ppt.pdf" target="_blank" rel="external">link</a>): In <strong><em>User View</em></strong>, the <strong>Execution</strong> permission is removed in the EPT page tables for Kernel Code pages , whenever entering kernel mode to fetch the entry point instruction from Kernel code page, an EPT violation vmexit occurs, then the control is transferred to hypervisor (SecVisor), so SecVisor can switch to <strong><em>Kernel View</em></strong> by updating the corresponding EPTP pointer in VMCS. Similarly, we can switch to <strong><em>User View</em></strong> whenever leaving kernel mode. </p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/secvisor1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/secvisor1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/secvisor2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/secvisor2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p><strong>Now, obviously we can get to know how to emulate SMEP behaviors.</strong></p>
+<p>Assumed that the guest logical processor is running Kernel mode, and EPTP hence points to the mapping tables in <strong><em>Kernel View</em></strong> and also assumed that <strong>only</strong> approved code (e.g. Kernel and trusted LKM modules) has EPT execution permission in <strong><em>Kernel View</em></strong>, see picture below in the meanwhile, provided that there is a kernel vulnerability that can be exploited by malware to execute arbitrary user mode code. When the logical processor starts to execution user accessible code in kernel mode, an EPT violation will be generated because that user mode code cannot be executable in EPT <strong><em>Kernel View</em></strong>. </p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/secvisor3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/secvisor3.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p><strong>When hypervisor gets the control, the following policy could be applied to check the execution (instruction fetch) violate SMEP functionality:</strong></p>
+<ol>
+<li><strong>Read the current CPL value from corresponding guest VMCS area to see if it is ZERO (kernel mode);</strong></li>
+<li><strong>Get the current guest CR3 value (also from VMCS) and guest violation linear address (actually for EPT violation due to execution fault, that address is guest RIP) from corresponding VMCS area, then traverse the guest page table to see if U/S bit (accessible in user mode) flags in every page structures are ONE.</strong><br><br></li>
+</ol>
+<p><strong>If both conditions above are true, then we catch a SMEP-like violation in guest kernel mode.</strong><br><br></p>
+<hr>
+<p> <strong><em>Challenges:</em></strong><br>However, there are many challenges to implement this software-based SMEP feature with virtualization technology.</p>
+<ol>
+<li><p>Performance impacts.<br>Because in that paper, we create two EPT memory protection views (Kernel View and User View), in order to switch back and forth at run time, the hypervisor must have to trap every event of entering and leaving kernel. This introduces significant performance cost because kernel-user mode switches are normally very frequent.<br><br><br><strong>I think one of solutions of switching EPTP pointers (Views) without VMExit is to leverage the latest Virtualization features, like <a href="http://hypervsir.blogspot.com/2014/10/thoughts-on-virtualization-exception.html" target="_blank" rel="external">Virtualization Exception (#VE) and EPTP switching function (VMFUNC) in my previous post</a>, and also use <a href="http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html" target="_blank" rel="external">IDT Shadow/Virtualization technique</a> in my another post to trap every kernel/user mode switches due to interrupt/trap/fault events</strong>. However, on those #VE/VMFUNC-capable machines, SMEP is also available:-)<br><br><br>For the mode switches due to syscall/sysret, you can brainstorm how to handle it without vmexit!</p>
+</li>
+<li><p>In <strong><em>Kernel View</em></strong>, we configure all the kernel code executable in EPT tables. When there is an LKM module loaded or unloaded, we must update the module memory to be executable in <strong><em>Kernel View</em></strong> and to be non-executable in <strong><em>User View</em></strong> immediately.<br><br><br>The author in the paper has a solution to solve it by adding code in load_module() and the free_module() function.<br><br><br>However, without guest kernel code changes, for module loading, I think we can use a <strong>lazy solution</strong> to solve it, for example, when a new loaded LKM module starts to run at the first time in Kernel mode, a EPT violation occurs, then in hypervisor we can check if it is a trusted LKM module, if yes, then we just allow that LKM code page executable in <strong><em>Kernel View</em></strong>, and remove the execution permissions in <strong><em>User View</em></strong>. But how to update the LKM code page EPT permissions in <strong><em>Kernel View</em></strong> when such a LKM module gets unloaded from kernel?</p>
+</li>
+<li>In the case of low memory pressure, will Linux OS page out or swap out LKM code pages to the disk storage?<br>I know this is true on Windows OS system, but I have no idea if Linux will do the same thing. (Anybody can tell me?)<br>If it is the case on Linux system, then without guest kernel hooks, it is also a challenge to update LKM code page permissions in EPT <strong><em>Kernel View</em></strong> and <strong><em>User View</em></strong>.</li>
+</ol>
+<p><strong>Note that what I’m talking about in this post is for fun. I don’t think it is worth doing all those things just only for emulating SMEP-like feature with virtualization technology:(. As a matter of fact, I have yet another solution to implement a software-based SMEP feature without Virtualization/Hypervisor. Please stay tuned…in my next post.</strong></p>
+<hr>
+<p><strong><em>Update:</em></strong><br>Question: thinking of how to implement a software SMAP (Supervisor Mode Access Protection) with virtualization technology……</p>
+<hr>
+<p><strong><em>References:</em></strong><br><a href="https://www.cs.cmu.edu/~arvinds/pubs/secvisor.pdf" target="_blank" rel="external">SecVisor: A Tiny Hypervisor to Provide Lifetime Kernel Code Integrity for Commodity OSes</a>, and its presentation <a href="http://quning.org/self/cmu_secvisor_ppt.pdf" target="_blank" rel="external">link</a>．</p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">8</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Hardware/">Hardware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+        
+	<div id="comment">
+	
+	<!-- 多说评论框 start -->
+	 <div class="ds-thread" data-thread-key="/20170504/smep-virtual/" data-title="如何利用虚拟化技术实现基于软件的SMEP(监督模式执行)" data-url="http://yoursite.com/20170504/smep-virtual/"></div>
+	<!-- 多说评论框 end -->
+	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+	<script type="text/javascript">
+	var duoshuoQuery = {short_name:"csyssec"};
+	  (function() {
+	    var ds = document.createElement('script');
+	    ds.type = 'text/javascript';ds.async = true;
+	    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+	    ds.charset = 'UTF-8';
+	    (document.getElementsByTagName('head')[0] 
+	     || document.getElementsByTagName('body')[0]).appendChild(ds);
+	  })();
+	  </script>
+	<!-- 多说公共JS代码 end -->
+	
+	</div>
+	<link rel="stylesheet" href="/css/comment.css">
+
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/20170504/smep-nx/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">上一篇</strong>
+      <div class="article-nav-title">
+        
+          利用NX位实现基于软件的SMEP
+        
+      </div>
+    </a>
+  
+  
+    <a href="/20170504/tsx-exploit/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">TSX处理器技术对漏洞利用意味着什么？</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+    <ol class="toc">无</ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+       <!--  自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a> --> 
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/courses" class="mobile-nav-link">Courses</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>

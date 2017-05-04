@@ -21,7 +21,7 @@ Recently in the latest Intel SDM, you can find that there is a new exception">
 <meta property="og:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/10/thoughts-on-virtualization-exception.html转载请注明：原作者信息以及CSysSec
 
 Recently in the latest Intel SDM, you can find that there is a new exception">
-<meta property="og:updated_time" content="2017-05-04T08:07:30.000Z">
+<meta property="og:updated_time" content="2017-05-04T10:07:03.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="对硬件虚拟化异常的思考(#VE)">
 <meta name="twitter:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/10/thoughts-on-virtualization-exception.html转载请注明：原作者信息以及CSysSec
@@ -141,8 +141,7 @@ Recently in the latest Intel SDM, you can find that there is a new exception">
 <p>According to the specification, when EPT is in use, certain addresses that would normally be treated as physical addresses (and used to access memory) are instead treated as guest-physical addresses. Guest-physical addresses are translated by traversing a set of EPT paging structures to produce physical addresses that are used to access memory. </p>
 <p>In addition to translating a guest-physical address to a physical address, EPT specifies the privileges that software is allowed when accessing the address. Attempts at disallowed accesses (e.g. write to an read-only guest physical address, or access to non-present address) in vmx non-root mode are called EPT violations and cause VM exits into vmx root mode (host) in previous VT-x architecture w/o #VE implementation. <strong>However, when #VE is available and enabled, such an virtualization exception will induce an guest exception in VMX non-root mode instead that will be handled with a ISR in vector 20 of GUEST IDT (interrupt descriptor table)</strong>. </p>
 <p><br></p>
-<p>####<strong>Some key information on understanding #VE, Virtualization Exception:</strong></p>
-<ul>
+<h4 id="Some-key-information-on-understanding-VE-Virtualization-Exception"><a href="#Some-key-information-on-understanding-VE-Virtualization-Exception" class="headerlink" title="Some key information on understanding #VE, Virtualization Exception:"></a><strong>Some key information on understanding #VE, Virtualization Exception:</strong></h4><ul>
 <li>This exception (#VE) is reserved on a processor that has no VT-x support, or VMX is off, or #VE is disabled or not available. </li>
 <li>Normally, it is guest’s responsibility to configure and setup #VE ISR (Interrupt Service Routine).</li>
 <li>Even though it is enabled, not all EPT violations cause virtualization exceptions. See Intel SDM for more details.</li>
@@ -151,8 +150,7 @@ Recently in the latest Intel SDM, you can find that there is a new exception">
 <li>Unlike EPT vmexit, it will induce processor VMX mode switch overhead (VMEXIT and VMENTRY or VMRESUME). #VE doesn’t introduce VMX mode switch. Therefore, it achieves better performance when handling a virtualization exception. </li>
 </ul>
 <p><br></p>
-<p>####<strong><em>So, how to use it probably?</em></strong></p>
-<p>Whatever you are using EPT to do, you can consider using #VE to catch EPT exceptions and handle them in guest OS directly without introducing extra EPT violation VMEXIT/VMRESUME overhead. In this manner, I don’t think there is any other difference but performance improvement. </p>
+<h4 id="So-how-to-use-it-probably"><a href="#So-how-to-use-it-probably" class="headerlink" title="So, how to use it probably?"></a><strong><em>So, how to use it probably?</em></strong></h4><p>Whatever you are using EPT to do, you can consider using #VE to catch EPT exceptions and handle them in guest OS directly without introducing extra EPT violation VMEXIT/VMRESUME overhead. In this manner, I don’t think there is any other difference but performance improvement. </p>
 <p>However, if you look at the Intel SDM for #VE exception description, you probably can see this </p>
 <p><em>“After the virtualization exception handler has corrected the violation (for example, by executing the EPTP-switching VM function), execution of the program or task can be resumed.”</em></p>
 <p>… here the manual says “<strong><em>EPTP-switching VM function</em></strong> “. </p>
@@ -179,7 +177,7 @@ Recently in the latest Intel SDM, you can find that there is a new exception">
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">3</span></a>
+    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">8</span></a>
 
 
       
@@ -244,7 +242,7 @@ Recently in the latest Intel SDM, you can find that there is a new exception">
     <div id="toc" class="toc-article">
     <strong class="toc-title">文章目录</strong>
     
-    <ol class="toc">无</ol>
+      <ol class="toc"><li class="toc-item toc-level-4"><a class="toc-link" href="#Some-key-information-on-understanding-VE-Virtualization-Exception"><span class="toc-number">1.</span> <span class="toc-text">Some key information on understanding #VE, Virtualization Exception:</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#So-how-to-use-it-probably"><span class="toc-number">2.</span> <span class="toc-text">So, how to use it probably?</span></a></li></ol>
     
     </div>
   </aside>

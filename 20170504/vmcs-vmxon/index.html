@@ -21,7 +21,7 @@ Previously when I was working on a Hypervisor based on Intel VT-x. I always">
 <meta property="og:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/09/thoughts-on-vmxon-and-vmcs-regions-in.html转载请注明：原作者信息以及CSysSec
 
 Previously when I was working on a Hypervisor based on Intel VT-x. I always">
-<meta property="og:updated_time" content="2017-05-04T08:00:43.000Z">
+<meta property="og:updated_time" content="2017-05-04T10:06:32.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="VT-x技术VMXON与VMCS区域的思考-从安全的角度">
 <meta name="twitter:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/09/thoughts-on-vmxon-and-vmcs-regions-in.html转载请注明：原作者信息以及CSysSec
@@ -137,7 +137,7 @@ Previously when I was working on a Hypervisor based on Intel VT-x. I always">
         <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/09/thoughts-on-vmxon-and-vmcs-regions-in.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/09/thoughts-on-vmxon-and-vmcs-regions-in.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
 <p>Previously when I was working on a Hypervisor based on Intel VT-x. I always did exactly as what I’m told to do in the VT-x specification when programing VMM software.<br>But now I’m going to revisit this again starting by asking these questions: What if I won’t do it as what we’re told to do? Is Intel VT-x exploitable? Can we find vulnerabilities in hardware VT-x implementation? Is it possible to do “reverse-engineering” to get internals on VT-x CPU implementation? Can we take advantage of VT-x to attack other privileged resource? Can we bypass EPT layer?  However, those are just some open questions, I don’t have answers either, but it has a lot of fun when you look into it.</p>
-<p>####<strong>VMXON Region</strong><br>If you take a look at the Intel SDM (<a href="http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html" target="_blank" rel="external">Software Development Manual</a>), you can see some words about VMXON region like below:</p>
+<h4 id="VMXON-Region"><a href="#VMXON-Region" class="headerlink" title="VMXON Region"></a><strong>VMXON Region</strong></h4><p>If you take a look at the Intel SDM (<a href="http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html" target="_blank" rel="external">Software Development Manual</a>), you can see some words about VMXON region like below:</p>
 <ul>
 <li><em>“Before executing VMXON, software allocates a region of memory (called the VMXON region) that the logical processor uses to support VMX operation….. Software should use a separate region for each logical processor and should not access or modify the VMXON region of a logical processor between execution of VMXON and VMXOFF on that logical processor. Doing otherwise may lead to unpredictable behaviors”</em></li>
 <li><em>“Before entering VMX operation, the host VMM allocates a VMXON region. A VMM can host several virtual machines and have many VMCSs active under its management. A unique VMCS region is required for each virtual machine; a VMXON region is required for the VMM itself.”</em><br><br></li>
@@ -147,7 +147,7 @@ Previously when I was working on a Hypervisor based on Intel VT-x. I always">
 <p>According to the VT-x specification, we also are told that the format of VMXON region is not architecturally defined, meaning that its format varies from processor generations to generations. Therefore, <strong>can we assume that “Intel says theire behaviors are unpredictable just because the format is different between VT-capable processors”? In other words, for a particular processor, the behaviors of read/write access to the VMXON region might be well-defined to some extent</strong>. If this happens to be true, then the question now is how to explore the internal structure/format of VMXON region? What are we able to do if we can exactly know the format for a particular processor? Are we able to control the VMX operation behaviors by simply programming the VMXON region with ordinary read/write access operation instructions like MOV? </p>
 <p>I don’t know the answers. But I will talk about a prototype later about how to inspect the internal format/layout of VMXON region and other VT-x regions with a software solution. </p>
 <p><br></p>
-<p>####<strong>VMCS Regions</strong><br>Now let’s take a look at VMCS structure. </p>
+<h4 id="VMCS-Regions"><a href="#VMCS-Regions" class="headerlink" title="VMCS Regions"></a><strong>VMCS Regions</strong></h4><p>Now let’s take a look at VMCS structure. </p>
 <p>  “Software should use the VMREAD and VMWRITE instructions to access the different fields in the current VMCS. Software should never access or modifythe VMCS data of an active VMCS using ordinary memory operations, <em>in part because the format used to store the VMCS data is implementation-specific and not architecturally defined, and also because a logical processor may maintain some VMCS data of an active VMCS on the processor and <strong>not in the VMCS region (then where?)</strong></em>. The following items detail some of the hazards of accessing VMCS data using ordinary memory operations:</p>
 <ul>
 <li>Any data read from a VMCS with an ordinary memory read does not reliably reflect the state of the VMCS. Results may vary from time to time or from logical processor to logical processor.</li>
@@ -245,7 +245,7 @@ Previously when I was working on a Hypervisor based on Intel VT-x. I always">
     <div id="toc" class="toc-article">
     <strong class="toc-title">文章目录</strong>
     
-    <ol class="toc">无</ol>
+      <ol class="toc"><li class="toc-item toc-level-4"><a class="toc-link" href="#VMXON-Region"><span class="toc-number">1.</span> <span class="toc-text">VMXON Region</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#VMCS-Regions"><span class="toc-number">2.</span> <span class="toc-text">VMCS Regions</span></a></li></ol>
     
     </div>
   </aside>

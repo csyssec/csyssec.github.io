@@ -106,7 +106,7 @@
         
           <section id="main">
   
-    <article id="post-kernelmalware"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-hav-exception"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -114,7 +114,7 @@
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170330/kernelmalware/">内核层恶意代码分析</a>
+      <a class="article-title" href="/20170504/hav-exception/">对硬件虚拟化异常的思考(#VE)</a>
     </h1>
   
 
@@ -122,52 +122,62 @@
     
     <div class="article-meta">
       
-	Posted on <a href="/20170330/kernelmalware/" class="article-date">
-	  <time datetime="2017-03-30T06:13:41.000Z" itemprop="datePublished">三月 30, 2017</time>
+	Posted on <a href="/20170504/hav-exception/" class="article-date">
+	  <time datetime="2017-05-04T08:06:43.000Z" itemprop="datePublished">五月 4, 2017</time>
 	</a>
 
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <hr>
-<p>作者：<a href="http://weibo.com/diting0x/profile?rightmod=1&amp;wvr=6&amp;mod=personinfo&amp;is_all=1" target="_blank" rel="external">Diting0x</a></p>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170330/kernelmalware" target="_blank" rel="external">内核层恶意代码分析</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/thoughts-on-virtualization-exception.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/thoughts-on-virtualization-exception.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
-<p>本文旨在收集Linux下内核层恶意代码并进行分析，持续更新。</p>
-<ul>
-<li>来源于论文<a href="https://www.cerias.purdue.edu/assets/pdf/bibtex_archive/2010-02.pdf" target="_blank" rel="external">LiveDM: Temporal Mapping of Dynamic Kernel Memory for Dynamic Kernel Malware Analysis and Debugging, </a>rootkit操纵内核动态对象的分析结果：</li>
+<p>Recently in the latest <a href="http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html" target="_blank" rel="external">Intel SDM</a>, you can find that there is a new exception type, <strong>Virtualization Exception</strong>, in Chapter 6 (Interrupt and Exception Handling) of  VOL2.</p>
+<p>What is it? How to use it? …<br>x86 Hardware Virtualization technology introduces a stage 2 virtual memory translation mechanism which translates guest physical address to (host or machine) physical address in real RAM space. It is called as Extended Page Table (Intel VT-x). </p>
+<p>According to the specification, when EPT is in use, certain addresses that would normally be treated as physical addresses (and used to access memory) are instead treated as guest-physical addresses. Guest-physical addresses are translated by traversing a set of EPT paging structures to produce physical addresses that are used to access memory. </p>
+<p>In addition to translating a guest-physical address to a physical address, EPT specifies the privileges that software is allowed when accessing the address. Attempts at disallowed accesses (e.g. write to an read-only guest physical address, or access to non-present address) in vmx non-root mode are called EPT violations and cause VM exits into vmx root mode (host) in previous VT-x architecture w/o #VE implementation. <strong>However, when #VE is available and enabled, such an virtualization exception will induce an guest exception in VMX non-root mode instead that will be handled with a ISR in vector 20 of GUEST IDT (interrupt descriptor table)</strong>. </p>
+<p><br></p>
+<h4 id="Some-key-information-on-understanding-VE-Virtualization-Exception"><a href="#Some-key-information-on-understanding-VE-Virtualization-Exception" class="headerlink" title="Some key information on understanding #VE, Virtualization Exception:"></a><strong>Some key information on understanding #VE, Virtualization Exception:</strong></h4><ul>
+<li>This exception (#VE) is reserved on a processor that has no VT-x support, or VMX is off, or #VE is disabled or not available. </li>
+<li>Normally, it is guest’s responsibility to configure and setup #VE ISR (Interrupt Service Routine).</li>
+<li>Even though it is enabled, not all EPT violations cause virtualization exceptions. See Intel SDM for more details.</li>
+<li>Like other exceptions, the processor also provides the corresponding exception information in Virtualization-Exception Information Area used by ISR, e.g. the violation permissions, guest linear and physical address. This area is populated by processor when such an exception happens. However, VMM or #VE ISR is responsible for pre-allocating physical memory space for that area (4KB size currently) before activating #VE.</li>
+<li>Even though EPT violation can cause #VE exception, it doesn’t mean only EPT violation can cause such an exception. It seems that Intel wants it also to be used for other virtualization exception types (e.g. CPU events) in future. But now, only EPT violation exception.</li>
+<li>Unlike EPT vmexit, it will induce processor VMX mode switch overhead (VMEXIT and VMENTRY or VMRESUME). #VE doesn’t introduce VMX mode switch. Therefore, it achieves better performance when handling a virtualization exception. </li>
 </ul>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/livedm1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/livedm1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
+<p><br></p>
+<h4 id="So-how-to-use-it-probably"><a href="#So-how-to-use-it-probably" class="headerlink" title="So, how to use it probably?"></a><strong><em>So, how to use it probably?</em></strong></h4><p>Whatever you are using EPT to do, you can consider using #VE to catch EPT exceptions and handle them in guest OS directly without introducing extra EPT violation VMEXIT/VMRESUME overhead. In this manner, I don’t think there is any other difference but performance improvement. </p>
+<p>However, if you look at the Intel SDM for #VE exception description, you probably can see this </p>
+<p><em>“After the virtualization exception handler has corrected the violation (for example, by executing the EPTP-switching VM function), execution of the program or task can be resumed.”</em></p>
+<p>… here the manual says “<strong><em>EPTP-switching VM function</em></strong> “. </p>
+<p>Actually, it is a new VMX instruction, VMFUNC, which can only be executed in guest OS (VMX non-root mode). According to the Intel manual, this instruction allows software in VMX non-root operation (guest) to invoke a VM function, which is processor functionality enabled and configured by software in VMX root operation (host). However, It seems that Intel currently defines only one VM function, EPTP-switching.  </p>
+<p><strong>This EPTP-switching VM function allows software in VMX non-root operation to load a new value for the EPT pointer (EPTP), thereby establishing a different EPT paging-structure hierarchy.</strong> However, software is limited to selecting from a list of potential EPTP values configured in advance by software in VMX root operation. Imagine that, in a traditional system configuration , CR3 (page directory base register) is pointing to a virtual address translation structure hierarchy, switching CR3 means switching different virtual address spaces. EPT pointer is just like CR3 pointer, but the difference is that EPT pointer establishes the translation structure from guest physical address to host physical address, CR3 pointer establishes the translation structure from guest virtual address to guest physical address. </p>
+<p>So, in a typical system, different VMs can be configured to use different EPT paging-structures pointed by different EPT pointers, when guest VM switches, the host VMM software can change to different EPTP pointers accordingly, hence the different VM can has different memory map view (memory isolation). <strong>However, even one single VM software (guest OS) can also be configured to use different EPT paging-structures</strong>, for example host VMM software can configure two different EPT paging-structure mappings pointed by two different EPTP pointer, one is a “privileged”, the other is “unprivileged”. When code running with “unprivileged” mapping attempts to access the guest physical memory referenced in “privileged” mapping, an EPT violation vmexit might happen, and then VMM can switch EPTP pointers to let access success if such an access is legitimate. </p>
+<p><strong>EPTP-switching VM function is introduced to do such a switch without transferring control to VMX root mode (HOST), because it allows guest software do it directly in VMX non-root mode, hence it can reduce performance overhead as well.</strong></p>
+<p>Note that in guest OS software, we cannot directly see the real value of each particular EPTP pointer, instead, we can only see the the EPTP-index value (0~511) that is corresponded to each one of available  EPTP pointer value. So it is VMM software’s responsibility to maintain/update the mapping between EPTP-index and real EPTP pointer value with a EPTP-list structure (4KB page, so total 512 entries at most currently).</p>
+<p>So now when you combine these two new features: VMFUNC (EPTP-switching) and #VE, you probably could understand </p>
+<p><em>“After the virtualization exception handler has corrected the violation (for example, by executing the EPTP-switching VM function), execution of the program or task can be resumed.”</em></p>
+<p> said in Intel manual. Eventually, it has two purposes: </p>
 <ul>
-<li>来源于论文<a href="http://friends.cs.purdue.edu/pubs/eurosys09.pdf" target="_blank" rel="external">Multi-Aspect Profiling of Kernel Rootkit Behavior, EuroSys’09</a>中PoKeR系统对rootkit行为的分析结果：</li>
+<li><strong>handle EPT violation directly in guest OS context without EPT violation VMEXIT;</strong> </li>
+<li><strong>switch EPTP pointer (hence EPT paging-structure hierarchy) directly in guest OS context without transferring control or exiting to VMM.</strong> </li>
 </ul>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/pokerresult.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/pokerresult.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<ul>
-<li>来源于论文<a href="http://www.cs.umd.edu/~mwh/papers/sbcfi.pdf" target="_blank" rel="external">Automated Detection of Persistent Kernel<br>Control-Flow Attacks,CCS’07</a>对内核层恶意代码的行为以及利用的机制分析结果：</li>
-</ul>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/sbcfi.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/sbcfi.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-<ul>
-<li>部分用于研究目的的内核层恶意代码源码分享，可以参考<a href="https://github.com/chonghw/research-malware" target="_blank" rel="external">这里</a></li>
-</ul>
+<p><br><br>Performance matters!!! </p>
+<p>but wait… questions: VMWare, XEN or any other public well-known hypervisor use it? and for what?  Anyone knows?</p>
+<p>&lt; The End&gt;</p>
 <hr>
-<p>作者：<a href="http://weibo.com/diting0x/profile?rightmod=1&amp;wvr=6&amp;mod=personinfo&amp;is_all=1" target="_blank" rel="external">Diting0x</a></p>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170330/kernelmalware" target="_blank" rel="external">内核层恶意代码分析</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 
       
     </div>
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">9</span></a>
+    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">8</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Rootkit/">Rootkit</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exception/">Exception</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/HAV/">HAV</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Hardware/">Hardware</a></li></ul>
 
       
     </footer>
@@ -178,7 +188,7 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-poker"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-monitoring-syscall"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -186,7 +196,7 @@
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170330/poker/">内核Rootkit行为的多方面解析</a>
+      <a class="article-title" href="/20170504/monitoring-syscall/">X86虚拟化技术监控/陷入SYSCALL的另一种方法</a>
     </h1>
   
 
@@ -194,296 +204,141 @@
     
     <div class="article-meta">
       
-	Posted on <a href="/20170330/poker/" class="article-date">
-	  <time datetime="2017-03-30T04:11:52.000Z" itemprop="datePublished">三月 30, 2017</time>
+	Posted on <a href="/20170504/monitoring-syscall/" class="article-date">
+	  <time datetime="2017-05-04T08:02:12.000Z" itemprop="datePublished">五月 4, 2017</time>
 	</a>
 
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>论文来源： <a href="http://friends.cs.purdue.edu/pubs/eurosys09.pdf" target="_blank" rel="external">R. Riley, X. Jiang, and D. Xu. Multi-aspect proling of kernel rootkit behavior.In EuroSys, pages 47-60, 2009</a></p>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170330/poker" target="_blank" rel="external">内核Rootkit行为的多方面解析</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-<p><strong>摘要</strong></p>
-<p>内核rootkit是一种恶意软件，用于破坏运行的操作系统内核。由于其难以捕获、种类繁多、行为复杂、运行在特权层，我们很难分析和了解内核rootkit。然而，全面的rootkit解析能够揭示内核rootkit的主要行为，有助于研究专家的人工详细分析。在本文中我们介绍PoKeR，PoKeR是一种内核rootkit分析器，能够用于多方面的rootkit分析，包括rootkit挂钩行为、目标内核对象（静态和动态）、用户层面的影响评估、以及内核rootkit代码提取。该系统的目的是部署在可以接受高负载的场景下，如蜜罐。我们采用了大量真实内核rootkit进行评估，评估结果表明PoKeR能够准确地分析各种rootkit，包括传统的系统调用挂钩rootkit以及更先进的直接内核对象操作rootkit。所获得的分析结果帮助我们以独特的视角了解rootkit的特征，并证明了PoKeR是一个有用的rootkit分析工具。</p>
-<p><strong>类别和主题描述</strong> </p>
-<p> D.4.6 [操作系统]：安全与保护—攻击软件<br> 一般术语   安全</p>
-<p> <strong>关键词</strong>   内核 Rootkit，恶意代码，解析</p>
-<h2 id="1-简介"><a href="#1-简介" class="headerlink" title="1 简介"></a>1 简介</h2><p>内核rootkit针对操作系统内核，被认为是最隐秘的计算机恶意代码之一，严重威胁计算机系统的完整性。它们在受害计算机中以最高权限运行，劫持操作系统内核的控制权，并提供“增值”服务以允许其他恶意活动或未授权访问—这些行为和访问都是在系统管理员和用户不知情的情况下进行的。例如，内核rootkit曾被用来隐藏僵尸程序或其他后门软件，从而最大限度地延长僵尸网络的存活时间。</p>
-<p>尽管最近在内核rootkit检测[Garfinkel 2003, Petroni 2004; 2006; 2007]和内核rootkit预防[Seshadri 2007, Riley 2008]方面有诸多研究，对于内核rootkit行为的关键特征的分析仍然比较少。我们更希望在动态的“现场”系统（如蜜罐）中进行这样的分析。内核rootkit特征分析对形成有效的内核rootkit检测方法、破坏预防方法以及内核完整性保护方法是很有价值的。在本文中，我们定义了内核rootkit的特征，包括以下四个方面：</p>
-<ul>
-<li>挂钩行为：即在rootkit安装过程中，内核rootkit劫持控制流的方法（在劫持的情况下）。通常情况下，rootkit通过修改内核挂钩（例如函数指针）实现劫持。请注意，rootkit经常将挂钩安装在各种内核对象中，包括内核代码或动态分配的内核对象[Hoglund 2006]。</li>
-</ul>
-<ul>
-<li><p>目标内核对象：即rootkit访问的内核对象，例如rootkit读取或修改对象。与挂钩行为类似，目标内核对象可以是动态的。典型的例子是all-task列表，此列表由操作系统内核控制，用于计算；但是经常被rootkit操控用于隐藏目的。</p>
-</li>
-<li><p>用户级的影响：即受影响的用户级应用程序，这些程序的执行可能直接受rootkit代码的影响。请注意，我们的目的并不是要获得完整的受影响程序的列表；而是常用系统工具（例如ps, ls, netstat等）集。这些工具能用于检索重要的系统，因此往往是内核rootkit的目标</p>
-</li>
-<li><p>注入代码：即注入内核内存地址空间并执行的内核rootkit代码。必须在运行时准确定位和提取注入的代码，以用于后续的取证分析。</p>
-</li>
-</ul>
-<p>近来，研究人员做了大量的工作来分析内核rootkit的特征 [Yin 2007; 2008, Wang 2008, Lanzi 2009]。虽然这些研究是有效的，但是目前的研究方法仍然不足以全面地分析rootkit的功能：（1）一些方法需要事先提供内核rootkit代码并确定rootkit攻击将要发生。这样的要求使得我们难以现场分析零日内核rootkit。（2）当前分析技术只集中在rootkit行为的一个方面（例如挂钩行为）或rootkit生命周期的一个阶段（例如，安装或执行，而非这两个阶段）。（3）现有方法的关键技术，例如全系统破坏或限制，存在一些众所周知的很难克服的局限性和挑战。例如，基于污点的信息流跟踪会被多种控制流规避方法所规避[Cavallaro 2008 ]。</p>
-<p>为克服上述局限性，我们推出了PoKeR（Profiler of Kernel Rootkits），这是一种基于虚拟化的内核rootkit分析器，能够在rootkit执行时多方面地分析内核rootkit。PoKeR的设计目的是部署在可以接受高负载的系统中，如蜜罐，这些系统易受rootkit攻击。基于PoKeR的系统会正常运行，直至内核rootkit安装在系统中并准备执行其注入内核的恶意代码。此时，PoKeR将系统（虚拟机）切换到rootkit解析模式并采用“作战跟踪” 策略，以自动跟踪并确定内核rootkit的目标内核对象（静态或动态）。此外，当目标内核对象被控制时，PoKeR会记录相关系统调用背景并推断对用户级应用程序产生的影响。</p>
-<p>我们已经研发出PoKeR原型，并用其分析了10个有代表性的真实内核rootkit，这些rootkit代表了很大一部分rootkit的攻击方法，包括基本系统调用表挂钩，更先进的直接内核对象操控技术[Silberman 2006]，动态内核数据对象的函数指针操控 [Hoglund 2006 ]以及其他方法。PoKeR的分析涵盖rootkit行为的多方面以及每个rootkit的特征。我们测量了基于QEMU的原型的性能，发现它在分析过程中使虚拟化系统的性能降低3倍到6倍，而虚拟系统本身也会使物理主机的性能降低3.8倍以上。</p>
-<p>本研究的贡献如下：</p>
-<ul>
-<li><p>我们确定了内核rootkit行为的四个关键方面，并用其分析现有内核rootkit。</p>
-</li>
-<li><p>我们定义了瞬时rootkit检测系统的概念；讨论了如何升级现有的内核rootkit防御系统，以生成检测点来触发rootkit解析。</p>
-</li>
-<li><p>我们提出作战跟踪技术，以确定rootkit的目标内核对象的身份和类型，甚至是在内核堆中动态分配的对象。</p>
-</li>
-<li><p>我们开发了PoKeR原型，给出了10个有代表性的真实内核rootkit的分析结果。获得了rootkit行为的有用信息。如果没有PoKeR，即使进行深入分析，其中一些信息也是难以获得的。</p>
-</li>
-</ul>
-<h2 id="2-假设"><a href="#2-假设" class="headerlink" title="2 假设"></a>2 假设</h2><p>在本研究中，我们假设内核rootkit与操作系统内核具有相同的内存访问权限。如果操作系统可以读取或写入到一个内存位置，则rootkit也可以。这也意味着rootkit不会拥有高于操作系统的权限，例如虚拟机监视器（VMM）的权限。Rootkit能够任意地修改静态或动态的内核对象。</p>
-<p>我们假设rootkit需要在内核权限级别下执行注入的代码，但是注入代码并不需要持续在rootkit攻击的整个生命周期。我们将需要在内核权限级别下执行注入代码的内核rootkit称为代码注入内核rootkit。为了便于说明，在本文中我们将使用术语“内核rootkit”来指代代码注入内核rootkit。这一假设是成立的。Petroni等人[Petroni 2007]研究了25个内核rootkit，我们的假设同以上任何内核rootkit都不冲突。特别是，所有25个内核rootkit利用内核中的注入代码，而其中24个需要注入代码持续在rootkit的整个生命周期。</p>
-<p>我们认为PoKeR能够利用操作系统内核源代码进行静态分析，或将调试符号和类型信息用于已编译的内核二进制代码。我们也认为PoKeR可以运行于能够接受高性能费用的系统中。</p>
-<h2 id="3-设计"><a href="#3-设计" class="headerlink" title="3 设计"></a>3 设计</h2><p> 图1显示了PoKeR的整体结构。如图中加粗部分所示，PoKeR有两个主要模块：</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/poker01.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/poker01.png" width="450"></a><br>    <figcaption>图1基于VMM的PoKeR架构</figcaption><br></figure>
-
-<ul>
-<li><p>记录和背景跟踪模块驻留在虚拟机监视器（VMM）中，一旦激活就会收集恶意rootkit代码运行时的痕迹。运行痕迹保存在目标虚拟机之外，包含rootkit执行指令、相应内存读取和写入、以及相关的运行背景等信息。运行背景的记录将有助于我们评估rootkit攻击导致的用户级影响。请注意，激活这个模块需要一个检测点，我们将在第3.1章节中简要介绍。</p>
-</li>
-<li><p>内核对象解析模块处理收集的运行时痕迹，并将目标地址读取或写入rootkit读取或操控的内核对象。相关内核对象的动态特征使得解析程序非常复杂。</p>
-</li>
-</ul>
-<p>PoKeR的设计面临三个关键的挑战和技术难点，我们将在下面三个小节中予以介绍。</p>
-<h3 id="3-1-切换到解析模式"><a href="#3-1-切换到解析模式" class="headerlink" title="3.1 切换到解析模式"></a>3.1 切换到解析模式</h3><p>在第1章中提到，PoKeR主要用于能够接受高负载的环境中。PoKeR系统有两种操作模式：一种是检测模式，即其初始状态，在检测模式下，瞬时rootkit检测系统（在下文中介绍）监视内核rootkit的运行，PoKeR的多数rootkit解析特征都会失效；另一种是解析模式，此模式在检测点生成时激活（即当瞬时rootkit检测系统上报rootkit进攻即将发生时）。在解析模式下，PoKeR激活其解析特征并细粒度地记录rootkit的行为，例如执行指令、系统调用、内存读取和写入等。之后，PoKeR根据第1章中介绍的4个方面生成rootkit分析结果。</p>
-<p>为了确保对rootkit的所有行为进行适当分析，我们必须保证rootkit即将在内核中执行第一个指令时生成检测点，我们将能够满足这种严格的时间限制的检测系统称为瞬时检测系统。Rootkit防御领域的现有研究结果可以用作瞬时检测系统，例如Livewire [Garfinkel2003]，SecVisor [Seshadri 2007]，以及我们之前的研究NICKLE [Riley 2008]。这些系统是基于多种虚拟技术开发的。例如，SecVisor利用硬件虚拟化支撑来防止恶意内核代码的运行，而Livewire和NICKLE则是利用软件虚拟化来保证只有合法的内核代码能够在内核中运行。PoKeR的设计使得它能够利用所有这些系统来生成rootkit检测点。</p>
-<h4 id="3-1-1-NICKLE作为瞬时检测系统"><a href="#3-1-1-NICKLE作为瞬时检测系统" class="headerlink" title="3.1.1 NICKLE作为瞬时检测系统"></a>3.1.1 NICKLE作为瞬时检测系统</h4><p>在本研究中，我们将NICKLE用作瞬时检测系统来生成PoKeR的内核rootkit检测点。下面，我们将简要介绍NICKLE。有兴趣的读者可参照我们之前的论文[Riley 2008 ]以了解更多信息。</p>
-<p>简言之，NICKLE在虚拟机监视器中运行，保护用户的操作系统。NICKLE为运行的虚拟机保留两个独立的内存空间。一个是标准内存，功能与正常的存储空间相同，用于存储内核和用户级的代码和数据；另一个是影子内存，只存储已被NICKLE验证的内核代码，这是通过动态技术实现的，即用已知的良好内核代码的哈希值来验证，并将验证后的内核代码从标准内存复制到影子内存。运行时，所有虚拟机操作系统执行的内核指令读取被透明地传送到影子内存，而其他所有的内存访问则被传送到标准内存。因此，内核rootkit无法在内核中执行未经授权的注入代码。未能通过NICKLE的内核代码认证的注入代码将只能驻留在标准内存，而无法被影子内存读取。所有这些操作对虚拟机操作系统都是透明的，且不需要修改。</p>
-<p>下一步就是将原始的NICKLE转化为PoKeR的瞬时检测系统。该系统不是简单地阻止rootkit代码的执行，而是允许代码在标准内存中不受阻碍地执行。在虚拟机内核指令读取时，系统比较标准内存和影子内存的内容，以确定两者中是否存在相同的指令。如果一个将要被读取的内核指令存在于标准内存而不存在于影子内存（简单地说就是两者内容不同），则未经授权的代码将在内核层面执行。这就是PoKeR的检测点，系统也将切换到解析模式。</p>
-<p>因为在指令执行前我们就知道它是恶意指令，所以我们就有绝好的机会来确定和提取恶意rootkit代码，然后对其进行分析，例如进行静态分析。我们还可以记录指令执行顺序。此外，系统的恶意代码识别功能允许解析模式不时地打开和关闭，即在rootkit指令执行时打开，在已验证的内核指令执行时关闭。检测模式（较快）和解析模式（较慢）之间的动态切换带来更高效的rootkit解析。</p>
-<h3 id="3-2-跟踪目标内核对象"><a href="#3-2-跟踪目标内核对象" class="headerlink" title="3.2 跟踪目标内核对象"></a>3.2 跟踪目标内核对象</h3><p>一旦检测到内核rootkit运行且PoKeR的解析模式打开，我们需要跟踪内核rootkit操控的所有内核对象。例如，rootkit可能会遍历整个进程列表，寻找特定PID的项，并将其删除；或者可能改变内核中的TCP数据结构的键值，以掩饰其向远程地址发送数据。重要的是，PoKeR能够在rootkit指令执行时确定被读取或修改的内核对象。这颇具挑战性，因为PoKeR运作于虚拟机监视器层面，并不直接提供虚拟机内核对象的语义视图。不幸的是，目前的虚拟机自省技术[Garfinkel 2003, Jiang 2007, Payne 2007]不支持这种“反向查找”（即给定一个内存地址，来确定相应的内核对象）。</p>
-<p>PoKeR的记录和背景跟踪模块记录了rootkit代码的所有读取和写入行为，利用这一模块，我们能够很容易地获取rootkit读取和写入列表，然而，大量的内核对象是动态分配的，这使得我们难以确定rootkit修改的内核对象。例如，我们能够检测到rootkit在内存地址0xc6600856处进行修改，但如果地址定位在内核堆中，我们就无法简单地确定对象了（这就是为什么简单的符号调试器不能用来跟踪内核对象的一个原因）。而静态分配的内核对象的地址则可以在编译时很容易地确定。为了确定动态分配的内核对象，我们需要创建地址—动态对象映射，用它将内存地址转换为相应的内核对象。</p>
-<p>创建此地址—动态对象映射的一个关键点是所有的内核对象必须是可以以某种方式存取的，包括全局变量或寄存器。如果将内核对象想象为一个图，图的边缘是指针，那么所有对象至少可以暂时地从一个全局变量存取。如果对象无法用此方法存取，那么内核本身也将不能够访问对象，因此无法使用对象。垃圾收集[Boehm 1988 ]和基于状态的控制流完整性[Petroni 2007 ]方面也有类似的研究。蛮力地址动态对象映射法需要搜索整个内存图，这将是非常低效的，无法满足我们的需要。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/poker2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/poker2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>为了更高效地支持地址—动态对象映射法，我们提出了“作战跟踪”技术。作战跟踪技术的关键点是：内核rootkit会首先遍历静态分配的内核对象地址从而找到动态分配的内核对象的地址。Rootkit与PoKeR很相似，本身不知道动态内核对象的分布，因此需要通过一系列的内核内存读取以获取对象。通过跟踪rootkit的一系列读取，我们可以动态地创建地址—动态对象映射，在一个给定内存地址时，PoKeR可以利用此映射查找相应的动态内核对象。</p>
-<p>算法1展示了PoKeR内核对象解析模块的作战跟踪算法。该算法假设初始静态对象映射可用，结合rootkit读取，即时创建动态对象映射（在我们的原型中，静态内核对象映射和对象类型定义来自调试符号编译的内核副本）。算法的第一步是确定被读取的地址的数据类型。我们首先查询静态对象映射，如果不是全局对象，我们则检查动态对象映射，确定我们是否已经将此地址添加到映射。一旦发现被读取的对象，我们需要确定它是否是指针。我们考虑指针的原因是：如果指针对象被读取，则读取的值与内核对象的地址对应。这可能是我们没见过的内核对象，可以用来进一步创建动态映射。鉴于此，当rootkit确实读取指针时，我们确定rootkit读取的值（新对象的地址）以及间接引用的指针类型（新对象的类型），并将此信息添加到动态映射中。这样我们根据rootkit读取逐步建立地址—动态对象映射。</p>
-<p>为了说明作战跟踪，我们举个例子。图2简单展示了Linux内核的进程列表。地址0xc03 00000处是一个全局数据结构；初始化任务（init task）位于动态分配的struct task_struct头部。如果rootkit试图在task_struct搜索pid 3，它会执行以下操作。首先，它读取地址0xc0300004以找到全局task_struct中的next_task指针。它将获取下一个结构的地址0xc11a0000。然后，它读取地址0xc11a0000处下一个结构的pid，如果发现pid不是3，它会读取0xc11a0004搜索下一个task_struct。它重复这个过程直到在地址0xc11c0000处的task_struct中找到pid 3。之后，它在数据结构（例如地址0xc11c0008）处修改变量，以操控内核对象。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/poker0.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/poker0.png" width="450"></a><br>    <figcaption>图2 Linux进程列表的简单图示</figcaption><br></figure>
-
-
-
-<p>如果不采用作战跟踪技术，我们只知道rootkit在地址0xc11c0008处写入，无法获取此地址处的数据类型。采用作战跟踪技术，根据整个读取链，我们能够创建动态映射：当rootkit读取init task的next task时，初始静态映射显示此读取对应struct task struct<em>对象。鉴于此，结合rootkit读取0xc11a0000的事实，我们知道地址0xc11a0000包含struct task_struct，并将其添加到我们的动态映射。之后木马从动态数据结构读取next_task指针时，我们知道（根据之前读取的经验）读取的是struct task_struct</em>的另一个指针，并将此链表元素添加到动态映射。我们继续以这种方式创建动态映射，直到rootkit读取的所有数据结构都被添加到映射中。之后，当出现地址0xc11c0008写入时，我们可以检查动态映射，确定地址是否是task_struct的一部分，并确定数据结构的哪些元素被修改。</p>
-<p>我们不跟踪内核对象的生命周期，当某项去分配后，将该项从动态映射中删除。该项仍然存在于映射中，只是其位置上已经没有对象。因为rootkit不会访问去分配的内核对象（如果访问，很可能是编程错误），这种“陈旧项”不会影响正常操作。如果一个新对象分配了之前使用的地址，则rootkit的新对象读取链将导致陈旧项被替换为与新对象相对应的项。</p>
-<h3 id="3-3-发现rootkit挂钩和用户级影响"><a href="#3-3-发现rootkit挂钩和用户级影响" class="headerlink" title="3.3 发现rootkit挂钩和用户级影响"></a>3.3 发现rootkit挂钩和用户级影响</h3><p>对很多内核rootkit来讲，操控内核对象特定子集的一个关键目的是最终劫持内核的控制流，以便影响内核的运行状态。Rootkit通常通过修改函数指针来劫持控制流，其中很多指针可能存储在内核堆中动态分配的对象中。要揭示rootkit的挂钩行为，至关重要的是在安装时找到这些挂钩。Rootkit也可能直接修改合法代码，迫使对rootkit代码的调用。所幸，这两种修改都可以视为内核对象跟踪问题（第3.2章节）。跟踪现有代码的修改类似于跟踪静态对象的修改；而跟踪函数指针的修改则属于使用作战跟踪技术跟踪对象修改，主要原因是修改后的函数指针属于特定的内核对象。</p>
-<p>举个例子，基于Linux内核模块（LKM）的rootkit 的目标是确保扩展名为“hacker”的文件对用户不可见。攻击者采用insmod命令将恶意rootkit作为内核模块安装。系统将恶意模块复制到内存，运行模块的init()函数。init()的第一条指令执行之前，瞬时rootkit检测系统生成检测点，检测点激活PoKeR的解析模式。之后，rootkit初始化函数修改系统调用表，使得原本检索目录列表的系统调用更改为指向确保.hacker文件不出现在列表的恶意函数。系统调用表写入被记录和解析。因此，我们能够发现代码的挂钩点并分析rootkit所执行的控制流修改。</p>
-<p>  除了确定哪些函数指针被内核rootkit劫持，我们也迫切地需要确定被修改的内核控制流如何影响用户级程序的系统调用。这可能有助于确定特定rootkit的目标用户级程序，并大致了解rootkit试图隐藏的内容。对修改系统调用表的内核rootkit来说，这种影响是相当明显的：当执行相应的系统调用时，被修改的调用表项将导致控制流劫持。然而，对不直接修改系统调用表项的rootkit来说，不太容易确定哪些系统调用会受影响。</p>
-<p>为了确定哪些系统调用导致运行时控制流劫持，我们需要将恶意rootkit代码的运行与相应的系统调用结合起来。为做到这一点，PoKeR将跟踪系统调用的执行并利用虚拟机内省技术[Jiang 2007]以确定当前的进程背景，即哪个进程执行系统调用。注意：通过记录系统调用的起始点以及系统调用结束点，PoKeR可以有效地跟踪系统调用的整个运行周期。如果检测到恶意代码运行，PoKeR会推断恶意代码运行的当前进程背景，并确定是否有系统调用运行于相同的进程背景下。如果存在这样的系统调用，则说明此系统调用的控制流已被劫持。</p>
-<h2 id="4-实施"><a href="#4-实施" class="headerlink" title="4 实施"></a>4 实施</h2><p>为了验证我们的设计，我们开发了PoKeR原型。在本章中，我们介绍PoKeR的实施。</p>
-<h3 id="4-1-瞬时rootkit检测"><a href="#4-1-瞬时rootkit检测" class="headerlink" title="4.1 瞬时rootkit检测"></a>4.1 瞬时rootkit检测</h3><p>在3.1.1章节中提到，我们采用NICKLE作为瞬时检测系统。NICKLE已在多个虚拟机监视器平台下测试和实施，例如QEMU [Bellard 2005]，VirtualBox[Innotek]，以及VMware Workstation [VMware]。在本研究中，我们选择了NICKLE的QEMU端口以便于实施。</p>
-<h3 id="4-2-记录和背景跟踪"><a href="#4-2-记录和背景跟踪" class="headerlink" title="4.2 记录和背景跟踪"></a>4.2 记录和背景跟踪</h3><p>一旦NICKLE检测到恶意内核rootkit代码并发出信号，PoKeR切换到解析模式。在解析模式下，PoKeR采用QEMU内置的动态再编译器（一种虚拟化技术，能够将虚拟机代码高效动态地转化为主机代码）解析所有的内核指令，以便细粒度地记录rootkit的行为。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/poker3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/poker3.png" width="450"></a><br>    <figcaption>图3PoKeR生成的样本日志项</figcaption><br></figure>
-
-
-<p>图3是一个日志样本，展示了七种不同类型的日志项。R和W日志行（第2和第4行）意味着恶意rootkit代码正在读取或写入。通过扩展QEMU转换虚拟机内存访问指令，使PoKeR检测指令规定的访问是否为恶意，从而捕获读取和写入。图中的第一行是读取或写入的内存地址，第二行是相应的内存内容。E日志行（第6行）由PoKeR在恶意指令转换运行时生成，表示rootkit代码的执行。图中的日志行分别代表恶意指令的地址和指令运行的进程环境的pid。每当内核模块加载时，M日志行（第1行）会被省略，如NICKLE的虚拟机内省部分；M日志行表示模块内核数据结构的地址（该日志行是检测点生成之前的记录项）。C日志行（第3行）是当前运行的进程（Linux中的current）任务结构的地址，以及读取或写入任务结构之前的输出。 SC和SR日志行（第5行和第7行）分别表示系统调用的起始和终止。SC日志行包含pid，程序名，和系统调用的信息，通过扩展系统调用程序名称，通过内核-用户模式转换生成。</p>
-<p>SC，SR和E帮助我们确定内核rootkit劫持的系统调用控制流，这是通过关联系统调用日志项和rootkit代码执行项（利用进程背景信息）实现的。我们解析日志文件，跟踪当前运行的系统调用（以SC开始，以SR结束），以获取运行过程。如果某个进程出现E日志行，而进程中存在开放的系统调用，则可以知道该系统调用的控制流已被劫持。</p>
-<p>如前所述，PoKeR根据执行顺序记录恶意rootkit指令的执行。之后，我们采用定制的反汇编器[libdisasm]来结合这两部分信息并根据执行顺序生成此rootkit执行代码的副本。</p>
-<h3 id="4-3-内核对象解析"><a href="#4-3-内核对象解析" class="headerlink" title="4.3 内核对象解析"></a>4.3 内核对象解析</h3><p>一旦内存访问的日志文件可用，将这些访问转换为相应内核对象的名称和类型是很重要的。为了跟踪第3.2章节中所述的静态和动态内核对象，我们必须在内核中执行静态分析。PoKeR可以利用此信息以及rootkit的内核读取来示例作战跟踪技术。</p>
-<p>Linux内核是一个大型的复杂的代码库，使得传统的静态分析难以进行。然而，通过调试符号（标识-g至gcc）编译内核副本，GNU的调试器（gdb）[免费软件基金会]可以用来提取所有静态内核对象的类型，名称和地址。我们修改gdb以此信息的访问以及查询静态内核对象信息。</p>
-<p>PoKeR的内核对象解析模块用Python编写，能够执行作战跟踪。它采用gdb处理静态信息并利用第3.2章节中提到的算法处理rootkit读取，从而逐步建立动态内核对象的内部映射。之后，解析rootkit内存写入，查询静态和动态内核对象映射，以生成Rootkit内核对象的分析。我们的方法能够更加方便地手动分析以确定共用数据类型（union）。目前，由用户事先确定采用何种类型的数据。另一种方法是将所有可能性插入动态映射以分别确定共用数据类型。但是，这可能导致映射搜索区域的膨胀。我们利用自动类型确定领域的新兴研究[Cozzie 2008 ]来自动化处理共用数据类型。</p>
-<h2 id="5-评估"><a href="#5-评估" class="headerlink" title="5 评估"></a>5 评估</h2><p>在本节中，我们将展示利用PoKeR分析10个真实内核rootkit的结果，并简要评估PoKeR的性能。在我们的实验中，主机是一个英特尔计算机，内核2-2.4GHz桌面运行Ubuntu8.10。虚拟机监视器（VMM）是QEMU 0.9.0的升级版，运行KQEMU 。我们的虚拟机操作系统是Red-Hat 8.0 ，运行Linux 2.4.18-14。生成带有调试符号（第4.3章节）的版本需要再编译。</p>
-<p>表1显示了分析结果的概要。对每个内核rootkit的分析包含第1章中介绍的四个部分。第一部分是挂钩的行为，由表1中某些内核对象的已修改函数指针揭示。第二部分是目标内核对象，显示rootkit感兴趣的对象。读取而未修改的内核对象属于此部分，由于其数量庞大以及表1的空间不足，我们在此不做列举。</p>
-<p>第三部分是用户级程序的潜在影响。鉴于大多数rootkit的主要目标是改变一个系统管理员的操作系统，我们运行10个系统程序，检索内核rootkit试图隐藏的系统信息。其中四个程序w，who，uptime，和 finger能够显示当前登录用户的相关信息。两个程序netstat 和ifconfig显示网络使用信息。另两个程序ls和bash可以揭示文件的存在。Ps能够获取运行程序的有关信息。最后，ismod能够显示安装的内核模块的列表。</p>
-<p>我们运行并测试这10个程序，以确定它们的多少系统调用会导致rootkit代码的执行，不过它们并不能代表所有可能的系统调用的执行。如果一个程序可以被写入以执行所有的系统调用，则会生成大量日志和日志触发的控制路径，这会使得我们无法确定次程序是否遵守所有挂钩rootkit代码路径。通过利用rootkit试图向其隐藏信息的程序，我们希望至少可以确定将被触发恶意rootkit代码的一部分。执行这10个程序时，39个不同的系统调用运行，导致rootkit代码运行的系统调用如表1所示。第四部分是分析提取的内核rootkit代码，如表1所示，只列出了提取的rootkit指令的数量。这有助于确定内核rootkit的体积，PoKeR还会将代码用于进一步分析，在第5.2.2章节介绍。</p>
-<h3 id="5-1-基于解析的rootkit行为研究"><a href="#5-1-基于解析的rootkit行为研究" class="headerlink" title="5.1 基于解析的rootkit行为研究"></a>5.1 基于解析的rootkit行为研究</h3><p>作为一个内核rootkit的研究工具，PoKeR使得专家能够迅速确定并划分rootkit的攻击方法，而不必完全依靠人工分析rootkit二进制代码、源代码、或被损害的操作系统。在下文中，我们将总结利用PoKeR所获取的rootkit分析结果。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/poker4.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/poker4.png" width="450"></a><br>    <figcaption>表1利用PoKeR获取的内核rootkit分析结果</figcaption><br></figure>
-
-
-<p> 根据“挂钩行为”分析，我们可以概括rootkit的三个挂钩策略：修改现有的内核代码、挂钩系统调用项、以及挂钩数据结构的函数指针。以rootkit SucKIT为例，它修改现有的内核代码；5个rootkit（rial, rkit, knark, kbdv3, adore 0.42）将syscall挂钩用作主要攻击向量；两个rootkit（SucKIT 和adore 0.53）采用syscall挂钩以及其他的攻击技术；另外两个rootkit（adore 0.53 和adore-ng 0.56）挂钩静态和动态内核对象的函数指针。</p>
-<p>根据“目标内核对象”分析，我们可以识别更容易被rootkit直接操纵的内核对象，这也称为直接内核对象操控（DKOM）。例如，进程控制块的一些关键字段（例如，uid和euid）会被某些rootkit（例如，kbdv3 rootkit）作为攻击目标，以提高某些进程权限，而rootkit的代码则运行于这些进程中。有些rootkit（例如linuxfu 和hp rootkit）则操控任务列表以隐藏进程。此外，内核rootkit劫持的函数指针的相关语义也能够揭示rootkit的意图。例如，函数指针get_info 和lookup会被rootkit（例如adore 0.53和adore-ng 0.56）劫持，以筛选出敏感信息，因此rootkit在被感染的系统中不会被发现。</p>
-<p>利用PoKeR分析rootkit的另一个有趣的优点是它能够揭示同一个rootkit的各个版本之间的不同。以表1中的adore rootkit为例，版本0.42只依赖系统调用挂钩攻击。之后的版本0.53降低了对系统调用挂钩的依赖，而是会挂钩两个内核对象。一旦adore成为adore-ng，它会完全依赖于内核对象中的挂钩。PoKeR清晰地分析了adore攻击行为的演变。</p>
-<h3 id="5-2-三个代表性rootkit的详细分析"><a href="#5-2-三个代表性rootkit的详细分析" class="headerlink" title="5.2 三个代表性rootkit的详细分析"></a>5.2 三个代表性rootkit的详细分析</h3><p>当深入分析内核rootkit时，PoKeR能够向专家提供内核rootkit行为相关的有用信息，使专家能够更快速地确定它这样做的目的。在本节中，我们将给出3个内核rootkit的详细分析结果，这三个rootkit分别代表了不同的攻击方法。在以下描述中，我们将给出（1）基于Linux和PoKeR多方面解析的每个rootkit的分析，（2）基于rootkit源代码（我们将源代码用于实验）的手动分析。由分析（1）所得的发现和说明以正常文本显示；而基于分析（2）的说明则缩进排版并以MUNUAL INSPECTIONRESULTS（人工检测结果）开始。我们的目的是展示专家在没有源代码的情况下，如何利用PoKeR迅速分析rootkit的行为。该说明还揭示了由分析（1）和（2）的结果很匹配，特别是在PoKeR能或不能捕获的数据方面。</p>
-<h3 id="5-2-1-adore-ng-0-56"><a href="#5-2-1-adore-ng-0-56" class="headerlink" title="5.2.1 adore-ng 0.56"></a>5.2.1 adore-ng 0.56</h3><p>挂钩行为：对adore-ng的挂钩分析很有趣，这是因为它并不挂钩任何系统调用。此外，它的一个挂钩需要作战跟踪技术（第3.2章节）来揭示。该rootkit修改各种内核对象的函数指针，对proc文件系统尤其感兴趣，并修改该系统的三个函数指针。其中一个指针，proc_net -&gt;（……）-&gt;get_info位于动态分配于内核堆的一个对象中（通过作战跟踪技术发现）。另外两个指针，proc_root_inode_operations-&gt;lookup和proc_root_operations-&gt;readdir则与proc的文件操作有关。Proc文件系统从内核区输出信息到用户区，并被检索系统信息的应用程序所使用。例如，ps检索进程列表，而netstat获取打开网络连接的信息。proc挂钩最可能的原因是隐藏进程和网络连接。</p>
-<p>人工检测结果：快速的adore-ng源代码搜索可以确定proc_net挂钩是为了隐藏特定端口存在网络连接，readdir挂钩则是为了隐藏运行的进程。然而，Lookup挂钩是为了揭示adore-ng内核组件的信息。以上的分析并没有包含这一点。</p>
-<p> Adore-ng也影响主要的ext 3文件系统。第一个函数ext3_dir_operations-&gt;用来生成目录列表。第二个函数ext3_file_operations-&gt;write用于文件写入。在主要文件系统挂钩readdir的最明显的原因是隐藏某些文件。写入操作则是执行一层过滤，从而隐藏rootkit相关的信息。</p>
-<p>人工检测结果：源代码审查可以确认readdir是用来隐藏文件的。Rootkit劫持写入以确保隐藏进程不写入任何系统日志文件in/ var。</p>
-<p>最终，adore-ng劫持unix_dgram_ops-&gt;recvmsg函数指针，从而拦截域接口信息（一种进程间通信）。这相当令人费解，拦截和终止进程间通信的方式看起来很奇怪。</p>
-<p>人工检测结果：源代码分析表明，它用来拦截并删除系统日志保护进程的信息。</p>
-<p>目标内核对象：根据PoKeR的分析结果，adore-ng看来并不修改任何内核对象，只修改相应的函数指针，并通过劫持控制流执行相关操作。在此方面，adore-ng并不比许多系统调用挂钩rootkit高级。然而，必须指出的是，虽然它不修改任何其他内核对象，其恶意代码仍然可以修改返回给用户级程序的系统调用结果。</p>
-<p> 人工检测结果：源代码审查确证实了这些结论的正确性。</p>
-<p>用户级进程的影响：adore-ng不直接修改任何系统调用表项，但是在系统调用时它仍然执行恶意有效载荷。考虑到它修改的函数指针可能用于多个系统调用，这是合乎逻辑的。我们的结果表明，数据库中的5个系统调用执行adore-ng代码。</p>
-<p>提取的代码：adore-ng导致785个指令被提取。</p>
-<h4 id="5-2-2-SucKIT-1-3b"><a href="#5-2-2-SucKIT-1-3b" class="headerlink" title="5.2.2 SucKIT 1.3b"></a>5.2.2 SucKIT 1.3b</h4><p>挂钩行为：SucKIT是另一个有趣的rootkit，主要是因为它只修改系统调用表中的一项，即59。这一项甚至不怎么有趣；它相当于oldolduname（我们可以想象，它不受青睐也不经常使用）。我们假设用户区控制程序利用此系统调用激活某些内核级函数。</p>
-<p>人工检测结果：源代码审查说明上述假说基本正确。SucKIT利用系统调用项生成内核函数kmalloc，此函数可以从用户区调用。这允许它在用户区为其内核组件分配区域，并通过/dev/kmem安装。</p>
-<p>目标内核对象：目标内核对象是非常有趣的，带给我们一些重要的发现。首先，PoKeR的内存读取日志表明SucKIT读取整个系统调用表。其次，它修改了两个内核函数system_call和tracesys的代码。这两个函数可用于调度系统调用。例如，当接收到一个软件中断0x80，system_call函数从调用表读取函数指针，从而将系统调用指向适当的内核处理程序。根据这些发现，我们推测SucKIT复制系统调用表，并修改调度函数，从而用新表代替旧表。</p>
-<p>人工检测结果：源代码审查证实了上述假设的正确性。</p>
-<p>用户级进程的影响：在SucKIT分析中，我们没有发现任何相关函数指针的修改，只发现一个奇怪的系统调用。然而，由于SucKIT直接重写Linux系统调用调度程序的内核代码，它仍然利用备用表劫持关键系统调用的控制流。在我们的测试中，我们发现，SucKIT试图劫持39个系统调用的其中10个。</p>
-<p>提取的代码：提取代码的其中一小部分很有趣。表2显示了SucKIT rootkit执行的前几十个指令、代码的虚拟地址、以及指令执行的顺序，这些都是由PoKeR提供的。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/poker5.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/poker5.png" width="450"></a><br>    <figcaption>表2 PoKeR提取的SucKIT代码片段</figcaption><br></figure>
-
-
-<p> 从这些指令中，我们可以看到SucKIT一个独特的性质：它用巧妙的方法创建全局变量。SucKIT将其恶意有效载荷目录写入到内存块kmalloc’d，从而安装到内核并运行有效载荷。编译时，rootkit作者并不知道SucKIT驻留内存的地址。全局变量（编译时必须知道内存地址）对rootkit作者来说是不可用的。安装为内核模块的rootkit则不存在这个问题，因为内核会重新动态迁移rootkit代码和数据，然后执行。鉴于SucKIT并不能动态迁移，它采用一个技巧来使用全局变量（当变量的地址无法推测时）。表2中的指令21（lcall0xFFFFE40B）调用函数到当前页面的偏移处，在这种情况下是一个负数。这一调用导致指令22（表2的最上方）执行。从指令22开始的内存布局非常有趣，我们可以看到布局如下：指令22，之后是4个字节的数据，其次是指令23和24。当指令22执行（另一个本地调用），lcall之后的内存地址后立即被推送到堆栈。这是返回地址，但在这里它对应4字节数据的地址。之后运行的pop指令将该地址移到寄存器eax并执行返回，将控制流返回主代码。在这一点上，寄存器eax包含4个字节的地址。这一机制允许攻击者实现全局变量的功能，而不必担心动态迁移。</p>
-<p>人工检测结果：源代码审查证实了上述分析的正确性。</p>
-<h4 id="5-2-3-hide-pid-hp-1-0-0"><a href="#5-2-3-hide-pid-hp-1-0-0" class="headerlink" title="5.2.3 hide pid (hp) 1.0.0"></a>5.2.3 hide pid (hp) 1.0.0</h4><p> 挂钩行为：hp rootkit不修改函数指针，事实上也并不劫持控制流，也不安装持久性代码。这与前两个rootkit大不相同。</p>
-<p>人工检测结果：源代码审查证实了这些结论的正确性。</p>
-<p>目标内核对象：hp访问的内核对象是pid哈希表（pidhash基本上是一个任务结构表，用pid计算散列。它允许内核函数利用pid搜索进程而不需要遍历整个进程列表，不过哈希表中的项仍然是进程列表的一部分）。通过下述对象访问日志的片段，我们可以看出rootkit的意图。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/poker6.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/poker6.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>可以从日志中看到，rootkit读取上表中的pidhash [600]，通过检查pid证实它是一个正确的表项，然后通过修改其相邻表项的指针删除这一项。可以看到这些任务结构是动态分配的，我们的作战跟踪技术能够准确地识别它们。</p>
-<p>人工检测结果：源代码审查证实了上述分析的正确性。</p>
-<p>用户级进程的影响：如上所述，在我们执行数据库时，hp rootkit不执行任何恶意代码。因此我们可以推断，它没有在内核中安装持久性代码，不会影响系统调用。</p>
-<p>人工检测结果：源代码审查证实了上述分析的正确性。</p>
-<p>提取的代码：hp提取的代码非常小，只有100条指令。考虑到hp似乎只是从进程列表中删除一个项，这是有道理的。因此我们推断hp可能不执行其他操作。</p>
-<p>人工检测结果：源代码审查证实了上述分析的正确性。</p>
-<h4 id="5-2-4-总结"><a href="#5-2-4-总结" class="headerlink" title="5.2.4 总结"></a>5.2.4 总结</h4><p>我们利用PoKeR分析以上3个内核rootkit，得到13个关于rootkit行为的结论，其中12个已经通过rootkit源代码分析得以验证（另外一个基本正确）。我们强调PoKeR的高精度仅基于一个执行模块，rootkit的源代码和原始二进制代码都不用手动分析。我们的比较也说明：即使可以获取rootkit的源代码，使用PoKeR能够更方便、快速地了解rootkit的行为。</p>
-<h3 id="5-3-性能"><a href="#5-3-性能" class="headerlink" title="5.3 性能"></a>5.3 性能</h3><p>虽然性能并不是蜜罐系统首要考虑的因素，但是我们认为有必要介绍一下PoKeR各个组件的运行速度。</p>
-<p>运行时PoKeR模块：我们通过两个基本测试来确定PoKeR运行组件（生成日志项）的性能，所有的测试都在第5章中所介绍的系统中进行。我们在标准QEMU下，QEMU+PoKeR（无rootkit分析），以及QEMU + PoKeR（adore-ng rootkit分析）这几种情况下运行Unixbench 4.1.0并测试内核编译模块。如图4所示，以标准QEMU的速度为标准（越低越好）。在解析模式下，PoKeR的内核编译测试速度比标准QEMU的速度慢2.96倍，而在Unixbench测试下则慢5.88倍。在非解析模式下（但是等待检测攻击），PoKeR的内核编译测试速度比标准QEMU的速度慢1.77倍，而在Unixbench测试下则慢1.28倍。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/poker7.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/poker7.png" width="450"></a><br>    <figcaption>图4PoKeR性能结果</figcaption><br></figure>
-
-
-<p>QEMU：QEMU使PoKeR原型负载大大增加。在本文中，我们不完整地介绍QEMU，但是会介绍基本的QEMU准则，以帮助大家理解PoKeR的整体性能。为了测试QEMU的负载，我们采用QEMU0.9.1（最新版本），并比较本地安装Ubuntu 8.10的性能和QEMU + KQEMU虚拟副本的性能。两者能够访问相同大小的内存（512MB）和一个处理器核心。内核编译基准显示3.8倍的负载。鉴于NICKLE能够移植到其他动态的基于转换的虚拟机监视器，例如VMware [Riley2008]，我们相信通过更高效的虚拟机监视器平台，这部分负载可以降低。</p>
-<p>日志处理：为了展示日志处理的效率，我们测定了处理10个rootkit日志项所用的时间，并在表1中列出。最长的处理时间为3分钟36秒；最短的时间为0.7秒；平均时间为37秒。</p>
-<h2 id="6-讨论"><a href="#6-讨论" class="headerlink" title="6 讨论"></a>6 讨论</h2><p>在本章中，我们将讨论PoKeR面临的潜在攻击，以及它的一些局限性和未来的改进方法。</p>
-<h3 id="6-1-攻击"><a href="#6-1-攻击" class="headerlink" title="6.1 攻击"></a>6.1 攻击</h3><p>Rootkit可能会利用很多潜在的攻击方法来规避PoKeR。</p>
-<p>我们目前的原型依赖于NICKLE来传递内核rootkit代码执行的信息。然而，如果内核rootkit利用内存访问设备（例如/dev/kmem）在用户区直接修改内核数据， PoKeR则无法解析此rootkit。我们已经合成了这样的一个rootkit，不过由于不能执行自己的内核代码，它的功能有限。一个相关的攻击只使用现有的内核代码，与针对内核的高级return-to-libc攻击[Shacham 2007, Buchanan 2008]类似。NICKLE可能无法生成PoKeR需要的检测点。现有的方法，如控制流完整性[Abadi 2005]能够检测这些类型的攻击，PoKeR可以使用这些方法来生成检测点。</p>
-<p>作战跟踪基于一个事实：rootkit必须在静态数据对象启动读取链以获得动态内核对象的地址。然而rootkit可能不需要这样做，它可能调用现有的内核代码来检索一个数据结构的地址。在这种情况下，读取链会从合法内核代码产生，因此将不会被记录。PoKeR处理这种情况的方法是：简单地跟踪所有的内核读取而不仅是rootkit读取，但是这样会导致性能损失。另一个潜在的方法是：只要当前内核堆栈中有指向恶意代码的指针，则PoKeR监控所有的内核读取。这一指针可能是rootkit代码的返回地址，它被称为有效的内核代码。</p>
-<p>另一种情况是: rootkit安装代码挂钩，并使用它来检查堆栈，找到堆栈上的内核对象地址（如果rootkit作者在挂钩之前已经知道被调用的函数，他可以很容易地导出堆栈中的函数类型信息）。在这种情况下，作战跟踪技术不能正确识别所读取数据的类型。我们可以扩展PoKeR的功能，使其监视堆栈中各项的类型信息，类似gdb。</p>
-<p> 最后，rootkit可以扫描内核内存并猜测内核对象的身份，并有较高的成功率。防御该攻击的一种可能的方法是周期性地创建完整的内核对象映射（类似于SBCFI [Petroni 2007]）。假设这种周期性映射定期创建，则PoKeR能够高概率地识别任何动态内核对象，甚至不需要读取链。</p>
-<h3 id="6-2-局限性"><a href="#6-2-局限性" class="headerlink" title="6.2 局限性"></a>6.2 局限性</h3><p>我们目前的PoKeR原型有一些限制。首先，我们目前的分析结果尚不能完全充分地确定rootkit的所有方面的行为；我们只是专注于rootkit的行为的四个方面。这种完整性的缺失也存在于其他基于动态分析的系统中[Moser2007, Lanzi 2009]。</p>
-<p>第二，目前的原型在揭示rootkit操控内核对象的运行背景方面功能仍然有限。例如，在adore-ng实验中我们看到IPC数据表接收函数被劫持，然而PoKeR生成的分析却不能告诉我们原因。而人工检测adore-ng源代码得到的结论是：这是用来过滤发送到syslogd的消息。因此，如果可以提高PoKeR的功能，使其能够自动显示此类信息，这将是一个巨大的优势。与此同时，我们也意识到，PoKeR的用户级影响分析仍然是较为简单的，我们计划扩展此功能，使PoKeR能够确定运行时可能被劫持的所有系统调用。修改后的内核对象、内核调用图的静态分析以及多路径探索[Moser 2007]是这方面研究的潜在途径。</p>
-<p>最后，rootkit可能会够检测出虚拟化或PoKeR的解析模式，并据此相应地改变行为。请注意，随着虚拟机中越来越普遍，它们迅速成为攻击目标，而rootkit作者也不用费力地躲避它们。虽然我们可以努力掩饰虚拟化的存在，使其不被攻击者发现，但是从一般意义上来说，这是一个无法解决的问题[Garfinkel 2007]。</p>
-<h2 id="7-相关的工作"><a href="#7-相关的工作" class="headerlink" title="7 相关的工作"></a>7 相关的工作</h2><p>分析内核级恶意代码：相关工作的第一个领域包括最近对于内核恶意代码行为的研究。例如，基于污点的分析，Panorama [Yin 2007]进行系统范围的信息流跟踪，以了解恶意代码如何窃取或操纵敏感的数据（例如用户的击键信息）。不幸的是，基本的基于污点的信息流技术遭受了控制流规避攻击[Cavallaro 2008]，这一攻击直接打断了污点传播。从另一个角度来看，K-Tracer [Lanzi 2009]结合了向后和向前的切片技术来分析内核rootkit的行为。然而，切片操作需要事先确定敏感数据的位置，以执行切片分析。因此，虽然切片技术能够处理常规的劫持系统调用表项的内核rootkit，它并不能有效地处理高级rootkit，如直接内核对象操控（DKOM）rootkit。通过比较跟踪静态和动态内核对象的能力，我们发现PoKeR不必事先知道敏感数据的位置，也可以处理DKOM rootkit（例如，在第5.2.3章节提到的hp rootkit）。</p>
-<p>最近研究人员提出了一些其他方法来分析rootkit的挂钩行为。HookFinder [Yin2008]分析了给定的rootkit样本，并给出了rootkit使用的内核挂钩的列表。HookMap [Wang 2008]旨在系统地列举所有被劫持的内核挂钩（劫持挂钩的目的是隐藏rootkit）。这些方法主要集中于rootkit行为的一方面，即挂钩行为。但是，rootkit其他方面的分析也很重要。</p>
-<p>检测Rootkit的存在：相关工作的第二个领域是基于rootkit相关特性检测内核rootkit。例如，Copilot [Petroni2004]利用受信硬件收集运行时操作系统内存图像，并通过检测任何内核代码的完整性破坏来推断rootkit是否存在。这一概念已经扩展到识别其他类型的破坏：包括动态内核数据[Petroni 2006]的语义完整性，以及基于状态的内核代码控制流完整性[Petroni 2007]。其他的解决方案，如VMwatcher [Jiang 2007]和Strider GhostBuster [Wang2005]利用rootkit的自我隐藏来推断它们是否存在，即从不同的角度检测同一系统，如果检测到差异，则存在rootkit。请注意，上述所有检测rootkit存在的方法都是基于rootkit表现出的某些症状。然而，这些系统都不是用来分析内核rootkit行为的。在原则上，其中的一些系统可以用作PoKeR检测点的生成器。然而，由于这些系统是在rootkit发起攻击之后才检测rootkit的存在的，可能会漏掉一些rootkit行为。</p>
-<p>防止rootkit运行：很多研究旨在防止内核rootkit的运行。例如，Livewire [Garfinkel 2003]是基于软件虚拟的入侵检测系统，旨在保护虚拟机操作系统内核代码和关键数据结构不被修改。SecVisor [Seshadri 2007] 利用硬件虚拟化支持保护内核代码的完整性。NICKLE [Riley2008]提出了一种内存跟踪方案，确保只有经过验证的内核代码才能在内核空间中获取和执行。其他保护内核完整性的方法也被提出，例如驱动程序签名[微软]和各种驱动器验证[Kruegel2004, Wilhelm 2007]。有趣的是，虽然这些系统的主要是用于保护内核完整性，它们也可作为瞬时rootkit检测系统。恶意代码即时仿真的概念[Portokalidis 2008]也获得用户级别研究。在本研究中，我们将这一概念运用于内核级rootkit的分析。</p>
-<h2 id="8-结论"><a href="#8-结论" class="headerlink" title="8 结论"></a>8 结论</h2><p>在本文中，我们介绍了PoKeR的设计、实施和评估。PoKeR是一种内核rootkit分析器，能够生成rootkit的多方面分析：包括rootkit挂钩行为、目标内核对象、用户级影响、以及执行的rootkit代码。特别是，通过作战跟踪技术，PoKeR能够创建动态内核对象映射，这使得它能够准确地确定哪些内核对象已被rootkit修改。PoKeR也能够提取执行的rootkit代码并推断其对用户级程序产生的潜在影响。我们通过10个真实内核rootkit来评估PoKeR的性能，PoKeR的分析揭示了rootkit的各种攻击方法并证明了PoKeR的有效性。</p>
-<h2 id="9-致谢"><a href="#9-致谢" class="headerlink" title="9 致谢"></a>9 致谢</h2><p>我们要感谢我们的导师U´lfarErlingsson，以及匿名审稿人。他们大量的有见地的意见帮助我们改进</p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/yet-another-solution-to-monitortrap.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/yet-another-solution-to-monitortrap.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
-<p> <strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170330/poker" target="_blank" rel="external">内核Rootkit行为的多方面解析</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">9</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Rootkit/">Rootkit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-valgrind-memcheck"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170315/valgrind-memcheck/">如何使用Valgrind memcheck工具进行C/C++的内存漏洞检测</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170315/valgrind-memcheck/" class="article-date">
-	  <time datetime="2017-03-15T07:34:22.000Z" itemprop="datePublished">三月 15, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>译者: @一帆<br>出品：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a><br>来源：<a href="http://www.thegeekstuff.com/2011/11/valgrind-memcheck/" target="_blank" rel="external">http://www.thegeekstuff.com/2011/11/valgrind-memcheck/</a></p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<h3 id="写在最前"><a href="#写在最前" class="headerlink" title="写在最前"></a>写在最前</h3><p>系统编程的一个重要方面就是有效处理内存相关问题。编程任务越接近系统，我们便自然要面对更多与内存相关的问题。</p>
-<p>有时这些问题不是很重要，然而很多时候调试内存相关问题就变成噩梦一样。所以，很多工具可用作为调试内存问题的实践。</p>
-<p>在这篇文章中，我们会讨论最广泛应用的开源内存管理框架VALGRIND。</p>
-<pre><code>摘自 [Valgrind.org][1]：
-
-Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系列工具，其中每个可进行某种调试、剖析或相似任务来帮助我们改善程序。Valgrind的结构是模块化的，所以我们可以轻而易举地创建新工具，而不干扰现有结构。
-</code></pre><p>以下是一些标准配置的工具：</p>
+<p>This article describes an idea to monitor SYSCALL with x86 Hardware Virtualization Technology. It doesn’t require visible guest code/data modification, so that in some cases, even Kernel Patch Protection (e.g. Windows x64 PatchGuard) cannot detect it. Here the SYSCALL could also be SYSENTER or INT 80h for system calls.</p>
+<p>Actually this solution can be extended to other resource monitoring, so at the end of this article I will give an overview on how to extend this as a generic solution (in a new post, LINK?).</p>
+<p>In x86/Intel, <strong>syscall</strong> (Fast System Call) instruction is invoked by a user application at privilege level 0 to call an OS system-call handler at privilege level 0. In ARM architecture, supervisor Call (<strong>SVC</strong>, formerly SWI) does the similar thing to request privileged operations or access to system resources from an operating system. </p>
+<p>To be more specific, x86/Intel syscall does so by loading RIP from the IA32_LSTAR MSR(after saving the address of the instruction following SYSCALL, returning RIP, into RCX, so when returning back from ring 0, sysret can load that user mode RIP from RCX, and continue to execute program). The WRMSR instruction ensures that the IA32_LSTAR MSR always contain a canonical address (A #GP will be triggered if an address is not canonical when WRMSR to IA32_LSTAR).</p>
+<p>The memory address in IA32_LSTAR MSR is an entry point of kernel system-call handler, it can only be configured by software software (OS kernel, normally), and cannot be a non-canonical address. </p>
+<p><strong><em>However, the key point is here: what if that address saved in IA32_LSTAR is an invalid canonical memory address (or Non-eXecute memory address)</em></strong>. When this happens, a CPU Page Fault (#PF) will be triggered at that address. And the error code indicates that this is a page-not-present instruction fetch exception (For simplicity, we don’t consider setting Non-eXecute memory address), and CR2 control register content is just that pre-set invalid canonical memory address. </p>
+<p><strong><em>Hence, whenever a syscall is invoked by application, an intended page-not-present instruction fetch #PF will be triggered</em></strong>. Then this exception is normally handled by #PF (vector = 14) handler specified in OS IDT. </p>
+<p>In a x86/Intel virtualization environment, page faults (exception vector = 14) can be configured to trigger a VMEXIT. And even more, we can selectively make only certain type of #PFs generate VMexit by configuring the VMCS page-fault error-code mask and page-fault error-code match. For example, only page-not-present instruction fetch #PF can generate a VMexit, any other #PF exceptions (like read/write access to invalid or disallowed memory) won’t generate VMexit, instead, they are handled in guest IDT #PF handler normally. By doing so, the performance impact will be minimized. </p>
+<p>So, to summarize this solution, we could do it like this to monitor every syscall invoked by user application without guest OS changes:</p>
 <ol>
-<li>Memcheck是一个内存错误检查器。它可以帮你把程序写的更加准确，尤其是用C和C++语言编写的程序。</li>
-<li>Cachegrind是一个缓存和分支预测分析器，它可以帮你让程序跑的更快。</li>
-<li>Callgrind是一款调用图生成缓存分析器。它的一些功能与Cachegrind有重叠，但它能够收集一些Cachegrind无法得到的信息。</li>
-<li>Helgrind是一个线程错误检测器。它可以帮你编写出更准确的多线程程序。</li>
-<li>DRD也是一个线程错误检测器。尽管它与Helgrind类似，但两者却适用不同的分析方法，因此可能会找出不同的问题。</li>
-<li>Massif是一个堆分析器，它有助于减小程序运行所用内存。</li>
-<li>DHAT是另一种堆分析器。它可以帮助你了解区块的试用期、使用及布局低效问题。</li>
-<li>SGcheck是一个可以检测堆数组和全局数组溢出的工具。它的功能与Memcheck互补： SGcheck可以发现Memcheck发现不了的问题，反之亦然。 </li>
-<li>BBV是一个实验性的SimPoint基础区块向量发生器。它对于计算机架构研究和开发的进行有很大帮助。</li>
+<li><p>VMM software traps any write access to IA32_LSTAR MSR, whenever a WRMSR to IA32_LSTAR happens, VMM records the original MSR value that points to the real entry point address of kernel system-call handler, and replace it with a MAGIC &amp; INVALID memory address.</p>
+</li>
+<li><p>VMM software configures relevant VMCS structures to cause only page-not-present instruction fetch #PF trigger a VMexit.</p>
+</li>
+<li><p>At runtime, whenever such a VMexit type happens, VMM software checks guest CR2 value, if it is equal to the predefined MAGIC and INVALID value, then it means this is an intended #PF exception VMexit (not considering malicious (in)direct call to that MAGIC address), we should discard this #PF, and directly resume guest OS back with a new RIP value (it is just the original MSR value that points to the real entry point address of kernel system-call handler).</p>
+<p>Otherwise, if this #PF VMexit indicates that it is an ordinary #PF, VMM software injects this exception event back to guest OS without doing anything, then it will be normally handled by #PF handler in guest IDT table.</p>
+</li>
 </ol>
-<p>还有一些对于大多数使用者不那么好用的小工具：Lackey就是一个演示仪器基础的示范工具；Nulgrind是最小化的Valgrind工具，不做分析或操作，仅用于测试。</p>
-<p>在这篇文章我们将关注“memcheck”工具。</p>
-<h2 id="使用-Valgrind-Memcheck"><a href="#使用-Valgrind-Memcheck" class="headerlink" title="使用 Valgrind Memcheck"></a>使用 Valgrind Memcheck</h2><p>Memcheck工具的使用如下：</p>
-<pre><code>valgrind --tool=memcheck ./a.out
-</code></pre><p>从以上的命令可以清楚地看到主要的二进数是“Valgrind”，而我们想要使用的工具由选项“-tool”指定。上述“a.out”表示能够如愿以偿运行memcheck的可执行文件。</p>
-<p>这个工具可以检测以下与内存相关的问题：</p>
+<p>Therefore, in this way, whenever a syscall is invoked in user mode application, VMM software will get an notification.</p>
+<p>But there is a problem here. You can see that we don’t need to change any guest OS kernel, however, the Kernel Patch Protection module (like PatchGuard) will probably detect this by reading MSR IA32_LSTAR and comparing it with the original value. It is very easy to solve this issue by monitoring RDMSR to IA32_LSTAR register, and hiding the real value with a return of the original value previously configured by OS kernel. </p>
+<p>Actually, there is another solution that can also works, see my previous blog on <a href="http://hypervsir.blogspot.com/2014/09/debug-registers-on-intel-x86-processor.html" target="_blank" rel="external">Debug Register usages</a>… by enabling Debug breakpoint on the original address stored in IA32_LSTAR MSR by OS kernel. </p>
+<p><strong>As an aforementioned generic solution to monitor/trap a specific event that we’re interested in, here it is:</strong></p>
+<ol>
+<li><strong>Attempt to change guest software for the purpose of making some certain instruction execution generate an intended exception. (Here it is the syscall execution in this post),</strong></li>
+<li><strong>Then the virtualization software, VMM or Hypervisor, monitors that intended exception by configuring the corresponding VMCS data structures (e.g. Exception-Bitmap VMCS).</strong></li>
+</ol>
+<p><br><br>I will write a new post to explain this solution in greater details later.</p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">10</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Monitoring/">Monitoring</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Syscall/">Syscall</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtulization/">Virtulization</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-vmcs-vmxon"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/vmcs-vmxon/">VT-x技术VMXON与VMCS区域的思考-从安全的角度</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/vmcs-vmxon/" class="article-date">
+	  <time datetime="2017-05-04T07:59:28.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/09/thoughts-on-vmxon-and-vmcs-regions-in.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/09/thoughts-on-vmxon-and-vmcs-regions-in.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>Previously when I was working on a Hypervisor based on Intel VT-x. I always did exactly as what I’m told to do in the VT-x specification when programing VMM software.<br>But now I’m going to revisit this again starting by asking these questions: What if I won’t do it as what we’re told to do? Is Intel VT-x exploitable? Can we find vulnerabilities in hardware VT-x implementation? Is it possible to do “reverse-engineering” to get internals on VT-x CPU implementation? Can we take advantage of VT-x to attack other privileged resource? Can we bypass EPT layer?  However, those are just some open questions, I don’t have answers either, but it has a lot of fun when you look into it.</p>
+<h4 id="VMXON-Region"><a href="#VMXON-Region" class="headerlink" title="VMXON Region"></a><strong>VMXON Region</strong></h4><p>If you take a look at the Intel SDM (<a href="http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html" target="_blank" rel="external">Software Development Manual</a>), you can see some words about VMXON region like below:</p>
 <ul>
-<li>使用未初始化的内存</li>
-<li>对释放后的内存读/写</li>
-<li>对malloc‘d（分配内存）区块尾部读/写</li>
-<li>内存泄露</li>
-<li>对malloc/new/new[] 与 free/delete/delete[]的不匹配使用</li>
-<li>双倍释放的内存</li>
+<li><em>“Before executing VMXON, software allocates a region of memory (called the VMXON region) that the logical processor uses to support VMX operation….. Software should use a separate region for each logical processor and should not access or modify the VMXON region of a logical processor between execution of VMXON and VMXOFF on that logical processor. Doing otherwise may lead to unpredictable behaviors”</em></li>
+<li><em>“Before entering VMX operation, the host VMM allocates a VMXON region. A VMM can host several virtual machines and have many VMCSs active under its management. A unique VMCS region is required for each virtual machine; a VMXON region is required for the VMM itself.”</em><br><br></li>
 </ul>
-<p>注意：以上列表不是全部但包含了这个工具检测出来的常见问题。</p>
-<p>让我们来一一讨论以上场景：</p>
-<p>注意：所有将要展示的检测代码应用带有-g选项（用来生成memcheck输出中的行号）的gcc来编译。如我们之前在<a href="http://www.thegeekstuff.com/2011/10/c-program-to-an-executable/" target="_blank" rel="external">如何将C程序编译成可执行文件</a>的讨论中提到的，这其中需要经历4个不同的阶段。</p>
-<h3 id="1-使用未初始化内存"><a href="#1-使用未初始化内存" class="headerlink" title="1.使用未初始化内存"></a><strong>1.使用未初始化内存</strong></h3><p>代码：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span> </span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">void</span>)</span></span></div><div class="line">&#123;</div><div class="line">    <span class="keyword">char</span> *p; </div><div class="line"></div><div class="line">    <span class="keyword">char</span> c = *p; </div><div class="line"></div><div class="line">    <span class="built_in">printf</span>(<span class="string">"\n [%c]\n"</span>,c); </div><div class="line"></div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>在以上代码中，我们尝试使用一个未初始化的指针“p”。</p>
-<p>我们一起运行以下memcheck并观察结果。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line">$ valgrind --tool=memcheck ./val</div><div class="line">==<span class="number">2862</span>== Memcheck, a memory error detector</div><div class="line">==<span class="number">2862</span>== Copyright (C) <span class="number">2002</span><span class="number">-2009</span>, and GNU GPL'd, by Julian Seward et al.</div><div class="line">==<span class="number">2862</span>== Using Valgrind<span class="number">-3.6</span><span class="number">.0</span>.SVN-Debian and LibVEX; rerun with -h <span class="keyword">for</span> copyright info</div><div class="line">==<span class="number">2862</span>== Command: ./val</div><div class="line">==<span class="number">2862</span>==</div><div class="line">==<span class="number">2862</span>== Use of uninitialised value of size <span class="number">8</span></div><div class="line">==<span class="number">2862</span>==    at <span class="number">0x400530</span>: main (valgrind.c:<span class="number">8</span>)</div><div class="line">==<span class="number">2862</span>==</div><div class="line"></div><div class="line">[#]</div><div class="line">==<span class="number">2862</span>==</div><div class="line">==<span class="number">2862</span>== HEAP SUMMARY:</div><div class="line">==<span class="number">2862</span>==     in use at <span class="built_in">exit</span>: <span class="number">0</span> bytes in <span class="number">0</span> blocks</div><div class="line">==<span class="number">2862</span>==   total heap usage: <span class="number">0</span> allocs, <span class="number">0</span> frees, <span class="number">0</span> bytes allocated</div><div class="line">==<span class="number">2862</span>==</div><div class="line">==<span class="number">2862</span>== All heap blocks were freed -- no leaks are possible</div><div class="line">==<span class="number">2862</span>==</div><div class="line">==<span class="number">2862</span>== For counts of detected and suppressed errors, rerun with: -v</div><div class="line">==<span class="number">2862</span>== Use --track-origins=yes to see where uninitialized values come from</div><div class="line">==<span class="number">2862</span>== ERROR SUMMARY: <span class="number">1</span> errors from <span class="number">1</span> contexts (suppressed: <span class="number">4</span> from <span class="number">4</span>)</div></pre></td></tr></table></figure>
-<pre><code>从以上输出来看，Valgrind可以检测出未初始化的变量并发出警告（请看上面加粗的几行）。
-</code></pre><h3 id="2-对释放的后内存读-写"><a href="#2-对释放的后内存读-写" class="headerlink" title="2. 对释放的后内存读/写"></a><strong>2. 对释放的后内存读/写</strong></h3><p>代码：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span> </span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">void</span>)</span></span></div><div class="line">&#123;</div><div class="line">    <span class="keyword">char</span> *p = <span class="built_in">malloc</span>(<span class="number">1</span>);</div><div class="line">    *p = <span class="string">'a'</span>; </div><div class="line"></div><div class="line">    <span class="keyword">char</span> c = *p; </div><div class="line"></div><div class="line">    <span class="built_in">printf</span>(<span class="string">"\n [%c]\n"</span>,c); </div><div class="line"></div><div class="line">    <span class="built_in">free</span>(p);</div><div class="line">    c = *p;</div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>在以上代码中，我们释放了指针 ‘p’，然后我们又尝试利用指针获取该值. </p>
-<p>让我们运行memcheck来看一下在这种情况下Valgrind有何帮助。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div></pre></td><td class="code"><pre><div class="line">$ valgrind --tool=memcheck ./val</div><div class="line">==<span class="number">2849</span>== Memcheck, a memory error detector</div><div class="line">==<span class="number">2849</span>== Copyright (C) <span class="number">2002</span><span class="number">-2009</span>, and GNU GPL'd, by Julian Seward et al.</div><div class="line">==<span class="number">2849</span>== Using Valgrind<span class="number">-3.6</span><span class="number">.0</span>.SVN-Debian and LibVEX; rerun with -h <span class="keyword">for</span> copyright info</div><div class="line">==<span class="number">2849</span>== Command: ./val</div><div class="line">==<span class="number">2849</span>== </div><div class="line"></div><div class="line"> [a]</div><div class="line">==<span class="number">2849</span>== Invalid read of size <span class="number">1</span></div><div class="line">==<span class="number">2849</span>==    at <span class="number">0x400603</span>: main (valgrind.c:<span class="number">30</span>)</div><div class="line">==<span class="number">2849</span>==  Address <span class="number">0x51b0040</span> is <span class="number">0</span> bytes inside a block of size <span class="number">1</span> <span class="built_in">free</span>'d</div><div class="line">==<span class="number">2849</span>==    at <span class="number">0x4C270BD</span>: <span class="built_in">free</span> (vg_replace_malloc.c:<span class="number">366</span>)</div><div class="line">==<span class="number">2849</span>==    by <span class="number">0x4005FE</span>: main (valgrind.c:<span class="number">29</span>)</div><div class="line">==<span class="number">2849</span>==</div><div class="line">==<span class="number">2849</span>==</div><div class="line">==<span class="number">2849</span>== HEAP SUMMARY:</div><div class="line">==<span class="number">2849</span>==     in use at <span class="built_in">exit</span>: <span class="number">0</span> bytes in <span class="number">0</span> blocks</div><div class="line">==<span class="number">2849</span>==   total heap usage: <span class="number">1</span> allocs, <span class="number">1</span> frees, <span class="number">1</span> bytes allocated</div><div class="line">==<span class="number">2849</span>==</div><div class="line">==<span class="number">2849</span>== All heap blocks were freed -- no leaks are possible</div><div class="line">==<span class="number">2849</span>==</div><div class="line">==<span class="number">2849</span>== For counts of detected and suppressed errors, rerun with: -v</div><div class="line">==<span class="number">2849</span>== ERROR SUMMARY: <span class="number">1</span> errors from <span class="number">1</span> contexts (suppressed: <span class="number">4</span> from <span class="number">4</span>)</div></pre></td></tr></table></figure>
-<p>从以上结果看出，这个工具可以检测出无效的读取操作并输出‘Invalid read of size 1’的警告.</p>
-<p>边注：<a href="http://www.thegeekstuff.com/2010/03/debug-c-program-using-gdb/" target="_blank" rel="external">用gdb调试C语言程序</a></p>
-<h3 id="3-对malloc‘d（分配内存）区块尾部进行读-写"><a href="#3-对malloc‘d（分配内存）区块尾部进行读-写" class="headerlink" title="3.对malloc‘d（分配内存）区块尾部进行读/写"></a><strong>3.对malloc‘d（分配内存）区块尾部进行读/写</strong></h3><p>代码：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span> </span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">void</span>)</span></span></div><div class="line">&#123;</div><div class="line">    <span class="keyword">char</span> *p = <span class="built_in">malloc</span>(<span class="number">1</span>);</div><div class="line">    *p = <span class="string">'a'</span>; </div><div class="line"></div><div class="line">    <span class="keyword">char</span> c = *(p+<span class="number">1</span>); </div><div class="line"></div><div class="line">    <span class="built_in">printf</span>(<span class="string">"\n [%c]\n"</span>,c); </div><div class="line"></div><div class="line">    <span class="built_in">free</span>(p);</div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>在上面这段代码中，我们给‘p’分配了一个字节的内存，而当我们将值读取给‘c’时用的是p+1的地址。</p>
-<p>现在让我们在这段代码中运行一下Valgrind：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div></pre></td><td class="code"><pre><div class="line">$ valgrind --tool=memcheck ./val</div><div class="line">==<span class="number">2835</span>== Memcheck, a memory error detector</div><div class="line">==<span class="number">2835</span>== Copyright (C) <span class="number">2002</span><span class="number">-2009</span>, and GNU GPL'd, by Julian Seward et al.</div><div class="line">==<span class="number">2835</span>== Using Valgrind<span class="number">-3.6</span><span class="number">.0</span>.SVN-Debian and LibVEX; rerun with -h <span class="keyword">for</span> copyright info</div><div class="line">==<span class="number">2835</span>== Command: ./val</div><div class="line">==<span class="number">2835</span>==</div><div class="line">==<span class="number">2835</span>== Invalid read of size <span class="number">1</span></div><div class="line">==<span class="number">2835</span>==    at <span class="number">0x4005D9</span>: main (valgrind.c:<span class="number">25</span>)</div><div class="line">==<span class="number">2835</span>==  Address <span class="number">0x51b0041</span> is <span class="number">0</span> bytes after a block of size <span class="number">1</span> alloc'd</div><div class="line">==<span class="number">2835</span>==    at <span class="number">0x4C274A8</span>: <span class="built_in">malloc</span> (vg_replace_malloc.c:<span class="number">236</span>)</div><div class="line">==<span class="number">2835</span>==    by <span class="number">0x4005C5</span>: main (valgrind.c:<span class="number">22</span>)</div><div class="line">==<span class="number">2835</span>== </div><div class="line"></div><div class="line"> []</div><div class="line">==<span class="number">2835</span>==</div><div class="line">==<span class="number">2835</span>== HEAP SUMMARY:</div><div class="line">==<span class="number">2835</span>==     in use at <span class="built_in">exit</span>: <span class="number">0</span> bytes in <span class="number">0</span> blocks</div><div class="line">==<span class="number">2835</span>==   total heap usage: <span class="number">1</span> allocs, <span class="number">1</span> frees, <span class="number">1</span> bytes allocated</div><div class="line">==<span class="number">2835</span>==</div><div class="line">==<span class="number">2835</span>== All heap blocks were freed -- no leaks are possible</div><div class="line">==<span class="number">2835</span>==</div><div class="line">==<span class="number">2835</span>== For counts of detected and suppressed errors, rerun with: -v</div><div class="line">==<span class="number">2835</span>== ERROR SUMMARY: <span class="number">1</span> errors from <span class="number">1</span> contexts (suppressed: <span class="number">4</span> from <span class="number">4</span>)</div></pre></td></tr></table></figure></p>
-<p>同样，在这种情况下这个工具也检测出无效的读取操作。</p>
-<h3 id="4-内存泄露"><a href="#4-内存泄露" class="headerlink" title="4.内存泄露"></a><strong>4.内存泄露</strong></h3><p>代码：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span> </span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">void</span>)</span></span></div><div class="line">&#123;</div><div class="line">    <span class="keyword">char</span> *p = <span class="built_in">malloc</span>(<span class="number">1</span>);</div><div class="line">    *p = <span class="string">'a'</span>; </div><div class="line"></div><div class="line">    <span class="keyword">char</span> c = *p; </div><div class="line"></div><div class="line">    <span class="built_in">printf</span>(<span class="string">"\n [%c]\n"</span>,c); </div><div class="line"></div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>在这个代码中，我们分配了一字节的内存但没有释放它。现在让我们运行一下Valgrind来看下现象:<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div></pre></td><td class="code"><pre><div class="line">$ valgrind --tool=memcheck --leak-check=full ./val</div><div class="line">==2888== Memcheck, a memory error detector</div><div class="line">==2888== Copyright (C) 2002-2009, and GNU GPL&apos;d, by Julian Seward et al.</div><div class="line">==2888== Using Valgrind-3.6.0.SVN-Debian and LibVEX; rerun with -h for copyright info</div><div class="line">==2888== Command: ./val</div><div class="line">==2888== </div><div class="line"></div><div class="line"> [a]</div><div class="line">==2888==</div><div class="line">==2888== HEAP SUMMARY:</div><div class="line">==2888==     in use at exit: 1 bytes in 1 blocks</div><div class="line">==2888==   total heap usage: 1 allocs, 0 frees, 1 bytes allocated</div><div class="line">==2888==</div><div class="line">==2888== 1 bytes in 1 blocks are definitely lost in loss record 1 of 1</div><div class="line">==2888==    at 0x4C274A8: malloc (vg_replace_malloc.c:236)</div><div class="line">==2888==    by 0x400575: main (valgrind.c:6)</div><div class="line">==2888==</div><div class="line">==2888== LEAK SUMMARY:</div><div class="line">==2888==    definitely lost: 1 bytes in 1 blocks</div><div class="line">==2888==    indirectly lost: 0 bytes in 0 blocks</div><div class="line">==2888==      possibly lost: 0 bytes in 0 blocks</div><div class="line">==2888==    still reachable: 0 bytes in 0 blocks</div><div class="line">==2888==         suppressed: 0 bytes in 0 blocks</div><div class="line">==2888==</div><div class="line">==2888== For counts of detected and suppressed errors, rerun with: -v</div><div class="line">==2888== ERROR SUMMARY: 1 errors from 1 contexts (suppressed: 4 from 4)</div></pre></td></tr></table></figure></p>
-<p>输出行（上面加粗部分）表示这个工具是能够检测出内存泄漏的。</p>
-<p>注：在这个情况下我们加了一个额外的选择“-leak-check=full”来得到详细的内存泄漏相关细节。</p>
-<h3 id="5-对malloc-new-new-与-free-delete-delete-的不匹配使用"><a href="#5-对malloc-new-new-与-free-delete-delete-的不匹配使用" class="headerlink" title="5.对malloc/new/new[] 与 free/delete/delete[]的不匹配使用"></a><strong>5.对malloc/new/new[] 与 free/delete/delete[]的不匹配使用</strong></h3><p>代码：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span><span class="meta-string">&lt;iostream&gt;</span> </span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">void</span>)</span></span></div><div class="line">&#123;</div><div class="line">    <span class="keyword">char</span> *p = (<span class="keyword">char</span>*)<span class="built_in">malloc</span>(<span class="number">1</span>);</div><div class="line">    *p = <span class="string">'a'</span>; </div><div class="line"></div><div class="line">    <span class="keyword">char</span> c = *p; </div><div class="line"></div><div class="line">    <span class="built_in">printf</span>(<span class="string">"\n [%c]\n"</span>,c);</div><div class="line">    <span class="keyword">delete</span> p;</div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>在以上代码中，我们用到了<code>malloc()</code>来分配内存但用delete运算符来删除内存。</p>
-<p>注：我们用g++来编译以上代码，是因为delete运算符是从C++中引入的；g++工具用于C++代码编译。</p>
-<p>让我们来运行这个工具看看：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div></pre></td><td class="code"><pre><div class="line">$ valgrind --tool=memcheck --leak-check=full ./val</div><div class="line">==<span class="number">2972</span>== Memcheck, a memory error detector</div><div class="line">==<span class="number">2972</span>== Copyright (C) <span class="number">2002</span><span class="number">-2009</span>, and GNU GPL'd, by Julian Seward et al.</div><div class="line">==<span class="number">2972</span>== Using Valgrind<span class="number">-3.6</span><span class="number">.0</span>.SVN-Debian and LibVEX; rerun with -h <span class="keyword">for</span> copyright info</div><div class="line">==<span class="number">2972</span>== Command: ./val</div><div class="line">==<span class="number">2972</span>== </div><div class="line"></div><div class="line"> [a]</div><div class="line">==<span class="number">2972</span>== Mismatched <span class="built_in">free</span>() / <span class="keyword">delete</span> / <span class="keyword">delete</span> []</div><div class="line">==<span class="number">2972</span>==    at <span class="number">0x4C26DCF</span>: <span class="keyword">operator</span> <span class="keyword">delete</span>(<span class="keyword">void</span>*) (vg_replace_malloc.c:<span class="number">387</span>)</div><div class="line">==<span class="number">2972</span>==    by <span class="number">0x40080B</span>: main (valgrind.c:<span class="number">13</span>)</div><div class="line">==<span class="number">2972</span>==  Address <span class="number">0x595e040</span> is <span class="number">0</span> bytes inside a block of size <span class="number">1</span> alloc'd</div><div class="line">==<span class="number">2972</span>==    at <span class="number">0x4C274A8</span>: <span class="built_in">malloc</span> (vg_replace_malloc.c:<span class="number">236</span>)</div><div class="line">==<span class="number">2972</span>==    by <span class="number">0x4007D5</span>: main (valgrind.c:<span class="number">7</span>)</div><div class="line">==<span class="number">2972</span>==</div><div class="line">==<span class="number">2972</span>==</div><div class="line">==<span class="number">2972</span>== HEAP SUMMARY:</div><div class="line">==<span class="number">2972</span>==     in use at <span class="built_in">exit</span>: <span class="number">0</span> bytes in <span class="number">0</span> blocks</div><div class="line">==<span class="number">2972</span>==   total heap usage: <span class="number">1</span> allocs, <span class="number">1</span> frees, <span class="number">1</span> bytes allocated</div><div class="line">==<span class="number">2972</span>==</div><div class="line">==<span class="number">2972</span>== All heap blocks were freed -- no leaks are possible</div><div class="line">==<span class="number">2972</span>==</div><div class="line">==<span class="number">2972</span>== For counts of detected and suppressed errors, rerun with: -v</div><div class="line">==<span class="number">2972</span>== ERROR SUMMARY: <span class="number">1</span> errors from <span class="number">1</span> contexts (suppressed: <span class="number">4</span> from <span class="number">4</span>)</div></pre></td></tr></table></figure></p>
-<p>我们从以上输出结果（粗体显示）可以看到，这个工具清楚地说明了‘Mismatched free()/delete/delete[]’</p>
-<p>你可以试着在检测代码中结合使用‘new’和‘free’，看一看这个工具可以给出怎样的结果。</p>
-<h3 id="6-重复释放的内存"><a href="#6-重复释放的内存" class="headerlink" title="6.重复释放的内存"></a><strong>6.重复释放的内存</strong></h3><p>代码：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span> </span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">void</span>)</span></span></div><div class="line">&#123;</div><div class="line">    <span class="keyword">char</span> *p = (<span class="keyword">char</span>*)<span class="built_in">malloc</span>(<span class="number">1</span>);</div><div class="line">    *p = <span class="string">'a'</span>; </div><div class="line"></div><div class="line">    <span class="keyword">char</span> c = *p;</div><div class="line">    <span class="built_in">printf</span>(<span class="string">"\n [%c]\n"</span>,c);</div><div class="line">    <span class="built_in">free</span>(p);</div><div class="line">    <span class="built_in">free</span>(p);</div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>在这段代码中，我们两次释放了被‘p’指向的内存。现在，让我们运行以下memcheck工具：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div></pre></td><td class="code"><pre><div class="line">$ valgrind --tool=memcheck --leak-check=full ./val</div><div class="line">==<span class="number">3167</span>== Memcheck, a memory error detector</div><div class="line">==<span class="number">3167</span>== Copyright (C) <span class="number">2002</span><span class="number">-2009</span>, and GNU GPL'd, by Julian Seward et al.</div><div class="line">==<span class="number">3167</span>== Using Valgrind<span class="number">-3.6</span><span class="number">.0</span>.SVN-Debian and LibVEX; rerun with -h <span class="keyword">for</span> copyright info</div><div class="line">==<span class="number">3167</span>== Command: ./val</div><div class="line">==<span class="number">3167</span>== </div><div class="line"></div><div class="line"> [a]</div><div class="line">==<span class="number">3167</span>== Invalid <span class="built_in">free</span>() / <span class="keyword">delete</span> / <span class="keyword">delete</span>[]</div><div class="line">==<span class="number">3167</span>==    at <span class="number">0x4C270BD</span>: <span class="built_in">free</span> (vg_replace_malloc.c:<span class="number">366</span>)</div><div class="line">==<span class="number">3167</span>==    by <span class="number">0x40060A</span>: main (valgrind.c:<span class="number">12</span>)</div><div class="line">==<span class="number">3167</span>==  Address <span class="number">0x51b0040</span> is <span class="number">0</span> bytes inside a block of size <span class="number">1</span> <span class="built_in">free</span>'d</div><div class="line">==<span class="number">3167</span>==    at <span class="number">0x4C270BD</span>: <span class="built_in">free</span> (vg_replace_malloc.c:<span class="number">366</span>)</div><div class="line">==<span class="number">3167</span>==    by <span class="number">0x4005FE</span>: main (valgrind.c:<span class="number">11</span>)</div><div class="line">==<span class="number">3167</span>==</div><div class="line">==<span class="number">3167</span>==</div><div class="line">==<span class="number">3167</span>== HEAP SUMMARY:</div><div class="line">==<span class="number">3167</span>==     in use at <span class="built_in">exit</span>: <span class="number">0</span> bytes in <span class="number">0</span> blocks</div><div class="line">==<span class="number">3167</span>==   total heap usage: <span class="number">1</span> allocs, <span class="number">2</span> frees, <span class="number">1</span> bytes allocated</div><div class="line">==<span class="number">3167</span>==</div><div class="line">==<span class="number">3167</span>== All heap blocks were freed -- no leaks are possible</div><div class="line">==<span class="number">3167</span>==</div><div class="line">==<span class="number">3167</span>== For counts of detected and suppressed errors, rerun with: -v</div><div class="line">==<span class="number">3167</span>== ERROR SUMMARY: <span class="number">1</span> errors from <span class="number">1</span> contexts (suppressed: <span class="number">4</span> from <span class="number">4</span>)</div></pre></td></tr></table></figure>
-<p>从以上输出结果我们可以看到，这个工具检测出了我们对同一个指针两次释放内存的操作。</p>
-<p>在这篇文章中，我们主要介绍了内存管理框架Valgrind，然后利用memcheck工具（由这个框架提供的）来了解它是怎样方便经常与内存打交道的开发者的。这个工具可以检测很多手动检测不到的内存相关问题。</p>
+<p>When you are reading these texts, probably some questions will come out in your mind: What’re unpredictable behaviors if we modify the content of VMXON region? How is the VMXON region layout organized?*</p>
+<p>We know that basically in the IA32 specification, almost all the operations/instructions have the corresponding defined behaviors even if they are the exceptions. Why are there so many undefined behaviors for VT-x specification, can we inspect the “so-called undefined behaviors” if we modify VMXON region during the period of VMX operation?</p>
+<p>According to the VT-x specification, we also are told that the format of VMXON region is not architecturally defined, meaning that its format varies from processor generations to generations. Therefore, <strong>can we assume that “Intel says theire behaviors are unpredictable just because the format is different between VT-capable processors”? In other words, for a particular processor, the behaviors of read/write access to the VMXON region might be well-defined to some extent</strong>. If this happens to be true, then the question now is how to explore the internal structure/format of VMXON region? What are we able to do if we can exactly know the format for a particular processor? Are we able to control the VMX operation behaviors by simply programming the VMXON region with ordinary read/write access operation instructions like MOV? </p>
+<p>I don’t know the answers. But I will talk about a prototype later about how to inspect the internal format/layout of VMXON region and other VT-x regions with a software solution. </p>
+<p><br></p>
+<h4 id="VMCS-Regions"><a href="#VMCS-Regions" class="headerlink" title="VMCS Regions"></a><strong>VMCS Regions</strong></h4><p>Now let’s take a look at VMCS structure. </p>
+<p>  “Software should use the VMREAD and VMWRITE instructions to access the different fields in the current VMCS. Software should never access or modifythe VMCS data of an active VMCS using ordinary memory operations, <em>in part because the format used to store the VMCS data is implementation-specific and not architecturally defined, and also because a logical processor may maintain some VMCS data of an active VMCS on the processor and <strong>not in the VMCS region (then where?)</strong></em>. The following items detail some of the hazards of accessing VMCS data using ordinary memory operations:</p>
+<ul>
+<li>Any data read from a VMCS with an ordinary memory read does not reliably reflect the state of the VMCS. Results may vary from time to time or from logical processor to logical processor.</li>
+<li>Writing to a VMCS with an ordinary memory write is not guaranteed to have a deterministic effect on the VMCS. Doing so may cause the VMCS to become corrupted (see below).<br>(Software can avoid these hazards by removing any linear-address mappings to a VMCS region before executing a VMPTRLD for that region and by not remapping it until after executing VMCLEAR for that region.)<br>This section has identified operations that may cause a VMCS to become corrupted. These operations may cause the VMCS’s data to become undefined. Behavior may be unpredictable if that VMCS used subsequently on any logical processor. The following items detail some hazards of VMCS corruption: </li>
+<li>VM entries may fail for unexplained reasons or may load undesired processor state. </li>
+<li>The processor may not correctly support VMX non-root operation as documented and may generate unexpected VM exits. </li>
+<li>VM exits may load undesired processor state, save incorrect state into the VMCS, or cause the logical processor to transition to a shutdown state.”</li>
+</ul>
+<p>So, we know that the behaviors of VMX operations (root mode and non-root mode) are also controlled by VMCS regions, and the format/layout of those regions are also undefined, and read/write access to them with ordinary memory operations are unpredictable too.</p>
+<p><strong>How to do ‘reverse-engineering’-like things to look into the internal <em>VMXON/VMCS</em>  region memory layout</strong><br>Here is an idea (software solution, without any hardware device but a particular VT-capable processor):</p>
+<ul>
+<li>Implement a tiny VMM/Hypervisor and a tiny Guest VM software, both with only code running in ring 0 mode. No need complex things like thread, multiple processor, scheduling, interrupt/exceptions, etc.. just a piece of code that can execute in VMX root mode and non-root mode respectively. </li>
+<li>Hypervisor allocates machine physical memory spaces for VMXON and VMCS region, and make these areas visible to guest VM software so that the guest software can read/write the VMXON/VMCS memory regions directly to inspect the content. </li>
+<li>After environment is setup, we can do inspections instruction by instruction or event by event.. for example, if we want to know what memory bits are changed during a vmentry, then we can do it like this:<br>(1)  In VMX-root mode, the VMM software logs all the contents of VMCS/VMXON regions right prior to calling VMRESUME;<br>(2)  Just right after resuming back to guest, the VM software logs all the contents of VMCS/VMXON regions again, then compares the differences between this two points;<br>(3)  The difference in some of memory areas might indicate something important that can control the behaviors of VMX operations. </li>
+<li>Repeatedly do above things again and again for all kinds of VMX transition events. </li>
+<li>Besides, for VMCS regions, we can read the contents before and after a legal VMCS write instruction, for example, VMCS_WRITE(GUEST_RIP) to get what has been changed for GUEST_RIP area.</li>
+</ul>
+<p>I didn’t do this, but I think this must be fun once you can get the VT-x internals. </p>
+<p>However, even though we could get the internal VMCS/VMXON data structure layout, what can we do? Imaging that there is a bug in a Hypervisor (XEN, KVM…), e.g. a buffer/stack overflow, that can lead to arbitrary memory overwriting… see below…:-)</p>
+<p>One more question:</p>
+<ul>
+<li><strong>How does the processor determine if the current processor execution mode is in VMX root mode or non-root mode? Does it look at some certain VMX mode state bit in VMXON region or VMCS regions before executing any instruction?</strong> This is unknown to us. But if my guess is true (hope not), then we can change that corresponding bit to control instruction behavior. For example, provided that there is a vulnerability in Hypervisor that can lead us overwrite arbitrary memory including VMCS/VMXON region, we can take advantage of it to change “such a bit”, and then any malicious code that is executed in VMX non-root mode will be treated as execution in VMX root mode… this is horrible, since for example we can bypass EPT to directly write machine physical memory space even in VMX non-root mode.<br>&lt; Note that, however, for other process modes like protected mode and real mode, we can easily check CR0.PE bit, for different privilege modes (ring), we can check CPL bit of CS selector to determine ring 0~3 &gt;</li>
+</ul>
+<p>&lt; The End&gt;</p>
 <hr>
-<p>译者: @一帆<br>出品：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a><br>来源：<a href="http://www.thegeekstuff.com/2011/11/valgrind-memcheck/" target="_blank" rel="external">http://www.thegeekstuff.com/2011/11/valgrind-memcheck/</a></p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 
       
     </div>
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/二进制分析/">二进制分析<span class="article-category-count">2</span></a>
+    <a class="article-category-link" href="/categories/硬件虚拟化/">硬件虚拟化<span class="article-category-count">1</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Instrumentation/">Instrumentation</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Valgrind/">Valgrind</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/HAV/">HAV</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/VT-x/">VT-x</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
 
       
     </footer>
@@ -494,7 +349,7 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
 <!-- Table of Contents -->
 
   
-    <article id="post-phd-expectations-realities"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-monitoring-schduling"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -502,7 +357,7 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170312/phd-expectations-realities/">PhD expectations and reality</a>
+      <a class="article-title" href="/20170504/monitoring-schduling/">使用硬件虚拟化技术无感监控Windows OS调度事件</a>
     </h1>
   
 
@@ -510,48 +365,45 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
     
     <div class="article-meta">
       
-	Posted on <a href="/20170312/phd-expectations-realities/" class="article-date">
-	  <time datetime="2017-03-12T11:42:48.000Z" itemprop="datePublished">三月 12, 2017</time>
+	Posted on <a href="/20170504/monitoring-schduling/" class="article-date">
+	  <time datetime="2017-05-04T07:49:55.000Z" itemprop="datePublished">五月 4, 2017</time>
 	</a>
 
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>来源： <a href="http://nebelwelt.net/blog/20120921-phd-expectations-and-reality.html" target="_blank" rel="external">http://nebelwelt.net/blog/20120921-phd-expectations-and-reality.html</a><br>作者：<a href="http://nebelwelt.net/" target="_blank" rel="external">Mathias Payer</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/09/windows-os-thread-scheduling-monitoring.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/09/windows-os-thread-scheduling-monitoring.html</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
-<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>Deciding to do a PhD is a huge commitment as you are just dedicating a couple of years of your life to a single cause. When I decided to do a PhD in 2006 I was not completely sure what would expect me. I just finished my master of science (MSc) at ETH Zurich and I knew that I really liked working on the research project that I chose. On the other hand I worked in programming and web development for the last couple of years to finance my studies and I discovered that only doing project/programming work is too boring for me. I had no clear picture how the PhD would be like, but I assumed that it would be a combination of a continuation of the research I did during my master thesis, writing papers, going to conferences to present your research, and in the end writing a thesis that proofs your thesis statement.</p>
-<p>Many others before me have already blogged or written books about the life as a PhD student, how to carry out a PhD, defined what research, yet I think that I can add my two cents to the existing stories. My experiences are still fresh (I started my PhD in 2006, defended beginning of May 2012, and started my PostDoc here at UC Berkeley in September 2012) and I hope that I can give a good description about the qualitative aspects of a PhD.</p>
-<h2 id="The-three-phases-of-a-research-PhD"><a href="#The-three-phases-of-a-research-PhD" class="headerlink" title="The three phases of a research PhD"></a>The three phases of a research PhD</h2><p>In my time as a PhD student at ETH Zurich I had uncounted discussions with peers, assistant professors, professors, researchers, and people related to academia. During these discussions we discovered that a PhD can be segmented into three basic phases: the first phase identifies the research topic and bootstraps the student; the second phase is the productive phase where the research bears fruits and is turned into papers (or at least communicated to other people); and the last phase consists in wrapping up, writing the thesis, and finally the defense. Every successful PhD student goes through three phases during his PhD. Each phase has different requirements and relies on different personality aspects. The phases follow after each other but there is no clear transition from one phase to the other yet one knows if the transition completed.</p>
-<p>The search for the holy grail: ramping up and finding your topic</p>
-<p>The first phase of a PhD is like the ‘get to know each other’ phase at the beginning of a relationship. You don’t really know what to expect but you are interested and you want to explore. Yes, there are some peculiarities but you are not too concerned about that right now. In this first phase you dig into the field that is interesting to you and you start reading up about prior research approaches about the problem you want to tackle. Some ideas start to form in your head and you decide on a topic for your thesis. In more practical research areas you start building prototypes and you execute small tests; in more theoretical areas you try to come up with some theorems and you have a rough idea about the general topic.</p>
-<p>Depending on your adviser he or she will restrict your search in one way or another. The most restrictive adviser tells you exactly what you should do (sometimes they have a grant proposal for a specific project and/or only need a code monkey to implement their grand idea) other advisers let you run free and let you come up with your own idea in a (sub-)field. Both extremes have their advantages and the kind of adviser that is best for you is basically an optimization problem that you need to solve for yourself.</p>
-<p>On one end of the scale you are given a topic by your adviser. This approach ensures that your adviser cares/should care deeply about your project and it gives you a head start, on the other hand you’ll have to make up for this pre-selection and you’ll have a harder time to bring in your own (research) ideas into the already existing project. On the other end you can choose your topic in an open void. It is up to you to make your adviser care about the project and you need to come up with the core idea. This great opportunity usually results in additional time needed to complete this phase. In the real world your adviser will usually set the limits anywhere between these two extremes.</p>
-<p>From my experience I would say that the average student stays in this phase from one to three years. I was lucky enough to have an adviser that allowed me to choose freely in any field that he was comfortable with. During my first three years I discussed a huge set of possible research ideas with him and even after we had settled on a specific topic the details kept changing as I passed through the later phases. Two key aspects in this phase are: (i) creativity, you need to come up with a good research idea and research plan. Nobody will tell you what to do, there is neither a customer who demands a specific feature, nor is there a pre-set plan like in a play. You need to be focused and keep yourself together to pass through this phase. (ii) Due to the fact that you need an idea and you are responsible for the schedule you build up a huge amount of psychological pressure. Most people that drop out during this phase fail due to either a lack of ideas (and creativity) or because they are unable to self-organize themselves in an unstructured work environment.</p>
-<h2 id="The-paper-mill"><a href="#The-paper-mill" class="headerlink" title="The paper mill"></a>The paper mill</h2><p>After you have decided on the (main) topic of your thesis and built the first prototype (or come up with the first layout of the system) you gradually transition from the first phase to the second phase. You are now trapped in the paper mill. This is the most productive phase as you try to publish your work in as many (good) conferences as possible. The quality of your work is (somewhat) measured in the number of papers that you publish at top tier conferences. You are evaluated based on the quality of your work combined with the human factor how you present yourself.</p>
-<p>In this phase you start to become an expert in your field: you have claimed a little spot in a bigger field that you extend with your research. Your adviser will try to keep you in this phase as long as you are able to produce more good papers (given that your adviser has enough funding and that you do not run into any hard time limits given by your university).</p>
-<p>The core qualifications for this phase are that you can (i) work hard and (ii) present yourself at conferences. You have to write all these papers and at the same time you should refill your pipeline of ideas to get the next publications in order. In addition you have to express all these ideas to others and you have to play the social game at conferences. Building your social network during conferences is actually hard work and you need to try to make friends with some of the bigger shots in your field as this can be helpful for future collaborations, additional papers, or even reviews. If other people understand your ideas from beginning to end and you can convince them (in person) that the ideas are great then they are more likely to accept your paper that they’ll review later on. This (productive) phase usually lasts about two years and is your opportunity to build your social network for possible future positions. A side quest during this time is to select your thesis committee. You already know in what area you will write your thesis about, you should have an idea about your thesis statement, and you should know who the experts are in this area. Hint: conferences are a good place to chat up possible committee members!</p>
-<h2 id="The-exit-strategy-wrapping-up-and-writing-your-thesis"><a href="#The-exit-strategy-wrapping-up-and-writing-your-thesis" class="headerlink" title="The exit strategy: wrapping up and writing your thesis"></a>The exit strategy: wrapping up and writing your thesis</h2><p>After you churned out a bunch of papers during your time on the paper mill you are finally ready to graduate. At one point in time you start to feel ready, you have published a couple of papers (or at least written a couple of technical reports if you weren’t able to publish the papers) and you developed a good understanding of what research in your area is about. In your (regular or not so regular) meetings with your adviser you should also get a feeling if he or she thinks that you are ready.</p>
-<p>At ETH you write your thesis from scratch. I started with reading (or at least skimming) my prior papers before I wrote my thesis. After that I came up with the basic outline and the vision that my thesis should get across. The goal of the thesis is to write down your thesis statement and to prove said statement. It is important that your thesis is a self-contained and self-consistent document.</p>
-<p>In this phase you should have settled on your thesis committee. Your committee consists of a couple of professors (or people with a PhD depending on your university) that are experts in your area of research. These experts will read your thesis and grill you during your defense. Some people quit at this late stage of the PhD due to timing constraints or due to burn out. After a couple of years they are worn out and run into deadlines imposed by their adviser or by the university. It makes me sad when I see colleagues that come up to this point in their career and then quit so close to the finish line.</p>
-<p>The defense is the end of this last phase and after you have passed this final test you have almost completed your PhD. At most universities there are some bureaucratic hurdles that are left for you to take and there might be some minor (or major) revisions to your written thesis that you have to carry out. Other than that you are done and at some delta t after the defense you are allowed to call yourself PhD (or Dr. Sc in my case).</p>
-<h2 id="The-teaching-aspect-in-a-PhD"><a href="#The-teaching-aspect-in-a-PhD" class="headerlink" title="The teaching aspect in a PhD"></a>The teaching aspect in a PhD</h2><p>Teaching is an orthogonal experience to the research experience. At ETH you are supposed to be the teaching assistant (TA) for one lecture per semester. At the beginning you will start off as a regular TA but as you progress in your PhD you will be trusted with more and more responsibilities, e.g. you will teach lectures if the professor is sick, or you will be head TA for a complete lecture. Head TAs are responsible to coordinate the lecture, to supervise the other TAs, and to organize the individual exercises.</p>
-<p>I really enjoyed teaching during my almost 5 1/2 years at ETH and I think that it is a great experience that every PhD should have. During the exercise hours that you have to supervise you learn how to speak in front of a group (a skill that is not that common in Switzerland and that is not part of the regular curriculum at high school or college), you learn how to prepare the material so that you can present it to a group of students, and most importantly you learn how to interact with all kinds of students that have different problems with the material, the course, or a specific exercise. All in all you learn a new skill: how to teach some specific material to students. If you plan an academic career then this might come in handy at one point in time.</p>
-<h2 id="The-PhD-grind"><a href="#The-PhD-grind" class="headerlink" title="The PhD grind"></a>The PhD grind</h2><p>Right when I was finishing my thesis Philip Guo published his memoirs about his own PhD experience in an e-book called <a href="http://pgbovine.net/PhD-memoir/pguo-PhD-grind.pdf" target="_blank" rel="external">“The PhD Grind”</a>. In the book Philip tells us about his PhD experience year for year in chronological order. Each year of his PhD is covered in a chapter and he writes about all the ups and downs during that time. The book is a great read and I warmly recommend that you read it too if you are interested in research and academia.</p>
-<p>I agree with many of his observations, e.g., that it is important that you focus on conferences that your adviser already has published in recent years. Your adviser will know the right lingo and the right buzzwords for the conference and the members of the committee will know your adviser which in turn will help as well.</p>
-<p>On the other hand there are a couple of things where I don’t agree with Philip. Most importantly Philip mentioned that being a TA only delays the PhD (page 70, of the e-book). As I explained above I really valued the teaching experience - from a personal as well as from a professional point of view. During the discussions with the students I learned several new and interesting details in areas that I actually assumed to know in depth. Another area I don’t agree with Philip is about how to select your thesis committee. Philip tells us that usually the adviser selects the thesis committee (page 56, of the e-book), I on the other side had the pleasure to select my own committee. I discussed possible members of the committee with my adviser and then approached each member myself. For me this was an interesting experience - first coming up with possible and plausible fits and then approaching these professors myself.</p>
-<h2 id="Conclusion"><a href="#Conclusion" class="headerlink" title="Conclusion"></a>Conclusion</h2><p>A PhD is certainly not the right career path for everyone. Doing a PhD is challenging, requires a lot of self-control and self-organization. The PhD is not (pre-)structured and you will need a lot of creativity. In addition you get less pay than an industry position with a comparable education. On the other hand you learn a huge amount of new skills during your PhD. This is your opportunity to do academic research, you can publish at conferences, you’ll meet a huge amount of new people, and you learn to network. I enjoyed my time and I recommend doing a PhD to all the curious and interested people out there that are interested in academia and who want to go that extra mile.</p>
+<p>A <strong><a href="http://en.wikipedia.org/wiki/Rootkit" target="_blank" rel="external">rootkit</a></strong> is a stealthy type of software, typically malicious, designed to hide the existence of itself or certain processes/programs from normal methods of detection and enable continued privileged access to a computer. However, even though the malicious process/program can be invisible to users, internally it must have to get time slices for running, otherwise if it has no chance to get scheduled by CPU, such an existence is meaningless for malware author. </p>
+<p>This article provides a solution to detect the malware and inspect its behaviors by monitoring each OS thread scheduling event.</p>
+<p>This article is organized into two parts: 1) explain Windows scheduling things and related data structures; 2) then explain how to get notified in underlying VMM software without any changes to guest Windows OS.</p>
+<h4 id="Windows-thread-scheduling"><a href="#Windows-thread-scheduling" class="headerlink" title="Windows thread scheduling"></a><strong>Windows thread scheduling</strong></h4><p>Thread (rather than Process) is the fundamental schedulable entity in the Windows operating system. It is represented by a <strong><a href="http://www.nirsoft.net/kernel_struct/vista/ETHREAD.html" target="_blank" rel="external">_ETHREAD</a></strong> structure that includes a <strong><a href="http://www.nirsoft.net/kernel_struct/vista/KETHREAD.html" target="_blank" rel="external">_KTHREAD structure</a></strong>. For every thread in the system there is an ETHREAD structure, including threads in the System Idle Process. The ETHREAD.<strong><em>Tcb</em></strong> field (Thread Control Block)/KTHREAD is used to store information related to thread scheduling. Every process stores a list of ETHREAD structures, representing all the threads running in that process, in the <strong><em>TheadListHead</em></strong> field of the <strong><a href="http://www.nirsoft.net/kernel_struct/vista/_EPROCESS.html" target="_blank" rel="external">_EPROCESS</a></strong> structure.</p>
+<p>In a SMP system, each processor (CPU) has a unique <strong><a href="http://www.nirsoft.net/kernel_struct/vista/KPCR.html" target="_blank" rel="external">KPCR</a></strong> (Kernel Processor Control Region) structure, which contains per-CPU information shared by the kernel and the HAL. In this structure, there is a <strong><em>Prcb</em></strong> field, contains an embedded <strong><a href="http://www.nirsoft.net/kernel_struct/vista/KPRCB.html" target="_blank" rel="external">KPRCB</a></strong> structure that represents the Kernel Processor Control Block. And in this KPRCB structure, there is a field <strong><em>CurrentThread</em></strong> that pointers to the KTHREAD of current running thread on this processor. </p>
+<p>Here is the interesting thing, before scheduling to a particular thread for running, the OS scheduler will update the pointer field <strong><em>CurrentThread</em></strong> with that corresponding KTHEAD structure. Besides, in a 32bit Windows OS, the KPCR of the current CPU is always accessible at FS:[0] in kernel, while in a x64 Windows OS it is always at GS:[0] in kernel space.  Here below illustrates the relationship:</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/FS-GS.png" target="_blank" rel="external"><br>    <img src="http://oij0laovn.bkt.clouddn.com/FS-GS.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>As long as we get the address of KTHREAD structure of particular thread, we can also get the address of ETHREAD structure, because the KTHRAD is embedded in (not pointed by) the ETHREAD structure, and KTHREAD is the first field of ETHREAD, the address of ETHREAD and KTHREAD is the same for a particular thread. Besides, we can also get the address of EPROCESS information structure by KTHEAD-&gt;Process for the process which that running thread belongs to. </p>
+<p>Once we get this process information, we can analyze it and check if it is a hidden malicious process for example by analyzing this process signatures. </p>
+<p>So now the question is how to get notified before a particular thread gets scheduled to run? The second part below explains one of implementations.</p>
+<p><br></p>
+<h4 id="Monitoring-thread-scheduling-events-with-debug-register"><a href="#Monitoring-thread-scheduling-events-with-debug-register" class="headerlink" title="Monitoring thread scheduling events with debug register."></a><strong>Monitoring thread scheduling events with debug register.</strong></h4><p>In order to monitor the changes to the field “PKTHREAD <strong><em>CurrentThread</em></strong> “ in _KPRCB structure, one of approaches is presented in <strong><a href="http://hypervsir.blogspot.com/2014/09/debug-registers-on-intel-x86-processor.html" target="_blank" rel="external">my previous blog for Debug Register usages</a></strong>. We can set the address of that field into one of DR0~DR3 registers, and configure the hardware breakpoint condition as WRITE triggering. Whenever the OS scheduler updates that field, a #DB exception will be generated by processor. If such an exception is configured by VMM to generate a VMexit, then the corresponding VMM exit handler will be invoked to handle this event. </p>
+<p>Now, the problem is how to get the address of that field “PKTHREAD <strong><em>CurrentThread</em></strong> “. See the picture above, originally we must have to retrieve the segment base address for FS segment or GS segment. Fortunately, we can directly read the guest FS_BASE_MSR (one of <strong><a href="http://en.wikipedia.org/wiki/Model-specific_register" target="_blank" rel="external">Model Specific Registers</a></strong>, the index is 0xC0000100) on 32bit OS and GS_BASE_MSR (0xC0000101) on 64bit OS to get that base address value. After getting this address value, we can walk through the KPCR and KPRCB structure to get the address of that field “PKTHREAD <strong><em>CurrentThread</em></strong> “. </p>
+<p>However, this solution might be only for academic/research or education purposes because it has some limitations, for example, all the data structures (KPCR, KPRCB, THREAD, ETHREAD) might be changed from OS version to version so it is not to walk through the data structure for all OS versions, it also may have compatibility issue with 3rd party software debugger because it must have to use one of debug registers, performance overhead might also be a problem because whenever a thread scheduling event occurs, there will be a #DB exception triggered. </p>
+<p> &lt; The End&gt;</p>
+<hr>
+<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 
       
     </div>
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/博士之路/">博士之路<span class="article-category-count">2</span></a>
+    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">10</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Ph-D/">Ph.D</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/HAV/">HAV</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Monitoring/">Monitoring</a></li></ul>
 
       
     </footer>
@@ -562,7 +414,7 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
 <!-- Table of Contents -->
 
   
-    <article id="post-paperwriting-collaboration"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-mtf"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -570,7 +422,7 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170312/paperwriting-collaboration/">On collaborative (remote) paper writing</a>
+      <a class="article-title" href="/20170504/mtf/">MTF在基于EPT的客户机物理内存监控中的使用</a>
     </h1>
   
 
@@ -578,48 +430,37 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
     
     <div class="article-meta">
       
-	Posted on <a href="/20170312/paperwriting-collaboration/" class="article-date">
-	  <time datetime="2017-03-12T11:28:17.000Z" itemprop="datePublished">三月 12, 2017</time>
+	Posted on <a href="/20170504/mtf/" class="article-date">
+	  <time datetime="2017-05-04T07:46:37.000Z" itemprop="datePublished">五月 4, 2017</time>
 	</a>
 
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>来源：<a href="http://nebelwelt.net/blog/category/academia.html" target="_blank" rel="external">http://nebelwelt.net/blog/category/academia.html</a><br>作者: <a href="http://nebelwelt.net/" target="_blank" rel="external">Mathias Payer</a></p>
+        <p>作者：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>来源：<a href="http://hypervsir.blogspot.com/2014/11/monitor-trap-flag-mtf-usage-in-ept.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/monitor-trap-flag-mtf-usage-in-ept.html</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
-<p>Writing scientific conference or journal papers is an art by itself. This article is not about writing great papers as there already are many good articles that focus on paper writing itself and cover technical aspects, structural aspects, or writing style aspects. In this article I want to give an overview of collaborative writing and some experiences I had during the last couple of scientific paper submissions.</p>
-<p>Simple collaborative writing starts in a sequential mode where always one party is writing and another party gives feedback or carries out slight changes to the paper. This simple model fits the adviser and grad student model fairly well, where the grad student produces individual drafts of a paper and the adviser gives feedback on each draft. The draft can start off with a vague description of the actual research project and many research questions might only be answered along the way, yet the model is very simple and also easy to coordinate: either push based, where the adviser explicitly asks for feedback or pull based, where the adviser periodically pulls for progress from the student.</p>
-<p>But as soon as either (i) more people join the project, (ii) not all team members are at the same physical location (i.e., all hands on meetings are no longer possible or easily possible), or (iii) the collaboration becomes more interactive it gets more complicated. Some of the questions that arise are:</p>
-<pre><code>* How can we write concurrently on different sections?
-* How can we coordinate a common goal or structural changes?
-* How do we stay focuesed and on track?
-</code></pre><p>In my (limited and still very short) experience it makes sense to group the collaborative writing process into three phases: (i) the brainstorming and research phase when the project is still very volatile, (ii) the distributed paper writing phase where the key points are shaped, and (iii) the freeze phase where individual sections are finished and closed off before the final submission.</p>
-<h2 id="Brainstorming-and-research-phase"><a href="#Brainstorming-and-research-phase" class="headerlink" title="Brainstorming and research phase"></a><strong>Brainstorming and research phase</strong></h2><p>During this phase the project is still fresh and very volatile: not all research questions have to be fully defined yet. A shared document (a wiki page or a shared Google document) is crucial to fast track this process as it offers a convenient way to write down notes and a rough design section of the project. An additional section can cover related work and key differences between the current project and all other related projects. At this point in time it does not make sense to write abstract, introduction, conclusion yet, as the direction of the project might still change.</p>
-<p>As time progresses, the first results of the evaluation can be added into their own section. This is also a great time to do weekly (or bi-weekly) status meetings, either via phone call, skype/hangout, or email. This phase progresses until a couple of weeks before the submission deadline and the results in the evaluation should improve continuously.</p>
-<h2 id="Distributed-paper-writing-phase"><a href="#Distributed-paper-writing-phase" class="headerlink" title="Distributed paper writing phase"></a><strong>Distributed paper writing phase</strong></h2><p>The “hot” paper writing phase starts a couple of weeks (at least 2, ideally 3-5) before the paper deadline. The existing text is moved from the wiki page (or Google document) into a source repository and formatted according to the submission guidelines of the conference (or journal).</p>
-<p>To produce a great final paper I propose a weekly build cycle but you can obviously adjust the time for each sub task to your needs. Each cycle consists of the following sub tasks: (i) 4 days of concurrent modifications with (sub-)section-level locks, (ii) 1 day reading pass, and (iii) asking for external feedback.</p>
-<h3 id="Concurrent-modification"><a href="#Concurrent-modification" class="headerlink" title="Concurrent modification"></a>Concurrent modification</h3><p>During this task all team members collaborate on the paper and update individual sections of the paper concurrently. The paper and all files are already in a source revision system. Most of these systems like git or svn handle partial concurrent textual changes and simple conflicts even in monolithic files fairly well (e.g., person A changes the first section while person B changes the second section concurrently). The discussion of using a single monolithic file versus per section files is almost religious (just like vim versus emacs) but I like monolithic files due to, e.g., the simplicity of moving text around, and the ease of global string replacement.</p>
-<p>But as soon as two persons change the same section concurrently it becomes very hard to resolve conflicts. To reduce the risk of conflicts it helps if we use explicit locks (i.e., only the person that currently holds the lock for a specific section is allowed to edit and change that section). Depending on the size of the team different lock strategies are possible. For small teams it can be advantageous to send explicit emails to all team members, thereby pushing explicit lock information. If the teams are larger then the amount of emails explodes and it becomes confusing who currently holds which locks. The wiki page (or Google document) from the first phase comes to the rescue again: the shared document can be used to keep track (on a per section basis) who holds which locks and if all team members acquire/release their locks as they work on their sections the risk for conflicts is eliminated. The shared document also allows queues on who requires the lock when it is released, depending on the protocol the releasing team member can send a direct push email to the person that continues on that section.</p>
-<h3 id="Bookkeeping-and-full-passes"><a href="#Bookkeeping-and-full-passes" class="headerlink" title="Bookkeeping and full passes"></a>Bookkeeping and full passes</h3><p>Every couple of days it makes sense to temporarily freeze all sections to allow a synchronized reading pass. Team members concurrently read the paper from beginning to end. In this pass there are only two kinds of changes allowed: (i) typos, phrasing, and wording and (ii) adding todo notes to individual sections that are then handled by the team member who is responsible for this section in the next concurrent modification pass.</p>
-<p>After the reading passes each team member commits a list of remaining task to the shared document and lists open questions that are discussed during the next meeting.</p>
-<h3 id="External-reviews"><a href="#External-reviews" class="headerlink" title="External reviews"></a>External reviews</h3><p>At the end of each bookkeeping pass it makes sense to generate a draft and send it to (i) advisers or more remote team members so that they can give feedback on the progress as well, (ii) friends who never read the paper to get valuable first-hand comments, and, as soon as the paper is mature enough, (iii) send it to external reviewers that can give detailed and harsh feedback.</p>
-<p>Depending on the amount of passes you can do (i.e., how many weeks you have left until the deadline) you can stretch out your friends and send different papers to different sets of friends, but remember that you should not overburden your colleagues as they might work towards the same deadline (and always return the favor of reviewing papers for them as well) and that each person can only read a paper for the first time once (this step is very important as a potential reviewer will read the paper as a first time reader without any prior knowledge about the idea, design, or other background information).</p>
-<p>The feedback from this task is then applied concurrently during the next concurrent writing phase. Individual reviews will dribble in asynchronously and can be discussed on demand.</p>
-<h3 id="Freeze-phase"><a href="#Freeze-phase" class="headerlink" title="Freeze phase"></a>Freeze phase</h3><p>One to two days before the deadline the lead author should start to freeze sections by marking sections as frozen in the shared locking document. A frozen section indicates that only the lead author may change any text in this section and only after a second person has reviewed this change.</p>
-<p>The last hours before the deadline are always very stressful and human mistakes tend to pile up. Freezing sections and requiring a two person review reduces the risk of human errors and makes the submission process smoother. Also remember to submit individual versions of the paper after every couple of changes, best start submitting the first versions when you start freezing sections.</p>
-<h2 id="Conclusion"><a href="#Conclusion" class="headerlink" title="Conclusion"></a><strong>Conclusion</strong></h2><p>Writing papers is fun and writing in a big collaboration that is remote can be fun too! Collaboration and team work always includes additional challenges but if you prepare well and are willing to adhere to a strict regimen: (i) synchronization is crucial and you should know what the other team members are doing, (ii) lock pages only work if people actually keep track of the logs, and (iii) you must keep track of the schedule to send out the drafts for external reviews. So enjoy your next collaborative research project!</p>
+<p>Monitor Trap Flag (MTF) is a flag specifically designed for single-stepping in x86/Intel hardware virtualization VT-x technology. When MTF is set, the guest will trigger a VM Exit after executing each instruction (need to consider NMI or other interrupt delivery boundary). This <a href="https://www.cerias.purdue.edu/assets/pdf/bibtex_archive/2013-5.pdf" target="_blank" rel="external">paper</a> presents an idea to use MTF for memory write allowing when monitoring modification to guest virtual-to-physical mapping (page table entries) tables. </p>
+<p>In that paper (SPIDER: Stealthy Binary Program Instrumentation and Debugging via Hardware Virtualization), it details a solution to trap guest virtual-to-physical mapping address changes by monitoring the corresponding guest page tables. <strong>Based upon my previous experience, monitoring page table entries (with read-only permission in EPT PTE settings) will cause significant performance cost</strong>. In this post, I am not challenging that solution since it is not a product after all.</p>
+<p>As we all know that EPT can be configured to monitor guest physical memory access with appropriate RWX permission settings. For example, for a guest data page, we can configure the corresponding EPT page table entry with !W permission, then whenever the processor fetches the instructions in that guest physical page for execution (e.g. code injection for shellcode execution), an EPT violation vmexit (or <a href="http://hypervsir.blogspot.com/2014/10/thoughts-on-virtualization-exception.html" target="_blank" rel="external">#VE interrupt</a>) will occur. </p>
+<p>However, the contents of some guest physical page might be swapped out to disk by OS under a low memory pressure condition, and then that physical page might be remapped to another guest virtual address used for by other process. In this case, we must restore the EPT permission to default (e.g. RWX), otherwise there are many unwanted EPT violations occur. </p>
+<p>One of solutions is to monitor guest virtual-to-physical mapping page table entries just as what the paper does. For example, we can monitor guest PTE page (guest physical address) with EPT Read-Only permission. Whenever a page remapping is required, the guest OS kernel will update the corresponding guest PTE entry. </p>
+<p>Since the PTE entry in EPT permission is read-only, any change to that entry will trigger EPT violation vmexit. After hypervisor captures this event, it will record the current values of PTE entry, then temporarily set the PTE page to writable and let the guest single-step (through enabling MTF) through the instruction that performs the write access. <strong>After the single-stepping, hypervisor will read the new values of PTE entry and see which ones of them have been modified, and take appropriate actions based up mapping updates. After that, hypervisor will disable MTF flag and set the PTE page back to read-only to capture future remapping event.</strong></p>
+<p>In the real case, the guest page table may have multiple levels, also changes to page table entries<br>may be very frequent, and minimal EPT page granularity is 4KB (too large), therefore this can only be an experimental solution due to huge performance penalty.</p>
+<p>However, using MTF flag to grant a data write access and/or inspect the write content on a data page that is wrote less frequently is acceptable.</p>
+<hr>
+<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 
       
     </div>
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/博士之路/">博士之路<span class="article-category-count">2</span></a>
+    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">10</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Ph-D/">Ph.D</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Ppaerwriting/">Ppaerwriting</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/HAV/">HAV</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Hardware/">Hardware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Monitoring/">Monitoring</a></li></ul>
 
       
     </footer>
@@ -634,7 +475,7 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
 
   <nav id="page-nav">
     
-    <a class="extend prev" rel="prev" href="/page/4/">上一页</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/3/">3</a><a class="page-number" href="/page/4/">4</a><span class="page-number current">5</span><a class="page-number" href="/page/6/">6</a><a class="page-number" href="/page/7/">7</a><span class="space">&hellip;</span><a class="page-number" href="/page/16/">16</a><a class="extend next" rel="next" href="/page/6/">下一页</a>
+    <a class="extend prev" rel="prev" href="/page/4/">上一页</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/3/">3</a><a class="page-number" href="/page/4/">4</a><span class="page-number current">5</span><a class="page-number" href="/page/6/">6</a><a class="page-number" href="/page/7/">7</a><span class="space">&hellip;</span><a class="page-number" href="/page/20/">20</a><a class="extend next" rel="next" href="/page/6/">下一页</a>
   </nav>
 
 </section>
@@ -729,7 +570,7 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/monitoring-int80/">X86/Intel虚拟化技术监控/陷入软件中断INT80H系统调用</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/cfi-development/">控制流完整性的发展历程</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -741,7 +582,7 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/unpriviledged-ins/">非特权指令的内核信息泄露</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/cfi-ccs05/">控制流完整性-CCS05年论文</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -753,7 +594,7 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/hav-exception/">对硬件虚拟化异常的思考(#VE)</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/rop-intel/">因特尔发布新的技术规范去防御 ROP 攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -765,7 +606,7 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/monitoring-syscall/">X86虚拟化技术监控/陷入SYSCALL的另一种方法</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/ropjop-research/">ROP/JOP攻击与防御最新研究进展</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -777,7 +618,7 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/vmcs-vmxon/">VT-x技术VMXON与VMCS区域的思考-从安全的角度</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/nmi-virtual/">虚拟化技术的NMI窗口退出</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -789,7 +630,7 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/monitoring-schduling/">使用硬件虚拟化技术无感监控Windows OS调度事件</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/lbr-ret2dir/">利用LBR特性检测ret2dir攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -801,7 +642,7 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/mtf/">MTF在基于EPT的客户机物理内存监控中的使用</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/virtual-ret2dir/">利用虚拟化技术防御ret2dir攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -813,7 +654,7 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/hardware-security-x86arm/">X86&amp;ARM架构处理器硬件安全特性</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/smep-nx/">利用NX位实现基于软件的SMEP</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -825,7 +666,7 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/xen-snapshot/">XEN快照机制</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/smep-virtual/">如何利用虚拟化技术实现基于软件的SMEP(监督模式执行)</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -837,7 +678,7 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/xen-event/">XEN事件通道机制及其实例</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/tsx-exploit/">TSX处理器技术对漏洞利用意味着什么？</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -849,7 +690,7 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/kvm-migration/">KVM迁移中脏页位图机制源码分析</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/lbr-idthooking/">使用LRB(最近分支记录)特性检测IDT Hooking</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -861,7 +702,7 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/kvm-exception/">KVM异常处理流程源码简要分析</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/bitvisor/">BitVisor- 一种实施I/O设备安全的轻量级Hypervisor</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -873,7 +714,7 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/qemukvm-source2/">Qemu-KVM虚拟机初始化及创建过程源码简要分析（二）</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/xencolor/">Xen模式：你的XEN是什么颜色？</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -885,7 +726,7 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/qemukvm-source1/">Qemu-KVM虚拟机初始化及创建过程源码简要分析（一）</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/securekernel-design/">这是Linux内核中一种好的安全设计吗- thread_info和内核栈的联系</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -897,8 +738,8 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170401/keylogger/">Keylogger检测</a></h6>
-          <!--  <span>四月 1, 2017</span> -->
+              <h6 style="margin: 0;"><a href="/20170504/secureos/">安全操作系统内核设计：一种阻止恶意软件覆盖关键系统内核数据结构的思想</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
             </div>
 
           </li>
@@ -909,8 +750,8 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170401/winkernelmal/">深入探索windows内核rootkit动态分析</a></h6>
-          <!--  <span>四月 1, 2017</span> -->
+              <h6 style="margin: 0;"><a href="/20170504/rop-jop/">一种运行时无感的方法防御ROP和JOP攻击</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
             </div>
 
           </li>
@@ -925,7 +766,7 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">10</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">8</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">10</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -935,7 +776,7 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.73px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 18.18px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.73px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 11.82px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.91px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 17.27px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 16.36px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.45px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.82px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 12.73px;">Monitoring</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.91px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.91px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 16.36px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.82px;">Rootkit</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.91px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.09px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 12.73px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 11.82px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.43px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.14px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.71px;">Binary</a> <a href="/tags/CFI/" style="font-size: 10.71px;">CFI</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.14px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 12.86px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 17.86px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.14px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 14.29px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.71px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.71px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.57px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.43px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.14px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 12.86px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 12.86px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.71px;">Malware</a> <a href="/tags/Memory/" style="font-size: 12.86px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.43px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 12.14px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.71px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.71px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.71px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.14px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.71px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.43px;">Rootkit</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.71px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.71px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.57px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.43px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.29px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 12.14px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 12.86px;">XEN</a>
     </div>
   </div>
 

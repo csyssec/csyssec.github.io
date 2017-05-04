@@ -106,7 +106,7 @@
         
           <section id="main">
   
-    <article id="post-winkernelmal"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-rop-jop"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -114,7 +114,7 @@
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170401/winkernelmal/">深入探索windows内核rootkit动态分析</a>
+      <a class="article-title" href="/20170504/rop-jop/">一种运行时无感的方法防御ROP和JOP攻击</a>
     </h1>
   
 
@@ -122,204 +122,42 @@
     
     <div class="article-meta">
       
-	Posted on <a href="/20170401/winkernelmal/" class="article-date">
-	  <time datetime="2017-04-01T02:48:38.000Z" itemprop="datePublished">四月 1, 2017</time>
+	Posted on <a href="/20170504/rop-jop/" class="article-date">
+	  <time datetime="2017-05-04T10:14:02.000Z" itemprop="datePublished">五月 4, 2017</time>
 	</a>
 
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Source: <a href="https://www.lastline.com/labsblog/high-resolution-dynamic-analysis-of-windows-kernel-rootkits/" target="_blank" rel="external">https://www.lastline.com/labsblog/high-resolution-dynamic-analysis-of-windows-kernel-rootkits/</a></p>
-<p>Author: <a href="https://www.lastline.com/author/clemens/" target="_blank" rel="external">Clemens Kolbitsch</a></p>
-<pre><code>Clemens is a Security Researcher and engine developer at Lastline. As a lead-developer of Anubis, he has gained profound expertise in analyzing current, malicious code found in the wild. He has observed various trends in the malware community and successfully published peer-reviewed research papers. In the past, he also investigated offensive technologies presenting results at conferences such as BlackHat.
-</code></pre><hr>
-<p>Many recently-discovered sophisticated attacks against Windows users have been found to use at least one component executing in the kernel of the operating system. Examples for such APT attacks are Equation, Regin, Dark Hotel, or Turla/Uroburos, and they have received a lot of scrutiny from the security and research community.</p>
-<p>These threats are particularly pernicious because their kernel components are running with the highest level of permissions available on a computer system. As such, it is very difficult for traditional antivirus systems to detect (or protect) a computer system from these attacks, because the attacker is running with the same (or higher!) permissions as the AV solution.</p>
-<p>At the same time, it is far from trivial to analyze such kernel-based APTs inside a traditional sandboxing system, as kernel behavior often lies outside the scope of what can be monitored using traditional hooking mechanisms.</p>
-<p>In this post, we will show how the latest release of the Lastline Breach Detection Platform using a full-system emulation approach defeats even the latest version of kernel-based attacks. In a series of follow-up posts, we will focus on individual APT families and techniques, and detail how our sandbox can be used to analyze and detect these threats.</p>
-<h2 id="Analysis-of-Malicious-Code-in-the-Kernel"><a href="#Analysis-of-Malicious-Code-in-the-Kernel" class="headerlink" title="Analysis of Malicious Code in the Kernel"></a>Analysis of Malicious Code in the Kernel</h2><p>Most traditional sandboxes available today are based on intercepting API function invocations by placing hooks into the user-mode libraries loaded by a program under analysis. The idea is to intercept – and sometimes even tamper with – any parameters passed to functions that can be used to perform security-relevant behavior on a system.</p>
-<p>Some slightly more advanced sandboxes are also able to intercept system calls invoked by the analyzed program, to address the case in which evasive malware bypasses user-mode functions and interacts with the operating system kernel directly. In both systems, the core idea is to interrupt the execution of malicious code at certain points of interest in order to extract and log the functions (and their arguments) that represent the actions performed by the program under analysis.</p>
-<p>When malware manages to load one of its components into the kernel (for example via an exploit, as we will cover in a follow-up post), this malicious component is loaded indistinguishably from trusted, operating-system code. At this point, it is no longer feasible to monitor actions triggered by malware code using traditional hooking mechanisms, as the malware behaviors do not rely on invocations of user-mode APIs or system calls any longer.<br>With the rise and prevalence of kernel-mode APTs, it is crucial to overcome this problem in order to defend against these recent attacks.</p>
-<p>Lastline’s high-resolution sandbox uses a full-system emulation approach, which allows the sandbox to see every instruction executed inside the analysis environment. This allows our engine to interrupt the execution of an interesting piece of code at any time (and not only when an API function or system call is invoked) to extract behavior, regardless of whether the malicious code is running in the context of a user-application or the operating system’s kernel. At the same time, our approach allows us to track which code has been loaded or modified from the context of untrusted operations (such as newly-loaded drivers) and thus track which code belongs to the original, trusted kernel, and what code is part of the malware threat and, therefore, requires special attention.</p>
-<h2 id="Anatomy-of-Traditional-Kernel-Rootkits"><a href="#Anatomy-of-Traditional-Kernel-Rootkits" class="headerlink" title="Anatomy of Traditional Kernel-Rootkits"></a>Anatomy of Traditional Kernel-Rootkits</h2><p>To start off, let us take a brief look at how kernel-based attacks have worked in the past. While some of the attacks described below are rather well-understood, they nevertheless highlight a few key concepts a next-generation analysis sandbox has to fulfill to allow for the analysis of kernel-based malicious code.</p>
-<p>Most traditional rootkits have the ability to hide the user-mode components of a malicious program. This is typically used to hide these components from AV software or analysts looking for signs of an infection. This can be achieved by hooking or modifying critical system tables, such as SSDT or IDT, or by modifying other kernel memory regions, such as code or data sections of system modules.</p>
-<p>For such rootkits, the infection typically works as follows: First, an attacker exploits a user system (for example, the attacker tricks the user to visit a URL serving a drive-by download exploit attacking the user’s browser), loading a piece of malicious code into the kernel. This code then intercepts any system call invoked by user-mode applications, and filters any data returned to a program that would reveal the infection. For example, if a security product is looking for newly-generated files in a directory, this filter function would simply remove any malicious files before returning a directory listing to the requesting program. In a similar way, these hooks can filter and hide the presence of registry modifications, running processes, or any other event generated by the attacker.</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>As one might have guessed, the presence of such filtering code loaded into the kernel is very indicative of malicious activity. Therefore, the Lastline analysis engine is able to analyze any code that is newly loaded into the kernel of the operating system under analysis.</p>
-<p>Additionally, whenever a critical function or memory location is hooked or modified, the analysis system uses this information to classify the origin of this code as malicious. At the same time, the analysis report exposes all this information with details on the type of function that was hooked or modified, providing analysts with highly-valuable information about the attack:</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal2.png" width="450"></a><br>    <figcaption>Analysis report showing kernel modification </figcaption><br></figure>
-
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal3.png" width="450"></a><br>    <figcaption>Analysis report showing SSDT hooks modification</figcaption><br></figure>
-
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal4.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal4.png" width="450"></a><br>    <figcaption>Analysis report showing critical kernel memory region modification</figcaption><br></figure>
-
-<p>Anatomy of Kernel-Based APTs<br>Recent waves of APT-attacks, such as Regin, Dark Hotel, or Turla/Uroburos, have shown that malware authors are using these rootkit techniques not only to hide the presence of other user-mode components, but also to leverage the privileges of kernel-code and integrate much more sophisticated behavior directly into the kernel-components. Examples of such added functionality are the ability to inject arbitrary code into running processes, or code to download and install further code, directly from the context of the kernel.</p>
-<p>At the same time, these APTs have also become more evasive against traditional, signature-based detection systems. Very often, they use encryption and loading in multiple stages to hinder analysis. Often they use hidden and encrypted files in unpartitioned sections of the file-system to hide their presence, even when the system is booted using a trusted, uncompromised kernel to analyze an infected host.</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal5.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal5.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-<p>With full visibility into any malicious code running in user or kernel context, the Lastline sandbox is able to perform comprehensive analysis of any such components. Whenever the engine sees that untrusted code tampers with or injects code into another user-mode process, the system includes any behavior exhibited by the modified user-process in the analysis.</p>
-<p>This way, our analysis results reflect the full chain of infection, from the initial exploit modifying the kernel, all the way to kernel code spreading to other user-mode processes.</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal6.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal6.png" width="450"></a><br>    <figcaption>Analysis report showing kernel-memory hooking and user-mode injections</figcaption><br></figure>
-
-<h2 id="Understanding-Kernel-Modifications-Necrus"><a href="#Understanding-Kernel-Modifications-Necrus" class="headerlink" title="Understanding Kernel Modifications: Necrus"></a>Understanding Kernel Modifications: Necrus</h2><p>As we have described in a <a href="http://lastline.wpengine.com/labsblog/exploit-analysis-via-process-snapshotting" target="_blank" rel="external">previous post on process snapshotting</a>, the Lastline analysis engine allows a security analyst to expose memory dumps from various stages of the malware execution in addition to the detailed description of the behavior observed during analysis.</p>
-<p>This is no different for kernel-based malicious code, so let us use a variant of the Necrus Rootkit to take a deeper look at how this malware behaves as part of the kernel.</p>
-<p>As any analyst who has worked on Necrus (or really any kernel rootkit) knows, it is very tedious to analyze and understand the various decryption loops obfuscating the interesting payload of a kernel driver.</p>
-<p>The following snippet of code shows just one such decryption loop present in Necrus:</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal7.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal7.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>In addition to using various obfuscation/decryption loops, Necrus also contains fake entries in the import table that are not related to any payload functionality:</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal8.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal8.png" width="450"></a><br>    <figcaption>Function Exports in IDA</figcaption><br></figure>
-
-<p>Luckily for this analysis, we can skip the description of how to set up a kernel debugger to intercept execution when the kernel component has decrypted itself. The Lastline analysis engine does all of this automatically and provides us with a decrypted, de-obfuscated, repackaged executable snapshot that can be loaded via IDA Pro.</p>
-<p>Once opened in IDA, the snapshot reveals all information about the decrypted payload. For example, the Rebuilt APIs section contains information about imports pointing to decrypted payload functionality:</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal9.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal9.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>Starting from this table, it is trivial to find a particular hook the analyst is interested in. For example, we can follow KeServiceDescriptorTable, which reveals that the sample patches the SSDT, and sets hooks at NtOpenProcess and NtOpenThread to the code seen below:</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal10.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal10.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>The routine first maps the Service Descriptor Table in memory to find the function addresses of NtOpenProcess and NtOpenThread. These pointers are then overwritten with addresses of the corresponding hook functions. Subsequently, calls to NtOpenProcess or NtOpenThread from any user-mode application execute the hijacked functions of the rootkit.</p>
-<p>Summary<br>Kernel-based malicious code has become part of the most advanced and sophisticated attacks seen in recent months. As a result, security solutions and analysis sandboxes need to adapt and provide the ability for analyzing and understanding kernel code to protect users from these threats.</p>
-<p>Lastline’s high-resolution sandbox uses a full-system emulation approach and is able to perform effective analysis of code running in both kernel and user spaces. This allows us to obtain a complete picture of the malicious behavior to detect and mitigate these advanced threats.</p>
-<p>To learn more about Lastline’s rootkit analysis capabilities, <a href="https://www.lastline.com/press/deep-kernel-malware-analysis-launch-industry-first/" target="_blank" rel="external">read the announcement</a> that we made today in a press release.</p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">9</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-buildsandbox"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170401/buildsandbox/">如何构建一个有效地恶意代码分析沙盒</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170401/buildsandbox/" class="article-date">
-	  <time datetime="2017-04-01T02:26:11.000Z" itemprop="datePublished">四月 1, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Source: <a href="https://www.lastline.com/labsblog/different-sandboxing-techniques-to-detect-advanced-malware/" target="_blank" rel="external">https://www.lastline.com/labsblog/different-sandboxing-techniques-to-detect-advanced-malware/</a><br>Author: <a href="https://www.lastline.com/author/christopher/" target="_blank" rel="external">Dr. Christopher Kruegel</a></p>
-<pre><code>Currently on leave from his position as Professor of Computer Science at UC Santa Barbara, Christopher Kruegel’s research interests focus on computer and communications security, with an emphasis on malware analysis and detection, web security, and intrusion detection. Christopher previously served on the faculty of the Technical University Vienna, Austria. He has published more than 100 peer-reviewed papers in top computer security conferences and has been the recipient of the NSF CAREER Award, MIT Technology Review TR35 Award for young innovators, IBM Faculty Award, and several best paper awards. He regularly serves on program committees of leading computer security conferences. Christopher was the Program Committee Chair of the Usenix Workshop on Large Scale Exploits and Emergent Threats (LEET, 2011), the International Symposium on Recent Advances in Intrusion Detection (RAID, 2007), and the ACM Workshop on Recurring Malcode (WORM, 2007). He was also the head of a working group that advised the European Commission (EC) on defenses to mitigate future threats against the Internet and Europe&apos;s cyber-infrastructure.
-</code></pre><hr>
-<p>Automated malware analysis systems (or sandboxes) are one of the latest weapons in the arsenal of security vendors. Such systems execute an unknown malware program in an instrumented environment and monitor their execution. While such systems have been used as part of the manual analysis process for a while, they are increasingly used as the core of automated detection processes. The advantage of the approach is clear: It is possible to identify previously unseen (zero day) malware, as the observed activity in the sandbox is used as the basis for detection.</p>
-<p>For a high level overview of this topic, please read <a href="http://www.csyssec.org/20170401/sandbox/" target="_blank" rel="external">Next-Generation Sandbox Offers Comprehensive Detection of Advanced Malware</a>.</p>
-<h2 id="Goals-of-a-dynamic-analysis-system-sandbox"><a href="#Goals-of-a-dynamic-analysis-system-sandbox" class="headerlink" title="Goals of a dynamic analysis system (sandbox)"></a>Goals of a dynamic analysis system (sandbox)</h2><p>A good malware analysis sandbox has to achieve three goals: Visibility, resistance to detection, and scalability.</p>
-<p>First, a sandbox has to see as much as possible of the execution of a program. Otherwise, it might miss relevant activity and cannot make solid deductions about the presence or absence of malicious behaviors. Second, a sandbox has to perform monitoring in a  fashion that makes it difficult to detect. Otherwise, it is easy for malware to identify the presence of the sandbox and, in response, alter its behavior to evade detection. The third goal captures the desire to run many samples through a sandbox, in a way that the execution of one sample does not interfere with the execution of subsequent malware programs. Also, scalability means that it must be possible to analyze many samples in an automated fashion.</p>
-<h2 id="What-information-should-a-sandbox-collect"><a href="#What-information-should-a-sandbox-collect" class="headerlink" title="What information should a sandbox collect?"></a>What information should a sandbox collect?</h2><p>In this post, we discuss different ways in which a sandbox can monitor the execution of malware that runs in user mode (either as a regular user or administrator). This leaves out malicious code that tampers with the kernel, such as rootkits. We leave those for a future post. Also, the vast majority of malware runs as regular user mode processes, and even rootkits typically leverage user mode components to install kernel drivers or to modify the operating system code.</p>
-<p>When monitoring the behavior of a user mode process, almost all sandboxes look at the system call interface or the Windows API. System calls are functions that the operating system exposes to user mode processes so that they can interact with their environment and get stuff done, such as reading from files, sending packets over the network, and reading a registry entry on Windows. Monitoring system calls (and Windows API function calls) makes sense, but it is only one piece of the puzzle. The problem is that a sandbox that monitors only such invocations is blind to everything that happens in between these calls. That is, a sandbox might see that a malware program reads from a file, but it cannot determine how the malware actually processes the data that it has just read. A lot of interesting information can be gathered from looking deeper into the execution of a program. Thus, some sandboxes go one step further than just hooking function calls (such as system calls or Windows API functions), and also monitor the instructions that a program executes between these invocations.</p>
-<h2 id="Emulation-versus-virtualization"><a href="#Emulation-versus-virtualization" class="headerlink" title="Emulation versus virtualization"></a>Emulation versus virtualization</h2><p>Now that we know what information we want to collect, the next question is how we can build a sandbox that can collect this data in a way that makes it difficult for malware to detect. The two main options are virtualization and emulation.</p>
-<p>An emulator is a software program that simulates the functionality of another program or a piece of hardware. Since an emulator implements functionality in software, it provides great flexibility. For example, consider an emulator that simulates the system hardware (such as the CPU and physical memory). When you run a guest program P on top of this emulated hardware, the system can collect very detailed information about the execution of P. The guest program might even be written for a different CPU architecture than the actual CPU that the emulator runs on. This mechanism allows, for example, to run an Android program, written for ARM, on top of an emulator that runs on an x86 host. The drawback of emulation is that the software layer incurs a performance penalty. The potential performance impact has to be carefully addressed to make the analysis system scalable.</p>
-<p>With virtualization, the guest program P actually runs on the underlying hardware. The virtualization software (the hypervisor) only controls and mediates the accesses of different programs (or different virtual machines) to the underlying hardware. In this fashion, the different virtual machines are independent and isolated from each other. However, when a program in a virtual machine is executing, it is occupying the actual physical resources, and as a result, the hypervisor (and the malware analysis system) cannot run simultaneously. This makes detailed data collection challenging. Moreover, it is hard to entirely hide the hypervisor from the prying eyes of malware programs. The advantage is that programs in virtual machines can run at essentially native speed.</p>
-<h2 id="Leveraging-emulation-and-virtualization-for-malware-analysis"><a href="#Leveraging-emulation-and-virtualization-for-malware-analysis" class="headerlink" title="Leveraging emulation and virtualization for malware analysis"></a>Leveraging emulation and virtualization for malware analysis</h2><p>As mentioned previously, the task of an emulator is to provide a simulated (runtime) environment in which a malware program can execute. There are two main options for this environment. First, one can emulate the operating system (this is called OS emulation). Intuitively, this makes sense. A program runs in user mode and needs to make system calls to interact with its environment. So, why not simply emulate these systems calls? While the malware is running, one can get a close look at its activity (one can see every instruction). When the malware tries to make a system call, this information can be easily recorded. At this point, the emulator simply pretends that the system call was successfully executed and returns the proper result to the program.</p>
-<p>This sounds simple enough in theory, but it is not quite as easy in practice. One problem is that the (native) system call interface in Windows is not documented, and Microsoft reserves the right to change it at will. Thus, an emulator would typically target the Windows API, a higher-level set of library functions on top of the native system calls. Unfortunately, there are tens of thousands of these Windows API functions. Moreover, the Windows OS is a huge piece of software, and emulating it faithfully requires an emulator that has a comparable complexity of Windows itself! Since faithful emulation is not practical, emulators typically focus on a popular subset of functionality that works “reasonably well” for most programs. Of course, malware authors know about this. They can simply invoke less frequently used functions and check whether the system behaves as expected (that is, like a real Windows OS). OS emulators invariably fail to behave as expected, and such sandboxes are quite easy for malware to detect and evade. Security vendors that leverage OS emulation are actually well aware of this limitations. They typically include OS emulation only as one part of their solution, complemented by other detection techniques.</p>
-<p>As the second option for an emulator, one can simulate the hardware (in particular, CPU and physical memory). This is called (whole) system emulation. System emulation has several advantages. First, one can install and run an actual operating system on top of the emulator. Thus, the malware is executed inside a real OS, making the analysis environment much more difficult to detect for malware. The second advantage is that the interface offered by a processor is (much) simpler than the interface provided by Windows. Yes, there are hundreds of instructions, but they are very well documented, and they essentially never change. After all, Intel, AMD and ARM want an operating system (or application) developer to know exactly what to expect when she targets their platform. Finally, and most importantly, a system emulator has great visibility. A sandbox based on system emulation sees every instruction that a malware program executes on top of the emulated processor, and it can monitor every single access to emulated memory.</p>
-<p>Virtualization platforms provides significantly fewer options for collecting detailed information. The easiest way is to record the system calls that programs perform. This can be done in two different ways. First, one could instrument the guest operating system. This has the obvious drawback that a malware program might be able to detect the modified OS environment. Alternatively, one can perform system call monitoring in the hypervisor. System calls are privileged operations. Thus, when a program in a guest VM performs such an operation, the hypervisor is notified. At this point, control passes back to the sandbox, which can then gather the desired data. The big challenge is that it is very hard to efficiently record the individual instructions that a guest process executes without being detected. After all, the sandbox relinquishes control to this process between the system calls. This is a fundamental limitation for any sandbox that uses virtualization technology.</p>
-<h2 id="How-is-our-sandbox-built"><a href="#How-is-our-sandbox-built" class="headerlink" title="How is our sandbox built?"></a>How is our sandbox built?</h2><p>We think that more visibility is better, especially facing malware that becomes increasingly aware of virtual machines and sandbox analysis. We have seen malware that tries to detect the presence of VMware for many years. Even if one builds a custom sandbox based on virtualization technology, the fundamental visibility limitations remain. Of course, when a malware program checks for specific files or processes that a well-known hypervisor like VMware introduces, these checks will fail, and the custom sandbox will be successful in seeing malicious activity. However, virtualization, by definition, means that malicious code is run directly on the underlying hardware. And while the malicious code is running, the sandbox is paused. It is only woken up at specific points, such as system calls. This is a problem, and a major reason why we decided to implement our sandbox as a system emulator.</p>
-<p>Why does not everybody use system emulation, since it seems such a great idea? The reason is that one needs to overcome two technical challenges to make a system emulator work in practice. One challenge is called the semantic gap, the other one is performance. The semantic gap is related to the problem that a system emulator sees instructions executed on the CPU, as well as the physical memory that the guest OS uses. However, it is not immediately clear how to connect CPU instructions and bytes in memory to objects that make sense in the context of the guest OS. After all, we want to know about the files that a process creates, or the Windows registry entries that it reads. To bridge the semantic gap, one needs to gain a deep understanding into the inner workings of the guest operating system. By doing this, we can then map the detailed, low level view of our system to high level information about files, processes and network traffic that are shown in our report.</p>
-<p>The second question is about performance. Isn’t emulation terribly slow? The answer is yes, if implemented in a naive way. If we emulated every instruction in software, the system would indeed not scale very well. However, we have done many clever things to speed up emulation, to a level where it is (almost) as fast as native execution. For example, one does not need to emulate all code. A lot of code can be trusted, such as Windows itself. Well, we can trust the kernel most of the time – of course, it can be compromised by rootkits. Only the malicious program (and code that this program interacts with) needs to be analyzed in detail. Also, one can perform dynamic translation. With dynamic translation, every instruction is examined in software once, and then translated into a much more efficient form that can be run directly.</p>
-<h2 id="Summary"><a href="#Summary" class="headerlink" title="Summary"></a>Summary</h2><p>A sandbox offers the promise of zero day detection capabilities. As a result, most security vendors offer some kind of sandbox as part of their solutions. However, not all sandboxes are alike, and the challenge is not to build a sandbox, but rather to build a good one. Most sandboxes leverage virtualization and rely on system calls for their detection. This is not enough, since these tools fundamentally miss a significant amount of potentially relevant behaviors. Instead, we believe that a sandbox must be an analysis platform that sees all instructions that a malware program executes, thus being able to see and react to attempts by malware authors to fingerprint and detect the runtime environment. As far as we know, Lastline is the only vendor that uses a sandbox based on system emulation, combining the visibility of an emulator with the resistance to detection (and evasion) that one gets from running the malware inside the real operating system.</p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">9</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Sandbox/">Sandbox</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-sandbox"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170401/sandbox/">下一代沙盒</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170401/sandbox/" class="article-date">
-	  <time datetime="2017-04-01T02:19:39.000Z" itemprop="datePublished">四月 1, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Source: <a href="https://www.lastline.com/blog/next-generation-sandbox-offers-comprehensive-detection-of-advanced-malware/" target="_blank" rel="external">https://www.lastline.com/blog/next-generation-sandbox-offers-comprehensive-detection-of-advanced-malware/</a><br>Author: <a href="https://www.lastline.com/author/freddy/" target="_blank" rel="external">Freddy Mangum</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
+<p>Source：<a href="http://hypervsir.blogspot.com/2014/10/a-run-time-non-invasive-approach-to.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/a-run-time-non-invasive-approach-to.html</a></p>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
-<p><strong>High-Resolution Security Analysis</strong></p>
-<p>Advanced malware and advanced persistent threats (APT) are frequently used as terms to describe malicious code that bypasses traditional security systems, such as signature-based detectors (anti-virus engines and intrusion detection systems). To counter such advanced threats, a new class of security vendors has introduced sandboxing technology. Sandboxing works by running code inside a tightly controlled environment, in which one can monitor and analyze the code’s behavior. Since it is not necessary to have seen a specific threat before, sandboxing offers the promise to identify advanced malware and zero-day threats.</p>
-<p>But don’t be fooled, not all sandbox technologies provide the same level of detection capabilities.  Let’s take a look.</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/sandbox.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/sandbox.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-
-
-
-<p><strong>Virtualization:</strong> VM (virtual machine) based sandboxing can look at suspicious programs that are contained within virtual machines. This approach provides the lowest level of visibility into relevant malware behaviors, but it is harder for sophisticated malware to evade detection.</p>
-<p><strong>OS Emulation</strong> of the operating system provides a high level of visibility into malware behaviors. Unfortunately, this approach is the easiest for advanced malware to detect and evade.</p>
-<p><strong>Full System Emulation</strong>, where the emulator simulates the physical hardware (including CPU and memory), provides the deepest level of visibility into malware behavior, and it is also the hardest for advanced malware to evade.</p>
-<p>For a more detailed technical explanation of Lastline’s high-resolution sandbox, which uses full system emulation, please read <a href="http://www.csyssec.org/20170401/buildsandbox/" target="_blank" rel="external">How To Build An Effective Sandbox</a>.</p>
+<p>&lt; For some reason, I cannot public it. But I’m planning to open it at some time later &gt;</p>
+<p>This blog presents an idea to defend against both ROP (Return-oriented Programming) and JOP (Jump-oriented Programming) attacks …</p>
+<p>It is a low-overhead, real-time, and non-invasive solution with no need target exploit binary/source change. </p>
+<hr>
+<p> <strong><em>References:</em></strong></p>
+<p>ROP<br><a href="http://en.wikipedia.org/wiki/Return-oriented_programming" target="_blank" rel="external">http://en.wikipedia.org/wiki/Return-oriented_programming</a></p>
+<p>Return-oriented programming without returns, JOP<br><a href="http://dl.acm.org/citation.cfm?id=1866370" target="_blank" rel="external">http://dl.acm.org/citation.cfm?id=1866370</a></p>
+<p>Mitigating ROP via Last Branch Recording (kBouncer)<br><a href="http://blogs.technet.com/b/srd/archive/2012/07/23/technical-analysis-of-the-top-bluehat-prize-submissions.aspx" target="_blank" rel="external">http://blogs.technet.com/b/srd/archive/2012/07/23/technical-analysis-of-the-top-bluehat-prize-submissions.aspx</a><br><a href="http://www.cs.columbia.edu/~vpappas/papers/kbouncer.pdf" target="_blank" rel="external">http://www.cs.columbia.edu/~vpappas/papers/kbouncer.pdf</a></p>
+<p>Hardware-assisted-cfi<br><a href="https://www.informatik.tu-darmstadt.de/fileadmin/user_upload/Group_TRUST/PubsPDF/hardware-assisted-cfi.pdf" target="_blank" rel="external">https://www.informatik.tu-darmstadt.de/fileadmin/user_upload/Group_TRUST/PubsPDF/hardware-assisted-cfi.pdf</a></p>
+<p>ROPecker<br><a href="http://www.mysmu.edu/phdis2008/yqcheng.2008/ROPecker-NDSS14.pdf" target="_blank" rel="external">http://www.mysmu.edu/phdis2008/yqcheng.2008/ROPecker-NDSS14.pdf</a></p>
+<p>&lt; For some reason, I cannot public it at this moment&gt;</p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 
       
     </div>
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">9</span></a>
+    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">14</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Sandbox/">Sandbox</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/JOP/">JOP</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/ROP/">ROP</a></li></ul>
 
       
     </footer>
@@ -330,7 +168,7 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-unmasking"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-arm-xen"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -338,7 +176,7 @@
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170401/unmasking/">揭开内核漏洞利用的神秘面纱</a>
+      <a class="article-title" href="/20170504/arm-xen/">为什么ARM平台XEN的代码量更小</a>
     </h1>
   
 
@@ -346,97 +184,61 @@
     
     <div class="article-meta">
       
-	Posted on <a href="/20170401/unmasking/" class="article-date">
-	  <time datetime="2017-04-01T01:27:11.000Z" itemprop="datePublished">四月 1, 2017</time>
+	Posted on <a href="/20170504/arm-xen/" class="article-date">
+	  <time datetime="2017-05-04T10:11:43.000Z" itemprop="datePublished">五月 4, 2017</time>
 	</a>
 
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Source: <a href="https://www.lastline.com/labsblog/unmasking-kernel-exploits/" target="_blank" rel="external">https://www.lastline.com/labsblog/unmasking-kernel-exploits/</a></p>
-<p>Author: <a href="https://www.lastline.com/author/roman/" target="_blank" rel="external">Roman Vasilenko</a></p>
-<pre><code>Roman Vasilenko started his career as a Virus Analyst     in 2007 at Dr. Web Ltd. From December 2008 to     November 2012 he worked in the Anti-Malware Research Department of Kaspersky Labs as a Research Developer/Senior Research Developer. Roman is the author of two patents: “System and Method of Files Comparison Based on Functionality Patterns” (Russia) and “System and Method for Detecting Unknown Malware” (Russia/USA). He was also a Senior Lecturer in the Department of Mathematics &amp; Mechanics, Saint Petersburg State University, Russia, where he taught a special course titled “Introduction to Malware Research” in 2011/2012. In November 2012, Roman moved to California to join Lastline, Inc. as an Internet Security Analyst. Since 2013 he has held a System Engineer position. His specialties are design and development of the LLAMA engine (Lastline Automated Malware Analysis), in-depth analysis of malicious techniques and malware families, targeted attack analysis, and development of new advanced algorithms of malware detection.
-</code></pre><hr>
-<p>A large set of publicly disclosed Advanced Persistent Threat (APT) and nation state attacks use sophisticated malware (e.g Turla, Duqu, Equation Group, Duqu2, etc.) that make use of at least one component running hidden inside the kernel of the Microsoft Windows operating system (OS). There, malware remains hidden from security solutions, and can abuse the highest privileges available on a computer system to achieve the attacker’s evil objectives.</p>
-<p>With the ability to run in the OS kernel, malicious code has started to evade automated malware analysis solutions (sandboxes) that have limited visibility into actions executed by malware in the context of the kernel. This new wave of kernel-malware makes the ability to provide in-depth kernel-mode analysis a key requirement for effective advanced malware analysis solutions.</p>
-<p>In two recent posts <a href="https://www.lastline.com/labsblog/high-resolution-dynamic-analysis-of-windows-kernel-rootkits/" target="_blank" rel="external">1</a>, <a href="https://www.lastline.com/labsblog/dissecting-turla-rootkit-malware-using-dynamic-analysis/" target="_blank" rel="external">2</a> we have looked at how we can analyze and detect these advanced threats, but we have not yet described how attackers manage to inject their code into the Windows kernel. In this post, we highlight some of the difficulties attackers face, and how security researchers and professionals can use <a href="http://lastline.wpengine.com/labsblog/dyre-malware-does-it-play-nice-in-your-sandbox" target="_blank" rel="external">full-system emulation</a> to analyze, dissect, and detect zero-day kernel exploitation techniques in an automated way.</p>
-<h2 id="Exploiting-Microsoft-Windows-Kernels"><a href="#Exploiting-Microsoft-Windows-Kernels" class="headerlink" title="Exploiting Microsoft Windows Kernels"></a>Exploiting Microsoft Windows Kernels</h2><p>All modern versions of Microsoft Windows enable <a href="https://support.microsoft.com/zh-cn/products/windows" target="_blank" rel="external">User Account Control (UAC)</a> by default, which grants limited privileges to user mode processes, restricting them in the actions they can perform on a host. For example, by default a program cannot access critical system components, modify the system registry, or load new drivers into the kernel, even if the driver is signed by a trusted entity.</p>
-<p>To regain the privileges attackers need to achieve their goals, kernel exploits have become one of the major components in modern attacks. Since we first highlighted malware running in the kernel as a rising threat and announced our own new <a href="https://www.lastline.com/press/deep-kernel-malware-analysis-launch-industry-first/" target="_blank" rel="external">deep kernel malware analysis</a> capabilities at SXSW Interactive in March, several kernel mode exploits have made headlines including:</p>
-<ul>
-<li>As revealed by <a href="https://securelist.com/blog/research/70504/the-mystery-of-duqu-2-0-a-sophisticated-cyberespionage-actor-returns/" target="_blank" rel="external">Kaspersky Lab</a> this month, Duqu2 uses a <a href="http://blog.trendmicro.com/trendlabs-security-intelligence/analysis-of-cve-2015-2360-duqu-2-0-zero-day-vulnerability/" target="_blank" rel="external">kernel mode exploit</a> for CVE-2015-2360 to load its kernel mode component.</li>
-<li>One of the most recent targeted attacks against NATO members and the White House, termed <a href="http://blog.trendmicro.com/trendlabs-security-intelligence/operation-pawn-storm-ramps-up-its-activities-targets-nato-white-house/" target="_blank" rel="external">Operation Pawn Storm</a>, attracted massive media attention in April. The malware used in this campaign was equipped with a <a href="(http://www.securityweek.com/russian-hackers-exploited-windows-zero-day-spy-nato-eu-other-high-profile-targets">kernel exploit for CVE-2015-1701</a>).</li>
-<li>Also reported in April, <a href="http://lastline.wpengine.com/labsblog/dissecting-turla-rootkit-malware-using-dynamic-analysis" target="_blank" rel="external">Turla</a> uses <a href="http://blog.talosintelligence.com/2014/04/snake-campaign-few-words-about-uroburos.html" target="_blank" rel="external">two exploits</a> for [CVE-2009-1123 and CVE-2010-0232].<br>And previously in February the well known, possibly government-sponsored, Equation Group APT was reported to have used malware using up to 10 exploits, <a href="https://securelist.com/blog/research/68750/equation-the-death-star-of-malware-galaxy/" target="_blank" rel="external">3 of them confirmed</a> for CVE-2009-1124, CVE-2011-3402, and CVE-2013-3879.</li>
-</ul>
-<p>But well-funded, government-sponsored attacks aren’t the only ones that leverage kernel exploits. Attacking the kernel has become increasingly common, as can be seen by looking at prominent malware families making use of kernel exploits:</p>
-<ul>
-<li><a href="http://www.malwaredigger.com/2015/05/rovnix-dropper-analysis.html" target="_blank" rel="external">Cidox/Rovnix Bootkit</a> uses exploits for CVE-2013-3660 and CVE-2014-4113.</li>
-<li><a href="http://blog.trendmicro.com/trendlabs-security-intelligence/an-analysis-of-a-windows-kernel-mode-vulnerability-cve-2014-4113/" target="_blank" rel="external">Sandworm</a> uses exploits for CVE-2014-4148 and CVE-2014-4113.</li>
-<li><a href="https://www.welivesecurity.com/2013/08/27/the-powerloader-64-bit-update-based-on-leaked-exploits/" target="_blank" rel="external">PowerLoader</a> uses exploits for CVE-2013-3660, CVE-2012-1864, and CVE-2012-0217.<br>… just to name a few.</li>
-</ul>
-<p>As one can see, the ability to analyze and identify compromises of the operating system kernel has become crucial in detecting modern threats – not only, but especially with advanced, targeted attacks.</p>
-<h2 id="Anatomy-of-Kernel-Exploits"><a href="#Anatomy-of-Kernel-Exploits" class="headerlink" title="Anatomy of Kernel Exploits"></a>Anatomy of Kernel Exploits</h2><p>Before we focus on how we detect kernel exploitation, let’s first dive into how a typical kernel exploit works. Usually, exploitation happens in four stages: host preparation, exploit-code setup, kernel vulnerability exploitation, and payload execution.</p>
-<p><strong>Host Preparation:</strong> In the first phase, the host preparation phase, the attacker tricks the user into executing a piece of user-mode code. This can happen through a conventional exploit, such as a drive-by-download exploit, or by executing the attack as part of user-mode malware already running on a target machine. Increasingly, this user-mode malware is tailor-made to evade traditional sandboxes through a number of techniques <a href="http://lastline.wpengine.com/labsblog/evasive-malware-gone-mainstream" target="_blank" rel="external">we’ve covered before</a>.</p>
-<p><strong>Exploit-code Setup:</strong> Next, in the exploit-code setup phase, the attacker prepares the shellcode that is later invoked using the kernel exploit. To perform any actions in the context of the kernel, the exploit needs to know information about the kernel internals, such as:</p>
-<ul>
-<li>the location or offsets of critical structures in kernel memory, or</li>
-<li>the addresses of kernel API functions.</li>
-</ul>
-<p>Windows kernel modules may vary between different versions of the operating system, between different service pack levels, and even when different system updates have been installed. Thus, an exploit must adapt to these changes. To do this, the user-mode setup code typically opens a kernel image from disk to analyze and find the necessary data.</p>
-<p>At the same time, the setup code can find custom OEM drivers available on the system, which can provide additional vulnerabilities to exploit. To this end, the attacker can search for the presence of drivers and probe for devices available on the system.</p>
-<p><strong>Vulnerability Exploitation:</strong> Once the attacker has gathered all necessary information to make an exploit possible, the kernel vulnerability is exploited. There are two types of exploits that we have to address, depending on the location of the shellcode that is executed: execution of user-space shellcode with kernel privileges (i.e., CPL/Current Privilege Level = 0) versus execution of kernel-space shellcode.</p>
-<p>User-space shellcode is easier to implement, because it only requires overwriting a small amount of data in kernel memory. In many cases, this memory is a function or function-pointer causing the next kernel thread executing this function to jump to the user-space memory prepared with the shellcode.</p>
-<p>The advantage of this type of shellcode is that there is no limitation on the size of the shellcode (because it doesn’t need to be copied to kernel memory). However, this type of exploit does not work in Windows 8 or later, because of a new security feature known as <a href="http://blog.ptsecurity.com/2012/09/intel-smep-overview-and-partial-bypass.html" target="_blank" rel="external">Supervisor Mode Execution Prevention (SMEP)</a>, which prevents execution of code located in user-mode pages with CPL of 0.</p>
-<p>Kernel-space shellcode bypasses SMEP but it is more complicated: it requires copying shellcode to kernel memory, but only very few (known) vulnerabilities allow overwriting large amounts of data in the kernel.</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/unmasking1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/unmasking1.png" width="450"></a><br>    <figcaption>Shellcode type overview</figcaption><br></figure>
-
-
-<p>Because of this, attackers sometimes use a hybrid approach combining both shellcode types: in a first step, using a small shellcode, the attacker disables SMEP, followed by executing a second, larger shellcode in user memory with CPL of 0.</p>
-<p><strong>Payload Execution:</strong> Once the shellcode has successfully been executed, the attacker is able to run any payload in the context of the kernel, that is, without any restrictions imposed by the operating system.</p>
-<p>In exploits against Microsoft Windows kernels, we typically find two types of payloads: In the first type, the attacker tries to elevate privileges of the user-mode process. The idea is to run an entire process, not just a small piece of shellcode, with elevated privileges, which greatly simplifies writing complex payloads.</p>
-<p>To elevate privileges, the payload can copy the access token of the System process and overwrite the current process’ access token. This gives the process the same level of permissions as those granted by the original process’ token. To do this, the payload needs to:</p>
-<ul>
-<li>enumerate <a href="https://msdn.microsoft.com/en-us/library/windows/hardware/ff544273(v=vs.85" target="_blank" rel="external">EPROCESS</a>.aspx) structures in kernel memory,</li>
-<li>find the System process, and</li>
-<li>copy the pointer to the token structure inside the EPROCESS structure of the System process to the current process’ EPROCESS structure.</li>
-</ul>
-<p>By stealing a pointer to the System process token structure, the process receives all <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/aa379571(v=vs.85" target="_blank" rel="external">Security Identifiers</a>.aspx) (SIDs) of that process, including the SID…</p>
-<p>SID: <strong>S-1-5-18</strong><br>Name: Local System<br>Description: A service account that is used by the operating system.</p>
-<p>…which allows performing any actions with system process privileges.</p>
-<p>The second type of payload we frequently find is more sophisticated: instead of elevating privileges of the user-mode process, the payload contains code for loading a malicious driver directly into kernel memory without the use of system APIs.</p>
-<h2 id="Analysis-of-Kernel-Exploit"><a href="#Analysis-of-Kernel-Exploit" class="headerlink" title="Analysis of Kernel Exploit"></a>Analysis of Kernel Exploit</h2><p>An interesting finding that emerged from our research is that some of the attacks are not using their own version of the setup/shellcode/payload functionality. Instead, the attackers use proof-of-concept implementations available on the Internet (sometimes provided for free by researchers, other times sold by specialized exploit groups). Here, the payload invokes a malware process after elevating privileges, providing the attacker with a simple and reliable way to bypass the kernel’s security restrictions.</p>
-<p>This allows traditional security solution to claim “kernel exploit detection” capabilities, because the proof-of-concept implementations can be trivially detected using signature-based approaches. Clearly, sophisticated and well-funded attack groups can leverage zero-day exploits – that is, exploits that have not been publicly documented – as part of their attack, and <a href="http://lastline.wpengine.com/labsblog/malware-in-the-wild-evolving-to-evade-detection" target="_blank" rel="external">use evasive code</a> to identify or bypass traditional analysis systems before launching the kernel exploit.</p>
-<p>As a consequence, the analysis system must not only be able to handle evasive code, but also to inspect code run as part of the operating system kernel. Only then can it correctly identify the malicious behavior and thwart the attack.</p>
-<h2 id="Unmasking-the-Cidox-Rovnix-Bootkit"><a href="#Unmasking-the-Cidox-Rovnix-Bootkit" class="headerlink" title="Unmasking the Cidox/Rovnix Bootkit"></a>Unmasking the Cidox/Rovnix Bootkit</h2><p>Our system performs in-depth analysis of all stages of kernel exploits, as one can see by looking at the following example (found in the wild) of the Cidox/Rovnix Bootkit</p>
-<p>MD5: d3d013aaa07c6217fda7a8a139c42b60<br>SHA1: c2255e187fc08109ee3da450bba1e176b7583384</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/unmasking2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/unmasking2.png" width="450"></a><br>    <figcaption>Analysis overview for Cidox/Rovnix bootkit</figcaption><br></figure>
-
-<p>As we can see, every stage of the kernel exploit discussed above is already highlighted in the analysis overview.</p>
-<p>But the analysis capabilities of our system go well beyond that! As we already covered in <a href="https://www.lastline.com/labsblog/dissecting-payload-injection-using-llama-process-snapshots/" target="_blank" rel="external">previous blog posts</a>, the Lastline analysis system automatically extracts full-process snapshots containing points of interest for subsequent analysis by a security analyst or researcher.</p>
-<p>Our solution tracks the execution of untrusted memory in user- as well as kernel-mode. As a result, the system sees all code fragments associated with the malicious behavior executed as part of the exploit, which can be downloaded as part of the analysis result, and be imported into off-the-shelf tools, such as IDA Pro.</p>
-<p>For example, the process-snapshot extracted as part of the Cidox/Rovnix Bootkit exploit analysis shows the malicious payload executed in the context of the kernel:</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/unmasking3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/unmasking3.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-
-<p>ere, the code searches for the EPROCESS structure of the System process (using its process-ID 4) as well as for the entry of the malicious process using <a href="https://msdn.microsoft.com/en-us/library/windows/hardware/ff551920(v=vs.85" target="_blank" rel="external">PsLookupProcessByProcessId</a>.aspx). Once found, it duplicates the EPROCESS::Token from System to the malicious process, giving it Local System privileges.</p>
-<p>The extracted process-snapshot not only contains all the relevant code-sections (and is stripped from unrelated, benign code cluttering the snapshot), but the system also highlights code areas of interest to guide the analyst in where to look.</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/unmasking4.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/unmasking4.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-<h2 id="Summary"><a href="#Summary" class="headerlink" title="Summary"></a>Summary</h2><p>Kernel exploits are not only part of advanced and sophisticated attacks, but are now also used in many mainstream malware families. As a result, security solutions and analysis sandboxes must be able to provide deep insights into the execution of kernel code to identify and address these types of threats.</p>
-<p>Lastline’s high-resolution sandbox uses a full-system emulation approach that is able to track malicious code running in user- as well as kernel-mode. This provides the analysis system with a complete picture of the malicious behavior exhibited by malware, to catch even the latest zero-day attacks, and provide valuable insights for security professionals and researchers alike.</p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
+<p>Source：<a href="http://hypervsir.blogspot.com/2014/10/why-smaller-code-size-with-xen-on-arm.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/why-smaller-code-size-with-xen-on-arm.html</a></p>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>This white paper (<a href="http://wiki.xenproject.org/wiki/Xen_ARM_with_Virtualization_Extensions_whitepaper" target="_blank" rel="external">Xen ARM with Virtualization Extensions whitepaper</a>) indicates that “Xen on ARM is 1/6 of the code size of x86_64 Xen, while still providing a similar level of features”. what does this mean? Does this mean that Xen/ARM is better than Xen/x86? We cannot simply just make this conclusion, but anyway smaller code size means smaller <a href="http://en.wikipedia.org/wiki/Trusted_computing_base" target="_blank" rel="external">TCB</a>, which can reduce security risks (e.g. security vulnerabilities). </p>
+<p>First of all, I don’t think that is the latest status on Xen 4.4+ version. see the latest one (in 2014, Xen on ARM summit, in the Reference link below). </p>
+<p>Here I’m going to give some more information. </p>
+<ol>
+<li><p>Unlike x86( or x64) XEN, <strong>no shadow page table management code is required any longer in XEN on ARM</strong>. </p>
+<p>In the first generation of Intel VT-x architecture processors, there is no memory virtualization(no EPT, Extended Page Table), which means there is no hardware support for address translations from guest physical memory to host physical memory. XEN and any other hypervisors must sets up the shadow page tables to do those things in a software way (and keep synchronization with guest virtual address page tables by monitoring MOV-CR3 and INVLPG instructions. This solution is sometimes also called as VTLB (virtual TLB). </p>
+<p>For compatibility reason, this part of code is still in XEN because there are still many machines on the market that have no EPT-capable VT-x processors.<br><strong>However, Xen/ARM doesn’t suffer the similar compatibility issue, because it is started from scratch due to the fact that hardware memory (MMU) virtualization is supported since from ARM virtualization was introduced (true? please correct me if i’m wrong). In ARM architecture, new processor mode (Hyp mode, PL2 privilege) is responsible for controlling a new MMU memory address translation layer, which is called as “stage 2” translation from IPA (Intermediate Physical Address) to final PA</strong>. So XEN/ARM doesn’t require the similar code like Virtual TLB. This can reduce thousands of code lines.</p>
+</li>
+<li><p>The white paper says <strong>Xen/ARM does not need QEMU because it does not do any emulation</strong>. <is this="" still="" true="" on="" latest="" xen="" arm?=""> … it uses paravirtualized interfaces for IO devices. Actually I’m not quite understand the Xen/ARM architecture for device emulation. It still uses Dom0 to hold PV backend drivers that have communication with PV frontend drivers in guest OS (DomU).</is></p>
+<p>For device virtualization, on a Xen/x86 system, there are many legacy devices that still are using I/O port (e.g. IN/OUT instructions) for communication between CPU and memory. In this manner, Xen/ARM doesn’t have such an issue because all the I/O communication interfaces are memory-mapped to system memory bus. so the I/O device access can be initiated by using regular memory operation instruction.</p>
+<p>So Xen/ARM can unify the I/O device interface, and hence simply the Hypervisor design as well as PV backend/frontend driver design. The code size may also be smaller.</p>
+</li>
+<li><p><strong>Xen/x86 has two kinds of guests: HVM guest (unmodified kernel, e.g. Windows OS) and PV guest whose kernel must be modified to be aware of the presence of Xen</strong>. For example, some of low-level CPU or MMU primitive operation functions in PV guest OS must be changed to call a HyperCall interface to communicate with underlying Xen for guest virtualization. </p>
+<p><strong>But Xen/ARM doesn’t want to introduce this differentiation.</strong> Whatever the guest kernel must have to be changed, then change it. I think partly because Xen/ARM won’t need to support Windows OS, or other closed-source operating systems, at least for now. So Xen/ARM code is smaller again.</p>
+</li>
+<li><p><strong>Xen/x86 supports both AMD and Intel Hardware Virtualization Technologies, AMD-v (Pacifica, SVM) and Intel VT-x.</strong> </p>
+<p>Although these two technologies are almost the same from guest’s perspective, the hypervisor still need to maintain two copies of x86 (and x64) code implementations because there are many minor differences in virtual machine monitor (VMM) due to some different virtualization architecture design.</p>
+<p>However, ARM doesn’t have the similar issue either. Till now there are only ARMv7-A and ARMv8-A architectures that support ARM hardware virtualization, and variation is very minimal.</p>
+</li>
+<li><p>Similarly, Xen/x86 also support different generations of AMD/Intel processor architectures and corresponding platform/chipsets. And each of the generations are different, but Xen/x86 must maintain backward compatibilities, so the code size is increasing from time to time.</p>
+<p>For example, Intel processor has 16-bit “real mode” in addition to 32bit protected mode and 64bit protected mode. In the earlier generation VT-x processor (prior to <a href="http://en.wikipedia.org/wiki/Westmere_(microarchitecture" target="_blank" rel="external">Westmere</a>)), the code running in 16-bit “real mode” cannot be natively virtualized, so the VMM/hypervisor software must have to emulate real mode instruction executions on guest logical processor. Until VMX “<strong>Unrestricted Guest</strong>“ mode was introduced, this issue eventually was resolved by just only adding several lines of code to enable it.</p>
+<p>I don’t think Xen/ARM will have NO such an problem in near future. </p>
+</li>
+<li><p>In the latest Intel VT-x processors (Haswell +), a new feature “<strong>Hardware <a href="http://en.wikipedia.org/wiki/Nested_virtualization" target="_blank" rel="external">Nested Virtualization</a></strong>“ is introduced. Intel calls it as “<strong><em>VMCS Shadowing</em></strong> “, which provides kind of hardware virtualization supports to allow VMM/hypervisor software running on top of itself or other 3rd party hypervisors. <strong>Xen currently adds partial nested virtualization support</strong> (The virtualization industry leader, VMware, does it better, most of virtualization features can be nested in their products). This definitely introduces some code overhead. </p>
+</li>
+</ol>
+<p><br><br>These above are just some examples to explain why Xen/ARM has smaller code size. We cannot say which one of architectures is better just based on the code size. As a newcomer for hardware virtualization, ARM should and must do better!</p>
+<hr>
+<p><strong><em>References:</em></strong><br>Xen On ARM - Stefano Stabellini<br><a href="http://www.slideshare.net/xen_com_mgr/xensummit-na-2012-xen-on-arm-cortex-a15" target="_blank" rel="external">http://www.slideshare.net/xen_com_mgr/xensummit-na-2012-xen-on-arm-cortex-a15</a></p>
+<p>Xen-on-arm-xen-developer-summit-2014<br><a href="http://www.slideshare.net/xen_com_mgr/xen-on-arm-xen-developer-summit-2014" target="_blank" rel="external">http://www.slideshare.net/xen_com_mgr/xen-on-arm-xen-developer-summit-2014</a> </p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 
       
     </div>
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">9</span></a>
+    <a class="article-category-link" href="/categories/虚拟化综合/">虚拟化综合<span class="article-category-count">2</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/XEN/">XEN</a></li></ul>
 
       
     </footer>
@@ -447,7 +249,7 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-raid"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-armtrustzone"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -455,7 +257,7 @@
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170331/raid/">RAID十年录用论文</a>
+      <a class="article-title" href="/20170504/armtrustzone/">ARM TrustZone安全扩展和虚拟化扩展 vs X86虚拟化技术</a>
     </h1>
   
 
@@ -463,671 +265,180 @@
     
     <div class="article-meta">
       
-	Posted on <a href="/20170331/raid/" class="article-date">
-	  <time datetime="2017-03-31T06:10:28.000Z" itemprop="datePublished">三月 31, 2017</time>
+	Posted on <a href="/20170504/armtrustzone/" class="article-date">
+	  <time datetime="2017-05-04T10:09:56.000Z" itemprop="datePublished">五月 4, 2017</time>
 	</a>
 
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <hr>
-<p><strong>CSysSec注</strong>： 本系列文章旨在收集主流会议每年录用的文章信息，并做相关的总结，持续更新。</p>
-<p><strong>转载请注明</strong>： <a href="http://www.csyssec.org/20170331/conference-raid/" target="_blank" rel="external">主流会议-RAID十年录用论文</a>与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
+<p>Source：<a href="http://hypervsir.blogspot.com/2014/09/arm-trustzone-security-extension-and_28.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/09/arm-trustzone-security-extension-and_28.html</a></p>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
-<h2 id="2016"><a href="#2016" class="headerlink" title="2016"></a>2016</h2><p><a href="http://www.raid2016.org/abstracts/" target="_blank" rel="external">Paper Abstract</a></p>
-<h3 id="Session-1-Systems-Security"><a href="#Session-1-Systems-Security" class="headerlink" title="Session 1: Systems Security"></a>Session 1: Systems Security</h3><p>Session Chair: Petros Efstathopoulos</p>
+<p>A typical virtualization system on both x86 and ARM includes three major parts:</p>
 <ul>
-<li>16:00 – 16:30    GRIM: Leveraging GPUs for Kernel Integrity Monitoring<br>Lazaros Koromilas, Giorgos Vasiliadis (Qatar Computing Research Institute, HBKU), Elias Athanasopoulos (VU University Amsterdam), Sotiris Ioannidis (FORTH)</li>
-<li>16:30 – 17:00    Taming Transactions: Towards Hardware-Assisted Control Flow Integrity using Transactional Memory<br>Marius Muench (Eurecom), Fabio Pagani (Eurecom), Yan Shoshitaishvili (University of California, Santa Barbara), Christopher Kruegel (University of California, Santa Barbara), Giovanni Vigna (University of California, Santa Barbara), Davide Balzarotti (Eurecom)</li>
-<li>17:00 – 17:30    Automatic Uncovering of Tap Points From Kernel Executions<br>Junyuan Zeng (University of Texas at Dallas), Yangchun Fu (University of Texas at Dallas), Zhiqiang Lin (University of Texas at Dallas)</li>
-<li>17:30 – 18:00    Detecting Stack Layout Corruptions with Robust Stack Unwinding<br>Yangchun Fu (University of Texas at Dallas), Junghwan Rhee (NEC Laboratories America), Zhiqiang Lin (University of Texas at Dallas), Zhichun Li (NEC Laboratories America), Hui Zhang (NEC Laboratories America), Guofei Jiang (NEC Laboratories America)</li>
-</ul>
-<h3 id="Session-2-Low-level-Attacks-and-Defenses"><a href="#Session-2-Low-level-Attacks-and-Defenses" class="headerlink" title="Session 2: Low-level Attacks and Defenses"></a>Session 2: Low-level Attacks and Defenses</h3><p>Session Chair: Hervé Debar</p>
-<ul>
-<li>9:30 – 10:00    APDU-level attacks in PKCS#11 devices<br>Claudio Bozzato (Ca’ Foscari University, Venice), Riccardo Focardi (Ca’ Foscari University, Venice and Cryptosense, Paris), Francesco Palmarini (Ca’ Foscari University, Venice), Graham Steel (Cryptosense, Paris)</li>
-<li>10:00 – 10:30    CloudRadar: A Real-Time Side-Channel Attack Detection System in Clouds<br>Tianwei Zhang (Princeton University), Yinqian Zhang (Ohio State University), Ruby B. Lee (Princeton University)</li>
-</ul>
-<h3 id="Session-3-Measurement-Studies"><a href="#Session-3-Measurement-Studies" class="headerlink" title="Session 3: Measurement Studies"></a>Session 3: Measurement Studies</h3><p>Session Chair: Roberto Perdisci</p>
-<ul>
-<li>11:00 – 11:30    The Abuse Sharing Economy: Understanding the Limits of Threat Exchanges<br>Kurt Thomas (Google), Rony Amira (Google), Adi Ben-Yoash (Google), Ari Berger (Google), Ori Folger (Google), Amir Hardon (Google), Elie Bursztein (Google), Michael Bailey (University of Illinois at Urbana-Champaign)</li>
-<li>11:30 – 12:00    SANDPRINT: Fingerprinting Malware Sandboxes to Provide Intelligence for Sandbox Evasion<br>Akira Yokoyama (Yokohama National University), Kou Ishii (Yokohama National University), Rui Tanabe (Yokohama National University), Yinmin Papa (Yokohama National University), Katsunari Yoshioka (Yokohama National University), Tsutomu Matsumoto (Yokohama National University), Takahiro Kasama (National Institute of Information and Communications Technology), Daisuke Inoue (National Institute of Information and Communications Technology), Michael Brengel (CISPA, Saarland University), Michael Backes (CISPA, Saarland University &amp; MPI-SWS), Christian Rossow (CISPA, Saarland University)</li>
-<li>12:00 – 12:30    Enabling Network Security Through Active DNS Datasets<br>Athanasios Kountouras (Georgia Institute of Technology), Panagiotis Kintis (Georgia Institute of Technology), Chaz Lever (Georgia Institute of Technology), Yizheng Chen (Georgia Institute of Technology), Yacin Nadji (Netrisk), David Dagon (Georgia Institute of Technology), Manos Antonakakis (Georgia Institute of Technology), Rodney Joffe (Neustar)</li>
-</ul>
-<h3 id="Session-4-Malware-Analysis"><a href="#Session-4-Malware-Analysis" class="headerlink" title="Session 4: Malware Analysis"></a>Session 4: Malware Analysis</h3><p>Session Chair: Zhiqiang Lin</p>
-<ul>
-<li>14:00 – 14:30    A Formal Framework for Environmentally Sensitive Malware<br>Jeremy Blackthorne (Rensselaer Polytechnic Institute), Benjamin Kaiser (Rensselaer Polytechnic Institute), Bülent Yener (Rensselaer Polytechnic Institute)</li>
-<li>14:30 – 15:00    AVClass: A Tool for Massive Malware Labeling<br>Marcos Sebastián (IMDEA Software Institute), Richard Rivera (IMDEA Software Institute &amp; Universidad Politécnica de Madrid), Platon Kotzias (IMDEA Software Institute &amp; Universidad, Politécnica de Madrid), Juan Caballero (IMDEA Software Institute)</li>
-<li>15:00 – 15:30    Semantics-Preserving Dissection of JavaScript Exploits via Dynamic JS-Binary Analysis<br>Xunchao Hu (Syracuse University), Aravind Prakash (Binghamton University), Jinghan Wang (Syracuse University), Rundong Zhou (Syracuse University), Yao Cheng (Syracuse University), Heng Yin (Syracuse University)</li>
-</ul>
-<h3 id="Session-5-Network-Security"><a href="#Session-5-Network-Security" class="headerlink" title="Session 5: Network Security"></a>Session 5: Network Security</h3><p>Session Chair: Marc Dacier</p>
-<ul>
-<li>9:30 – 10:00    The Messenger Shoots Back: Network Operator Based IMSI Catcher Detection<br>Adrian Dabrowski (SBA Research), Georg Petzl (T-Mobile Austria), Edgar R. Weippl (SBA Research)</li>
-<li>10:00 – 10:30    On the Feasibility of TTL-based Filtering for DRDoS Mitigation<br>Michael Backes (CISPA, Saarland University &amp; MPI-SWS), Thorsten Holz (Horst Görtz Institute for IT-Security, Ruhr University Bochum), Christian Rossow (CISPA, Saarland University), Teemu Rytilahti (Horst Görtz Institute for IT-Security, Ruhr University Bochum), Milivoj Simeonovski (CISPA, Saarland University), Ben Stock (CISPA, Saarland University)</li>
-</ul>
-<h3 id="Session-6-Systematization-of-Knowledge-and-Experience-Reports"><a href="#Session-6-Systematization-of-Knowledge-and-Experience-Reports" class="headerlink" title="Session 6: Systematization of Knowledge and Experience Reports"></a>Session 6: Systematization of Knowledge and Experience Reports</h3><p>Session Chair: Giancarlo Pellegrino</p>
-<ul>
-<li>11:00 – 11:30    A Look into 30 Years of Malware Development from a Software Metrics Perspective<br>Alejandro Calleja (Universidad Carlos III de Madrid), Juan Tapiador (Universidad Carlos III de Madrid), Juan Caballero (IMDEA Software Institute)</li>
-<li>11:30 – 12:00    Small Changes, Big Changes: An Updated View on the Android Permission System<br>Yury Zhauniarovich (Qatar Computing Research Institute, HBKU), Olga Gadyatskaya (SnT, University of Luxembourg)</li>
-<li>12:00 – 12:30    Who Gets the Boot? Analyzing Victimization by DDoS-as-a-Service<br>Arman Noroozian (Delft University of Technology, The Netherlands), Maciej Korczyński (Delft University of Technology, The Netherlands), Carlos Hernandez Gañan (Delft University of Technology, The Netherlands), Daisuke Makita (Yokohama National University, National Institute of Information and Communications Technology, Japan), Katsunari Yoshioka (Yokohama National University, Japan), Michel van Eeten (Delft University of Technology, The Netherlands)</li>
-</ul>
-<h3 id="Session-7-Web-amp-Mobile-Security"><a href="#Session-7-Web-amp-Mobile-Security" class="headerlink" title="Session 7: Web &amp; Mobile Security"></a>Session 7: Web &amp; Mobile Security</h3><p>Session Chair: Michael Bailey</p>
-<ul>
-<li>13:30 – 14:00    Uses and Abuses of Server-Side Requests<br>Giancarlo Pellegrino (Saarland University), Onur Catakoglu (Eurecom), Davide Balzarotti (Eurecom), Christian Rossow (Saarland University)</li>
-<li>14:00 – 14:30    Identifying Extension-based Ad Injection via Fine-grained Web Content Provenance<br>Sajjad Arshad (Northeastern University), Amin Kharraz (Northeastern University), William Robertson (Northeastern University)</li>
-<li>14:30 – 15:00    Trellis: Privilege Separation for Multi-User Applications Made Easy<br>Andrea Mambretti (Northeastern University), Kaan Onarlioglu (Northeastern University), Collin Mulliner (Northeastern University), William Robertson (Northeastern University), Engin Kirda (Northeastern University), Federico Maggi (Politecnico di Milano), Stefano Zanero (Politecnico di Milano)</li>
-<li>15:00 – 15:30    Blender: Self-randomizing Address Space Layout for Android Apps<br>Mingshen Sun (The Chinese University of Hong Kong), John C.S. Lui (The Chinese University of Hong Kong), Yajin Zhou (Qihoo 360 Technology Co. Ltd.)</li>
-</ul>
-<h2 id="2015"><a href="#2015" class="headerlink" title="2015"></a>2015</h2><h2 id="Session-1-Cool-Stuff-You-Can-Do-With-Hardware"><a href="#Session-1-Cool-Stuff-You-Can-Do-With-Hardware" class="headerlink" title="Session 1: Cool Stuff You Can Do With Hardware"></a>Session 1: Cool Stuff You Can Do With Hardware</h2><ul>
-<li>10:30 - 11:00    Ensemble Learning for Low-level Hardware-supported Malware Detection (Public Review) [Video]<br>Khaled N. Khasawneh; Meltem Ozsoy; Caleb Donovick; Nael Abu-Ghazaleh; Dmitry V. Ponomarev</li>
-<li>11:00 - 11:30    Physical-layer Detection of Hardware Keyloggers (Public Review) [Video]<br>Ryan M. Gerdes; Saptarshi Mallick</li>
-<li>11:30 - 12:00    Reverse Engineering Intel Last-Level Cache Complex Addressing Using Performance Counters (Public Review) [Video]<br>Clémentine Maurice; Nicolas Le Scouarnec; Christoph Neumann; Olivier Heen; Aurélien Francillon</li>
-<li>12:00 - 12:30    Hardware-Assisted Fine-Grained Code-Reuse Attack Detection (Public Review) [Video]<br>Pinghai Yuan; Xuhua Ding; Qingkai Zeng</li>
-</ul>
-<h3 id="Session-2-Networks"><a href="#Session-2-Networks" class="headerlink" title="Session 2: Networks"></a>Session 2: Networks</h3><ul>
-<li>14:00 - 14:30    Haetae: Scaling the Performance of Network Intrusion Detection with Many-core Processors (Public Review) [Video]<br>Jaehyun Nam; Muhammad Jamshed; Byungkwon Choi; Dongsu Han; KyoungSoo Park</li>
-<li>14:30 - 15:00    Demystifying the IP Blackspace (Public Review) [Video]<br>Quentin Jacquemart; Pierre-Antoine Vervier; Guillaume Urvoy-Keller; Ernst Biersack</li>
-<li>15:00 - 15:30    Providing Dynamic Control to Passive Network Security Monitoring (Public Review)<br>Johanna Amann; Robin Sommer</li>
-</ul>
-<h3 id="Session-3-Hardening"><a href="#Session-3-Hardening" class="headerlink" title="Session 3: Hardening"></a>Session 3: Hardening</h3><ul>
-<li>16:00 - 16:30    Probabilistic Inference on Integrity for Access Behavior Based Malware Detection (Public Review) [Video]<br>Weixuan Mao; Zhongmin Cai; Xiaohong Guan; Don Towsley</li>
-<li>16:30 - 17:00    Counteracting Data-Only Malware with Code Pointer Examination (Public Review) [Video]<br>Thomas Kittel; Sebastian Vogl; Julian Kirsch; Claudia Eckert</li>
-<li>17:00 - 17:30    Xede: Practical Exploit Early Detection (Public Review) [Video]<br>Meining Nie; Purui Su; Qi Li; Zhi Wang; Lingyun Ying; Jinlong Hu; Dengguo Feng</li>
-</ul>
-<h3 id="Session-4-Attack-Detection-I"><a href="#Session-4-Attack-Detection-I" class="headerlink" title="Session 4: Attack Detection I"></a>Session 4: Attack Detection I</h3><ul>
-<li>09:00 - 09:30    Preventing Exploits in Microsoft Office Documents through Content Randomization (Public Review) [Video]<br>Charles Smutz; Angelos Stavrou</li>
-<li>09:30 - 10:00    Improving accuracy of static integer overflow detection in binary (Public Review) [Video]<br>Yang Zhang; Xiaoshan Sun; Yi Deng; Liang Cheng; Shuke Zeng; Yu Fu; Dengguo Feng</li>
-<li>10:00 - 10:30    A Formal Framework for Program Anomaly Detection (Public Review) [Video]<br>Xiaokui Shu; Danfeng (Daphne) Yao; Barbara G. Ryder</li>
-</ul>
-<h3 id="Session-5-Web-and-Net"><a href="#Session-5-Web-and-Net" class="headerlink" title="Session 5: Web and Net"></a>Session 5: Web and Net</h3><ul>
-<li>11:00 - 11:30    jAEk: Using Dynamic Analysis to Crawl and Test Modern Web Applications (Public Review) [Video]<br>Giancarlo Pellegrino; Constantin Tschürtz; Eric Bodden; Christian Rossow</li>
-<li>11:30 - 12:00    WYSISNWIV: What You Scan Is Not What I Visit (Public Review) [Video]<br>Qilang Yang; Dimitrios Damopoulos; Georgios Portokalidis</li>
-<li>12:00 - 12:30    SDN Rootkits: Subverting Network Operating Systems of Software-Defined Networks (Public Review)<br>Christian Röpke; Thorsten Holz</li>
-</ul>
-<h3 id="Session-6-Android"><a href="#Session-6-Android" class="headerlink" title="Session 6: Android"></a>Session 6: Android</h3><ul>
-<li>14:00 - 14:30    AppSpear: Bytecode Decrypting and DEX Reassembling for Packed Android Malware (Public Review) [Video]<br>Wenbo Yang; Juanru Li; Bodong Li; Junliang Shu; Wenjun Hu; Yuanyuan Zhang; Dawu Gu</li>
-<li>14:30 - 15:00    HelDroid: Dissecting and Detecting Android Ransomware (Public Review) [Video]<br>Federico Maggi; Nicolò Andronio; Stefano Zanero</li>
-<li>15:00 - 15:30    Continuous Authentication on Mobile Devices Using Power Consumption, Touch Gestures and Physical Movement of Users (Public Review) [Video]<br>Rahul Murmuria; Angelos Stavrou; Daniel Barbara; Dan Fleck</li>
-</ul>
-<h3 id="Session-7-Privacy"><a href="#Session-7-Privacy" class="headerlink" title="Session 7: Privacy"></a>Session 7: Privacy</h3><ul>
-<li>16:00 - 16:30    Privacy Risk Assessment on Online Photos (Public Review) [Video]<br>Haitao Xu; Haining Wang; Angelos Stavrou</li>
-<li>16:30 - 17:00    Privacy is Not an Option: Attacking the IPv6 Privacy Extension (Public Review) [Video]<br>Johanna Ullrich; Edgar Weippl</li>
-</ul>
-<h3 id="Session-8-Evaluating-Solutions"><a href="#Session-8-Evaluating-Solutions" class="headerlink" title="Session 8: Evaluating Solutions"></a>Session 8: Evaluating Solutions</h3><ul>
-<li>09:00 - 09:30    Evaluation of Intrusion Detection Systems in Virtualized Environments Using Attack Injection (Public Review) [Video]<br>Aleksandar Milenkoski; Bryan D. Payne; Nuno Antunes; Marco Vieira; Samuel Kounev; Alberto Avritzer; Matthias Luft</li>
-<li>09:30 - 10:00    Security Analysis of PHP Bytecode Protection Mechanisms (Public Review) [Video]<br>Dario Weißer; Johannes Dahse; Thorsten Holz</li>
-<li>10:00 - 10:30    Radmin: Early Detection of Application-Level Resource Exhaustion and Starvation Attacks (Public Review) [Video]<br>Mohamed Elsabagh; Daniel Barbara; Daniel Fleck; Angelos Stavrou</li>
-<li>10:30 - 11:00    Towards Automatic Inference of Kernel Object Semantics from Binary Code (Public Review) [Video] Junyuan Zeng; Zhiqiang Lin</li>
-</ul>
-<h3 id="Session-9-Attack-Detection-II"><a href="#Session-9-Attack-Detection-II" class="headerlink" title="Session 9: Attack Detection II"></a>Session 9: Attack Detection II</h3><ul>
-<li>11:30 - 12:00    BotWatcher: Transparent and Generic Botnet Tracking (Public Review) [Video]<br>Thomas Barabosch; Adrian Dombeck; Khaled Yakdan; Elmar Gerhards-Padilla</li>
-<li>12:00 - 12:30    Elite: Automatic Orchestration of Elastic Detection Services to Secure Cloud Hosting (Public Review)<br>Yangyi Chen; Vincent Bindschaedler; Xiaofeng Wang; Stefan Berger; Dimitrios Pendarakis</li>
-<li>12:30 - 13:00    AmpPot: Monitoring and Defending Against Amplification DDoS Attacks (Public Review) [Video]<br>Lukas Krämer; Johannes Krupp; Daisuke Makita; Tomomi Nishizoe; Takashi Koide; Katsunari Yoshioka; Christian Rossow</li>
-</ul>
-<h3 id="Poster-Session"><a href="#Poster-Session" class="headerlink" title="Poster Session"></a>Poster Session</h3><ul>
-<li>A Day’s Worth of Changes to Fully Qualified Domains On The Global Internet<br>Paul Vixie; Joe St Sauver</li>
-<li>On the Detection of Targeted Attacks by Constructing Lateral Movement Graphs<br>Nobutaka Kawaguchi; Mamoru Tsuichihara; Kota Ideguchi; Yoshinobu Tanigawa; Hideyuki Tomimura</li>
-<li>Revisiting discriminative power of identifying DGA-based domains<br>Sungryoul Lee</li>
-<li>Investigating the Detection of Rootkits Using Hardware Performance Counters<br>Baljit Singh; Ryan Riley; Iliano Cervesato</li>
-<li>Detecting malicious behaviors through analysis of user interaction sequences<br>Nizar Kheir; Ndeye-Seynabou Diop; Sok-Yen Loui; Vincent Frey</li>
-<li>TouchLeak: A New Approach for Touch Loggers on Smartphones<br>Yisroel Mirsky; Simon Dzanashvili</li>
-<li>Canvas Fingerprinting in the Wild: A Large-scale Measurement and Evaluation<br>Yumehisa Haga; Yuta Takata; Mitsuaki Akiyama; Tatsuya Mori; Shigeki Goto</li>
-<li>Structural Resilience of Cyberphysical Systems Under Attack<br>Bhaskar Ramasubramanian; M.A. Rajan; M. Girish Chandra</li>
-<li>Understanding the Origins of Similar Android Apps<br>Yuta Ishii; Takuya Watanabe; Mitsuaki Akiyama; Tatsuya Mori</li>
-<li>Seeing is Believing? The analysis of unusual ratings and reviews on Android app store<br>Bo Sun; Takuya Watanabe; Mitsuaki Akiyama; Tatsuya Mori</li>
-<li>Detecting Malicious Wireless APs: Methodology and Field Studies<br>Toshiaki Harada; Tatsuya Mori; Shigeki Goto</li>
-<li>Observing Interaction between Java and JavaScript for privacy leakage detection in Android<br>Fumihiro Kanei; Mitsuaki Akiyama; Yuta Takata; Takeshi Yada</li>
-<li>Analysis of Spam Mail Containing Malicious Attachments using Spamtrap<br>Masaki Shimura; Mitsuhiro Hatada; Tatsuya Mori; Shigeki Goto</li>
-<li>Exploiting large-scale Webshells as a Botnet<br>AnXiaoYu</li>
-<li>Privacy is Not an Option: Attacking the IPv6 Privacy Extension<br>Johanna Ullrich; Edgar Weippl</li>
-<li>Security Logging Might Be Exploited: A Case of a Wireless Router<br>Heeju Yoon; Da Ran Park; Ji Hye Kim; Hae Young Lee</li>
-<li>A Formal Framework for Program Anomaly Detection<br>Xiaokui Shu; Danfeng (Daphne) Yao; Barbara G. Ryder</li>
-<li>Effective Malware Detection via Discriminative and Representative Feature Selection<br>Xiao-Yu Zhang; Shupeng Wang; Guangjun Wu</li>
-<li>Hardware-Assisted Fine-Grained Code-Reuse Attack Detection<br>Pinghai Yuan; Qingkai Zeng; Xuhua Ding</li>
-<li>Observation and Analysis of TCP-based Reflection DDoS Attacks Using Honeypot<br>Takashi Koide; Daisuke Makita; Katsunari Yoshioka; Tsutomu Matsumoto</li>
-<li>Re-recognizing “Malicious Certificates” - A Measurement Study<br>Mingxin Cui; Zigang Cao; Gang Xiong; Yong Zhao</li>
-<li>Xede: Practical Exploit Early Detection<br>Meining Nie; Purui Su; Qi Li; Zhi Wang; Lingyun Ying; Jinlong Hu; Dengguo Feng</li>
-<li>Privacy Risk Assessment on Online Photos<br>Haitao Xu; Haining Wang; Angelos Stavrou</li>
-<li>A Reduction Method for Program Trace Sizes for Deobfuscation<br>Seong-Kyun Mok; Hyeon-gu Jeon; Eun-Sun Cho<br>-Ensemble Learning for Low-level Hardware-supported Malware Detection<br>Khaled N. Khasawneh; Meltem Ozsoy; Caleb Donovick; Nael Abu-Ghazaleh; Dmitry V. Ponomarev</li>
-</ul>
-<h2 id="2014"><a href="#2014" class="headerlink" title="2014"></a>2014</h2><h3 id="Network-Security"><a href="#Network-Security" class="headerlink" title="Network Security"></a>Network Security</h3><p>Session Chair: Will Robertson</p>
-<ul>
-<li>11:00 - 11:30    Count Me In: Viable Distributed Summary Statistics for Securing High-Speed Networks<br>Johanna Amann; Seth Hall; Robin Sommer</li>
-<li><p>11:30 - 12:00    Formal Analysis of Security Procedures in LTE - A Feasibility Study<br>Noomene Ben Henda; Karl Norrman</p>
-</li>
-<li><p>12:00 - 12:30    Run Away If You Can: Persistent Jamming Attacks against Channel Hopping Wi-Fi Devices in Dense Networks<br>Il-Gu Lee; Hyunwoo Choi; Yongdae Kim; Seungwon Shin; Myungchul Kim</p>
-</li>
-</ul>
-<h3 id="Authentication-amp-Privacy"><a href="#Authentication-amp-Privacy" class="headerlink" title="Authentication &amp; Privacy"></a>Authentication &amp; Privacy</h3><p>Session Chair: David Sands</p>
-<ul>
-<li>14:00 - 14:30    A Comparative Evaluation of Implicit Authentication Schemes<br>Hassan Khan; Aaron Atwater; Urs Hengartner<br>paper    no presentation available</li>
-<li>14:30 - 15:00    Protecting Web-based Single Sign-on Protocols against Relying Party Impersonation Attacks through a Dedicated Bi-directional Authenticated Secure Channel<br>Yinzhi Cao; Yan Shoshitaishvili; Kevin Borgolte; Christopher Kruegel; Giovanni Vigna; Yan Chen</li>
-<li>15:00 - 15:30    Wait a minute! A fast, Cross-VM attack on AES<br>Gorka Irazoqui; Mehmet Sinan Inci; Thomas Eisenbarth; Berk Sunar</li>
-</ul>
-<h3 id="Intrusion-detection-amp-Vulnerability-Analysis"><a href="#Intrusion-detection-amp-Vulnerability-Analysis" class="headerlink" title="Intrusion detection &amp; Vulnerability Analysis"></a>Intrusion detection &amp; Vulnerability Analysis</h3><p>Session Chair: Giovanni Vigna</p>
-<ul>
-<li>10:30 - 11:00    On Emulation-Based Network Intrusion Detection Systems<br>Ali Abbasi; Jos Wetzels; Wouter Bokslag; Emmanuele Zambon; Sandro Etalle</li>
-<li><p>11:00 - 11:30    Quantitative Evaluation of Dynamic Platform Techniques as a Defensive Mechanism<br>Hamed Okhravi; James Riordan; Kevin Carter</p>
-</li>
-<li><p>11:30 - 12:00    Some Vulnerabilities Are Different Than Others: Studying Vulnerabilities and Attack Surfaces in the Wild<br>Kartik Nayak; Daniel Marino; Petros Efstathopoulos; Tudor Dumitras</p>
-</li>
-<li>12:00 - 12:30    Towards a Masquerade Detection System based on User’s Tasks<br>J. Benito Camiña; Raúl Monroy; Jorge Rodríguez</li>
-</ul>
-<h3 id="Malware-amp-Defenses"><a href="#Malware-amp-Defenses" class="headerlink" title="Malware &amp; Defenses"></a>Malware &amp; Defenses</h3><p>Session Chair: Christian Rossow</p>
-<ul>
-<li><p>14:00 - 14:30    Unsupervised Anomaly-based Malware Detection using Hardware Features<br>Adrian Tang; Simha Sethumadhavan; Salvatore Stolfo</p>
-</li>
-<li><p>14:30 - 15:00    GOLDENEYE: Efficiently and Effectively Unveiling Malware’s Targeted Environment<br>Zhaoyan Xu; Jialong Zhang; Guofei Gu; Zhiqiang Lin</p>
-</li>
-<li><p>15:00 - 15:30    PillarBox: Combating Next-Generation Malware with Fast Forward-Secure Logging<br>Kevin Bowers; Catherine Hart; Ari Juels; Nikos Triandopoulos</p>
-</li>
-</ul>
-<h3 id="Web-I"><a href="#Web-I" class="headerlink" title="Web I"></a>Web I</h3><p>Session Chair: Andrei Sabelfeldt</p>
-<ul>
-<li><p>16:00 - 16:30    Eyes of a Human, Eyes of a Program: Leveraging different views of the web for analysis and detection<br>Jacopo Corbetta; Luca Invernizzi; Christopher Kruegel; Giovanni Vigna</p>
-</li>
-<li><p>16:30 - 17:00    You Can’t Be Me: Enabling Trusted Paths &amp; User Sub-Origins in Web Browsers<br>Enrico Budianto; Yaoqi Jia; Xinshu Dong; Prateek Saxena; Zhenkai Liang</p>
-</li>
-<li><p>17:00 - 17:30    Measuring Drive-by Download Defense in Depth<br>Nathaniel Boggs; Senyao Du; Salvatore J. Stolfo</p>
-</li>
-</ul>
-<h3 id="Malware-amp-Binary-Analysis"><a href="#Malware-amp-Binary-Analysis" class="headerlink" title="Malware &amp; Binary Analysis"></a>Malware &amp; Binary Analysis</h3><p>Session Chair: Marc Dacier</p>
-<ul>
-<li><p>09:00 - 09:30    Dynamic Reconstruction of Relocation Information for Stripped Binaries<br>Vasilis Pappas; Michalis Polychronakis; Angelos D. Keromytis</p>
-</li>
-<li><p>09:30 - 10:00    Evaluating the Effectiveness of Current Anti-ROP Defenses<br>Felix Schuster; Thomas Tendyck; Jannik Pewny; Andreas Maass; Martin Steegmanns; Moritz Contag; Thorsten Holz</p>
-</li>
-<li><p>10:00 - 10:30    Paint it Black: Evaluating the Effectiveness of Malware Blacklists<br>Marc Kührer; Christian Rossow; Thorsten Holz</p>
-</li>
-</ul>
-<h3 id="Web-II"><a href="#Web-II" class="headerlink" title="Web II"></a>Web II</h3><p>Session Chair: Hamed Ohkravi</p>
-<ul>
-<li><p>11:00 - 11:30    A Lightweight Formal Approach for Analyzing Security of Web Protocols<br>Apurva Kumar</p>
-</li>
-<li><p>11:30 - 12:00    Why is CSP Failing? Trends and Challenges in CSP Adoption<br>Michael Weissbacher; Tobias Lauinger; William Robertson</p>
-</li>
-<li><p>12:00 - 12:30    Synthetic Data Generation and Defense in Depth Measurement of Web Applications<br>Nathaniel Boggs; Hang Zhao; Senyao Du; Salvatore J. Stolfo</p>
-</li>
-</ul>
-<h3 id="Poster"><a href="#Poster" class="headerlink" title="Poster"></a>Poster</h3><ul>
-<li><p>Poster Abstract: Forensically extracting encrypted contents from Stego-files using NTFS artefacts<br>Niall McGrath</p>
-</li>
-<li><p>Poster Abstract: Economic Denial of Sustainability (EDoS) Attack in the Cloud Using Web-Bugs<br>Natalija Vlajic and Armin Slopek</p>
-</li>
-<li><p>Poster Abstract: CITRIN: Extracting Adversaries Strategies Hidden in a Large-Scale Event Log<br>Satomi Honda, Yuki Unno, Koji Maruhashi, Masahiko Takenaka, and Satoru Torii</p>
-</li>
-<li><p>Poster Abstract: On Security Monitoring of Mobile Networks – Future threats and leveraging of network information<br>Michael Liljenstam, Prajwol Kumar Nakarmi, Oscar Ohlsson, and John Mattsson</p>
-</li>
-<li><p>Poster Abstract: Data Leakage Detection Algorithm including Sequences of Activities<br>César Guevara, Matilde Santos, and Victoria López</p>
-</li>
-<li><p>Poster abstract: BPIDS - Using business model specification in intrusion detection<br>João Pedro Lima, Nelson Escravana, and Carlos Ribeiro</p>
-</li>
-<li><p>Poster Abstract: Highlighting Easily How Malicious Applications Corrupt Android Devices<br>Radoniaina Andriatsimandefitra and Valérie Viêt Triêm Tông</p>
-</li>
-<li><p>Poster Abstract: Improving intrusion detection on SSL/TLS channels by classifying certificates<br>Zi-gang Cao, Gang Xiong, Zhen Li, and Li Guo</p>
-</li>
-<li><p>Poster Abstract: Using Financial Synthetic Data Sets for Fraud Detection Research<br>Edgar Alonso Lopez-Rojas and Stefan Axelsson</p>
-</li>
-<li><p>Poster Abstract: Automatic Discovery for Common Protocol Mimicry<br>Quan Bai, Gang Xiong, Yong Zhao, and Zhenzhen Li</p>
-</li>
-<li><p>Exploitation of vulnerabilities - if, when and how often (paper poster)<br>Kartik Nayak, Daniel Marino, Petros Efstathopoulos, Tudor Dumitras</p>
-</li>
-</ul>
-<h2 id="2013"><a href="#2013" class="headerlink" title="2013"></a>2013</h2><h3 id="Session-I-Hardware-level-Security"><a href="#Session-I-Hardware-level-Security" class="headerlink" title="Session I (Hardware-level Security)"></a>Session I (Hardware-level Security)</h3><p>Session Chair: Kapil Singh</p>
-<ul>
-<li>1:00PM - 1:30PM    A Primitive for Revealing Stealthy Peripheral-based Attacks on the Computing Platform’s Main Memory<br>Patrick Stewin</li>
-<li>1:30PM - 2:00PM    Hypervisor Memory Forensics<br>Mariano Graziano, Andrea Lanzi and Davide Balzarotti<br>Break</li>
-</ul>
-<h3 id="Session-II-Server-level-and-OS-level-Security"><a href="#Session-II-Server-level-and-OS-level-Security" class="headerlink" title="Session II (Server-level and OS-level Security)"></a>Session II (Server-level and OS-level Security)</h3><p>Session Chair: Wenke Lee</p>
-<ul>
-<li>2:30PM - 3:00PM    Server-side code injection attacks: a historical perspective<br>Jakob Fritz, Corrado Leita and Michalis Polychronakis</li>
-<li>3:00PM - 3:30PM    Check my profile: Leveraging static analysis for fast and accurate detection of ROP gadgets<br>Blaine Stancill, Kevin Snow, Nathan Otterness, Fabian Monrose, Lucas Davi and Ahmad-Reza Sadeghi</li>
-<li>3:30PM - 4:00PM    Systematic Analysis of Defenses Against Return-Oriented Programming<br>Richard Skowyra, Kelly Casteel, Hamed Okhravi, Nickolai Zeldovich and William Streilein</li>
-<li>4:00PM - 4:30PM    SILVER: Fine-grained and Transparent Protection Domain Primitives in Commodity OS Kernel<br>Xi Xiong and Peng Liu<br>Thursday, October 24, 2013</li>
-</ul>
-<h3 id="Session-III-Malware"><a href="#Session-III-Malware" class="headerlink" title="Session III (Malware)"></a>Session III (Malware)</h3><p>Session Chair: Michalis Polychronakis</p>
-<ul>
-<li>8:30AM - 9:00AM    API Chaser: Anti-analysis Resistant Malware Analyzer<br>Yuhei Kawakoya, Makoto Iwamura, Eitaro Shioji and Takeo Hariu</li>
-<li>9:00AM - 9:30AM    FIRMA: Malware Clustering and Network Signature Generation with Mixed Network Behaviors<br>M. Zubair Rafique and Juan Caballero</li>
-<li>9:30AM - 10:00AM    Deobfuscating Embedded Malware using Probable-Plaintext Attacks<br>Christian Wressnegger, Frank Boldewin and Konrad Rieck</li>
-<li>10:00AM - 10:30AM    Detecting Traditional Packers, Decisively (photo)<br>Denis Bueno, Kevin Compton, Karem Sakallah and Michael Bailey</li>
-</ul>
-<p>Break<br>10:30AM - 11:00AM</p>
-<h3 id="Session-IV-Authentication-Credential-Attacks"><a href="#Session-IV-Authentication-Credential-Attacks" class="headerlink" title="Session IV (Authentication/Credential Attacks)"></a>Session IV (Authentication/Credential Attacks)</h3><p>Session Chair: Andrea Lanzi</p>
-<ul>
-<li>11:00AM - 11:30AM    Side-Channel Attacks on the Yubikey 2 One-Time Password Generator<br>David Oswald, Bastian Richter and Christof Paar</li>
-<li>11:30AM - 12:00PM    Active Credential Leakage for Observing Web-based Attack Cycle<br>Mitsuaki Akiyama, Takeshi Yagi, Kazufumi Aoki, Takeo Hariu and Youki Kadobayashi</li>
-</ul>
-<p>Break<br>12:00PM - 1:30PM    Lunch (provided)<br>Best Paper Award</p>
-<h3 id="Session-V-Web-and-Network-Privacy-and-Security"><a href="#Session-V-Web-and-Network-Privacy-and-Security" class="headerlink" title="Session V (Web and Network Privacy and Security)"></a>Session V (Web and Network Privacy and Security)</h3><p>Session Chair: Juan Caballero</p>
-<ul>
-<li>1:30PM - 2:00PM    Behavior Decomposition: Aspect-level Browser Extension Clustering and Its Security Implications<br>Bin Zhao and Peng Liu</li>
-<li>2:00PM - 2:30PM    Tamper-resistant LikeJacking<br>Martin Johns and Sebastian Lekies</li>
-<li>2:30PM - 3:00PM    Deconstructing the Assessment of Anomaly-based Intrusion Detectors for Critical Applications<br>Arun Viswanathan, Kymie Tan and Clifford Neuman</li>
-</ul>
-<p>Break<br>3:00PM - 3:30PM</p>
-<h3 id="Session-VI-Posters-amp-Five-minute-Talks"><a href="#Session-VI-Posters-amp-Five-minute-Talks" class="headerlink" title="Session VI (Posters &amp; Five-minute Talks)"></a>Session VI (Posters &amp; Five-minute Talks)</h3><p>Session Chair: Kevin Z. Snow</p>
-<ul>
-<li>Detecting Code Reuse Attacks with a Model of Conformant Program Execution (Poster Abstract)<br>Emily R. Jacobson, Andrew R. Bernat, William R. Williams and Barton P. Miller</li>
-<li>Improving Data Quality of Proxy Logs for Intrusion Detection (Poster Abstract)<br>Hongzhou Sha, Tingwen Liu, Peng Qin, Yong Sun and Qingyun Liu</li>
-<li>An Identification Method Based on SSL Extension (Poster Abstract)<br>Peipei Fu, Gang Xiong, Yong Zhao, Ming Song and Peng Zhang</li>
-<li>Shingled Graph Disassembly: Finding the Undecideable Path (Poster Abstract)<br>Richard Wartell, Yan Zhou, Kevin Hamlen and Murat Kantarcioglu</li>
-<li>Protocol Level Attack Replay (Poster Abstract)<br>Dan Li, Chaoge Liu, Ke Li and Xiang Cui</li>
-<li>Cloud Synchronization Increase Cross-application Scripting Threats on Smartphone (Poster Abstract)<br>Qixu Liu, Yuqing Zhang, Chen Cao and Guanxing Wen</li>
-<li>NFC-based Two-Pass Mobile Authentication (Poster Abstract)<br>Jagannadh Vempati, Garima Bajwa and Ram Dantu</li>
-<li>Android Sensor Data Anonymization (Poster Abstract)<br>Cynthia Claiborne, Mohamed Fazeen Mohamed Issadeen and Ram Dantu</li>
-<li>Detect IAP Flaws in iOS Applications (Poster Abstract)<br>Cheng Luo, Yuqing Zhang, Qixu Liu and Chen Cao</li>
-</ul>
-<p>Social Event<br>6:30PM - 8:30PM    Beach BBQ (food provided) (photo) (photo) (photo) (photo)<br>Friday, October 25, 2013</p>
-<h3 id="Session-VII-Mobile-Security"><a href="#Session-VII-Mobile-Security" class="headerlink" title="Session VII (Mobile Security)"></a>Session VII (Mobile Security)</h3><p>Session Chair: Malek Ben Salem</p>
-<ul>
-<li>9:00AM - 9:30AM    Practical Context-Aware Permission Control for Hybrid Mobile Applications<br>Kapil Singh</li>
-<li>9:30AM - 10:00AM    Understanding SMS Spam in a Large Cellular Network: Characteristics, Strategies and Defenses<br>(Best Paper Award!)<br>Nan Jiang, Yu Jin, Ann Skudlark and Zhi-Li Zhang</li>
-<li>10:00AM - 10:30AM    Mobile Malware Detection Based on Energy Fingerprints - A Dead End?<br>Johannes Hoffmann, Stephan Neumann and Thorsten Holz</li>
-</ul>
-<p>Break<br>10:30AM - 11:00AM</p>
-<h3 id="Session-VIII-Cloud-and-Anonymity-Networks-I"><a href="#Session-VIII-Cloud-and-Anonymity-Networks-I" class="headerlink" title="Session VIII (Cloud and Anonymity Networks I)"></a>Session VIII (Cloud and Anonymity Networks I)</h3><p>Session Chair: Corrado Leita</p>
-<ul>
-<li>11:00AM - 11:30AM    Holiday Pictures or Blockbuster Movies? Insights into Copyright Infringement in User Uploads to One-Click File Hosters<br>Tobias Lauinger, Kaan Onarlioglu, Abdelberi Chaabane, Engin Kirda, William Robertson and Mohamed Ali Kaafar</li>
-<li>11:30AM - 12:00PM    Connected Colors: Unveiling the Structure of Criminal Networks<br>Yacin Nadji, Manos Antonakakis, Roberto Perdisci and Wenke Lee</li>
-</ul>
-<p>Break<br>12:00PM - 1:30PM    Lunch (provided)</p>
-<h3 id="Session-IX-Cloud-and-Anonymity-Networks-II"><a href="#Session-IX-Cloud-and-Anonymity-Networks-II" class="headerlink" title="Session IX (Cloud and Anonymity Networks II)"></a>Session IX (Cloud and Anonymity Networks II)</h3><p>Session Chair: Charles Wright</p>
-<ul>
-<li>1:30PM - 2:00PM    CloudFence: Data Flow Tracking as a Cloud Service<br>Vasilis Pappas, Vasileios P. Kemerlis, Angeliki Zavou, Michalis Polychronakis and Angelos D. Keromytis</li>
-<li>2:00PM - 2:30PM    Practical attacks against the I2P network<br>Christoph Egger, Johannes Schlumberger, Christopher Kruegel and Giovanni Vigna</li>
-</ul>
-<h2 id="2012"><a href="#2012" class="headerlink" title="2012"></a>2012</h2><h3 id="Session-I-Virtualization-Auditorium-First-Floor"><a href="#Session-I-Virtualization-Auditorium-First-Floor" class="headerlink" title="Session I (Virtualization) Auditorium, First Floor"></a>Session I (Virtualization) Auditorium, First Floor</h3><p>Session Chair: Wil Robertson</p>
-<ul>
-<li>14:30 - 15:00    Trusted VM Snapshots in Untrusted Cloud Infrastructures<br>Abhinav Srivastava, Himanshu Raj, Jonathon Giffin, Paul England</li>
-<li>15:00 - 15:30    Secure and Robust Monitoring of Virtual Machines through Guest-Assisted Introspection<br>Martim Carbone, Matthew Conover, Bruce Montague, Wenke Lee</li>
-<li>15:30 - 16:00    Assessing the Trustworthiness of Drivers<br>Shengzhi Zhang and Peng Liu</li>
-</ul>
-<p>Break Side Rooms, First Floor</p>
-<p> 16:00 - 16:30    Coffee and Biscuits</p>
-<h3 id="Session-II-Attacks-and-Defenses-Auditorium-First-Floor"><a href="#Session-II-Attacks-and-Defenses-Auditorium-First-Floor" class="headerlink" title="Session II (Attacks and Defenses) Auditorium, First Floor"></a>Session II (Attacks and Defenses) Auditorium, First Floor</h3><p>Session Chair: Al Valdes</p>
-<ul>
-<li>16:30 - 17:00    Industrial Espionage and Targeted Attacks: Understanding the Characteristics of an Escalating Threat<br>Olivier Thonnard, Leyla Bilge, Gavin O’Gorman, Seán Kiernan, Martin Lee</li>
-<li>17:00 - 17:30    Memory Errors: The Past, the Present, and the Future<br>Victor van der Veen, Nitish dutt-Sharma, Lorenzo Cavallaro, Herbert Bos</li>
-<li>17:30 - 18:00    A Memory Access Validation Scheme against Payload Injection Attacks<br>Dongkyun Ahn and Gyungho Lee</li>
-</ul>
-<p>Thursday September 13th<br>Breakfast Foyer, First Floor<br>08:00 - 09:00    Dutch Breakfast<br>Awards Auditorium, First Floor<br>09:00 - 09:15    Best Paper Awards (Speaker: Davide Balzarotti)</p>
-<ul>
-<li>09:15 - 10:00    Most Influential Paper Award<br>Probabilistic Alert Correlation - A. Valdes, and K. Skinner (2001)</li>
-</ul>
-<h3 id="Session-III-Host-amp-Network-Security-Auditorium-First-Floor"><a href="#Session-III-Host-amp-Network-Security-Auditorium-First-Floor" class="headerlink" title="Session III (Host &amp; Network Security) Auditorium, First Floor"></a>Session III (Host &amp; Network Security) Auditorium, First Floor</h3><p>Session Chair: Herbert Bos</p>
-<ul>
-<li>10:00 - 10:30    Dione: A Flexible Disk Monitoring and Analysis Framework<br>Jennifer Mankin and David Kaeli</li>
-<li>10:30 - 11:00    AK-PPM: An Authenticated Packet Attribution Scheme for Mobile Ad Hoc Networks<br>Zhi Xu, Hungyuan Hsu, Xin Chen, Sencun Zhu, and Ali R. Hurson</li>
-</ul>
-<p>Break Foyer, First Floor<br>11:00 - 11:30    Coffee and Biscuits</p>
-<h3 id="Session-IV-Fraud-Detection-and-Underground-Economy-Auditorium-First-Floor"><a href="#Session-IV-Fraud-Detection-and-Underground-Economy-Auditorium-First-Floor" class="headerlink" title="Session IV (Fraud Detection and Underground Economy) Auditorium, First Floor"></a>Session IV (Fraud Detection and Underground Economy) Auditorium, First Floor</h3><p>Session Chair: Fabian Monrose</p>
-<ul>
-<li>11:30 - 12:00    Paying for Piracy? An Analysis of One-Click Hosters’ Controversial Reward Schemes<br>Tobias Lauinger, Engin Kirda, and Pietro Michiardi</li>
-<li>12:00 - 12:30    Proactive Discovery of Phishing Related Domain Names<br>Samuel Marchal, Jérôme François, Radu State, and Thomas Engel</li>
-<li>12:30 - 13:00    Evaluating Electricity Theft Detectors in Smart Grid Networks<br>Daisuke Mashima and Alvaro A. Cardenas</li>
-</ul>
-<p>Lunch The Basket<br>13:00 - 14:30    Dutch Lunch and Drinks</p>
-<h3 id="Session-V-Web-Security-Auditorium-First-Floor"><a href="#Session-V-Web-Security-Auditorium-First-Floor" class="headerlink" title="Session V (Web Security) Auditorium, First Floor"></a>Session V (Web Security) Auditorium, First Floor</h3><p>Session Chair: Wenke Lee</p>
-<ul>
-<li>14:30 - 15:00    PoisonAmplifier: A Guided Approach of Discovering Compromised Websites through Reversing Search Poisoning Attacks<br>Jialong Zhang, Chao Yang, Zhaoyan Xu, Guofei Gu</li>
-<li>15:00 - 15:30    DEMACRO: Defense against Malicious Cross-domain Requests<br>Sebastian Lekies, Nick Nikiforakis, Walter Tighzert, Frank Piessens, and Martin Johns</li>
-<li>15:30 - 16:00    FlashDetect: ActionScript 3 Malware Detection<br>Timon Van Overveldt, Christopher Kruegel, and Giovanni Vigna<br>Drinks Foyer, First Floor</li>
-</ul>
-<h3 id="Poster-Session-Foyer-First-Floor"><a href="#Poster-Session-Foyer-First-Floor" class="headerlink" title="Poster Session Foyer, First Floor"></a>Poster Session Foyer, First Floor</h3><ul>
-<li>Poster Abstract: Online Social Networks, a Criminals Multipurpose Toolbox<br>Shah Mahmood and Yvo Desmedt</li>
-<li>Poster Abstract: The Triple-Channel Model: Toward Robust and Efficient Advanced Botnets<br>Cui Xiang, Shi Jinqiao, Liao Peng, Liu Chaoge</li>
-<li>Poster Abstract: Network Security Analysis Method Taking into Account the Usage Information<br>Wu Jinyu, Yin Lihua, Fang Binxing</li>
-<li>Poster Abstract: Automatic Covert Channel Detection in Asbestos System<br>Shuyuan Jin, Zhi Yang, Xiang Cui</li>
-<li>Poster Abstract: EFA for Efficient Regular Expression Matching in NIDS<br>Dengke Qiao, Tingwen Liu, Yong Sun, and Li Guo</li>
-<li>Poster Abstract: Distress Detection<br>Mark Vella, Sotirios Terzis, Marc Roper</li>
-<li>Poster Abstract: Trie Data Structure to Compare Traffic Payload in a Supervised Anomaly Detection System<br>Jenny Andrea Pinto Sánchez and Luis Javier García Villalba</li>
-<li>Poster Abstract: Towards Automated Forensic Event Reconstruction of Malicious Code<br>Ahmed F. Shosha, Joshua I. James, Chen-Ching Liu and Pavel Gladyshev</li>
-<li>Poster Abstract: Accurate Recovery of Functions in a Retargetable Decompiler<br>Lukáš Ďurfina, Jakub Křoustek, Petr Zemek, and Břetislav Kábele</li>
-<li>Poster Abstract: Improvement of an Anagram Based NIDS by Reducing the Storage Space of Bloom Filters<br>Hugo Villanúa Vega, Jorge Maestre Vidal, Jaime Daniel Mejuía Castro, and Luis Javier García Villalba</li>
-<li>Poster Abstract: Concurrency Optimization for NIDS<br>Jorge Maestre Vidal, Hugo Villanúa Vega, Jaime Daniel Mejuıa Castro, and Luis Javier García Villalba</li>
-<li>Poster Abstract: Malware Detection System by Payload Analysis of Network Traffic<br>Luis Javier García Villalba, Jaime Daniel Mejuía Castro, Ana Lucila, Sandoval Orozco, and Javier Martínez Puentes<br>Social Dinner Restaurant In De Waag<br>19:30 - 22:30    Dinner at the Restaurant In De Waag</li>
-</ul>
-<p>Friday September 14th<br>Breakfast Side Rooms, First Floor<br>08:00 - 09:00    Dutch Breakfast</p>
-<h3 id="Session-VI-Intrusion-Detection-Auditorium-First-Floor"><a href="#Session-VI-Intrusion-Detection-Auditorium-First-Floor" class="headerlink" title="Session VI (Intrusion Detection) Auditorium, First Floor"></a>Session VI (Intrusion Detection) Auditorium, First Floor</h3><p>Session Chair: Sal Stolfo</p>
-<ul>
-<li>09:00 - 09:30    ALERT-ID: Analyze Logs of the network Element in Real Time for Intrusion Detection<br>Jie Chu, Zihui Ge, Richard Huber, Ping Ji, Jennifer Yates, Yung-Chao Yu</li>
-<li>09:30 - 10:00    A Lone Wolf No More: Supporting Network Intrusion Detection with Real-Time Intelligence<br>Bernhard Amann, Robin Sommer, Aashish Sharma, and Seth Hall</li>
-<li>10:00 - 10:30    GPP-grep: High-Speed Regular Expression Processing Engine on General Purpose Processors<br>Victor C. Valgenti, Jatin Chhugani, Yan Sun, Nadathur Satish, Min Sik Kim, Changkyu Kim, Pradeep Dubey</li>
-<li>10:30 - 11:00    N-gram Against the Machine: On the Feasibility of the N-gram Network Analysis for Binary Protocols<br>Dina Hadžiosmanović, Lorenzo Simionato, Damiano Bolzoni, Emmanuele Zambon, and Sandro Etalle</li>
-</ul>
-<h2 id="2011"><a href="#2011" class="headerlink" title="2011"></a>2011</h2><h3 id="Session-1-Malware"><a href="#Session-1-Malware" class="headerlink" title="Session 1 (Malware)"></a>Session 1 (Malware)</h3><p>Chair: Guofei Gu</p>
-<ul>
-<li><p>10:00 – 10:30<br>Shellzer: a tool for the dynamic analysis of malicious shellcode<br>Yanick Fratantonio (Politecnico di Milano), Christopher Kruegel and Giovanni Vigna (University of California, Santa Barbara)</p>
-</li>
-<li><p>10:30 – 11:00<br>KLIMAX: Profiling Memory Write Patterns to Detect Keystroke-Harvesting Malware<br>Stefano Ortolani and Cristiano Giuffrida (Vrije Universiteit) and Bruno Crispo (University of Trento)</p>
-</li>
-<li><p>11:00 – 11:30<br>Packed, Printable, and Polymorphic Return-Oriented Programming<br>Kangjie Lu and Dabi Zou (Singapore Management University), Weiping Wen (Peking University), and Debin Gao (Singapore Management University)</p>
-</li>
-<li><p>11:30 – 12:00<br>On the Expressiveness of Return-into-libc Attacks<br>Minh Tran, Mark Etheridge, Tyler Bletsch, Xuxian Jiang, Vincent Freeh, and Peng Ning (North Carolina State University)</p>
-</li>
-</ul>
-<p>12:00 – 13:30<br>Lunch<br>13:30 – 15:00</p>
-<h3 id="Session-2-Application-Security"><a href="#Session-2-Application-Security" class="headerlink" title="Session 2 (Application Security)"></a>Session 2 (Application Security)</h3><p>Chair: Debin Gao</p>
-<ul>
-<li><p>13:30 – 14:00<br>Minemu: The World’s Fastest Taint Tracker<br>Erik Bosman, Asia Slowinska, and Herbert Bos (Vrije Universiteit Amsterdam)</p>
-</li>
-<li><p>14:00 – 14:30<br>Dymo: Tracking Dynamic Code Identity<br>Bob Gilbert, Richard Kemmerer, Christopher Kruegel, and Giovanni Vigna (University of California, Santa Barbara)</p>
-</li>
-<li><p>14:30 – 15:00<br>Automated Identification of Cryptographic Primitives in Binary Programs<br>Felix Gröbert (Ruhr-University Bochum), Carsten Willems (University of Mannheim), and Thorsten Holz (Ruhr-University Bochum)</p>
-</li>
-</ul>
-<p>15:00 – 15:30<br>Health Break<br>15:30 – 17:00</p>
-<h3 id="Session-3-Anomaly-Detection"><a href="#Session-3-Anomaly-Detection" class="headerlink" title="Session 3 (Anomaly Detection)"></a>Session 3 (Anomaly Detection)</h3><p>Chair: Mathieu Couture</p>
-<ul>
-<li><p>15:30 – 16:00<br>Cross-domain Collaborative Anomaly Detection: So Far Yet So Close<br>Nathaniel Boggs (Columbia University), Sharath Hiremagalore and Angelos Stavrou (George Mason University), and Salvatore J. Stolfo (Columbia University)</p>
-</li>
-<li><p>16:00 – 16:30<br>Revisiting Traffic Anomaly Detection using Software Defined Networking<br>Syed Akbar Mehdi, Junaid Khalid, and Syed Ali Khayam (National University of Sciences and Technology, Pakistan)</p>
-</li>
-<li><p>16:30 – 17:00<br>Modeling User Search Behavior for Masquerade Detection<br>Malek Ben Salem and Salvatore J. Stolfo (Columbia University)</p>
-</li>
-</ul>
-<h3 id="Session-4-Special-Environments-and-Sandboxing"><a href="#Session-4-Special-Environments-and-Sandboxing" class="headerlink" title="Session 4 (Special Environments and Sandboxing)"></a>Session 4 (Special Environments and Sandboxing)</h3><p>Chair: Angelos Stavrou</p>
-<ul>
-<li><p>8:30 – 9:00<br>Defending Legacy Embedded Systems with Software Symbiotes<br>Ang Cui and Salvatore J. Stolfo (Columbia University)</p>
-</li>
-<li><p>9:00 – 9:30<br>What if you can’t trust your network card?<br>Loïc Duflot, Yves-Alexis Perez, and Benjamin Morin (ANSSI)</p>
-</li>
-<li><p>9:30 – 10:00<br>Detecting Environment-Sensitive Malware<br>Martina Lindorfer, Clemens Kolbitsch, and Paolo Milani Comparetti (Vienna University of Technology)</p>
-</li>
-</ul>
-<p>10:00 – 10:15<br>Health Break<br>10:15 – 11:45<br>Panel Discussion: State and Future of Open-Source Network Intrusion Detection<br>11:45 – 13:15<br>Lunch<br>13:15 – 15:15</p>
-<h3 id="Session-5-Web-Security-and-Social-Networks"><a href="#Session-5-Web-Security-and-Social-Networks" class="headerlink" title="Session 5 (Web Security and Social Networks)"></a>Session 5 (Web Security and Social Networks)</h3><p>Chair: Davide Balzarotti</p>
-<ul>
-<li><p>13:15 – 13:45<br>Banksafe - Information Stealer Detection inside the Web Browser<br>Armin Buescher (G Data Security Labs), Felix Leder (University of Bonn), and Thomas Siebert (G Data Security Labs)</p>
-</li>
-<li><p>13:45 – 14:15<br>IceShield: Detection and Mitigation of Malicious Websites with a Frozen DOM<br>Mario Heiderich, Tilman Frosch, and Thorsten Holz (Ruhr-University Bochum)</p>
-</li>
-<li><p>14:15 – 14:45<br>Spam Filtering in Twitter using Sender-Receiver Relationship<br>Jonghyuk Song, Sangho Lee, and Jong Kim (POSTECH)</p>
-</li>
-<li><p>14:45 – 15:15<br>Die Free or Live Hard? Empirical Evaluation and New Design for Fighting Evolving Twitter Spammers<br>Chao Yang, Robert Harkreader, and Guofei Gu (Texas A&amp;M University)</p>
-</li>
-</ul>
-<p>15:15 – 15:30<br>Health Break<br>15:30 – 17:00</p>
-<h3 id="Session-6-Network-Security"><a href="#Session-6-Network-Security" class="headerlink" title="Session 6 (Network Security)"></a>Session 6 (Network Security)</h3><p>Chair: Phil Porras</p>
-<ul>
-<li><p>15:30 – 16:00<br>Securing Application-Level Topology Estimation Networks: Facing the Frog-Boiling Attack<br>Sheila Becker (University of Luxembourg), Jeff Seibert and Cristina Nita-Rotaru (Purdue University), and Radu State (University of Luxembourg)</p>
-</li>
-<li><p>16:00 – 16:30<br>Detecting Traffic Snooping in Tor Using Decoys<br>Sambuddho Chakravarty, Georgios Portokalidis, Michalis Polychronakis, and Angelos D. Keromytis (Columbia University)</p>
-</li>
-<li><p>16:30 – 17:00<br>Cross-Analysis of Botnet Victims: New Insights and Implications<br>Seungwon Shin, Raymond Lin, and Guofei Gu (Texas A&amp;M University)</p>
-</li>
-</ul>
-<h2 id="2010"><a href="#2010" class="headerlink" title="2010"></a>2010</h2><h3 id="Session-1-Keynote-Eric-Chien"><a href="#Session-1-Keynote-Eric-Chien" class="headerlink" title="Session 1 (Keynote: Eric Chien)"></a>Session 1 (Keynote: Eric Chien)</h3><p>The New Generation of Targeted Attacks (slides)<br>North Victoria Ballroom</p>
-<p>14:15 - 15:15</p>
-<h3 id="Session-2-High-Performance"><a href="#Session-2-High-Performance" class="headerlink" title="Session 2 (High-Performance)"></a>Session 2 (High-Performance)</h3><p>North Victoria Ballroom<br>Chair: Robin Sommer</p>
-<ul>
-<li><p>14:15 - 14:45<br>Improving NFA-based Signature Matching using Ordered Binary Decision Diagrams (slides)<br>Liu Yang, Rezwana Karim, Vinod Ganapathy and Randy Smith</p>
-</li>
-<li><p>14:45 - 15:15<br>GrAVity: A Massively Parallel Antivirus Engine (slides)<br>Giorgos Vasiliadis and Sotiris Ioannidis</p>
-</li>
-</ul>
-<p>15:15 - 15:45<br>Health Break<br>South Victoria Ballroom</p>
-<p>15:45 - 17:15</p>
-<h3 id="Session-3-Network-Protection"><a href="#Session-3-Network-Protection" class="headerlink" title="Session 3 (Network Protection)"></a>Session 3 (Network Protection)</h3><p>North Victoria Ballroom<br>Chair: Charles Wright</p>
-<ul>
-<li><p>15:45 - 16:15<br>What is the Impact of P2P Traffic on Anomaly Detection? (slides)<br>Irfan Ul Haq, Sardar Ali, Hassan Khan and Syed Ali Khayam</p>
-</li>
-<li><p>16:15 - 16:45<br>A Centralized Monitoring Infrastructure for Improving DNS Security (slides)<br>Manos Antonakakis, David Dagon, Luo Xiapu, Roberto Perdisci and Wenke Lee</p>
-</li>
-<li><p>16:45 - 17:15<br>Behavior-based Worm Detectors Compared (slides)<br>Shad Stafford and Jun Li</p>
-</li>
-<li><p>18:00 - 20:00<br>Reception, Poster Session and Technology Showcase<br>South Victoria Ballroom</p>
-</li>
-</ul>
-<p>Thursday September 16th</p>
-<p>7:30 – 8:30<br>Breakfast and Registration<br>Victoria Ballroom Foyer</p>
-<p>8:30 - 10:00</p>
-<h3 id="Session-4-Malware-Detection-and-Defence-1"><a href="#Session-4-Malware-Detection-and-Defence-1" class="headerlink" title="Session 4 (Malware Detection and Defence 1)"></a>Session 4 (Malware Detection and Defence 1)</h3><p>North Victoria Ballroom<br>Chair: Mathieu Couture</p>
-<ul>
-<li><p>8:30 - 9:00<br>Automatic Discovery of Parasitic Malware (slides)<br>Abhinav Srivastava and Jonathon Giffin</p>
-</li>
-<li><p>9:00 - 9:30<br>BotSwindler: Tamper Resistant Injection of Believable Decoys in VM-Based Hosts for Crimeware Detection (slides)<br>Brian Bowen, Pratap Prabhu, Vasileios P. Kemerlis, Stelios Sidiroglou, Salvatore Stolfo and Angelos Keromytis</p>
-</li>
-<li><p>9:30 - 10:00<br>CANVuS: Context-Aware Network Vulnerability Scanning (slides)<br>Yunjing Xu, Michael Bailey, Eric Vander Weele and Farnam Jahanian</p>
-</li>
-</ul>
-<p>10:00 - 10:30<br>Health Break<br>South Victoria Ballroom</p>
-<p>10:30 - 12:00</p>
-<h3 id="Session-5-Malware-Detection-and-Defence-2"><a href="#Session-5-Malware-Detection-and-Defence-2" class="headerlink" title="Session 5 (Malware Detection and Defence 2)"></a>Session 5 (Malware Detection and Defence 2)</h3><p>North Victoria Ballroom<br>Chair: Corrado Leita</p>
-<ul>
-<li><p>10:30 - 11:00<br>HyperCheck: A Hardware-Assisted Integrity Monitor (slides)<br>Jiang Wang, Angelos Stavrou and Anup Ghosh</p>
-</li>
-<li><p>11:00 - 11:30<br>Kernel Malware Analysis with Un-tampered and Temporal Views of Dynamic Kernel Memory (slides)<br>Junghwan Rhee, Ryan Riley, Dongyan Xu and Xuxian Jiang</p>
-</li>
-<li><p>11:30 - 12:00<br>Bait your Hook: a Novel Detection Technique for Keyloggers (slides)<br>Stefano Ortolani, Cristiano Giuffrida and Bruno Crispo</p>
-</li>
-<li><p>12:00 - 13:30<br>Lunch and Technology Showcase<br>South Victoria Ballroom</p>
-</li>
-</ul>
-<p>13:30 - 15:00</p>
-<h3 id="Session-6-Evaluation"><a href="#Session-6-Evaluation" class="headerlink" title="Session 6 (Evaluation)"></a>Session 6 (Evaluation)</h3><p>North Victoria Ballroom<br>Chair: Michael Bailey</p>
-<ul>
-<li><p>13:30 - 14:00<br>Generating Client Workloads and High-Fidelity Network Traffic for Controllable, Repeatable Experiments in Computer Security (slides)<br>Charles Wright, Christopher Connelly, Timothy Braje, Jesse Rabek, Lee Rossey and Robert Cunningham</p>
-</li>
-<li><p>14:00 - 14:30<br>On Challenges in Evaluating Malware Clustering (slides)<br>Peng Li, Limin Liu, Debin Gao and Michael Reiter</p>
-</li>
-<li><p>14:30 - 15:00<br>Why Did My Detector Do That?! Predicting Keystroke-Dynamics Error Rates (slides)<br>Kevin Killourhy and Roy Maxion</p>
-</li>
-</ul>
-<p>15:00 - 15:30<br>Health Break<br>South Victoria Ballroom</p>
-<p>15:30 - 17:00</p>
-<h3 id="Session-7-Forensics"><a href="#Session-7-Forensics" class="headerlink" title="Session 7 (Forensics)"></a>Session 7 (Forensics)</h3><p>North Victoria Ballroom<br>Chair: Benjamin Morin</p>
-<ul>
-<li><p>15:30 - 16:00<br>NetStore: An Efficient Storage Infrastructure For Network Forensics And Monitoring (slides)<br>Paul Giura and Nasir Memon</p>
-</li>
-<li><p>16:00 - 16:30<br>Live and Trustworthy Forensic Analysis of Commodity Production Systems (slides)<br>Lorenzo Martignoni, Aristide Fattori, Roberto Paleari and Lorenzo Cavallaro</p>
-</li>
-<li><p>16:30 - 17:00<br>Hybrid Analysis and Control of Malware (slides)<br>Kevin Roundy and Barton P. Miller</p>
-</li>
-</ul>
-<p>18:00 - 19:00<br>Double Decker Bus Tour of Ottawa - Leaving from hotel lobby</p>
-<p>19:00 - 19:30<br>Cocktails<br>Merlot Rooftop Restaurant</p>
-<p>19:30 - 22:00<br>Canadian Experience Dinner<br>Merlot Rooftop Restaurant</p>
-<p>Friday September 17th</p>
-<p>8:00 - 9:00<br>Breakfast and Registration<br>Victoria Ballroom Foyer</p>
-<p>9:00 - 11:00</p>
-<h3 id="Session-8-Anomaly-Detection"><a href="#Session-8-Anomaly-Detection" class="headerlink" title="Session 8 (Anomaly Detection)"></a>Session 8 (Anomaly Detection)</h3><p>North Victoria Ballroom<br>Chair: Ludovic Mé</p>
-<ul>
-<li><p>9:00 - 9:30<br>Anomaly detection and mitigation for disaster area networks (slides)<br>Jordi Cucurull, Mikael Asplund and Simin Nadjm-Tehrani</p>
-</li>
-<li><p>9:30 - 10:00<br>Community Epidemic Detection using Time-Correlated Anomalies (slides)<br>Adam Oliner, Ashutosh Kulkarni and Alex Aiken</p>
-</li>
-<li><p>10:00 - 10:30<br>A Data-Centric Approach to Insider Attack Detection in Database Systems (slides)<br>Sunu Mathew, Michalis Petropoulos, Hung Q Ngo and Shambhu Upadhyaya</p>
-</li>
-<li><p>10:30 - 11:00<br>Privilege States Based Access Control for Fine-Grained Intrusion Response (slides)<br>Ashish Kamra and Elisa Bertino</p>
-</li>
-</ul>
-<p>11:00 - 11:30<br>Health Break<br>South Victoria Ballroom</p>
-<p>11:30 - 13:00</p>
-<h3 id="Session-9-Web-Security"><a href="#Session-9-Web-Security" class="headerlink" title="Session 9 (Web Security)"></a>Session 9 (Web Security)</h3><p>North Victoria Ballroom<br>Chair: Anil Somayaji</p>
-<ul>
-<li><p>11:30 - 12:00<br>Abusing Social Networks for Automated User Profiling (slides)<br>Marco Balduzzi, Christian Platzer, Thorsten Holz, Engin Kirda, Davide Balzarotti and Christopher Kruegel</p>
-</li>
-<li><p>12:00 - 12:30<br>An Analysis of Rogue AV Campaigns (slides)<br>Marco Cova, Corrado Leita, Olivier Thonnard, Angelos Keromytis and Marc Dacier</p>
-</li>
-<li><p>12:30 - 13:00<br>Fast-Flux Bot Detection in Real Time (slides)<br>Ching-Hsiang Hsu, Chun-Ying Huang and Kuan-Ta Chen</p>
-</li>
-</ul>
-<h2 id="2009"><a href="#2009" class="headerlink" title="2009"></a>2009</h2><h3 id="Anomaly-and-Specification-Based-Approaches"><a href="#Anomaly-and-Specification-Based-Approaches" class="headerlink" title="Anomaly and Specification-Based Approaches"></a>Anomaly and Specification-Based Approaches</h3><p>Chair: Radu State</p>
-<ul>
-<li><p>Damiano Bolzoni, Sandro Etalle and Pieter Hartel. Panacea: Automating Attack Classification for Anomaly-based Network Intrusion Detection Systems [slides]</p>
-</li>
-<li><p>Federico Maggi, William Robertson, Christopher Kruegel and Giovanni Vigna. Protecting a Moving Target: Addressing Web Application Concept Drift [slides]</p>
-</li>
-<li><p>Gabriela Cretu-Ciocarlie, Angelos Stavrou, Michael Locasto and Salvatore Stolfo. Adaptive Anomaly Detection via Self-Calibration and Dynamic Updating [slides]</p>
-</li>
-<li><p>Martin Rehak, Eugen Staab, Volker Fusenig, Michal Pechoucek, Martin Grill, Jan Stiborek and Karel Bartos. Runtime Monitoring and Dynamic Reconfiguration for Intrusion Detection Systems [slides]</p>
-</li>
-</ul>
-<h3 id="Malware-Detection-and-Prevention-I"><a href="#Malware-Detection-and-Prevention-I" class="headerlink" title="Malware Detection and Prevention (I)"></a>Malware Detection and Prevention (I)</h3><p>Chair: Thorsten Holz</p>
-<ul>
-<li><p>Grégoire Jacob, Hervé Debar and Eric Filiol. Malware Behavioral Detection by Attribute-Automata using Abstraction from Platform and Language [slides]</p>
-</li>
-<li><p>Scott Schneider, Kent Griffin, Tzi-cker Chiueh and Xin Hu. Automatic Generation of String Signatures for Malware Detection [slides]</p>
-</li>
-<li><p>M. Zubair Shafiq, S. Momina Tabish, Fauzan Mirza, and Muddassar Farooq. PE-miner: Mining Structural Information to Detect Malicious Executables in Real-Time [slides]</p>
-</li>
-</ul>
-<h3 id="Network-and-Host-Intrusion-Detection-and-Prevention"><a href="#Network-and-Host-Intrusion-Detection-and-Prevention" class="headerlink" title="Network and Host Intrusion Detection and Prevention"></a>Network and Host Intrusion Detection and Prevention</h3><p>Chair: Corrado Leita</p>
-<ul>
-<li><p>Peng Li, Debin Gao and Mike Reiter. Automatically Adapting a Trained Anomaly Detector to Software Patches [slides]</p>
-</li>
-<li><p>Juan Caballero, Zhenkai Liang, Pongsin Poosankam and Dawn Song. Towards Generating High Coverage Vulnerability-based Signatures with Protocol-level Constraint-guided Exploration</p>
-</li>
-<li><p>Jérôme François, Humberto Abdelnur, Radu State and Olivier Festor. Automated Behavioral Fingerprinting [slides]</p>
-</li>
-</ul>
-<h3 id="Intrusion-Detection-for-Mobile-Devices"><a href="#Intrusion-Detection-for-Mobile-Devices" class="headerlink" title="Intrusion Detection for Mobile Devices"></a>Intrusion Detection for Mobile Devices</h3><p>Chair: Benjamin Morin</p>
-<ul>
-<li><p>Guanhua Yan, Stephan Eidenbenz and Emanuele Galli. SMS-Watchdog: Profiling Social Behaviors of SMS Users for Anomaly Detection [slides]</p>
-</li>
-<li><p>Saira Zahid, Muhammad Shahzad, Syed Ali Khayam and Muddassar Farooq. Keystroke-based User Identification on Smart Phones [slides]</p>
-</li>
-<li><p>Lei Liu, Guanhua Yan, Xinwen Zhang and Songqing Chen. VirusMeter: Preventing Your Cellphone from Spies [slides]</p>
-</li>
-</ul>
-<h3 id="High-performance-Intrusion-Detection"><a href="#High-performance-Intrusion-Detection" class="headerlink" title="High-performance Intrusion Detection"></a>High-performance Intrusion Detection</h3><p>Chair: Robin Sommer</p>
-<ul>
-<li><p>Giorgos Vasiliadis, Michalis Polychronakis, Spiros Antonatos, Evangelos Markatos and Sotiris Ioannidis. Regular Expression Matching on Graphics Hardware for Intrusion Detection [slides]</p>
-</li>
-<li><p>Daniel Luchaup, Randy Smith, Cristian Estan and Somesh Jha. Multi-Byte Regular Expression Matching with Speculation</p>
-</li>
-</ul>
-<h3 id="Malware-Detection-and-Prevention-II"><a href="#Malware-Detection-and-Prevention-II" class="headerlink" title="Malware Detection and Prevention (II)"></a>Malware Detection and Prevention (II)</h3><p>Chair: Davide Balzarotti</p>
-<ul>
-<li><p>Chaoting Xuan, John Copeland and Raheem Beyah. Toward Revealing Kernel Malware Behavior in Virtual Execution Environments [slides]</p>
-</li>
-<li><p>Jaideep Chandrashekar, Frederic Giroire, Nina Taft, Eve Schooler and Dina Papagiannaki. Exploiting Temporal Persistence to Detect Covert Botnet Channels [slides]</p>
-</li>
-</ul>
-<h2 id="2008"><a href="#2008" class="headerlink" title="2008"></a>2008</h2><h3 id="Session-1-Rootkit-Prevention"><a href="#Session-1-Rootkit-Prevention" class="headerlink" title="Session 1 Rootkit Prevention"></a>Session 1 Rootkit Prevention</h3><p>Chair: Thorsten Holz</p>
-<p>Best Paper</p>
-<ul>
-<li>Guest-Transparent Prevention of Kernel Rootkits with VMM-based Memory Shadowing Ryan Riley (Purdue University, US); Xuxian Jiang (North Carolina State University, US); Dongyan Xu (Purdue University, US)<br>Presentation (pdf)</li>
-<li>Countering Persistent Kernel Rootkits Through Systematic Hook Discovery Zhi Wang (George Mason University, US); Xuxian Jiang (North Carolina State University, US); Weidong Cui (Microsoft Research, US); Xinyuan Wang (George Mason University, US)<br>Presentation (pdf)</li>
-</ul>
-<h3 id="Session-2-Malware-Detection-and-Prevention"><a href="#Session-2-Malware-Detection-and-Prevention" class="headerlink" title="Session 2    Malware Detection and Prevention"></a>Session 2    Malware Detection and Prevention</h3><p>Chair: Engin Kirda</p>
-<ul>
-<li>Tamper-Resistant, Application-Aware Blocking of Malicious Network Flows Abhinav Srivastava (Georgia Institute of Technology, US); Jonathon Giffin (Georgia Institute of Technology, US)<br>Presentation (pdf)</li>
-<li>A First Step Toward Live Botmaster Traceback Daniel Ramsbrock (George Mason University, US); Xinyuan Wang (George Mason University, US); Xuxian Jiang (North Carolina State University, US)<br>Presentation (pdf)</li>
-<li>A Layered Architecture for Detecting Malicious Behaviors Lorenzo Martignoni (University of Milan, IT); Elizabeth Stinson (Stanford University, US); Matt Fredrikson (University of Wisconsin, Madison, US); Somesh Jha (University of Wisconsin, US); John Mitchell (Stanford University, US)<br>Presentation (pdf)</li>
-<li>A Study of the Packer Problem and Its Solutions Fanglu Guo (Symantec Research Labs, US); Peter Ferrie (Symantec Research Labs, US); Tzi-Cker Chiueh (Symantec Research Labs, US)<br>Presentation (pdf)</li>
-</ul>
-<h3 id="Session-3-High-Performance-Intrusion-Detection-and-Evasion"><a href="#Session-3-High-Performance-Intrusion-Detection-and-Evasion" class="headerlink" title="Session 3 High Performance Intrusion Detection and Evasion"></a>Session 3 High Performance Intrusion Detection and Evasion</h3><p>Chair: Fanglu Guo</p>
-<ul>
-<li><p>Gnort: High Performance Network Intrusion Detection Using Graphics Processors Giorgos Vasiliadis (Institute of Computer Science, Foundation for Research and Technology – Hellas, GR); Spiros Antonatos (Institute of Computer Science, Foundation For Research and Technology Hellas, GR); Michalis Polychronakis (ICS-FORTH, GR); Evangelos Markatos (ICS-FORTH, GR); Sotiris Ioannidis (University of Crete, GR)<br>Presentation (ppt)</p>
-</li>
-<li><p>Predicting the Resource Consumption of Network Intrusion Detection Systems Holger Dreger (Siemens AG, DE); Anja Feldmann (Deutsche Telekom Laboratories, DE); Vern Paxson (ICSI, US); Robin Sommer (ICSI and LBNL, US)<br>Presentation (pdf)</p>
-</li>
-<li><p>High-speed Matching of Vulnerability Signatures Nabil Schear (University of Illinois at Urbana-Champaign, US); David Albrecht (University of Illinois at Urbana-Champaign, US); Nikita Borisov (University of Illinois at Urbana Champaign, US)<br>Presentation (pdf)</p>
-</li>
-<li><p>Swarm Attacks against Network-level Emulation/Analysis Simon Pak Ho Chung (University of Texas at Austin, US); Aloysius Mok (University of Texas at Austin, US)<br>Paper (pdf)</p>
-</li>
-</ul>
-<h3 id="Session-4-Web-Application-Testing-and-Evasion"><a href="#Session-4-Web-Application-Testing-and-Evasion" class="headerlink" title="Session 4 Web Application Testing and Evasion"></a>Session 4 Web Application Testing and Evasion</h3><p>Chair: Jon Giffin</p>
-<ul>
-<li><p>Leveraging User Interactions for In-Depth Testing of Web Applications Sean McAllister (Technical University Vienna, AT); Engin Kirda (Institute Eurecom, FR); Christopher Kruegel (University of California, Santa Barbara, US)<br>Presentation (pdf)</p>
-</li>
-<li><p>Model-Based Covert Timing Channels: Automated Modeling and Evasion Steven Gianvecchio (The College of William &amp; Mary, US); Haining Wang (College of William and Mary, US); Duminda Wijesekera (George Mason University, US); Sushil Jajodia (George Mason University, US)<br>Presentation (pdf)</p>
-</li>
-</ul>
-<h3 id="Session-5-Alert-Correlation-and-Worm-Detection"><a href="#Session-5-Alert-Correlation-and-Worm-Detection" class="headerlink" title="Session 5 Alert Correlation and Worm Detection"></a>Session 5 Alert Correlation and Worm Detection</h3><p>Chair: Benjamin Morin</p>
-<ul>
-<li><p>Optimal Cost, Collaborative and Distributed Response to Zero-Day Worms – A Control Theoretic Approach Senthil Cheetancheri (University of California, Davis, US); John Agosta (Intel Research, US); Karl Levitt (UC Davis, US); S. Felix Wu (University of California at Davis, US); Jeff Rowe (UC Davis, US)<br>Presentation (pdf)</p>
-</li>
-<li><p>On the Limits of Payload-oblivious Network Attack Detection Michael Collins (CERT, US); Mike Reiter (University of North Carolina at Chapel Hill, US)<br>Presentation (pdf)</p>
-</li>
-<li><p>Determining placement of intrusion detectors for a distributed application through Bayesian network modeling Gaspar Modelo-Howard (Purdue University, US); Saurabh Bagchi (Purdue University, US); Guy Lebanon (Purdue University, US)<br>Presentation (pdf)</p>
-</li>
-<li><p>A Multi-Sensor Model to Improve Automated Attack Detection Magnus Almgren (Chalmers University of Technology, SE); Ulf Lindqvist (SRI International, US); Erland Jonsson (Chalmers University of Technology, SE)<br>Presentation (pdf)</p>
-</li>
-</ul>
-<h3 id="Session-6-Anomaly-Detection-and-Network-Traffic-Analysis"><a href="#Session-6-Anomaly-Detection-and-Network-Traffic-Analysis" class="headerlink" title="Session 6 Anomaly Detection and Network Traffic Analysis"></a>Session 6 Anomaly Detection and Network Traffic Analysis</h3><p>Chair: Robin Sommer</p>
-<ul>
-<li><p>Monitoring SIP traffic using Support Vector Machines Mohamed Nassar (INRIA Lorraine, FR); Radu State (INRIA - LORIA, FR); Olivier Festor (INRIA-LORIA, FR)<br>Presentation (pdf)</p>
-</li>
-<li><p>The Effect of Clock Resolution on Keystroke Dynamics Kevin Killourhy (Carnegie Mellon University, US); Roy A. Maxion (Carnegie Mellon University, US)<br>Presentation (pdf)</p>
-</li>
-<li><p>A Comparative Evaluation of Anomaly Detectors under Portscan Attacks Ayesha Binte Ashfaq; Maria Joseph; Asma Mumtaz; Muhammad Qasim Ali; Ali Sajjad; Syed Ali Khayam (National University of Sciences &amp; Technology, PK)<br>Presentation (pdf)</p>
-</li>
-<li><p>Advanced Network Fingerprinting Humberto Abdelnur (INRIA Nancy - Grand Est, FR); Radu State (INRIA - LORIA, FR); Olivier Festor (INRIA Nancy - Grand Est, FR)<br>Presentation (pdf)</p>
-</li>
-</ul>
-<h2 id="2007"><a href="#2007" class="headerlink" title="2007"></a>2007</h2><h3 id="Session-1-Host-Based-Intrusion-Detection"><a href="#Session-1-Host-Based-Intrusion-Detection" class="headerlink" title="Session 1:    Host-Based Intrusion Detection"></a>Session 1:    Host-Based Intrusion Detection</h3><p>Chair: Benjamin Morin</p>
-<ul>
-<li><p>Exploiting Execution Context for the Detection of Anomalous System Calls<br>Darren Mutz, William Robertson, Giovanni Vigna, and Richard Kemmerer</p>
-</li>
-<li><p>Understanding Precision in Host Based Intrusion Detection<br>Monirul Sharif, Kapil Singh, Jonathon Giffin, and Wenke Lee</p>
-</li>
-</ul>
-<h3 id="Session-2-Anomaly-Based-Intrusion-Detection"><a href="#Session-2-Anomaly-Based-Intrusion-Detection" class="headerlink" title="Session 2: Anomaly-Based Intrusion Detection"></a>Session 2: Anomaly-Based Intrusion Detection</h3><p>Chair: Wenke Lee</p>
-<ul>
-<li><p>Comparing Anomaly Detection Techniques for HTTP<br>Kenneth L. Ingham and Hajime Inoue</p>
-</li>
-<li><p>Swaddler: An Approach for the Anomaly-based Detection of State Violations in Web Applications<br>Marco Cova, Davide Balzarotti, Viktoria Felmetsger, and Giovanni Vigna</p>
-</li>
-</ul>
-<h3 id="Session-4-Network-Based-Intrusion-Detection-and-Response"><a href="#Session-4-Network-Based-Intrusion-Detection-and-Response" class="headerlink" title="Session 4:    Network-Based Intrusion Detection and Response"></a>Session 4:    Network-Based Intrusion Detection and Response</h3><p>Chair: Giovanni Vigna</p>
-<ul>
-<li><p>Emulation-Based Detection of Non-self-contained Polymorphic Shellcode<br>Michalis Polychronakis, Kostas G. Anagnostakis, and Evangelos P. Markatos</p>
-</li>
-<li><p>The NIDS Cluster: Scalable, Stateful Network Intrusion Detection on Commodity Hardware<br>Matthias Vallentin, Robin Sommer, Jason Lee, Craig Leres, Vern Paxson, and Brian Tierney</p>
-</li>
-<li><p>Cost-Sensitive Intrusion Responses for Mobile Ad Hoc Networks<br>Shiau-Huey Wang, Chinyang Henry Tseng, Karl Levitt, and Matthew Bishop</p>
-</li>
-</ul>
-<h3 id="Session-5-Insider-Detection-and-Alert-Correlation"><a href="#Session-5-Insider-Detection-and-Alert-Correlation" class="headerlink" title="Session 5:Insider Detection and Alert Correlation"></a>Session 5:Insider Detection and Alert Correlation</h3><p>Chair: Richard Lippmann</p>
-<ul>
-<li><p>ELLICIT: A System for Detecting Insiders Who Violate Need-to-know<br>Marcus A. Maloof and Gregory D. Stephens</p>
-</li>
-<li><p>On the Use of Different Statistical Tests for Alert Correlation - Short Paper<br>Federico Maggi and Stefano Zanero</p>
-</li>
-</ul>
-<h3 id="Session-6-Malicious-Code-Analysis"><a href="#Session-6-Malicious-Code-Analysis" class="headerlink" title="Session 6:    Malicious Code Analysis"></a>Session 6:    Malicious Code Analysis</h3><p>Chair: Thorsten Holz</p>
-<ul>
-<li><p>Automated Classification and Analysis of Internet Malware<br>Michael Bailey, Jon Oberheide, Jon Andersen, Z. Morley Mao, Farnam Jahanian, and Jose Nazario</p>
-</li>
-<li><p>‘Out-of-the-box’ Monitoring of VM-based High-Interaction Honeypots<br>Xuxian Jiang and Xinyuan Wang</p>
-</li>
-<li><p>A Forced Sampled Execution Approach to Kernel Rootkit Identification<br>Jeffrey Wilhelm and Tzi-cker Chiueh</p>
-</li>
-</ul>
-<h3 id="Session-7-Evasion"><a href="#Session-7-Evasion" class="headerlink" title="Session 7:Evasion"></a>Session 7:Evasion</h3><p>Chair: Robin Sommer</p>
-<ul>
-<li><p>Advanced Allergy Attacks: Does a Corpus Really Help?<br>Simon P. Chung and Aloysius K. Mok</p>
-</li>
-<li><p>Alert Verification Evasion through Server Response Forging<br>Adam D. Todd, Richard A. Raines, Rusty O. Baldwin, Barry E. Mullins, and Steven K. Rogers</p>
-</li>
-</ul>
-<h3 id="Session-8-Malicious-Code-Defense"><a href="#Session-8-Malicious-Code-Defense" class="headerlink" title="Session 8:Malicious Code Defense"></a>Session 8:Malicious Code Defense</h3><p>Chair: Ludovic Me</p>
-<ul>
-<li><p>Hit-List Worm Detection and Bot Identification in Large Networks Using Protocol Graphs<br>M. Patrick Collins and Michael K. Reiter</p>
-</li>
-<li><p>SpyShield: Preserving Privacy from Spy Add-ons<br>Zhuowei Li, XiaoFeng Wang, and Jong Youl Choi</p>
-</li>
-<li><p>Vortex: Enabling Cooperative Selective Wormholing for Network Security Systems<br>John R. Lange, Peter A. Dinda, and Fabian E. Bustamante</p>
-</li>
-</ul>
+<li>CPU virtualization</li>
+<li>Memory virtualization, and </li>
+<li>I/O virtualization (device, interrupt virtualization). </li>
+</ul>
+<p>Because the 3rd one above normally requires additional platform/chipset support, in this article I’m going to only talk about the first two virtualization extensions that are related only to processor architectures. I will back to the 3rd one later as another topic especially for device I/O virtualization and emulation.</p>
+<p>&lt; TO-BE-STARTED&gt;</p>
 <hr>
-<p><strong>转载请注明</strong>： <a href="http://www.csyssec.org/20170331/conference-raid/" target="_blank" rel="external">主流会议-RAID十年录用论文</a>与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<p><strong><em>Update:</em></strong><br>I found there is very very good lecture about ARM Virtualization Technology from National Tsing Hua University, the link is here:<br><a href="http://www.cs.nthu.edu.tw/~ychung/slides/Virtualization/VM-Lecture-7-2-Hardware%20support-ARM.pptx" target="_blank" rel="external">http://www.cs.nthu.edu.tw/~ychung/slides/Virtualization/VM-Lecture-7-2-Hardware%20support-ARM.pptx</a></p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 
       
     </div>
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/主流会议/">主流会议<span class="article-category-count">4</span></a>
+    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">8</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Conferences/">Conferences</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Paper/">Paper</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/TrustZone/">TrustZone</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
 
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-monitoring-int80"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/monitoring-int80/">X86/Intel虚拟化技术监控/陷入软件中断INT80H系统调用</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/monitoring-int80/" class="article-date">
+	  <time datetime="2017-05-04T08:12:04.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/monitortrap-software-interrupt-int-08h.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/monitortrap-software-interrupt-int-08h.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>In an unix-like system, before syscall/sysret and/or sysenter/sysexit instructions were introduced by x86/Intel processors, software interrupt “<strong>INT 80h</strong>“ was used as system call interface. Unlike <a href="http://hypervsir.blogspot.com/2014/10/yet-another-solution-to-monitortrap.html" target="_blank" rel="external">my previous post</a>, this one is going to talk about how to monitor this old type system call.</p>
+<p>The INT n instruction is the general mnemonic for executing a software-generated call to an interrupt handler. So when INT 80h is executed in an user application, the processor will immediately switch to kernel mode (normally ring 0, depends on the 0x80 interrupt descriptor settings), and jump to the corresponding interrupt handler. After the request is served by the handler in kernel mode, IRET (interrupt return) is executed, and processor then will switch back to user mode and continue to execute user mode application.</p>
+<p>In a x86 hardware virtualization environment, <strong><em>Intel VT-x technology unfortunately doesn’t provide a means to make software interrupt through INTn instruction generate a VMexit, which means that the system call INT 80h cannot be monitored directly by VMM software.</em></strong> </p>
+<p>However, we can still have a small trick so that VMM can monitor and trap any INT 80h system call. The idea is basically the same as the one that is summarized as <a href="http://hypervsir.blogspot.com/2014/10/yet-another-solution-to-monitortrap.html" target="_blank" rel="external">a generic solution in my previous post</a>.</p>
+<p>If you take a look at the <a href="http://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-instruction-set-reference-manual-325383.pdf" target="_blank" rel="external">Intel Architecture Instruction Set Reference Manual</a>, you may see there is a special exception type for INT instruction execution in protected mode, as below. </p>
+<p>  <strong>#NP(error_code)<br>   If code segment, interrupt-, trap-, or task gate, or TSS is not present.</strong></p>
+<p>Here, the #NP is exception <strong><em>Segment Not Present</em></strong> , one of Intel reserved exception type whose vector is 11. According to Intel Software Development Manual, </p>
+<p><em>“A not-present indication in a gate descriptor, however, does not indicate that a segment is not present (because gates do not correspond to segments). The operating system may use the present flag for gate descriptors to trigger exceptions of special significance to the operating system”</em></p>
+<p>In other words, if we intentionally clear the “<strong><em>present</em></strong> “ bit in the interrupt or trap gate descriptor of vector 80h in IDT table, all the software interrupts through INT 80h system call, will trigger a #NP exception, hence the CPU control will instead be transferred to the fault handler in vector 11 (#NP) of IDT.</p>
+<p>Meanwhile, by checking the corresponding “error_code” for this exception in the exception stack, and decoding the instruction address at which the #NP exception was triggered, we can easily know that this #NP fault is generated intentionally by executing “INT 80h” system call.  </p>
+<p>In a virtualization environment, similarly VMM software can configure <strong><em>Exception-Bitmap VMCS</em></strong> structure to make such an #NP fault generate a VMexit. </p>
+<p><strong><em>So, finally here is the idea to monitor and trap the Linux/Unix system call through software interrupt INT 0x80:</em></strong></p>
+<ol>
+<li>VMM software locates the interrupt descriptor of vector 0x80 in guest IDT table, and clears the “present” bit;</li>
+<li>VMM software also configures Exception-Bitmap VMCS structure to trap guest #NP fault exception, which means that all the guest #NP exceptions will incur a VMexit, instead of being handled directly by guest #NP handler in guest IDT;</li>
+<li>At runtime, all the system call “INT 0x80” from user mode application will generate a CPU #NP fault because the corresponding 0x80 descriptor “present” bit is clear in step 1 above;</li>
+<li>Such a #NP fault will then cause a VMexit because of step 2 settings above;</li>
+<li>Then, VMM software can check various VMexit VMCS information structures (e.g. VM-Exit Interruption-Information Field, IDT-vectoring information Field, and IDT-vectoring Error Code Field), and decode the fault instruction to determine whether or not this #NP fault VMexit is an intended exception by executing system call “INT 0x80”:</li>
+</ol>
+<ul>
+<li>If yes, VMM software emulates the “INT 0x80” behavior, discards this #NP exception, and resumes back to guest with RIP pointing to the system call handler that is defined in vector 0x80 interrupt descriptor of guest IDT table.</li>
+<li>Otherwise, inject this exception back to guest OS, and let guest OS handle the #NP fault as normally.</li>
+</ul>
+<p>With this idea, whenever a system call through INT 0x80 is made by user application software, VMM software can get notified immediately. <br></p>
+<hr>
+<h4 id="Update"><a href="#Update" class="headerlink" title="Update:"></a><strong><em>Update:</em></strong></h4><p>The same idea can apply to any external interrupt (vector 32~255) traps, e.g. ATA device, Audio interrupts. </p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">10</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Monitoring/">Monitoring</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/SYSCALL/">SYSCALL</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtulization/">Virtulization</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-unpriviledged-ins"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/unpriviledged-ins/">非特权指令的内核信息泄露</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/unpriviledged-ins/" class="article-date">
+	  <time datetime="2017-05-04T08:09:19.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/kernel-information-leak-with.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/kernel-information-leak-with.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>In computer security, information leaking is one of threats to software security. For example, the memory address of kernel critical resource should not be visible to user mode. Address space layout randomization (ASLR) is just one of techniques to prevent an attacker from reliably getting a particular exploited function in memory. </p>
+<p>However, I’m just very curious about why x86 processor leaks kernel data structures by some unprivileged instructions. Is this a bad CPU design?</p>
+<p>Here is an example. </p>
+<p>x86 IDTR register holds the base memory address for the Interrupt Descriptor Table entries (vector 0 through 255). As long as we gets its address, we can calculate and get all the ISR memory addresses of all exceptions/interrupts in a system. </p>
+<p><strong>But an user program can simply get the IDTR address by executing SIDT instruction.</strong></p>
+<p>See these two real-world example exploits below, <strong>if SIDT instruction in x86 were not allowed to execute in user mode, then one more roadblock would be placed to mitigate such an attack.</strong></p>
+<p>1) Linux Kernel ptrace/sysret - Local Privilege Escalation<br>    <a href="http://www.exploit-db.com/exploits/34134/" target="_blank" rel="external">http://www.exploit-db.com/exploits/34134/</a></p>
+<p>2) Ubuntu 12.04.0-2LTS x64 - perf_swevent_init Kernel Local Root Exploit<br>    <a href="http://www.exploit-db.com/exploits/33589/" target="_blank" rel="external">http://www.exploit-db.com/exploits/33589/</a></p>
+<p>So the questions:  </p>
+<ul>
+<li><strong>Why does Intel/x86 allow such an instruction to be executed by unprivileged program/task in user mode?</strong></li>
+<li><strong>Is there any legitimate application in user mode that must have to use this instruction to get kernel structure address?</strong></li>
+</ul>
+<p>The similar instructions are SGDT (retrieving Global Descriptor Table Register), and even seldom used instructions like STR, SLDT, SMSW. </p>
+<p>Anybody (Intel processor architect or application software developer) can tell me the reason of that? </p>
+<hr>
+<h4 id="Update"><a href="#Update" class="headerlink" title="Update:"></a><strong><em>Update:</em></strong></h4><p><strong><a href="https://groups.google.com/forum/#!msg/comp.arch/RV4w6yfDxtA/05g1URTkdcIJ" target="_blank" rel="external">Why SIDT/SGDT instructions are allowed to execute in user mode (x86/Intel)?</a></strong></p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">8</span></a>
+
+
+      
       
     </footer>
   </div>
@@ -1141,7 +452,7 @@
 
   <nav id="page-nav">
     
-    <a class="extend prev" rel="prev" href="/page/3/">上一页</a><a class="page-number" href="/">1</a><a class="page-number" href="/page/2/">2</a><a class="page-number" href="/page/3/">3</a><span class="page-number current">4</span><a class="page-number" href="/page/5/">5</a><a class="page-number" href="/page/6/">6</a><span class="space">&hellip;</span><a class="page-number" href="/page/16/">16</a><a class="extend next" rel="next" href="/page/5/">下一页</a>
+    <a class="extend prev" rel="prev" href="/page/3/">上一页</a><a class="page-number" href="/">1</a><a class="page-number" href="/page/2/">2</a><a class="page-number" href="/page/3/">3</a><span class="page-number current">4</span><a class="page-number" href="/page/5/">5</a><a class="page-number" href="/page/6/">6</a><span class="space">&hellip;</span><a class="page-number" href="/page/20/">20</a><a class="extend next" rel="next" href="/page/5/">下一页</a>
   </nav>
 
 </section>
@@ -1236,7 +547,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/monitoring-int80/">X86/Intel虚拟化技术监控/陷入软件中断INT80H系统调用</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/cfi-development/">控制流完整性的发展历程</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1248,7 +559,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/unpriviledged-ins/">非特权指令的内核信息泄露</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/cfi-ccs05/">控制流完整性-CCS05年论文</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1260,7 +571,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/hav-exception/">对硬件虚拟化异常的思考(#VE)</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/rop-intel/">因特尔发布新的技术规范去防御 ROP 攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1272,7 +583,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/monitoring-syscall/">X86虚拟化技术监控/陷入SYSCALL的另一种方法</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/ropjop-research/">ROP/JOP攻击与防御最新研究进展</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1284,7 +595,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/vmcs-vmxon/">VT-x技术VMXON与VMCS区域的思考-从安全的角度</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/nmi-virtual/">虚拟化技术的NMI窗口退出</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1296,7 +607,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/monitoring-schduling/">使用硬件虚拟化技术无感监控Windows OS调度事件</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/lbr-ret2dir/">利用LBR特性检测ret2dir攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1308,7 +619,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/mtf/">MTF在基于EPT的客户机物理内存监控中的使用</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/virtual-ret2dir/">利用虚拟化技术防御ret2dir攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1320,7 +631,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/hardware-security-x86arm/">X86&amp;ARM架构处理器硬件安全特性</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/smep-nx/">利用NX位实现基于软件的SMEP</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1332,7 +643,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/xen-snapshot/">XEN快照机制</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/smep-virtual/">如何利用虚拟化技术实现基于软件的SMEP(监督模式执行)</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1344,7 +655,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/xen-event/">XEN事件通道机制及其实例</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/tsx-exploit/">TSX处理器技术对漏洞利用意味着什么？</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1356,7 +667,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/kvm-migration/">KVM迁移中脏页位图机制源码分析</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/lbr-idthooking/">使用LRB(最近分支记录)特性检测IDT Hooking</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1368,7 +679,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/kvm-exception/">KVM异常处理流程源码简要分析</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/bitvisor/">BitVisor- 一种实施I/O设备安全的轻量级Hypervisor</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1380,7 +691,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/qemukvm-source2/">Qemu-KVM虚拟机初始化及创建过程源码简要分析（二）</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/xencolor/">Xen模式：你的XEN是什么颜色？</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1392,7 +703,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/qemukvm-source1/">Qemu-KVM虚拟机初始化及创建过程源码简要分析（一）</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/securekernel-design/">这是Linux内核中一种好的安全设计吗- thread_info和内核栈的联系</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1404,8 +715,8 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170401/keylogger/">Keylogger检测</a></h6>
-          <!--  <span>四月 1, 2017</span> -->
+              <h6 style="margin: 0;"><a href="/20170504/secureos/">安全操作系统内核设计：一种阻止恶意软件覆盖关键系统内核数据结构的思想</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
             </div>
 
           </li>
@@ -1416,8 +727,8 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170401/winkernelmal/">深入探索windows内核rootkit动态分析</a></h6>
-          <!--  <span>四月 1, 2017</span> -->
+              <h6 style="margin: 0;"><a href="/20170504/rop-jop/">一种运行时无感的方法防御ROP和JOP攻击</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
             </div>
 
           </li>
@@ -1432,7 +743,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">10</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">8</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">10</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -1442,7 +753,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.73px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 18.18px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.73px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 11.82px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.91px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 17.27px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 16.36px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.45px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.82px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 12.73px;">Monitoring</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.91px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.91px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 16.36px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.82px;">Rootkit</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.91px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.09px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 12.73px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 11.82px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.43px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.14px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.71px;">Binary</a> <a href="/tags/CFI/" style="font-size: 10.71px;">CFI</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.14px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 12.86px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 17.86px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.14px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 14.29px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.71px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.71px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.57px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.43px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.14px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 12.86px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 12.86px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.71px;">Malware</a> <a href="/tags/Memory/" style="font-size: 12.86px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.43px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 12.14px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.71px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.71px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.71px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.14px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.71px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.43px;">Rootkit</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.71px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.71px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.57px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.43px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.29px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 12.14px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 12.86px;">XEN</a>
     </div>
   </div>
 

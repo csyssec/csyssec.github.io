@@ -106,7 +106,7 @@
         
           <section id="main">
   
-    <article id="post-monitoring-int80"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-cfi-development"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -114,7 +114,7 @@
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/monitoring-int80/">X86/Intel虚拟化技术监控/陷入软件中断INT80H系统调用</a>
+      <a class="article-title" href="/20170504/cfi-development/">控制流完整性的发展历程</a>
     </h1>
   
 
@@ -122,55 +122,28 @@
     
     <div class="article-meta">
       
-	Posted on <a href="/20170504/monitoring-int80/" class="article-date">
-	  <time datetime="2017-05-04T08:12:04.000Z" itemprop="datePublished">五月 4, 2017</time>
+	Posted on <a href="/20170504/cfi-development/" class="article-date">
+	  <time datetime="2017-05-04T10:47:57.000Z" itemprop="datePublished">五月 4, 2017</time>
 	</a>
 
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/monitortrap-software-interrupt-int-08h.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/monitortrap-software-interrupt-int-08h.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>In an unix-like system, before syscall/sysret and/or sysenter/sysexit instructions were introduced by x86/Intel processors, software interrupt “<strong>INT 80h</strong>“ was used as system call interface. Unlike <a href="http://hypervsir.blogspot.com/2014/10/yet-another-solution-to-monitortrap.html" target="_blank" rel="external">my previous post</a>, this one is going to talk about how to monitor this old type system call.</p>
-<p>The INT n instruction is the general mnemonic for executing a software-generated call to an interrupt handler. So when INT 80h is executed in an user application, the processor will immediately switch to kernel mode (normally ring 0, depends on the 0x80 interrupt descriptor settings), and jump to the corresponding interrupt handler. After the request is served by the handler in kernel mode, IRET (interrupt return) is executed, and processor then will switch back to user mode and continue to execute user mode application.</p>
-<p>In a x86 hardware virtualization environment, <strong><em>Intel VT-x technology unfortunately doesn’t provide a means to make software interrupt through INTn instruction generate a VMexit, which means that the system call INT 80h cannot be monitored directly by VMM software.</em></strong> </p>
-<p>However, we can still have a small trick so that VMM can monitor and trap any INT 80h system call. The idea is basically the same as the one that is summarized as <a href="http://hypervsir.blogspot.com/2014/10/yet-another-solution-to-monitortrap.html" target="_blank" rel="external">a generic solution in my previous post</a>.</p>
-<p>If you take a look at the <a href="http://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-instruction-set-reference-manual-325383.pdf" target="_blank" rel="external">Intel Architecture Instruction Set Reference Manual</a>, you may see there is a special exception type for INT instruction execution in protected mode, as below. </p>
-<p>  <strong>#NP(error_code)<br>   If code segment, interrupt-, trap-, or task gate, or TSS is not present.</strong></p>
-<p>Here, the #NP is exception <strong><em>Segment Not Present</em></strong> , one of Intel reserved exception type whose vector is 11. According to Intel Software Development Manual, </p>
-<p><em>“A not-present indication in a gate descriptor, however, does not indicate that a segment is not present (because gates do not correspond to segments). The operating system may use the present flag for gate descriptors to trigger exceptions of special significance to the operating system”</em></p>
-<p>In other words, if we intentionally clear the “<strong><em>present</em></strong> “ bit in the interrupt or trap gate descriptor of vector 80h in IDT table, all the software interrupts through INT 80h system call, will trigger a #NP exception, hence the CPU control will instead be transferred to the fault handler in vector 11 (#NP) of IDT.</p>
-<p>Meanwhile, by checking the corresponding “error_code” for this exception in the exception stack, and decoding the instruction address at which the #NP exception was triggered, we can easily know that this #NP fault is generated intentionally by executing “INT 80h” system call.  </p>
-<p>In a virtualization environment, similarly VMM software can configure <strong><em>Exception-Bitmap VMCS</em></strong> structure to make such an #NP fault generate a VMexit. </p>
-<p><strong><em>So, finally here is the idea to monitor and trap the Linux/Unix system call through software interrupt INT 0x80:</em></strong></p>
-<ol>
-<li>VMM software locates the interrupt descriptor of vector 0x80 in guest IDT table, and clears the “present” bit;</li>
-<li>VMM software also configures Exception-Bitmap VMCS structure to trap guest #NP fault exception, which means that all the guest #NP exceptions will incur a VMexit, instead of being handled directly by guest #NP handler in guest IDT;</li>
-<li>At runtime, all the system call “INT 0x80” from user mode application will generate a CPU #NP fault because the corresponding 0x80 descriptor “present” bit is clear in step 1 above;</li>
-<li>Such a #NP fault will then cause a VMexit because of step 2 settings above;</li>
-<li>Then, VMM software can check various VMexit VMCS information structures (e.g. VM-Exit Interruption-Information Field, IDT-vectoring information Field, and IDT-vectoring Error Code Field), and decode the fault instruction to determine whether or not this #NP fault VMexit is an intended exception by executing system call “INT 0x80”:</li>
-</ol>
-<ul>
-<li>If yes, VMM software emulates the “INT 0x80” behavior, discards this #NP exception, and resumes back to guest with RIP pointing to the system call handler that is defined in vector 0x80 interrupt descriptor of guest IDT table.</li>
-<li>Otherwise, inject this exception back to guest OS, and let guest OS handle the #NP fault as normally.</li>
-</ul>
-<p>With this idea, whenever a system call through INT 0x80 is made by user application software, VMM software can get notified immediately. <br></p>
-<hr>
-<p>####<strong><em>Update:</em></strong><br>The same idea can apply to any external interrupt (vector 32~255) traps, e.g. ATA device, Audio interrupts. </p>
-<hr>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>作者：武成刚，李建军<br>-中科院计算所</p>
+<p>控制流劫持是一种危害性极大的攻击方式，攻击者能够通过它来获取目标机器的控制权，甚至进行提权操作，对目标机器进行全面控制。当攻击者掌握了被攻击程序的内存错误漏洞后，一般会考虑发起控制流劫持攻击。早期的攻击通常采用代码注入的方式，通过上载一段代码，将控制转向这段代码执行。为了阻止这类攻击，后来的计算机系统中都基本上都部署了DEP(Data Execution Prevention)机制，通过限定内存页不能同时具备写权限和执行权限，来阻止攻击者所上载的代码的执行。为了突破DEP的防御，攻击者又探索出了代码重用攻击方式，他们利用被攻击程序中的代码片段，进行拼接以形成攻击逻辑。代码重用攻击包括Return­to­libc、ROP(Return Oriented Programming)、JOP（Jump Oriented Programming）等。研究表明，当被攻击程序的代码量达到一定规模后，一般能够从被攻击程序中找到图灵完备的代码片段。<br>为了抵御控制流劫持攻击，加州大学和微软公司于2005年提出了控制流完整性（Control Flow Integrity, CFI）的防御机制。其核心思想是限制程序运行中的控制转移，使之始终处于原有的控制流图所限定的范围内。具体做法是通过分析程序的控制流图，获取间接转移指令（包括间接跳转、间接调用、和函数返回指令）目标的白名单，并在运行过程中，核对间接转移指令的目标是否在白名单中。控制流劫持攻击往往会违背原有的控制流图，CFI使得这种攻击行为难以实现，从而保障软件系统的安全。CFI从实现角度上，被分为细粒度和粗粒度两种。细粒度CFI严格控制每一个间接转移指令的转移目标，这种精细的检查，在现有的系统环境中，通常会引入很大的开销。而粗粒度CFI则是将一组类似或相近类型的目标归到一起进行检查，以降低开销，但这种方法会导致安全性的下降。CFI已经被提出十多年的今天，依然有许多研究者在探索新的CFI技术，使其在可接受的开销下能获得高安全性，图1给出了CFI的发展历程，本文将介绍在该历程中的重要的技术创新和相关研究成果。</p>
+<p>全文可参考<a href="http://159.226.251.229/videoplayer/%E6%8E%A7%E5%88%B6%E6%B5%81%E5%AE%8C%E6%95%B4%E6%80%A7%E7%9A%84%E5%8F%91%E5%B1%95%E5%8E%86%E7%A8%8B.pdf?ich_u_r_i=3d7aa6628d43c85b1890a1c181e79a72&amp;ich_s_t_a_r_t=0&amp;ich_e_n_d=0&amp;ich_k_e_y=1745058903750163072443&amp;ich_t_y_p_e=1&amp;ich_d_i_s_k_i_d=5&amp;ich_u_n_i_t=1" target="_blank" rel="external">这里</a></p>
 
       
     </div>
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">10</span></a>
+    <a class="article-category-link" href="/categories/内核安全/">内核安全<span class="article-category-count">2</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Monitoring/">Monitoring</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/SYSCALL/">SYSCALL</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtulization/">Virtulization</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/CFI/">CFI</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li></ul>
 
       
     </footer>
@@ -181,7 +154,7 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-unpriviledged-ins"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-cfi-ccs05"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -189,7 +162,7 @@
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/unpriviledged-ins/">非特权指令的内核信息泄露</a>
+      <a class="article-title" href="/20170504/cfi-ccs05/">控制流完整性-CCS05年论文</a>
     </h1>
   
 
@@ -197,189 +170,59 @@
     
     <div class="article-meta">
       
-	Posted on <a href="/20170504/unpriviledged-ins/" class="article-date">
-	  <time datetime="2017-05-04T08:09:19.000Z" itemprop="datePublished">五月 4, 2017</time>
+	Posted on <a href="/20170504/cfi-ccs05/" class="article-date">
+	  <time datetime="2017-05-04T10:46:24.000Z" itemprop="datePublished">五月 4, 2017</time>
 	</a>
 
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/kernel-information-leak-with.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/kernel-information-leak-with.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>In computer security, information leaking is one of threats to software security. For example, the memory address of kernel critical resource should not be visible to user mode. Address space layout randomization (ASLR) is just one of techniques to prevent an attacker from reliably getting a particular exploited function in memory. </p>
-<p>However, I’m just very curious about why x86 processor leaks kernel data structures by some unprivileged instructions. Is this a bad CPU design?</p>
-<p>Here is an example. </p>
-<p>x86 IDTR register holds the base memory address for the Interrupt Descriptor Table entries (vector 0 through 255). As long as we gets its address, we can calculate and get all the ISR memory addresses of all exceptions/interrupts in a system. </p>
-<p><strong>But an user program can simply get the IDTR address by executing SIDT instruction.</strong></p>
-<p>See these two real-world example exploits below, <strong>if SIDT instruction in x86 were not allowed to execute in user mode, then one more roadblock would be placed to mitigate such an attack.</strong></p>
-<p>1) Linux Kernel ptrace/sysret - Local Privilege Escalation<br>    <a href="http://www.exploit-db.com/exploits/34134/" target="_blank" rel="external">http://www.exploit-db.com/exploits/34134/</a></p>
-<p>2) Ubuntu 12.04.0-2LTS x64 - perf_swevent_init Kernel Local Root Exploit<br>    <a href="http://www.exploit-db.com/exploits/33589/" target="_blank" rel="external">http://www.exploit-db.com/exploits/33589/</a></p>
-<p>So the questions:  </p>
-<ul>
-<li><strong>Why does Intel/x86 allow such an instruction to be executed by unprivileged program/task in user mode?</strong></li>
-<li><strong>Is there any legitimate application in user mode that must have to use this instruction to get kernel structure address?</strong></li>
-</ul>
-<p>The similar instructions are SGDT (retrieving Global Descriptor Table Register), and even seldom used instructions like STR, SLDT, SMSW. </p>
-<p>Anybody (Intel processor architect or application software developer) can tell me the reason of that? </p>
-<hr>
-<p>####<strong><em>Update:</em></strong><br><strong><a href="https://groups.google.com/forum/#!msg/comp.arch/RV4w6yfDxtA/05g1URTkdcIJ" target="_blank" rel="external">Why SIDT/SGDT instructions are allowed to execute in user mode (x86/Intel)?</a></strong></p>
-<hr>
+        <p>Author：<a href="http://mudongliang.github.io/about/" target="_blank" rel="external">Dongliang Mu</a></p>
+<p>Source：<a href="http://mudongliang.github.io/2015/04/14/ccs-05-cfi.html" target="_blank" rel="external">http://mudongliang.github.io/2015/04/14/ccs-05-cfi.html</a></p>
 <p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">3</span></a>
-
-
-      
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-hav-exception"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/hav-exception/">对硬件虚拟化异常的思考(#VE)</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/hav-exception/" class="article-date">
-	  <time datetime="2017-05-04T08:06:43.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/thoughts-on-virtualization-exception.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/thoughts-on-virtualization-exception.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
-<p>Recently in the latest <a href="http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html" target="_blank" rel="external">Intel SDM</a>, you can find that there is a new exception type, <strong>Virtualization Exception</strong>, in Chapter 6 (Interrupt and Exception Handling) of  VOL2.</p>
-<p>What is it? How to use it? …<br>x86 Hardware Virtualization technology introduces a stage 2 virtual memory translation mechanism which translates guest physical address to (host or machine) physical address in real RAM space. It is called as Extended Page Table (Intel VT-x). </p>
-<p>According to the specification, when EPT is in use, certain addresses that would normally be treated as physical addresses (and used to access memory) are instead treated as guest-physical addresses. Guest-physical addresses are translated by traversing a set of EPT paging structures to produce physical addresses that are used to access memory. </p>
-<p>In addition to translating a guest-physical address to a physical address, EPT specifies the privileges that software is allowed when accessing the address. Attempts at disallowed accesses (e.g. write to an read-only guest physical address, or access to non-present address) in vmx non-root mode are called EPT violations and cause VM exits into vmx root mode (host) in previous VT-x architecture w/o #VE implementation. <strong>However, when #VE is available and enabled, such an virtualization exception will induce an guest exception in VMX non-root mode instead that will be handled with a ISR in vector 20 of GUEST IDT (interrupt descriptor table)</strong>. </p>
-<p><br></p>
-<p>####<strong>Some key information on understanding #VE, Virtualization Exception:</strong></p>
+<p>CFI(Control-Flow Integrity)来自于CCS 05！</p>
+<h2 id="简介"><a href="#简介" class="headerlink" title="简介"></a><strong>简介</strong></h2><p>控制流完整性，可以防止那些任意控制程序行为的攻击。CFI的特点：</p>
 <ul>
-<li>This exception (#VE) is reserved on a processor that has no VT-x support, or VMX is off, or #VE is disabled or not available. </li>
-<li>Normally, it is guest’s responsibility to configure and setup #VE ISR (Interrupt Service Routine).</li>
-<li>Even though it is enabled, not all EPT violations cause virtualization exceptions. See Intel SDM for more details.</li>
-<li>Like other exceptions, the processor also provides the corresponding exception information in Virtualization-Exception Information Area used by ISR, e.g. the violation permissions, guest linear and physical address. This area is populated by processor when such an exception happens. However, VMM or #VE ISR is responsible for pre-allocating physical memory space for that area (4KB size currently) before activating #VE.</li>
-<li>Even though EPT violation can cause #VE exception, it doesn’t mean only EPT violation can cause such an exception. It seems that Intel wants it also to be used for other virtualization exception types (e.g. CPU events) in future. But now, only EPT violation exception.</li>
-<li>Unlike EPT vmexit, it will induce processor VMX mode switch overhead (VMEXIT and VMENTRY or VMRESUME). #VE doesn’t introduce VMX mode switch. Therefore, it achieves better performance when handling a virtualization exception. </li>
+<li>CFI实施是很简单的，保障很容易建立；更近一步说，它是很实用的，它可以兼容现存的。</li>
+<li>CFI实施提供保护，即使是对整个执行程序的数据有完全控制的敌人。</li>
+<li>CFI为实施进一步的安全策略提供一个有用的基础。</li>
 </ul>
-<p><br></p>
-<p>####<strong><em>So, how to use it probably?</em></strong></p>
-<p>Whatever you are using EPT to do, you can consider using #VE to catch EPT exceptions and handle them in guest OS directly without introducing extra EPT violation VMEXIT/VMRESUME overhead. In this manner, I don’t think there is any other difference but performance improvement. </p>
-<p>However, if you look at the Intel SDM for #VE exception description, you probably can see this </p>
-<p><em>“After the virtualization exception handler has corrected the violation (for example, by executing the EPTP-switching VM function), execution of the program or task can be resumed.”</em></p>
-<p>… here the manual says “<strong><em>EPTP-switching VM function</em></strong> “. </p>
-<p>Actually, it is a new VMX instruction, VMFUNC, which can only be executed in guest OS (VMX non-root mode). According to the Intel manual, this instruction allows software in VMX non-root operation (guest) to invoke a VM function, which is processor functionality enabled and configured by software in VMX root operation (host). However, It seems that Intel currently defines only one VM function, EPTP-switching.  </p>
-<p><strong>This EPTP-switching VM function allows software in VMX non-root operation to load a new value for the EPT pointer (EPTP), thereby establishing a different EPT paging-structure hierarchy.</strong> However, software is limited to selecting from a list of potential EPTP values configured in advance by software in VMX root operation. Imagine that, in a traditional system configuration , CR3 (page directory base register) is pointing to a virtual address translation structure hierarchy, switching CR3 means switching different virtual address spaces. EPT pointer is just like CR3 pointer, but the difference is that EPT pointer establishes the translation structure from guest physical address to host physical address, CR3 pointer establishes the translation structure from guest virtual address to guest physical address. </p>
-<p>So, in a typical system, different VMs can be configured to use different EPT paging-structures pointed by different EPT pointers, when guest VM switches, the host VMM software can change to different EPTP pointers accordingly, hence the different VM can has different memory map view (memory isolation). <strong>However, even one single VM software (guest OS) can also be configured to use different EPT paging-structures</strong>, for example host VMM software can configure two different EPT paging-structure mappings pointed by two different EPTP pointer, one is a “privileged”, the other is “unprivileged”. When code running with “unprivileged” mapping attempts to access the guest physical memory referenced in “privileged” mapping, an EPT violation vmexit might happen, and then VMM can switch EPTP pointers to let access success if such an access is legitimate. </p>
-<p><strong>EPTP-switching VM function is introduced to do such a switch without transferring control to VMX root mode (HOST), because it allows guest software do it directly in VMX non-root mode, hence it can reduce performance overhead as well.</strong></p>
-<p>Note that in guest OS software, we cannot directly see the real value of each particular EPTP pointer, instead, we can only see the the EPTP-index value (0~511) that is corresponded to each one of available  EPTP pointer value. So it is VMM software’s responsibility to maintain/update the mapping between EPTP-index and real EPTP pointer value with a EPTP-list structure (4KB page, so total 512 entries at most currently).</p>
-<p>So now when you combine these two new features: VMFUNC (EPTP-switching) and #VE, you probably could understand </p>
-<p><em>“After the virtualization exception handler has corrected the violation (for example, by executing the EPTP-switching VM function), execution of the program or task can be resumed.”</em></p>
-<p> said in Intel manual. Eventually, it has two purposes: </p>
+<p>CFI的安全策略要求/命令软件执行过程必须按照一个提前设定的CFG中的路径,然后这个CFG可以通过源码分析、二进制分析或者执行剖析得到.这个提前设定的CFG是一个关键。</p>
+<p>因为从我的感觉，这个方法就像是程序设计者或者说保护着预先设计了一个游戏，这个游戏规定用户只能做出这样或者那样的行为，不能跳出他的设计范围，否则即刻出局.</p>
+<p>用原文中的话就是说，运行时的动态检测必须保证控制流保持在给定CFG的范围内。CFI的主要工作就是对于直接或者间接的控制流进行限制。</p>
+<p>由于在一些攻击中不正常的控制流更改是必须的步骤，所以CFI对于它们的防御还是很有效果的。比如说<strong>classic</strong>, <strong>stack-based buffer overflow</strong>。CFI实施并不是万能钥匙，因为对于已允许CFG边界内的渗透无法防御。这些渗透包含依赖错误参数字符串转化的特定渗透等。就像上面说的游戏的例子，只要用户行为在游戏规定的范围之类，就算这属于攻击行为，游戏程序也是不会对它做出反应的。</p>
+<p>CFI需要，程序执行期间，无论何时一个机器指令转移控制流，它目标定位于一个有效的目的地址，正如先前创建的CFG图判定的。因为大部分的指令目标是一个常量目标地址，所以这个要求通常静态地施行。然而，对于目的地址只能在动态运行时确定的计算控制流，这个要求必须实施一个动态检查.</p>
+<h2 id="实现"><a href="#实现" class="headerlink" title="实现"></a><strong>实现</strong></h2><figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/label.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/label.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>利用ID来进行跳转的动态检查，这里的call，ret的用法都不是原本这两个命令所有的用法，有可能是进行插桩修改过的！完全看不出来作者的实现方法.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/instrumentation.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/instrumentation.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>这张图解析了两种可行的ID和ID检测方式。作者使用12345678h来作为ID，上图中第一部分是一个简单的间接跳转实例！左侧是直接跳转指令<code>jmp ecx</code>，右侧是一个从栈上取内容的<code>mov</code>指令。其中<code>ecx</code>中放的是目的指令所在的地址。</p>
 <ul>
-<li><strong>handle EPT violation directly in guest OS context without EPT violation VMEXIT;</strong> </li>
-<li><strong>switch EPTP pointer (hence EPT paging-structure hierarchy) directly in guest OS context without transferring control or exiting to VMM.</strong> </li>
+<li><p>a方案：在目的地址<code>mov</code>指令处加上<code>ID</code>，同时在计算目的地址处加上<code>lea</code>指令（这个指令的 好处是不修改<code>eflags</code>，同时将<code>ecx</code>加4）。直接比较<code>[ecx]</code>和<code>12345678h</code>，不等的话直接跳转到错误<code>label</code>，否则将<code>ecx</code>加上4，然后跳转.</p>
+</li>
+<li><p>b方案：使用ID-1作为ID检查的常量，在运行期间加1。相同的是，b方案也没有改变计算跳转地址，但是它并不是插入一个ID，而是加入了一个无副作用的<code>prefetchnta</code>指令来人工合成ID。要注意，这里所谓的无副作用指令，就是没有效果，单纯放在那里，引出来参数地址。这里有一个疑问3没有解决。</p>
+</li>
 </ul>
-<p><br><br>Performance matters!!! </p>
-<p>but wait… questions: VMWare, XEN or any other public well-known hypervisor use it? and for what?  Anyone knows?</p>
-<p>&lt; The End&gt;</p>
-<hr>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<p>我们来说明一下核心思想：对于限制间接跳转的动态检查，我们可以这样做！假设我们有一个动态检查的可能集合。对于间接跳转，我们将动态运行的结果和我们的集合进行对比，如果动态结果不在我们预先设置的集合，就跳到错误处理的地方.</p>
+<p>但是，对于动态集合大小的设定，我们需要在精确和效率做一个权衡，这里涉及到图1中的ID设定，如果<code>sort2</code>不同的放回位置设置不同的ID，我感觉也是可以的！但是这样就要考虑由于动态检查集合的增大而带来的性能损失.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/implemention.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/implemention.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
 
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">3</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exception/">Exception</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/HAV/">HAV</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Hardware/">Hardware</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-monitoring-syscall"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/monitoring-syscall/">X86虚拟化技术监控/陷入SYSCALL的另一种方法</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/monitoring-syscall/" class="article-date">
-	  <time datetime="2017-05-04T08:02:12.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/yet-another-solution-to-monitortrap.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/yet-another-solution-to-monitortrap.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>This article describes an idea to monitor SYSCALL with x86 Hardware Virtualization Technology. It doesn’t require visible guest code/data modification, so that in some cases, even Kernel Patch Protection (e.g. Windows x64 PatchGuard) cannot detect it. Here the SYSCALL could also be SYSENTER or INT 80h for system calls.</p>
-<p>Actually this solution can be extended to other resource monitoring, so at the end of this article I will give an overview on how to extend this as a generic solution (in a new post, LINK?).</p>
-<p>In x86/Intel, <strong>syscall</strong> (Fast System Call) instruction is invoked by a user application at privilege level 0 to call an OS system-call handler at privilege level 0. In ARM architecture, supervisor Call (<strong>SVC</strong>, formerly SWI) does the similar thing to request privileged operations or access to system resources from an operating system. </p>
-<p>To be more specific, x86/Intel syscall does so by loading RIP from the IA32_LSTAR MSR(after saving the address of the instruction following SYSCALL, returning RIP, into RCX, so when returning back from ring 0, sysret can load that user mode RIP from RCX, and continue to execute program). The WRMSR instruction ensures that the IA32_LSTAR MSR always contain a canonical address (A #GP will be triggered if an address is not canonical when WRMSR to IA32_LSTAR).</p>
-<p>The memory address in IA32_LSTAR MSR is an entry point of kernel system-call handler, it can only be configured by software software (OS kernel, normally), and cannot be a non-canonical address. </p>
-<p><strong><em>However, the key point is here: what if that address saved in IA32_LSTAR is an invalid canonical memory address (or Non-eXecute memory address)</em></strong>. When this happens, a CPU Page Fault (#PF) will be triggered at that address. And the error code indicates that this is a page-not-present instruction fetch exception (For simplicity, we don’t consider setting Non-eXecute memory address), and CR2 control register content is just that pre-set invalid canonical memory address. </p>
-<p><strong><em>Hence, whenever a syscall is invoked by application, an intended page-not-present instruction fetch #PF will be triggered</em></strong>. Then this exception is normally handled by #PF (vector = 14) handler specified in OS IDT. </p>
-<p>In a x86/Intel virtualization environment, page faults (exception vector = 14) can be configured to trigger a VMEXIT. And even more, we can selectively make only certain type of #PFs generate VMexit by configuring the VMCS page-fault error-code mask and page-fault error-code match. For example, only page-not-present instruction fetch #PF can generate a VMexit, any other #PF exceptions (like read/write access to invalid or disallowed memory) won’t generate VMexit, instead, they are handled in guest IDT #PF handler normally. By doing so, the performance impact will be minimized. </p>
-<p>So, to summarize this solution, we could do it like this to monitor every syscall invoked by user application without guest OS changes:</p>
-<ol>
-<li><p>VMM software traps any write access to IA32_LSTAR MSR, whenever a WRMSR to IA32_LSTAR happens, VMM records the original MSR value that points to the real entry point address of kernel system-call handler, and replace it with a MAGIC &amp; INVALID memory address.</p>
+<p>这张图解释了函数调用和返回的时候使用的插桩方法.函数调用这里综合了a，b两种方案，你可以对比它们！对于后边<code>prefetchnta</code>的作用是为函数返回时增加动态验证.关于这个地方，我们可以从函数返回处的插桩代码很容易看出来.<code>ecx</code>原本指向<code>prefetchnta [AABBCCDDh]</code>这个指令的地址，所以使用<code>cmp [ecx+4],AABBCCDDh</code>来进行动态检查.</p>
+<p>这篇文章向我讲述了很多关于间接转移指令，如函数返回，函数指针调用，<code>switch</code>结构和其他如<code>C++ vtables</code>之类的结构。</p>
+<h2 id="问题讨论"><a href="#问题讨论" class="headerlink" title="问题讨论"></a><strong>问题讨论</strong></h2><ol>
+<li><p>文章中说已给出的CFG是如何生成，间接跳转它是如何拿出来的？</p>
 </li>
-<li><p>VMM software configures relevant VMCS structures to cause only page-not-present instruction fetch #PF trigger a VMexit.</p>
+<li><p>关于作者自己定义的<code>Lable ID; call ID,DST; ret ID</code>这些指令是自己实现的，还是一个虚拟定义，具体实现的时候并不是这样的？为什么问这个，因为我去查过关于<code>call</code>和<code>ret</code>，没有这样的用法！ret指令，是可以带参数，但是这个表示的也不是ID啊.</p>
 </li>
-<li><p>At runtime, whenever such a VMexit type happens, VMM software checks guest CR2 value, if it is equal to the predefined MAGIC and INVALID value, then it means this is an intended #PF exception VMexit (not considering malicious (in)direct call to that MAGIC address), we should discard this #PF, and directly resume guest OS back with a new RIP value (it is just the original MSR value that points to the real entry point address of kernel system-call handler).</p>
-<p>Otherwise, if this #PF VMexit indicates that it is an ordinary #PF, VMM software injects this exception event back to guest OS without doing anything, then it will be normally handled by #PF handler in guest IDT table.</p>
+<li><p>关于<code>mov eax,12345677h;inc eax</code>;没有想出来原因.</p>
+</li>
+<li><p>关于<code>prefetchnta</code>这个指令的使用，无论是Figure 2(b)还是Figure 3中，完全不明白是什么意思？曾经去查过这个指令，它是intel用于缓存的命令，但是手册上面并没有详细说明？</p>
+</li>
+<li><p>CFG结构正确处理了x86中执行计算控制转移的指令，包括函数返回，通过函数指针发出的函数调用，switch结构，动态调度。上述话语描述了程序中的间接跳转，但是我不是很明白这个可能集合如何得到？？？ 特别是switch结构的各种case如何得到？对于函数指针发出的函数调用，本文利用二进制文件中的重定位信息来获得.这个问题貌似又回到了问题1.</p>
 </li>
 </ol>
-<p>Therefore, in this way, whenever a syscall is invoked in user mode application, VMM software will get an notification.</p>
-<p>But there is a problem here. You can see that we don’t need to change any guest OS kernel, however, the Kernel Patch Protection module (like PatchGuard) will probably detect this by reading MSR IA32_LSTAR and comparing it with the original value. It is very easy to solve this issue by monitoring RDMSR to IA32_LSTAR register, and hiding the real value with a return of the original value previously configured by OS kernel. </p>
-<p>Actually, there is another solution that can also works, see my previous blog on <a href="http://hypervsir.blogspot.com/2014/09/debug-registers-on-intel-x86-processor.html" target="_blank" rel="external">Debug Register usages</a>… by enabling Debug breakpoint on the original address stored in IA32_LSTAR MSR by OS kernel. </p>
-<p><strong>As an aforementioned generic solution to monitor/trap a specific event that we’re interested in, here it is:</strong></p>
-<ol>
-<li><strong>Attempt to change guest software for the purpose of making some certain instruction execution generate an intended exception. (Here it is the syscall execution in this post),</strong></li>
-<li><strong>Then the virtualization software, VMM or Hypervisor, monitors that intended exception by configuring the corresponding VMCS data structures (e.g. Exception-Bitmap VMCS).</strong></li>
-</ol>
-<p><br><br>I will write a new post to explain this solution in greater details later.</p>
 <hr>
 <p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 
@@ -388,12 +231,12 @@
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">10</span></a>
+    <a class="article-category-link" href="/categories/内核安全/">内核安全<span class="article-category-count">2</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Monitoring/">Monitoring</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Syscall/">Syscall</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtulization/">Virtulization</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/CFI/">CFI</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li></ul>
 
       
     </footer>
@@ -404,7 +247,7 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-vmcs-vmxon"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-rop-intel"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -412,7 +255,7 @@
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/vmcs-vmxon/">VT-x技术VMXON与VMCS区域的思考-从安全的角度</a>
+      <a class="article-title" href="/20170504/rop-intel/">因特尔发布新的技术规范去防御 ROP 攻击</a>
     </h1>
   
 
@@ -420,51 +263,24 @@
     
     <div class="article-meta">
       
-	Posted on <a href="/20170504/vmcs-vmxon/" class="article-date">
-	  <time datetime="2017-05-04T07:59:28.000Z" itemprop="datePublished">五月 4, 2017</time>
+	Posted on <a href="/20170504/rop-intel/" class="article-date">
+	  <time datetime="2017-05-04T10:45:02.000Z" itemprop="datePublished">五月 4, 2017</time>
 	</a>
 
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/09/thoughts-on-vmxon-and-vmcs-regions-in.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/09/thoughts-on-vmxon-and-vmcs-regions-in.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author: <a href="http://mudongliang.github.io/about/" target="_blank" rel="external">Dongliang Mu</a></p>
+<p>Source: <a href="http://mudongliang.github.io/2016/08/04/intel-release-new-technology-specifications-to-protect-against-rop-attacks-zh.html" target="_blank" rel="external">http://mudongliang.github.io/2016/08/04/intel-release-new-technology-specifications-to-protect-against-rop-attacks-zh.html</a></p>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
-<p>Previously when I was working on a Hypervisor based on Intel VT-x. I always did exactly as what I’m told to do in the VT-x specification when programing VMM software.<br>But now I’m going to revisit this again starting by asking these questions: What if I won’t do it as what we’re told to do? Is Intel VT-x exploitable? Can we find vulnerabilities in hardware VT-x implementation? Is it possible to do “reverse-engineering” to get internals on VT-x CPU implementation? Can we take advantage of VT-x to attack other privileged resource? Can we bypass EPT layer?  However, those are just some open questions, I don’t have answers either, but it has a lot of fun when you look into it.</p>
-<p>####<strong>VMXON Region</strong><br>If you take a look at the Intel SDM (<a href="http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html" target="_blank" rel="external">Software Development Manual</a>), you can see some words about VMXON region like below:</p>
-<ul>
-<li><em>“Before executing VMXON, software allocates a region of memory (called the VMXON region) that the logical processor uses to support VMX operation….. Software should use a separate region for each logical processor and should not access or modify the VMXON region of a logical processor between execution of VMXON and VMXOFF on that logical processor. Doing otherwise may lead to unpredictable behaviors”</em></li>
-<li><em>“Before entering VMX operation, the host VMM allocates a VMXON region. A VMM can host several virtual machines and have many VMCSs active under its management. A unique VMCS region is required for each virtual machine; a VMXON region is required for the VMM itself.”</em><br><br></li>
-</ul>
-<p>When you are reading these texts, probably some questions will come out in your mind: What’re unpredictable behaviors if we modify the content of VMXON region? How is the VMXON region layout organized?*</p>
-<p>We know that basically in the IA32 specification, almost all the operations/instructions have the corresponding defined behaviors even if they are the exceptions. Why are there so many undefined behaviors for VT-x specification, can we inspect the “so-called undefined behaviors” if we modify VMXON region during the period of VMX operation?</p>
-<p>According to the VT-x specification, we also are told that the format of VMXON region is not architecturally defined, meaning that its format varies from processor generations to generations. Therefore, <strong>can we assume that “Intel says theire behaviors are unpredictable just because the format is different between VT-capable processors”? In other words, for a particular processor, the behaviors of read/write access to the VMXON region might be well-defined to some extent</strong>. If this happens to be true, then the question now is how to explore the internal structure/format of VMXON region? What are we able to do if we can exactly know the format for a particular processor? Are we able to control the VMX operation behaviors by simply programming the VMXON region with ordinary read/write access operation instructions like MOV? </p>
-<p>I don’t know the answers. But I will talk about a prototype later about how to inspect the internal format/layout of VMXON region and other VT-x regions with a software solution. </p>
-<p><br></p>
-<p>####<strong>VMCS Regions</strong><br>Now let’s take a look at VMCS structure. </p>
-<p>  “Software should use the VMREAD and VMWRITE instructions to access the different fields in the current VMCS. Software should never access or modifythe VMCS data of an active VMCS using ordinary memory operations, <em>in part because the format used to store the VMCS data is implementation-specific and not architecturally defined, and also because a logical processor may maintain some VMCS data of an active VMCS on the processor and <strong>not in the VMCS region (then where?)</strong></em>. The following items detail some of the hazards of accessing VMCS data using ordinary memory operations:</p>
-<ul>
-<li>Any data read from a VMCS with an ordinary memory read does not reliably reflect the state of the VMCS. Results may vary from time to time or from logical processor to logical processor.</li>
-<li>Writing to a VMCS with an ordinary memory write is not guaranteed to have a deterministic effect on the VMCS. Doing so may cause the VMCS to become corrupted (see below).<br>(Software can avoid these hazards by removing any linear-address mappings to a VMCS region before executing a VMPTRLD for that region and by not remapping it until after executing VMCLEAR for that region.)<br>This section has identified operations that may cause a VMCS to become corrupted. These operations may cause the VMCS’s data to become undefined. Behavior may be unpredictable if that VMCS used subsequently on any logical processor. The following items detail some hazards of VMCS corruption: </li>
-<li>VM entries may fail for unexplained reasons or may load undesired processor state. </li>
-<li>The processor may not correctly support VMX non-root operation as documented and may generate unexpected VM exits. </li>
-<li>VM exits may load undesired processor state, save incorrect state into the VMCS, or cause the logical processor to transition to a shutdown state.”</li>
-</ul>
-<p>So, we know that the behaviors of VMX operations (root mode and non-root mode) are also controlled by VMCS regions, and the format/layout of those regions are also undefined, and read/write access to them with ordinary memory operations are unpredictable too.</p>
-<p><strong>How to do ‘reverse-engineering’-like things to look into the internal <em>VMXON/VMCS</em>  region memory layout</strong><br>Here is an idea (software solution, without any hardware device but a particular VT-capable processor):</p>
-<ul>
-<li>Implement a tiny VMM/Hypervisor and a tiny Guest VM software, both with only code running in ring 0 mode. No need complex things like thread, multiple processor, scheduling, interrupt/exceptions, etc.. just a piece of code that can execute in VMX root mode and non-root mode respectively. </li>
-<li>Hypervisor allocates machine physical memory spaces for VMXON and VMCS region, and make these areas visible to guest VM software so that the guest software can read/write the VMXON/VMCS memory regions directly to inspect the content. </li>
-<li>After environment is setup, we can do inspections instruction by instruction or event by event.. for example, if we want to know what memory bits are changed during a vmentry, then we can do it like this:<br>(1)  In VMX-root mode, the VMM software logs all the contents of VMCS/VMXON regions right prior to calling VMRESUME;<br>(2)  Just right after resuming back to guest, the VM software logs all the contents of VMCS/VMXON regions again, then compares the differences between this two points;<br>(3)  The difference in some of memory areas might indicate something important that can control the behaviors of VMX operations. </li>
-<li>Repeatedly do above things again and again for all kinds of VMX transition events. </li>
-<li>Besides, for VMCS regions, we can read the contents before and after a legal VMCS write instruction, for example, VMCS_WRITE(GUEST_RIP) to get what has been changed for GUEST_RIP area.</li>
-</ul>
-<p>I didn’t do this, but I think this must be fun once you can get the VT-x internals. </p>
-<p>However, even though we could get the internal VMCS/VMXON data structure layout, what can we do? Imaging that there is a bug in a Hypervisor (XEN, KVM…), e.g. a buffer/stack overflow, that can lead to arbitrary memory overwriting… see below…:-)</p>
-<p>One more question:</p>
-<ul>
-<li><strong>How does the processor determine if the current processor execution mode is in VMX root mode or non-root mode? Does it look at some certain VMX mode state bit in VMXON region or VMCS regions before executing any instruction?</strong> This is unknown to us. But if my guess is true (hope not), then we can change that corresponding bit to control instruction behavior. For example, provided that there is a vulnerability in Hypervisor that can lead us overwrite arbitrary memory including VMCS/VMXON region, we can take advantage of it to change “such a bit”, and then any malicious code that is executed in VMX non-root mode will be treated as execution in VMX root mode… this is horrible, since for example we can bypass EPT to directly write machine physical memory space even in VMX non-root mode.<br>&lt; Note that, however, for other process modes like protected mode and real mode, we can easily check CR0.PE bit, for different privilege modes (ring), we can check CPL bit of CS selector to determine ring 0~3 &gt;</li>
-</ul>
-<p>&lt; The End&gt;</p>
+<p>英特尔长期同软件社区合作，并且在运行在现代电脑系统上的操作系统和软件的加固保护方面取得了很大进展。因为这些防御发挥了作用，攻击者们开始寻找创造性的替代攻击方法来绕过这些防御。<strong>Return Oriented Programming</strong> （也称为 <strong>ROP</strong>）和 <strong>Jump Oriented Programming</strong>（也称为 <strong>JOP</strong>）就是两种正在日益流行的这类技术。<strong>JOP</strong> 和 <strong>ROP</strong> 特别难以检测或防御，因为攻击者使用了可执行内存中的已有代码，以一种创造性的方式修改了程序的行为。<strong>ROP/JOP</strong> 难以防御的原因就在于攻击者使用的是可执行内存中的已有代码。已经开发和部署了一些基于软件的检测和防御技术，只是收效甚微。</p>
+<p><a href="http://twitter.com/home/?status=Intel%20and%20Microsoft%20recognized%20the%20seriousness%20of%20ROP%20attacks%20https%3A%2F%2Fblogs.intel.com%2Fevangelists%2F2016%2F06%2F09%2Fintel-release-new-technology-specifications-protect-rop-attacks%2F%20@IntelSWevents%20%23InfoSec" target="_blank" rel="external">英特尔和微软已经意识到 ROP 攻击的危害性</a>，以及开发防御 <strong>ROP/JOP</strong> 的方法的难度。总之，我们评估过超过十项的技术创新来解决这些最近 7 年内新兴起的威胁，并且将范围缩小到 <strong>x86/x64</strong> 的 <strong>CET</strong> 标准来更有效地处理 <strong>ROP</strong> 威胁。基于之前定义指令集扩展方面的经验，以及对采用新 ISA 带来的挑战，我们把目标定在一个用于 <strong>ROP/JOP</strong> 防御而设计的 ISA，并且它对于大部分设计良好的软件是透明的，只需要很小的修改，甚至零修改；也允许需要修改的软件取消该功能。我们也想确认这个解决方案并不只是适用于应用，还适用于操作系统内核，并且对大多数编程语言写的软件也有益。我们也想确保开启了 <strong>CET</strong> 的软件可以无修改地在老的平台系统上运行（虽然没有任何安全益处）。最终，也是最重要的，我们想去解决所有已有的 <strong>ROP/JOP</strong> 攻击。</p>
+<p>虽然我们在这里包含一个 <strong>CET</strong> 的简要描述，但是并不应该取代对<a href="https://software.intel.com/en-us/isa-extensions/cet-preview" target="_blank" rel="external">完整标准</a>的仔细阅读。这里我们强调 ISA 的两个关键方面来帮助你入门，即 <strong>shadow stack</strong> 和 <strong>indirect branch tracking</strong>。<strong>CET</strong> 是这两者的结合，而这两者都是为了处理 <strong>ROP</strong> 和 <strong>JOP</strong> 而设计的。</p>
+<p>除了用于控制转移和数据的传统栈，<strong>CET</strong> 定义了第二个栈（<strong>shadow stack</strong>），专门用于控制转移操作。当 <strong>CET</strong> 启用的时候，<code>CALL</code> 指令除了完成把返回地址压入普通栈的正常行为（对于传统的栈操作没有改变）之外，还把返回地址压入到 <strong>shadow stack</strong> 中。而返回指令（比如说，<code>RET</code>）会将 <strong>shadow stack</strong> 和传统栈上的返回地址弹出，同时只有当两个栈的返回地址相同时才会执行控制转移为弹出来的地址。对于 <strong>shadow stack</strong> 的写操作有诸多的限制，使得攻击者通过修改页表来修改两个栈上的返回地址变得更加困难。因此限制 <strong>shadow stack</strong> 仅用于 <code>call</code> 和 <code>return</code> 操作就是为了只存储返回地址。通过防御非计划中的或者恶意的切换 <strong>shadow stack</strong> 或者对于 <strong>shadow stack</strong> 的 <strong>overflow</strong> 和 <strong>underflow</strong>，<strong>shadow stack</strong> 的页表保护机制也是设计用于保护 <strong>shadow stack</strong> 的完整性。</p>
+<p><code>ENDBRANCH</code> 指令是为了标记一个间接分支或者跳转而新添加到 <strong>ISA</strong> 的指令。因此如果 ENDBRANCH 不是一个间接分支或者跳转的目标，<strong>CPU</strong> 生成一个表明非计划中的或者恶意的行为异常。为了后向兼容和在软件中提前启用，这个特定的指令已经在当前的 <strong>Intel</strong> 处理器被实现为 <code>NOP</code> 指令（类似于一些 MPX 指令）。</p>
+<p>正如我们过去有的，英特尔努力去减少安全特性所带来性能影响，<strong>CET</strong> 也不例外，然而，请记住性能影响高度依赖于特定软件和工作内容。</p>
+<p>最后，我们想承认一点，这个标准受益于同微软大量的合作。</p>
 <hr>
 <p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 
@@ -473,12 +289,154 @@
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/硬件虚拟化/">硬件虚拟化<span class="article-category-count">1</span></a>
+    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">14</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/HAV/">HAV</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/VT-x/">VT-x</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Attack/">Attack</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-ropjop-research"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/ropjop-research/">ROP/JOP攻击与防御最新研究进展</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/ropjop-research/" class="article-date">
+	  <time datetime="2017-05-04T10:42:57.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
+<p>Source：<a href="http://hypervsir.blogspot.com/2014/11/latest-researching-status-of-ropjop.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/latest-researching-status-of-ropjop.html</a></p>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>Control Flow Hijacking, like ROP, becomes a hot topic in recent years since ever DEP(W^X enforcement) and SMEP were introduced in h/w processor. Based upon the papers that I read recently, this post just gives a brief introduction on the recent researching status (though incomplete) about control flow attacks and defenses. </p>
+<p>When code injection attacks become more and more difficult, attackers start to seek other opportunities to execute arbitrary code with completely re-using existing executable code in application image and/or shared libraries.</p>
+<p>Typically, for example, those techniques without code injection could be return-to-libc, ROP (Return Oriented Programming), JOP (Jump Oriented Programming), or even SROP (Sigreturn Oriented Programming, see <a href="https://www.cs.vu.nl/~herbertb/papers/srop_sp14.pdf" target="_blank" rel="external">Framing Signals—A Return to Portable Shellcode</a>). </p>
+<p>Regarding techniques that defend against those control flow hijackings, here below are the lists (also incomplete).</p>
+<ul>
+<li>Change existing compilers to re-generate the code binaries. There are some typical solutions like, generate return-less binary code, generate control flow friendly binary (with extra IDs/labels for CFG hardening), modify all the control flow (ret, jmp, call) instructions to a well-known center redirection table, etc.</li>
+<li>Without binary changes, make static binary instrument and dynamic control flow tracing. For instance, build control flow graph, and enforce the control flow execution exactly aligning with the known CFG paths.</li>
+<li>Hardware assisted CFI. CFI(Control-Flow Integrity) is an efficient way to defend against ROP/JOP attacks. However, due to performance issue, complete CFI enforcement is impossible in practice. So, there are some lightweight CFI checks with the help of latest processor LBR (last branch record) to examine the control flow behaviors base upon the experience (rather than the full CFG analysis).</li>
+<li>THere are some specific solutions, like stack shadowing (to check if the target “ret” is call-preceding instruction), code section shadowing. But most of them are not a generic solution, but have many assumptions and limitations. </li>
+</ul>
+<p>Regarding to the defenses with CFI, there are many papers that focus on the policy of checking whether or not the history control flow instructions behave as a malicious software. Typically, for example:</p>
+<ul>
+<li>Some solutions to <strong><em>check the length of each one of ROP gadgets</em></strong>. If it is very short (e.g. less than 5~6 instructions), it might be suspected. If there are consecutive chain of gadgets with “short” instruction sequences in a control flow, then it might be a ROP attack.</li>
+<li>Some of them to <strong><em>check whether if the target of “ret” is a Call-Preceded instruction</em></strong> (the instruction immediately preceding is a CALL instruction), this is because normally, every “ret” instruction returns back to an instruction that immediately follows a corresponding “call” instruction. </li>
+<li>Or check if <strong><em>the target of all the indirect call/jmp instructions are the “entry-point” functions</em></strong>. This is also normally true for a legitimate application, because generally an indirect “jmp” or “call” won’t be calling into a certain middle location in a function. </li>
+</ul>
+<p>However, just as those papers (see the links in References below) indicate, all the current CFI solutions based upon above assumptions can be bypassed with advanced ROP gadgets. </p>
+<p>For example, in Nicholas’s paper, he just used some call-preceded ROP gadgets and long termination gadgets for flushing attacking history to bypass checks of the famous kBouncer and ROPecker CFI solutions.</p>
+<p>But his solution has an assumption for kBounce/ROPecker: the last branch records (LBR) can be stored in only 16 (at most) pairs of LBR MSRs. </p>
+<p>As a matter of fact, if appropriately configured, the last branch records can also be stored into a variable-sized memory-resident branch trace store (BTS) buffer specified by DS(Debug Store) save area pointed by the IA32_DS_AREA MSR . And processor doesn’t restrict how many pairs of last branch records could be stored in that BTS buffer, it also allows us to make processor generate an interrupt before the count of records reaches to the max records configured (or when the BTS buffer is nearly full). This means that we will never miss history LBR records. If we don’t consider performance cost when enforcing CFI check at run time, this could be a good solution to trace all the control flow information. </p>
+<p><strong>However, even if we can get all the control flow traces (to defend against Nicholas’s “history flushing” solution), does it mean that we can completely defend against control flow attacks?</strong> Unless that we can make full CFI checks with CFG, one of another problems that we might always encounter is how to design a better policy to reduce “false positive”, and at the same time to catch all the ROP attacks at run time with acceptable performance cost in practice. </p>
+<hr>
+<p><strong><em>References:</em></strong></p>
+<ul>
+<li>Nicholas Carlini, David Wagner, ROP is Still Dangerous: Breaking Modern Defenses<br><a href="http://www.cs.berkeley.edu/~daw/papers/rop-usenix14.pdf" target="_blank" rel="external">http://www.cs.berkeley.edu/~daw/papers/rop-usenix14.pdf</a></li>
+<li>Enes Gökta¸s, Size Does Matter - Why Using Gadget-Chain Length to Prevent Code-Reuse Attacks is Hard<br><a href="http://www.cs.columbia.edu/~mikepo/papers/chainlength.sec14.pdf" target="_blank" rel="external">http://www.cs.columbia.edu/~mikepo/papers/chainlength.sec14.pdf</a></li>
+<li>Out Of Control: Overcoming Control-Flow Integrity:  <a href="http://www.ieee-security.org/TC/SP2014/papers/OutOfControl_c_OvercomingControl-FlowIntegrity.pdf" target="_blank" rel="external">http://www.ieee-security.org/TC/SP2014/papers/OutOfControl_c_OvercomingControl-FlowIntegrity.pdf</a></li>
+<li>Technical Report TR-HGI-2014-001:<br><a href="http://www.hgi.ruhr-uni-bochum.de/media/emma/veroeffentlichungen/2014/05/09/TR-HGI-2014-001_1_1.pdf" target="_blank" rel="external">http://www.hgi.ruhr-uni-bochum.de/media/emma/veroeffentlichungen/2014/05/09/TR-HGI-2014-001_1_1.pdf</a></li>
+</ul>
+<hr>
+<p> 转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">14</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Attack/">Attack</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-nmi-virtual"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/nmi-virtual/">虚拟化技术的NMI窗口退出</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/nmi-virtual/" class="article-date">
+	  <time datetime="2017-05-04T10:41:33.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
+<p>Source：<a href="http://hypervsir.blogspot.com/2015/04/what-how-and-why-on-interrupt-window-or.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2015/04/what-how-and-why-on-interrupt-window-or.html</a></p>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>More recently, one of my colleagues asked me <strong><em>why</em></strong>  there is a feature called “<strong><em>Interrupt Window exiting</em></strong> “ in virtualization technology, and <strong><em>how</em></strong> it can be used by VMM? This blog is going to briefly describe its “what, how and why” .</p>
+<h3 id="WHAT-and-HOW"><a href="#WHAT-and-HOW" class="headerlink" title="WHAT, and HOW"></a><strong>WHAT, and HOW</strong></h3><p>“Interrupt Window Exiting” is one of VM exit reasons (#7 in Intel Technology). If “interrupt-window exiting” VM-execution control is set, this VM exit happens right after a VM entry and at the beginning of an any instruction:</p>
+<ul>
+<li>at which RFLAGS.IF = 1 (external interrupt is unmaksed) and,</li>
+<li>on which the interruptibility state of the guest would allow delivery of an interrupt (for example, not being blocked by STI or by MOV SS).<br><br><br></li>
+</ul>
+<h3 id="WHY"><a href="#WHY" class="headerlink" title="WHY"></a><strong>WHY</strong></h3><p>In a typical case, the VMM software wants to inject/deliver a (virtual) interrupt to its one of Guest VM at some point, but unfortunately the interruptibility state of its guest would NOT allow delivery of an interrupt at that moment (for example, since its guest RFLAGS.IF = 0). </p>
+<p>So, in order to deliver this interrupt, the VMM will need to poll and check the interruptibility state of the guest, once the interruptibility state of its guest allows delivery of an interrupt (A window is open), then VMM can deliver it at this moment. This is inefficient way to do so.</p>
+<p><strong><em>So, the problem is that – How does a VMM get to know when its guest becomes interruptible?</em></strong></p>
+<p>With this feature supported, a VMM is allowed to queue a virtual interrupt to its guest when the guest is not in an interruptible state. The VMM can just only set the “interrupt-window exiting” VM-execution control for that guest and depend on a VM exit to know when the guest becomes interruptible (and, therefore, when it can inject a virtual interrupt). The VMM can detect such VM exits by checking for the basic exit reason “interrupt-window”, if the value of exit reason is 7, then VMM knows it is right time to deliver a virtual interrupt to its specific guest.</p>
+<p><strong><em>Similarly, those also apply to “NMI window exiting” feature in Virtualization Technology.</em></strong></p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟化原理/">虚拟化原理<span class="article-category-count">7</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
 
       
     </footer>
@@ -493,7 +451,7 @@
 
   <nav id="page-nav">
     
-    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><a class="page-number" href="/page/3/">3</a><span class="space">&hellip;</span><a class="page-number" href="/page/16/">16</a><a class="extend next" rel="next" href="/page/2/">下一页</a>
+    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><a class="page-number" href="/page/3/">3</a><span class="space">&hellip;</span><a class="page-number" href="/page/20/">20</a><a class="extend next" rel="next" href="/page/2/">下一页</a>
   </nav>
 
 </section>
@@ -588,7 +546,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/monitoring-int80/">X86/Intel虚拟化技术监控/陷入软件中断INT80H系统调用</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/cfi-development/">控制流完整性的发展历程</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -600,7 +558,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/unpriviledged-ins/">非特权指令的内核信息泄露</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/cfi-ccs05/">控制流完整性-CCS05年论文</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -612,7 +570,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/hav-exception/">对硬件虚拟化异常的思考(#VE)</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/rop-intel/">因特尔发布新的技术规范去防御 ROP 攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -624,7 +582,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/monitoring-syscall/">X86虚拟化技术监控/陷入SYSCALL的另一种方法</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/ropjop-research/">ROP/JOP攻击与防御最新研究进展</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -636,7 +594,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/vmcs-vmxon/">VT-x技术VMXON与VMCS区域的思考-从安全的角度</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/nmi-virtual/">虚拟化技术的NMI窗口退出</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -648,7 +606,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/monitoring-schduling/">使用硬件虚拟化技术无感监控Windows OS调度事件</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/lbr-ret2dir/">利用LBR特性检测ret2dir攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -660,7 +618,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/mtf/">MTF在基于EPT的客户机物理内存监控中的使用</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/virtual-ret2dir/">利用虚拟化技术防御ret2dir攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -672,7 +630,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/hardware-security-x86arm/">X86&amp;ARM架构处理器硬件安全特性</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/smep-nx/">利用NX位实现基于软件的SMEP</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -684,7 +642,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/xen-snapshot/">XEN快照机制</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/smep-virtual/">如何利用虚拟化技术实现基于软件的SMEP(监督模式执行)</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -696,7 +654,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/xen-event/">XEN事件通道机制及其实例</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/tsx-exploit/">TSX处理器技术对漏洞利用意味着什么？</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -708,7 +666,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/kvm-migration/">KVM迁移中脏页位图机制源码分析</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/lbr-idthooking/">使用LRB(最近分支记录)特性检测IDT Hooking</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -720,7 +678,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/kvm-exception/">KVM异常处理流程源码简要分析</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/bitvisor/">BitVisor- 一种实施I/O设备安全的轻量级Hypervisor</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -732,7 +690,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/qemukvm-source2/">Qemu-KVM虚拟机初始化及创建过程源码简要分析（二）</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/xencolor/">Xen模式：你的XEN是什么颜色？</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -744,7 +702,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/qemukvm-source1/">Qemu-KVM虚拟机初始化及创建过程源码简要分析（一）</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/securekernel-design/">这是Linux内核中一种好的安全设计吗- thread_info和内核栈的联系</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -756,8 +714,8 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170401/keylogger/">Keylogger检测</a></h6>
-          <!--  <span>四月 1, 2017</span> -->
+              <h6 style="margin: 0;"><a href="/20170504/secureos/">安全操作系统内核设计：一种阻止恶意软件覆盖关键系统内核数据结构的思想</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
             </div>
 
           </li>
@@ -768,8 +726,8 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170401/winkernelmal/">深入探索windows内核rootkit动态分析</a></h6>
-          <!--  <span>四月 1, 2017</span> -->
+              <h6 style="margin: 0;"><a href="/20170504/rop-jop/">一种运行时无感的方法防御ROP和JOP攻击</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
             </div>
 
           </li>
@@ -784,7 +742,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">10</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">8</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">10</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -794,7 +752,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.73px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 18.18px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.73px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 11.82px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.91px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 17.27px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 16.36px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.45px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.82px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 12.73px;">Monitoring</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.91px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.91px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 16.36px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.82px;">Rootkit</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.91px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.09px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 12.73px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 11.82px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.43px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.14px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.71px;">Binary</a> <a href="/tags/CFI/" style="font-size: 10.71px;">CFI</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.14px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 12.86px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 17.86px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.14px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 14.29px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.71px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.71px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.57px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.43px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.14px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 12.86px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 12.86px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.71px;">Malware</a> <a href="/tags/Memory/" style="font-size: 12.86px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.43px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 12.14px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.71px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.71px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.71px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.14px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.71px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.43px;">Rootkit</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.71px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.71px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.57px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.43px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.29px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 12.14px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 12.86px;">XEN</a>
     </div>
   </div>
 

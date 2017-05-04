@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>为什么arm平台xen的代码量更小 | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="Author：Bing Zhu 
+Source：http://hypervsir.blogspot.com/2014/10/why-smaller-code-size-with-xen-on-arm.html
+转载请注明：原作者信息以及CSysSec
+
+This white paper (Xen ARM with Virtualization Extensions whitepaper) indi">
+<meta property="og:type" content="article">
+<meta property="og:title" content="为什么ARM平台XEN的代码量更小">
+<meta property="og:url" content="http://yoursite.com/20170504/arm-xen/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="Author：Bing Zhu 
+Source：http://hypervsir.blogspot.com/2014/10/why-smaller-code-size-with-xen-on-arm.html
+转载请注明：原作者信息以及CSysSec
+
+This white paper (Xen ARM with Virtualization Extensions whitepaper) indi">
+<meta property="og:updated_time" content="2017-05-04T10:12:56.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="为什么ARM平台XEN的代码量更小">
+<meta name="twitter:description" content="Author：Bing Zhu 
+Source：http://hypervsir.blogspot.com/2014/10/why-smaller-code-size-with-xen-on-arm.html
+转载请注明：原作者信息以及CSysSec
+
+This white paper (Xen ARM with Virtualization Extensions whitepaper) indi">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">FROM 0 TO 1</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">系统结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/courses">名人课堂</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-arm-xen" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      为什么ARM平台XEN的代码量更小
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/arm-xen/" class="article-date">
+	  <time datetime="2017-05-04T10:11:43.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
+<p>Source：<a href="http://hypervsir.blogspot.com/2014/10/why-smaller-code-size-with-xen-on-arm.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/why-smaller-code-size-with-xen-on-arm.html</a></p>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>This white paper (<a href="http://wiki.xenproject.org/wiki/Xen_ARM_with_Virtualization_Extensions_whitepaper" target="_blank" rel="external">Xen ARM with Virtualization Extensions whitepaper</a>) indicates that “Xen on ARM is 1/6 of the code size of x86_64 Xen, while still providing a similar level of features”. what does this mean? Does this mean that Xen/ARM is better than Xen/x86? We cannot simply just make this conclusion, but anyway smaller code size means smaller <a href="http://en.wikipedia.org/wiki/Trusted_computing_base" target="_blank" rel="external">TCB</a>, which can reduce security risks (e.g. security vulnerabilities). </p>
+<p>First of all, I don’t think that is the latest status on Xen 4.4+ version. see the latest one (in 2014, Xen on ARM summit, in the Reference link below). </p>
+<p>Here I’m going to give some more information. </p>
+<ol>
+<li><p>Unlike x86( or x64) XEN, <strong>no shadow page table management code is required any longer in XEN on ARM</strong>. </p>
+<p>In the first generation of Intel VT-x architecture processors, there is no memory virtualization(no EPT, Extended Page Table), which means there is no hardware support for address translations from guest physical memory to host physical memory. XEN and any other hypervisors must sets up the shadow page tables to do those things in a software way (and keep synchronization with guest virtual address page tables by monitoring MOV-CR3 and INVLPG instructions. This solution is sometimes also called as VTLB (virtual TLB). </p>
+<p>For compatibility reason, this part of code is still in XEN because there are still many machines on the market that have no EPT-capable VT-x processors.<br><strong>However, Xen/ARM doesn’t suffer the similar compatibility issue, because it is started from scratch due to the fact that hardware memory (MMU) virtualization is supported since from ARM virtualization was introduced (true? please correct me if i’m wrong). In ARM architecture, new processor mode (Hyp mode, PL2 privilege) is responsible for controlling a new MMU memory address translation layer, which is called as “stage 2” translation from IPA (Intermediate Physical Address) to final PA</strong>. So XEN/ARM doesn’t require the similar code like Virtual TLB. This can reduce thousands of code lines.</p>
+</li>
+<li><p>The white paper says <strong>Xen/ARM does not need QEMU because it does not do any emulation</strong>. <is this="" still="" true="" on="" latest="" xen="" arm?=""> … it uses paravirtualized interfaces for IO devices. Actually I’m not quite understand the Xen/ARM architecture for device emulation. It still uses Dom0 to hold PV backend drivers that have communication with PV frontend drivers in guest OS (DomU).</is></p>
+<p>For device virtualization, on a Xen/x86 system, there are many legacy devices that still are using I/O port (e.g. IN/OUT instructions) for communication between CPU and memory. In this manner, Xen/ARM doesn’t have such an issue because all the I/O communication interfaces are memory-mapped to system memory bus. so the I/O device access can be initiated by using regular memory operation instruction.</p>
+<p>So Xen/ARM can unify the I/O device interface, and hence simply the Hypervisor design as well as PV backend/frontend driver design. The code size may also be smaller.</p>
+</li>
+<li><p><strong>Xen/x86 has two kinds of guests: HVM guest (unmodified kernel, e.g. Windows OS) and PV guest whose kernel must be modified to be aware of the presence of Xen</strong>. For example, some of low-level CPU or MMU primitive operation functions in PV guest OS must be changed to call a HyperCall interface to communicate with underlying Xen for guest virtualization. </p>
+<p><strong>But Xen/ARM doesn’t want to introduce this differentiation.</strong> Whatever the guest kernel must have to be changed, then change it. I think partly because Xen/ARM won’t need to support Windows OS, or other closed-source operating systems, at least for now. So Xen/ARM code is smaller again.</p>
+</li>
+<li><p><strong>Xen/x86 supports both AMD and Intel Hardware Virtualization Technologies, AMD-v (Pacifica, SVM) and Intel VT-x.</strong> </p>
+<p>Although these two technologies are almost the same from guest’s perspective, the hypervisor still need to maintain two copies of x86 (and x64) code implementations because there are many minor differences in virtual machine monitor (VMM) due to some different virtualization architecture design.</p>
+<p>However, ARM doesn’t have the similar issue either. Till now there are only ARMv7-A and ARMv8-A architectures that support ARM hardware virtualization, and variation is very minimal.</p>
+</li>
+<li><p>Similarly, Xen/x86 also support different generations of AMD/Intel processor architectures and corresponding platform/chipsets. And each of the generations are different, but Xen/x86 must maintain backward compatibilities, so the code size is increasing from time to time.</p>
+<p>For example, Intel processor has 16-bit “real mode” in addition to 32bit protected mode and 64bit protected mode. In the earlier generation VT-x processor (prior to <a href="http://en.wikipedia.org/wiki/Westmere_(microarchitecture" target="_blank" rel="external">Westmere</a>)), the code running in 16-bit “real mode” cannot be natively virtualized, so the VMM/hypervisor software must have to emulate real mode instruction executions on guest logical processor. Until VMX “<strong>Unrestricted Guest</strong>“ mode was introduced, this issue eventually was resolved by just only adding several lines of code to enable it.</p>
+<p>I don’t think Xen/ARM will have NO such an problem in near future. </p>
+</li>
+<li><p>In the latest Intel VT-x processors (Haswell +), a new feature “<strong>Hardware <a href="http://en.wikipedia.org/wiki/Nested_virtualization" target="_blank" rel="external">Nested Virtualization</a></strong>“ is introduced. Intel calls it as “<strong><em>VMCS Shadowing</em></strong> “, which provides kind of hardware virtualization supports to allow VMM/hypervisor software running on top of itself or other 3rd party hypervisors. <strong>Xen currently adds partial nested virtualization support</strong> (The virtualization industry leader, VMware, does it better, most of virtualization features can be nested in their products). This definitely introduces some code overhead. </p>
+</li>
+</ol>
+<p><br><br>These above are just some examples to explain why Xen/ARM has smaller code size. We cannot say which one of architectures is better just based on the code size. As a newcomer for hardware virtualization, ARM should and must do better!</p>
+<hr>
+<p><strong><em>References:</em></strong><br>Xen On ARM - Stefano Stabellini<br><a href="http://www.slideshare.net/xen_com_mgr/xensummit-na-2012-xen-on-arm-cortex-a15" target="_blank" rel="external">http://www.slideshare.net/xen_com_mgr/xensummit-na-2012-xen-on-arm-cortex-a15</a></p>
+<p>Xen-on-arm-xen-developer-summit-2014<br><a href="http://www.slideshare.net/xen_com_mgr/xen-on-arm-xen-developer-summit-2014" target="_blank" rel="external">http://www.slideshare.net/xen_com_mgr/xen-on-arm-xen-developer-summit-2014</a> </p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟化综合/">虚拟化综合<span class="article-category-count">2</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/XEN/">XEN</a></li></ul>
+
+      
+        
+	<div id="comment">
+	
+	<!-- 多说评论框 start -->
+	 <div class="ds-thread" data-thread-key="/20170504/arm-xen/" data-title="为什么ARM平台XEN的代码量更小" data-url="http://yoursite.com/20170504/arm-xen/"></div>
+	<!-- 多说评论框 end -->
+	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+	<script type="text/javascript">
+	var duoshuoQuery = {short_name:"csyssec"};
+	  (function() {
+	    var ds = document.createElement('script');
+	    ds.type = 'text/javascript';ds.async = true;
+	    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+	    ds.charset = 'UTF-8';
+	    (document.getElementsByTagName('head')[0] 
+	     || document.getElementsByTagName('body')[0]).appendChild(ds);
+	  })();
+	  </script>
+	<!-- 多说公共JS代码 end -->
+	
+	</div>
+	<link rel="stylesheet" href="/css/comment.css">
+
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/20170504/rop-jop/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">上一篇</strong>
+      <div class="article-nav-title">
+        
+          一种运行时无感的方法防御ROP和JOP攻击
+        
+      </div>
+    </a>
+  
+  
+    <a href="/20170504/armtrustzone/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">ARM TrustZone安全扩展和虚拟化扩展 vs X86虚拟化技术</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+    <ol class="toc">无</ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+       <!--  自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a> --> 
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/courses" class="mobile-nav-link">Courses</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>

@@ -106,7 +106,7 @@
         
           <section id="main">
   
-    <article id="post-course-zhiqianglin1"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-qemukvm-source2"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -114,7 +114,7 @@
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170306/course-zhiqianglin1/">名人课堂-高级数字取证与数据逆向工程</a>
+      <a class="article-title" href="/20170504/qemukvm-source2/">Qemu-KVM虚拟机初始化及创建过程源码简要分析（二）</a>
     </h1>
   
 
@@ -122,840 +122,30 @@
     
     <div class="article-meta">
       
-	Posted on <a href="/20170306/course-zhiqianglin1/" class="article-date">
-	  <time datetime="2017-03-06T13:05:25.000Z" itemprop="datePublished">三月 6, 2017</time>
+	Posted on <a href="/20170504/qemukvm-source2/" class="article-date">
+	  <time datetime="2017-05-04T07:02:19.000Z" itemprop="datePublished">五月 4, 2017</time>
 	</a>
 
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>来源:<a href="https://www.utdallas.edu/~zxl111930/fall2011.html" target="_blank" rel="external">https://www.utdallas.edu/~zxl111930/fall2011.html</a></p>
+        <p>作者: <a href="http://blog.csdn.net/mrbuffoon" target="_blank" rel="external">Mr_buffoon</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
-<p><strong>CSysSec注：</strong> 本系列文章在于收集知名海外教授在计算机系统与安全领域的授课信息，会包含课程详细信息以及slides。<br><strong>转载本文请务必注明</strong>，文章出处：<a href="http://www.csyssec.org/20170306/course-zhiqianglin1/" target="_blank" rel="external">《名人课堂-高级数字取证与数据逆向工程》</a>与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<p> 前面我们讲了KVM内核层创建及初始化虚拟机的一些工作过程，现在讲一下Qemu层的流程以及与KVM内核层的配合过程。<br>Qemu层是从vl.c中的main()函数开始的，这里通过在代码中添加一些注释的方式来进行讲解,中间省略了很多不重要或者我也没有搞清楚的代码。<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div><div class="line">73</div><div class="line">74</div><div class="line">75</div><div class="line">76</div><div class="line">77</div><div class="line">78</div><div class="line">79</div><div class="line">80</div><div class="line">81</div><div class="line">82</div><div class="line">83</div><div class="line">84</div><div class="line">85</div><div class="line">86</div><div class="line">87</div><div class="line">88</div><div class="line">89</div><div class="line">90</div><div class="line">91</div><div class="line">92</div><div class="line">93</div><div class="line">94</div><div class="line">95</div><div class="line">96</div><div class="line">97</div><div class="line">98</div><div class="line">99</div><div class="line">100</div><div class="line">101</div><div class="line">102</div><div class="line">103</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, charchar **argv, charchar **envp)</span>  </span></div><div class="line">&#123;  </div><div class="line">    ......  </div><div class="line">    atexit(qemu_run_exit_notifiers);<span class="comment">//注册了Qemu的退出函数  </span></div><div class="line">    ......  </div><div class="line">    module_call_init(MODULE_INIT_QOM);<span class="comment">//初始化Qemu的各个模块，具体见下面注释  </span></div><div class="line">      </div><div class="line"><span class="comment">/* </span></div><div class="line">    module_call_init实际上是设计了一个函数链表ModuleTypeList，参数作为一个Type，相关的函数注册到这个函数链表上， </div><div class="line">    然后内部通过调用e-&gt;init()函数完成所有Type相关的设备的初始化。关于e-&gt;init()的具体内容后面再细说。 </div><div class="line">    Type总计有这些类型： </div><div class="line">    typedef enum &#123; </div><div class="line">    MODULE_INIT_BLOCK, </div><div class="line">    MODULE_INIT_MACHINE, </div><div class="line">    MODULE_INIT_QAPI, </div><div class="line">    MODULE_INIT_QOM, </div><div class="line">    MODULE_INIT_MAX </div><div class="line">    &#125; module_init_type; </div><div class="line">*/   </div><div class="line">  </div><div class="line">    qemu_add_opts(&amp;qemu_drive_opts);<span class="comment">//将各种函数指针（也就是操作）集合添加到链表中   </span></div><div class="line">    qemu_add_opts(&amp;qemu_chardev_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_device_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_netdev_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_net_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_rtc_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_global_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_mon_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_trace_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_option_rom_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_machine_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_boot_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_sandbox_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_add_fd_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_object_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_tpmdev_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_realtime_opts);  </div><div class="line">     ......   </div><div class="line">    init_clocks();<span class="comment">//时钟初始化相关   </span></div><div class="line">    rtc_clock = host_clock;   </div><div class="line">    ......   </div><div class="line">    module_call_init(MODULE_INIT_MACHINE);   </div><div class="line">    machine = find_default_machine();  </div><div class="line">    ......   </div><div class="line">    ......   </div><div class="line">    cpudef_init();<span class="comment">//初始化CPU def相关  </span></div><div class="line">     ......   </div><div class="line">    <span class="keyword">if</span> (log_mask) &#123;<span class="comment">//日志相关的设置，KVM对外的日志在这里配置   </span></div><div class="line">        <span class="keyword">int</span> mask;   </div><div class="line">        <span class="keyword">if</span> (log_file) &#123;   </div><div class="line">            qemu_set_log_filename(log_file);   </div><div class="line">        &#125;  </div><div class="line">        mask = qemu_str_to_log_mask(log_mask);   </div><div class="line">        <span class="keyword">if</span> (!mask) &#123;   </div><div class="line">            qemu_print_log_usage(<span class="built_in">stdout</span>);   </div><div class="line">            <span class="built_in">exit</span>(<span class="number">1</span>);   </div><div class="line">        &#125;  </div><div class="line">        qemu_set_log(mask);  </div><div class="line">     &#125;   </div><div class="line">    ......   </div><div class="line">    configure_accelerator();<span class="comment">//进行虚拟机模拟器的配置，这里重点注意，它内部调用了accel_list[i].init()函数   </span></div><div class="line">  </div><div class="line"><span class="comment">/* </span></div><div class="line">    for (i = 0; i &lt; ARRAY_SIZE(accel_list); i++) &#123; </div><div class="line">        if (strcmp(accel_list[i].opt_name, buf) == 0) &#123; </div><div class="line">            if (!accel_list[i].available()) &#123; </div><div class="line">                printf("%s not supported for this target\n",accel_list[i].name); </div><div class="line">                continue; </div><div class="line">            &#125; </div><div class="line">            *(accel_list[i].allowed) = true; </div><div class="line">            ret = accel_list[i].init(); </div><div class="line">            if (ret &lt; 0) &#123; </div><div class="line">                init_failed = true; </div><div class="line">                fprintf(stderr, "failed to initialize %s: %s\n",accel_list[i].name,strerror(-ret)); </div><div class="line">               *(accel_list[i].allowed) = false;         </div><div class="line">            &#125; else &#123;             </div><div class="line">                accel_initialised = true;        </div><div class="line">            &#125;        </div><div class="line">            break;    </div><div class="line">         &#125; </div><div class="line">     &#125;  </div><div class="line">    //accel_list定义如下，实际上在kvm平台，我们就关注kvm_init即可。     </div><div class="line">    static struct &#123; </div><div class="line">        const char *opt_name;   </div><div class="line">        const char *name;   </div><div class="line">        int (*available)(void); </div><div class="line">        int (*init)(void); </div><div class="line">        bool *allowed;  </div><div class="line">    &#125; accel_list[] = &#123; </div><div class="line">       &#123; "tcg", "tcg", tcg_available, tcg_init, &amp;tcg_allowed &#125;, </div><div class="line">       &#123; "xen", "Xen", xen_available, xen_init, &amp;xen_allowed &#125;, </div><div class="line">       &#123; "kvm", "KVM", kvm_available, kvm_init, &amp;kvm_allowed &#125;, </div><div class="line">       &#123; "qtest", "QTest", qtest_available, qtest_init, &amp;qtest_allowed &#125;,  </div><div class="line">    &#125;;     </div><div class="line">    //kvm_init函数内首先打开用于用户层以及内核层交互的字符设备文件/dev/kvm，然后通过kvm_ioctl()与内核进行交互，比如     KVM_GET_API_VERSION，KVM_CREATE_VM等命令，其中KVM_CREATE_VM命令创建虚拟机并获得虚拟机句柄，后续kvm_arch_init()、 kvm_irqchip_create()等函数就可以通过kvm_vm_ioctl系统调用进行更进一步的一些配置。这些系统调用实际上是传递到内核层，由内核来完成相应的操作并返回到用户层，内核层的相关函数很多就是前一篇文章注册过的函数指针。 </div><div class="line">*/  </div><div class="line">    ......       </div><div class="line">    ......       </div><div class="line">    cpu_exec_init_all();<span class="comment">//记录CPU执行前的一些初始化工作     </span></div><div class="line">    ......      </div><div class="line">    ......       </div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>前面提到过e-&gt;init()函数，并没有展开细说，现在来说一下这个函数。实际上e-&gt;init()函数是在machine_init(pc_machine_init)函数注册时注册到ModuleTypeList的ModuleEntry上的，module_call_init()针对X86架构时调用amchine_init(),随即调用pc_machine_init()函数，代码如下：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">void</span> <span class="title">pc_machine_init</span><span class="params">(<span class="keyword">void</span>)</span>  </span></div><div class="line">&#123;  </div><div class="line">    qemu_register_machine(&amp;pc_i440fx_machine_v1_5);  </div><div class="line">    qemu_register_machine(&amp;pc_i440fx_machine_v1_4);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v1_3);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v1_2);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v1_1);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v1_0);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_15);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_14);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_13);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_12);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_11);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_10);  </div><div class="line">    qemu_register_machine(&amp;isapc_machine);  </div><div class="line"><span class="meta">#<span class="meta-keyword">ifdef</span> CONFIG_XEN  </span></div><div class="line">    qemu_register_machine(&amp;xenfv_machine);  </div><div class="line"><span class="meta">#<span class="meta-keyword">endif</span>  </span></div><div class="line">&#125;  </div><div class="line">  </div><div class="line">machine_init(pc_machine_init);</div></pre></td></tr></table></figure></p>
+<p>注意这里注册的第一个为pc_i440fx_machine_v1_5，这个结构体定义为下：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">static</span> QEMUMachine pc_i440fx_machine_v1_5 = &#123;  </div><div class="line">    .name = <span class="string">"pc-i440fx-1.5"</span>,  </div><div class="line">    .alias = <span class="string">"pc"</span>,  </div><div class="line">    .desc = <span class="string">"Standard PC (i440FX + PIIX, 1996)"</span>,  </div><div class="line">    .init = pc_init_pci,  </div><div class="line">    .hot_add_cpu = pc_hot_add_cpu,  </div><div class="line">    .max_cpus = <span class="number">255</span>,  </div><div class="line">    .is_default = <span class="number">1</span>,  </div><div class="line">    DEFAULT_MACHINE_OPTIONS,  </div><div class="line">&#125;;</div></pre></td></tr></table></figure></p>
+<p> .init=pc_init_pci, pc_init_pci()即为初始化时候调用的函数，一路跟下去，其实最终调到pc_init1()这个函数。再看pc_init1()这个函数，这里面进行了内存（pc_memory_init）、cpu（pc_cpus_init）、中断等等多种的初始化，这里不细说，重点看cpu的初始化。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">pc_cpus_init</span><span class="params">(<span class="keyword">const</span> charchar *cpu_model, DeviceState *icc_bridge)</span>  </span></div><div class="line">&#123;  </div><div class="line">    <span class="keyword">int</span> i;  </div><div class="line">    X86CPU *cpu = <span class="literal">NULL</span>;  </div><div class="line">    Error *error = <span class="literal">NULL</span>;  </div><div class="line">  </div><div class="line">    <span class="comment">/* init CPUs */</span>  </div><div class="line">    <span class="keyword">if</span> (cpu_model == <span class="literal">NULL</span>) &#123;  </div><div class="line"><span class="meta">#<span class="meta-keyword">ifdef</span> TARGET_X86_64  </span></div><div class="line">        cpu_model = <span class="string">"qemu64"</span>;  </div><div class="line"><span class="meta">#<span class="meta-keyword">else</span>  </span></div><div class="line">        cpu_model = <span class="string">"qemu32"</span>;  </div><div class="line"><span class="meta">#<span class="meta-keyword">endif</span>  </span></div><div class="line">    &#125;  </div><div class="line">    current_cpu_model = cpu_model;  </div><div class="line">  </div><div class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; smp_cpus; i++) &#123;  </div><div class="line">        cpu = pc_new_cpu(cpu_model, x86_cpu_apic_id_from_index(i),<span class="comment">//对每一个CPU进行初始化及创建  </span></div><div class="line">                         icc_bridge, &amp;error);  </div><div class="line">        <span class="keyword">if</span> (error) &#123;  </div><div class="line">            <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>, <span class="string">"%s\n"</span>, error_get_pretty(error));  </div><div class="line">            error_free(error);  </div><div class="line">            <span class="built_in">exit</span>(<span class="number">1</span>);  </div><div class="line">        &#125;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">    <span class="comment">/* map APIC MMIO area if CPU has APIC */</span>  </div><div class="line">    <span class="keyword">if</span> (cpu &amp;&amp; cpu-&gt;env.apic_state) &#123;  </div><div class="line">        <span class="comment">/* <span class="doctag">XXX:</span> what if the base changes? */</span>  </div><div class="line">        sysbus_mmio_map_overlap(SYS_BUS_DEVICE(icc_bridge), <span class="number">0</span>,  </div><div class="line">                                APIC_DEFAULT_ADDRESS, <span class="number">0x1000</span>);  </div><div class="line">    &#125;  </div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p> 该函数内调用pc_new_cpu()函数对每一个CPU进行初始化，其后依次调用关系为：</p>
+ <figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/3-1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/3-1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>下面来看kvm_init_vcpu()函数<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">kvm_init_vcpu</span><span class="params">(CPUState *cpu)</span>  </span></div><div class="line">&#123;  </div><div class="line">    KVMState *s = kvm_state;  </div><div class="line">    <span class="keyword">long</span> mmap_size;  </div><div class="line">    <span class="keyword">int</span> ret;  </div><div class="line">  </div><div class="line">    DPRINTF(<span class="string">"kvm_init_vcpu\n"</span>);  </div><div class="line">  </div><div class="line">    ret = kvm_vm_ioctl(s, KVM_CREATE_VCPU, (voidvoid *)kvm_arch_vcpu_id(cpu));<span class="comment">//通过ioctl调用向内核发起创建CPU请求，内核完成相关工作。  </span></div><div class="line">    <span class="keyword">if</span> (ret &lt; <span class="number">0</span>) &#123;  </div><div class="line">        DPRINTF(<span class="string">"kvm_create_vcpu failed\n"</span>);  </div><div class="line">        <span class="keyword">goto</span> err;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">    cpu-&gt;kvm_fd = ret;  </div><div class="line">    cpu-&gt;kvm_state = s;  </div><div class="line">    cpu-&gt;kvm_vcpu_dirty = <span class="literal">true</span>;  </div><div class="line">  </div><div class="line">    mmap_size = kvm_ioctl(s, KVM_GET_VCPU_MMAP_SIZE, <span class="number">0</span>);<span class="comment">//通过ioctl调用获取内核与用户层共享的内存大小，这部分内存以内存映射的方式进行共享。  </span></div><div class="line">    <span class="keyword">if</span> (mmap_size &lt; <span class="number">0</span>) &#123;  </div><div class="line">        ret = mmap_size;  </div><div class="line">        DPRINTF(<span class="string">"KVM_GET_VCPU_MMAP_SIZE failed\n"</span>);  </div><div class="line">        <span class="keyword">goto</span> err;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">    cpu-&gt;kvm_run = mmap(<span class="literal">NULL</span>, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,<span class="comment">//获取内存大小后，用户层进行共享内存映射。  </span></div><div class="line">                        cpu-&gt;kvm_fd, <span class="number">0</span>);  </div><div class="line">    <span class="keyword">if</span> (cpu-&gt;kvm_run == MAP_FAILED) &#123;  </div><div class="line">        ret = -errno;  </div><div class="line">        DPRINTF(<span class="string">"mmap'ing vcpu state failed\n"</span>);  </div><div class="line">        <span class="keyword">goto</span> err;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">    <span class="keyword">if</span> (s-&gt;coalesced_mmio &amp;&amp; !s-&gt;coalesced_mmio_ring) &#123;  <span class="comment">//mmio相关的一部分共享内存设置  </span></div><div class="line">        s-&gt;coalesced_mmio_ring =  </div><div class="line">            (voidvoid *)cpu-&gt;kvm_run + s-&gt;coalesced_mmio * PAGE_SIZE;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">    ret = kvm_arch_init_vcpu(cpu);<span class="comment">//相关初始化  </span></div><div class="line">    <span class="keyword">if</span> (ret == <span class="number">0</span>) &#123;  </div><div class="line">        qemu_register_reset(kvm_reset_vcpu, cpu);  </div><div class="line">        kvm_arch_reset_vcpu(cpu);  </div><div class="line">    &#125;  </div><div class="line">err:  </div><div class="line">    <span class="keyword">return</span> ret;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>回到上面一些列调用中的qemu_kvm_cpu_thread_fn()函数中，在调用了kvm_init_vcpu()函数完成cpu的初始化之后，又调用kvm_cpu_exec()函数运行cpu，也就是运行了整个虚拟机。<br>我们来看kvm_cpu_exec()这个函数<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">kvm_cpu_exec</span><span class="params">(CPUArchState *env)</span>  </span></div><div class="line">&#123;  </div><div class="line">    .......  </div><div class="line">    <span class="keyword">do</span>&#123;   </div><div class="line">        run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, <span class="number">0</span>);  </div><div class="line">  </div><div class="line">       .......  </div><div class="line">        trace_kvm_run_exit(cpu-&gt;cpu_index, run-&gt;exit_reason);  </div><div class="line">        <span class="keyword">switch</span> (run-&gt;exit_reason) &#123;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_IO:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_MMIO:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_IRQ_WINDOW_OPEN:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_SHUTDOWN:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_UNKNOWN:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_INTERNAL_ERROR:  </div><div class="line">           ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">default</span>:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        &#125;  </div><div class="line">    &#125; <span class="keyword">while</span> (ret == <span class="number">0</span>);  </div><div class="line">  </div><div class="line">    .......  </div><div class="line">    <span class="keyword">return</span> ret;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>首先一个kvm_vcpu_ioctl系统调用，向内核请求运行虚拟机，然后内核运行虚拟机，kvm_cpu_exec()内是有一个while循环，只要是没有错误就会不断运行不会终止，后面的switch语句实际上是接收内核传来的退出原因，因为I/O等是需要Qemu即用户层来完成的，这样虚拟机运行时内核层遇到I/O等就需要退出到Qemu层并记录退出原因，Qemu根据退出原因执行相关操作，完成后再次执行ioctl操作转到内核层继续运行虚拟机。关于异常退出的具体流程下篇文章再详细讲解。<br><br></p>
+<p>关于内存初始化相关工作，在之前提到过的kvm初始化主函数kvm_init()函数里，依次调用：<br>    memory_listener_register(&amp;kvm_memory_listener, &amp;address_space_memory);<br>    listener_add_address_space(listener, as);<br>    listener-&gt;region_add(listener, &amp;section);<br>    .region_add = kvm_region_add,<br>    kvm_set_phys_mem(section, true);<br>    err = kvm_set_user_memory_region(s, mem);<br>    return kvm_vm_ioctl(s, KVM_SET_USER_MEMORY_REGION, &amp;mem);<br>    这些函数依次调用，基本完成内存初始化过程，这里最后的ioctl调用是设置影子页表信息以及设置页面访问权限等。<br><br></p>
+<p>最终，在内核与用户层的配合下完成整个虚拟机的创建和初始化工作，并运行虚拟机。</p>
 <hr>
-<h3 id="教授"><a href="#教授" class="headerlink" title="教授"></a>教授</h3><p><a href="https://www.utdallas.edu/~zxl111930/" target="_blank" rel="external">Zhiqiang Lin</a> </p>
-<h3 id="课程简介"><a href="#课程简介" class="headerlink" title="课程简介"></a>课程简介</h3><p>CS 6V81 is a graduate level, research oriented, system security course. Our focus is digital forensics and data reverse engineering, which tackles the problem of what information is stored in a computer system and how this information can be extracted and used. There are a wide range of applications of data reverse engineering, including digital forensics, crash analysis, game hacking, kernel rootkit defense, and malware analysis. The overall goal of this course is to introduce students to the current techniques used in both research and practice.</p>
-<p>In particular, we will cover the underline technical details (including the most recent techniques) of digital forensics and data reverse engineering, discuss various security applications, analyze potential limitations of existing systems, and propose/develop more secure systems. In the first a few lectures, the instructor will introduce the techniques, foundations, and applications of digital forensics and data reverse engineering. After that, in each class students will read current and seminal research papers from the reading materials. Students are encouraged to prepare a short summary/review of the paper of their choosing and submit it to the discussion board in UT Dallas elearning system. Students will lead and prepare for presentations explaining to others.</p>
-<p>Students will also need to perform research, and will pick a semester-long research topic of their choosing. In addition, this course will have one hands-on challenge.</p>
-<h3 id="课程安排"><a href="#课程安排" class="headerlink" title="课程安排"></a>课程安排</h3><table>
-<thead>
-<tr>
-<th>Date</th>
-<th style="text-align:left">Topic To Be Covered</th>
-<th style="text-align:left">Presenter</th>
-<th style="text-align:left">Slides</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>08/26 A</td>
-<td style="text-align:left">Course Overview</td>
-<td style="text-align:left">Instructor</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec1.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td><strong>Foundations</strong></td>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
-</tr>
-<tr>
-<td>08/26 B</td>
-<td style="text-align:left">OS (Memory Data Management), File System (Disk Data Management)</td>
-<td style="text-align:left">Instructor</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec2.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td><strong>Techniques, Tools, and Applications</strong></td>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
-</tr>
-<tr>
-<td>09/02 A</td>
-<td style="text-align:left">Data Structure Reverse Engineering: REWARDS [1], TIE [2], and HOWARD [3]</td>
-<td style="text-align:left">Instructor</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec3.pdf" target="_blank" rel="external">pdf</a> </td>
-</tr>
-<tr>
-<td>09/02 B</td>
-<td style="text-align:left">Kernel Rootkit Defense I: SigGraph [10], KOP [11], Crash tool[5], Memory graph [4]</td>
-<td style="text-align:left">Instructor</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec4.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td>09/09 A</td>
-<td style="text-align:left">Vulnerability Analysis I: Exploit Hardening [Q], Surgically Returning to Randomized lib(c) [58], Pointer corruption [7], Non-control data attack[8], and Data flow integrity [9]</td>
-<td style="text-align:left">Mitchell Adair</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec5.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td>09/09 B</td>
-<td style="text-align:left">Vulnerability Analysis II: Crash dump analysis using Bitblaze [6]</td>
-<td style="text-align:left">Kevin Weaver</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec6.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td>09/16 A</td>
-<td style="text-align:left">Protocol Reverse Engineering: Discoverer [12], Polyglot [13], AutoFormat [14], Protocol Analysis [15] …</td>
-<td style="text-align:left">Yangchun Fu</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec9.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td>09/16 B</td>
-<td style="text-align:left">Digital Forensics I: Research problem and roadmap [16], the next 10 years [17]</td>
-<td style="text-align:left">Kevin Weaver</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec8.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td>09/23 A</td>
-<td style="text-align:left">Digital Forensics II: Metadata extraction [18][19][20]</td>
-<td style="text-align:left">Junyuan Zeng</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec9.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td>09/23 B</td>
-<td style="text-align:left">Digital Forensics III: File carving [21][22][23]</td>
-<td style="text-align:left">Kevin Hulin</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec10.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td>09/30 A</td>
-<td style="text-align:left">Digital Forensics IV: Cell phone forensics [24][25][26][27][28]</td>
-<td style="text-align:left">Donald Talkington</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec11.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td>09/30 B</td>
-<td style="text-align:left">Digital Forensics V: Network Forensics [29] (Wireshark/TCPdump, IP prefix hijacking[30], OS Fingerprinting[31])</td>
-<td style="text-align:left">Scott Hand</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec12.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td>10/07 A</td>
-<td style="text-align:left">Digital Forensics VI: Crypto key discovery [32], and extraction [33]</td>
-<td style="text-align:left">Tom Hill</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec13.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td>10/07 B</td>
-<td style="text-align:left">Digital Forensics VII: Windows Memory Analysis[34][35][36][37][38]</td>
-<td style="text-align:left">Camron Quitugua</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec14.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td>10/14 A</td>
-<td style="text-align:left">Digital Forensics VIII: Legal and ethical issues [39]</td>
-<td style="text-align:left">Donald Talkington</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec15.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td>10/14 B</td>
-<td style="text-align:left">Game Hacking I: Differentiating human and bots [59]</td>
-<td style="text-align:left">Nathan McDaniel</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec16.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td>10/21</td>
-<td style="text-align:left">Working on your project (instructor on leave for a conference)</td>
-<td style="text-align:left"></td>
-</tr>
-<tr>
-<td>10/28 A</td>
-<td style="text-align:left">Malicious Code Analysis I: Using data structure as program signature (Laika[40]), Data structure layout randomization ([DSLR])</td>
-<td style="text-align:left">Scott Hand</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec17.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td>10/28 B</td>
-<td style="text-align:left">Malicious Code Analysis II: String analysis for PHP [41, x86 binary [42]</td>
-<td style="text-align:left">Mitchell Adair</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec18.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td>11/04 A</td>
-<td style="text-align:left">Program Analysis I: Value-invariant discovery (Daikon[43][44]), Robust signatures using value-invariant [52]</td>
-<td style="text-align:left">Junyuan Zeng</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec19.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td>11/04 B</td>
-<td style="text-align:left">Program Analysis II: Server-side verification of client behavior in online games [60]</td>
-<td style="text-align:left">Nathan McDaniel</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec20.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td>11/11 A</td>
-<td style="text-align:left">Kernel Rootkit Defense II: data centric approach [46]</td>
-<td style="text-align:left">Camron Quitugua</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec21.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td>11/11 B</td>
-<td style="text-align:left">Using Reverse Engineering Practices to Improve Systems-of-Systems Understanding</td>
-<td style="text-align:left">Tom Hill</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec22.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td>11/18 A</td>
-<td style="text-align:left">Game Hacking II: Preventing map hacks [50]</td>
-<td style="text-align:left">Kevin Hulin</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec23.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td>11/18 B</td>
-<td style="text-align:left">Cloud Computing: Information leakage in 3rd party cloud [51]</td>
-<td style="text-align:left">Yangchun Fu</td>
-<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/fall2011/lec24.pdf" target="_blank" rel="external">pdf</a></td>
-</tr>
-<tr>
-<td>11/25</td>
-<td style="text-align:left">Thanksgiving Hollidays. No Class</td>
-</tr>
-<tr>
-<td>**Hands on Challenge: Participating UCSB iCTF</td>
-<td style="text-align:left"><a href="http://ictf.cs.ucsb.edu/**" target="_blank" rel="external">http://ictf.cs.ucsb.edu/**</a></td>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
-<td></td>
-</tr>
-<tr>
-<td>12/02 A</td>
-<td style="text-align:left">UCSB iCTF (10AM - 7PM)</td>
-<td style="text-align:left">ECSS 4.619    </td>
-</tr>
-<tr>
-<td>12/02 B</td>
-<td style="text-align:left">UCSB iCTF (10AM - 7PM)</td>
-<td style="text-align:left">ECSS 4.619    </td>
-</tr>
-<tr>
-<td><strong>Project Presentation</strong></td>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
-</tr>
-<tr>
-<td>12/09 A</td>
-<td style="text-align:left">Project Presentation</td>
-<td style="text-align:left">Adair, Fu, Hand, Hill, Hulin, McDaniel    </td>
-</tr>
-<tr>
-<td>12/09 B</td>
-<td style="text-align:left">Project Presentation</td>
-<td style="text-align:left">Talkington, Quitugua, Weaver, Zeng</td>
-</tr>
-</tbody>
-</table>
-<h3 id="阅读列表"><a href="#阅读列表" class="headerlink" title="阅读列表"></a>阅读列表</h3><p>We do not have a text book, but we have the following reading list. Students are requied to read all of these papers (at least of their choosing) and encouraged to submit their summary on each paper.</p>
-<p>[1] Z. Lin, X. Zhang, and D. Xu. “Automatic Reverse Engineering of Data Structures from Binary Execution,” In NDSS 2010</p>
-<p>[2] J. Lee, T. Avgerinos, and D. Brumley. “TIE: Principled Reverse Engineering of Types in Binary Programs,” In NDSS 2011</p>
-<p>[3] A. Slowinska, T. Stancescu, and H. Bos. “Howard: A Dynamic Excavator for Reverse Engineering Data Structures,” In NDSS 2011</p>
-<p>[4] T. Zimmermann and A. Zeller. “Visualizing memory graphs,” In Revised Lectures on Software Visualization, International Seminar, 2002</p>
-<p>[5] Mission Critical Linux – Crash Core Analysis Suite <a href="http://mclx.com/projects/crash/" target="_blank" rel="external">http://mclx.com/projects/crash/</a></p>
-<p>[6] Charlie Miller, Juan Caballero, Noah M. Johnson, Min Gyung Kang, Stephen McCamant, Pongsin Poosankam, and Dawn Song. “Crash Analysis with Bitblaze,” In Blackhat 2010</p>
-<p>[7] Shuo Chen, Jun Xu, Nithin Nakka, Zbigniew Kalbarczyk, and Ravishankar K. Iyer, “Defeating Memory Corruption Attacks via Pointer Taintedness Detection,” In DSN 2005</p>
-<p>[8] Shuo Chen, Jun Xu, Emre C. Sezer, Prachi Gauriar, and Ravishankar K. Iyer, “Non-Control-Data Attacks Are Realistic Threats,” In USENIX Security 2005</p>
-<p>[9] Miguel Castro, Manuel Costa, and Tim Harris. “Securing software by enforcing data-flow integrity,” In OSDI 2006</p>
-<p>[10] Z. Lin, X. Zhang, D.Xu, and X. Jiang. “SigGraph: Brute Force Scanning of Kernel Data Structure Instances Using Graph-based Signatures,” In NDSS 2011</p>
-<p>[11] M. Carbone, W. Cui, L. Lu, W. Lee, M. Peinado, and X. Jiang. “Mapping kernel objects to enable systematic integrity checking,” In CCS 2009</p>
-<p>[12] W. Cui, J. Kannan, and H. J. Wang. “Discoverer: Automatic protocol reverse engineering from network traces,” In USENIX Security 2007</p>
-<p>[13] J. Caballero and D. Song. “Polyglot: Automatic extraction of protocol format using dynamic binary analysis,” In CCS 2007</p>
-<p>[14] Z. Lin, X. Jiang, D. Xu, and X. Zhang. “Automatic protocol format reverse engineering through context-aware monitored execution,” In NDSS 2008</p>
-<p>[15] G. Wondracek, P. M. Comparetti, C. Kruegel, and E. Kirda. “Automatic Network Protocol Analysis,” In NDSS 2008</p>
-<p>[16] “A Road Map for Digital Forensic Research,” Report From the First Digital Forensic Research Workshop (DFRWS). 2001</p>
-<p>[17] Simson L. Garfinkel. “Digital forensics research: The next 10 years”. In DFRWS 2010</p>
-<p>[18] Metadata Extraction Tool, <a href="http://meta-extractor.sourceforge.net/" target="_blank" rel="external">http://meta-extractor.sourceforge.net/</a></p>
-<p>[19] Hachoir <a href="https://bitbucket.org/haypo/hachoir/wiki/Home" target="_blank" rel="external">https://bitbucket.org/haypo/hachoir/wiki/Home</a></p>
-<p>[20] Sleuthkit <a href="http://www.sleuthkit.org/" target="_blank" rel="external">http://www.sleuthkit.org/</a></p>
-<p>[21] Mikus, Nicholas A. “An analysis of disc carving techniques,” MS Thesis. Naval Postgraduate School, 2006</p>
-<p>[22] Golden G. Richard and Vassil Roussev. “Scalpel: A Frugal, High Performance File Carver,” In DFRWS 2005</p>
-<p>[23] Anandabrata Pal and Nasir Memon. “The Evolution of File Carving,” IEEE Signal Processing Magazine, Vol26(2) March 2009</p>
-<p>[24] Vrizlynn L.L. Thing, Kian-Yong Ng, Ee-Chien Chang. “Live memory forensics of mobile phones,” In DFRWS 2010</p>
-<p>[25] Guidelines on Cell Phone Forensics (NIST SP 800-101), May 2007</p>
-<p>[26] Cell Phone Forensic Tools: An Overview and Analysis (NISTIR 7250)</p>
-<p>[27] PDA Forensic Tools: An Overview and Analysis (NISTIR 7100)</p>
-<p>[28] R Ahmed. “Mobile forensics: an overview, tools, future trends and challenges from law enforcement perspective”. 6th International Conference on E-Governance. 2008</p>
-<p>[29] <a href="http://en.wikipedia.org/wiki/Network_forensics" target="_blank" rel="external">http://en.wikipedia.org/wiki/Network_forensics</a></p>
-<p>[30] Hitesh Ballani, Paul Francis, and Xinyang Zhang. “A study of prefix hijacking and interception in the internet,” In SIGCOMM 2007</p>
-<p>[31] Techniques in OS-Fingerprinting, <a href="http://nostromo.joeh.org/osf.pdf" target="_blank" rel="external">http://nostromo.joeh.org/osf.pdf</a></p>
-<p>[32] J. Halderman, S. Schoen, N. Heninger, W. Clarkson, W. Paul, J. Calandrino, A. Feldman, J. Appelbaum, E. Felton. “Lest We Remember: Cold Boot Attacks on Encryption Keys,” In USENIX Security 2008</p>
-<p>[33] Carsten Maartmann-Moe, Steffen E. Thorkildsen, Andre Arnes. “The persistence of memory: Forensic identification and extraction of cryptographic keys,” In DFRWS 2009</p>
-<p>[34] Andreas Schuster. “Searching for Processes and Threads in Microsoft Windows Memory Dumps,” In DFRWS 2006</p>
-<p>[35] Ali Reza Arasteh and Mourad Debbabi. “Forensic Memory Analysis: From Stack and Code to Execution History,” In DFRWS 2007</p>
-<p>[36] Mariusz Burdach. “Finding Digital Evidence In Physical Memory,” In Black Hat Federal 2008</p>
-<p>[37] Brendan Dolan-Gavitt. “Forensic Analysis of the Windows Registry in Memory,” In DFRWS 2008</p>
-<p>[38] Andreas Schuster. “The impact of Microsoft Windows pool allocation strategies on memory forensics,” In DFRWS 2008</p>
-<p>[39] Aaron J. Burstein, “Toward a Culture of Cybersecurity Research,” UC Berkeley Public Law Research Paper No. 1113014, 2008</p>
-<p>[40] A. Cozzie, F. Stratton, H. Xue, and S. T. Kin. “Digging for Data Structures,” In OSDI 2008</p>
-<p>[41]Fang Yu, Muath Alkhalaf, Tevfik Bultan. “Stranger: An Automata-based String Analysis Tool for PHP.” [Tool paper <a href="http://www.cs.ucsb.edu/~vlab/stranger/" target="_blank" rel="external">http://www.cs.ucsb.edu/~vlab/stranger/</a>]. In TACAS 2010</p>
-<p>[42] Mihai Christodorescu, Nicholas Kidd, and Wen-Han Goh. “String analysis for x86 binaries,” In PASTE 2005</p>
-<p>[43] Michael D. Ernst, Jeff H. Perkins, Philip J. Guo, Stephen McCamant, Carlos Pacheco, Matthew S. Tschantz, and Chen Xiao. “The Daikon system for dynamic detection of likely invariants,” Science of Computer Programming, 2007</p>
-<p>[44] Michael D. Ernst, Jake Cockrell, William G. Griswold, and David Notkin. “Dynamically discovering likely program invariants to support program evolution,” IEEE Transactions on Software Engineering, 27(2) 2001</p>
-<p>[45] Y. Jhi, X. Wang, X. Jia, S. Zhu, P. Liu, and D. Wu. “Value-Based Program Characterization and Its Application to Software Plagiarism Detection,” In ICSE 2011</p>
-<p>[46] Junghwan Rhee, Ryan Riley, Dongyan Xu, and Xuxian Jiang. “Kernel malware analysis with un-tampered and temporal views of dynamic kernel memory. In RAID 2010</p>
-<p>[47] A. Baliga, V. Ganapathy, and L. Iftode. “Automatic inferenceand enforcement of kernel data structure invariants,” In ACSAC 2008</p>
-<p>[48] An architecture for specification-based detection of semantic integrity violations in kernel dynamic data. In USENIX Security 2006</p>
-<p>[49] Copilot - a coprocessor-based kernel runtime integrity monitor. In USENIX Security 2004</p>
-<p>[50] E. Bursztein, J. Lagarenne, M. Hamburg, D. Boneh. “OpenConflict: Preventing Real Time Map Hacks in Online Games,” In IEEE S&amp;P (Oakland) 2011</p>
-<p>[51] Thomas Ristenpart, Eran Tromer, Hovav Shacham, Stefan Savage. “Hey, You, Get Off of My Cloud! Exploring Information Leakage in Third-Party Compute Clouds,” In CCS 2009</p>
-<p>[52] B. Dolan-Gavitt, A. Srivastava, P. Traynor, and J. Giffin. “Robust signatures for kernel data structures,” In CCS 2009</p>
-<p>[53] Zhi Wang, Xuxian Jiang, Weidong Cui, Xinyuan Wang. “Countering Persistent Kernel Rootkits Through Systematic Hook Discovery”. In RAID 2008</p>
-<p>[54] Zhi Wang, Xuxian Jiang, Weidong Cui, and Peng Ning. “Countering Kernel Rootkits with Lightweight Hook Protection”. In CCS 2009</p>
-<p>[55] Heng Yin, Pongsin Poosankam, Steve Hanna, and Dawn song. “HookScout: Proactive and Binary-Centric Hook Detection”. In DIMVA 2010</p>
-<p>[56] Zhiqiang Lin, Ryan Riley, and Dongyan Xu. “Polymorphing Software by Randomizing Data Structure Layout”. In DIMVA 2009</p>
-<p>[57] Edward J. Schwartz, Thanassis Avgerinos, and David Brumley. “Q: Exploit Hardening Made Easy “. In USENIX Security 2011</p>
-<p>[58] Giampaolo Fresi Roglia, Lorenzo Martignoni, Roberto Paleari, Danilo Bruschi “Surgically Returning to Randomized lib(c)”. In ACSAC 2009</p>
-<p>[59] Steven Gianvecchio, Zhenyu Wu, Mengjun Xie, and Haining Wang, “Battle of Botcraft: Fighting Bots in Online Games with Human Observational Proofs”. In ACM CCS 2009</p>
-<p>[60] D. Bethea, R. A. Cochran and M. K. Reiter, “Server-side verification of client behavior in online games”. In NDSS 2010</p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：<a href="http://www.csyssec.org/20170306/course-zhiqianglin1/" target="_blank" rel="external">《名人课堂-高级数字取证与数据逆向工程》</a>与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/名人课堂/">名人课堂<span class="article-category-count">5</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Course/">Course</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Forensics/">Forensics</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/RE/">RE</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-drakvuf"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170302/drakvuf/">虚拟机监控-DRAKVUF</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170302/drakvuf/" class="article-date">
-	  <time datetime="2017-03-02T08:56:54.000Z" itemprop="datePublished">三月 2, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p> <strong>[译文]</strong> 来源：<a href="https://drakvuf.com/" target="_blank" rel="external">https://drakvuf.com/</a> </p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170302/drakvuf/" target="_blank" rel="external">虚拟机监控-DRAKVUF</a>》</p>
-<hr>
-<h3 id="介绍"><a href="#介绍" class="headerlink" title="介绍"></a>介绍</h3><p>DRAKVUF是一款无 Agent 的恶意软件动态分析系统，它基于Xen、LibVMI、Volatility、Rekall。它能深度追踪病毒样本，从内存中提取被删除的文件，并且无需在虚拟机里安装别的分析软件。</p>
-<h3 id="硬件要求"><a href="#硬件要求" class="headerlink" title="硬件要求"></a>硬件要求</h3><p>DRAKVUF使用Intel CPU 中的硬件虚拟化扩展技术。你需要支持虚拟化(VT-x)和EPT(ExtendedPage Tables)的Intel CPU。DRAKVUF不能在其他CPU上运行(如AMD)或者不支持虚拟化扩展的CPU。</p>
-<h3 id="支持系统"><a href="#支持系统" class="headerlink" title="支持系统"></a>支持系统</h3><p>DRAKVUF目前支持Windows 7，32位和64位系统演示使用DRAKVUF追踪Windows内部内核函数，包括堆分配。</p>
-<p><a href="https://www.youtube.com/watch?v=ZJPHfpDiN4o" target="_blank" rel="external">DRAKVUF追踪Windows内部内核函数</a></p>
-<p>这个演示展示的是DRAKVUF中的进程注入组件，它能够在客机中执行任意可执行文件，不需要任何在客机中安装的帮助程序。演示中我们劫持了Windows任务管理器来执行我们的任务。</p>
-<p><a href="https://www.youtube.com/watch?v=0Dk5RehrA-Q" target="_blank" rel="external">劫持了Windows任务管理器</a></p>
-<p>从内存中提取被删除的文件。很多病毒droppes的文件只会出现在内存中，不会在硬盘出现。</p>
-<p><a href="https://www.youtube.com/watch?v=sOmD9tDU3lM" target="_blank" rel="external">从内存中提取被删除的文件</a></p>
-<h3 id="报告展示"><a href="#报告展示" class="headerlink" title="报告展示"></a>报告展示</h3><p><a href="http://www.slideshare.net/slideshow/embed_code/key/72sSuElfARSGhI" target="_blank" rel="external">这是</a>2014年年度计算机安全应用会议(ACSAC)的展示</p>
-<p>这是2014年在Hacktivity上的<a href="https://www.youtube.com/watch?v=EZPXy314q3E" target="_blank" rel="external">展示</a></p>
-<h3 id="目前状态"><a href="#目前状态" class="headerlink" title="目前状态"></a>目前状态</h3><p>目前有以下的核心功能：</p>
-<pre><code>无Agent执行恶意软件
-无Agent监控Windows内部内核函数
-客机多vCPU支持
-追踪堆分配
-追踪被访问的文件
-在文件被删除前从内存中提取文件
-通过写时拷贝内存和硬盘来克隆分析虚拟机
-</code></pre><p>注意DRAKVUF仍在早期开发阶段，因此缺少其他恶意软件分析器具备的功能。还有很多的提升空间，例如：</p>
-<pre><code>生成JSON/MySQL/MongoDB的结构化的日志
-将提取的文件自动提交到VirusTotal
-Linux支持
-使用Run-time重复数据删除技术删除Xen共享内存中未使用的内存
-整合恶意软件分析功能，如[CRITS](https://crits.github.io/)
-</code></pre><h3 id="安装指导"><a href="#安装指导" class="headerlink" title="安装指导"></a>安装指导</h3><p>12/31/2015更新</p>
-<p>如果安装了旧版本的DRAKVUF，阅读指导打开系统中的Xen altp2m！</p>
-<p>要在基于Debian 的Linux上buildXen和DRAKVUF就需要安装以下的包。以下内容在Debian Jessie和Ubuntu14.04 LTS上测试通过。</p>
-<pre><code>sudo apt-get install wget git bcc bin86 gawk bridge-utilsiproute libcurl3 libcurl4-openssl-dev bzip2 module-init-tools pciutils-devbuild-essential make gcc clang libc6-dev libc6-dev-i386 linux-libc-devzlib1g-dev python python-dev python-twisted python-gevent python-setuptoolslibncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-deve2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlibxz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev cabextractlibglib2.0-dev autoconf automake libtool check libjson-c-dev libfuse-devlibsystemd-daemon-dev
-</code></pre><p>你可以从repository安装Xen，但是我们还是建议用源码build。</p>
-<pre><code>wget http://bits.xensource.com/oss-xen/release/4.6.1/xen-4.6.1.tar.gz 
-wget http://bits.xensource.com/oss-xen/release/4.6.1/xen-4.6.1.tar.gz.sig
-gpg --keyserver pgp.mit.edu --recv-keys 0x83fe14c957e82bd9
-gpg --verify xen-4.6.1.tar.gz.sig
-</code></pre><p>安装Xen dom0，分配4GB RAM和两个专用的CPU内核：</p>
-<pre><code>sudo su make -j4 install-xen make -j4 install-tools
-echo&quot;GRUB_CMDLINE_XEN_DEFAULT=\&quot;dom0_mem=4096M,max:4096M dom0_max_vcpus=4dom0_vcpus_pin=true hap_1gb=false hap_2mb=false altp2m=1\&quot;&quot; &gt;&gt;/etc/default/grub
-echo &quot;/usr/local/lib&quot; &gt;/etc/ld.so.conf.d/xen.conf
-ldconfig
-update-grub
-echo &quot;none /proc/xen xenfs defaults,nofail 0 0&quot;&gt;&gt;         /etc/fstab
-echo &quot;xen-evtchn&quot; &gt;&gt; /etc/modules
-echo &quot;xen-privcmd&quot; &gt;&gt; /etc/modules
-update-rc.d xencommons defaults 19 18
-update-rc.d xendomains defaults 21 20
-update-rc.d xen-watchdog defaults 22 23
-reboot
-</code></pre><p>还要确保你的内核相对较新(版本大于3.8应该就行了)</p>
-<pre><code>uname -r
-</code></pre><p>进入Xen之后，验证一切是否正常：</p>
-<pre><code>sudo xen-detect
-</code></pre><p>输出的结果应该是：Running in PV context on Xen v4.6</p>
-<pre><code>xl list
-</code></pre><p>输出的结果应该类似于：</p>
-<pre><code>Name                                        ID   Mem VCPUs           State     Time(s)
-Domain-0                                     0  4096    2     r-----     614.0
-</code></pre><p>建立一个LVM卷组存档虚拟机磁盘，然后创建卷：</p>
-<pre><code>lvcreate -L20G -n windows7-sp1 vg
-</code></pre><p>用ISO安装Windows 7：</p>
-<pre><code>arch = &apos;x86_64&apos;
-name = &quot;windows7-sp1&quot;
-maxmem = 3000
-memory = 3000
-vcpus = 1
-maxcpus = 1
-builder = &quot;hvm&quot;
-boot = &quot;cd&quot;
-hap = 1
-acpi = 1
-on_poweroff = &quot;destroy&quot;
-on_reboot = &quot;destroy&quot;
-on_crash = &quot;destroy&quot;
-vnc=1
-vnclisten=&quot;0.0.0.0&quot;
-usb = 1
-usbdevice = &quot;tablet&quot;
-altp2mhvm = 1
-shadow_memory = 16
-vif =[&apos;type=ioemu,model=e1000,bridge=xenbr0,mac=00:06:5B:BA:7C:01&apos;]
-disk = [
- &apos;phy:/dev/vg/windows7-sp1,xvda,w&apos;,
- &apos;file:/path/to/your/windows7.iso,hdc:cdrom,r&apos;
-]
-</code></pre><p>下载LibVMI 的DRAKVUF分支，并准备build：</p>
-<pre><code>git clone -b drakvuf https://github.com/tklengyel/libvmi
-cd libvmi
-./autogen.sh
-./configure --enable-xen         --enable-xen-events--disable-address-cache
-</code></pre><p>输出的结果应该类似于：</p>
-<table>
-<thead>
-<tr>
-<th>Feature</th>
-<th>Option</th>
-<th>Reason</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Xen Support</td>
-<td>–enable-xen=yes</td>
-<td>yes</td>
-</tr>
-<tr>
-<td>Xen Events</td>
-<td>–enable-xen-events=yes</td>
-<td>yes</td>
-</tr>
-<tr>
-<td>KVM Support</td>
-<td>–enable-kvm=no</td>
-<td>libvirt missing</td>
-</tr>
-<tr>
-<td>File Support</td>
-<td>–enable-file=yes</td>
-<td>yes</td>
-</tr>
-<tr>
-<td>Shm-snapshot</td>
-<td>–enable-shm-snapshot=no</td>
-<td>no</td>
-</tr>
-<tr>
-<td>————-</td>
-<td>—————————</td>
-<td>—————————-</td>
-</tr>
-</tbody>
-</table>
-<table>
-<thead>
-<tr>
-<th>Tools</th>
-<th>Option</th>
-<th>Reason</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Examples</td>
-<td>–enable-examples=yes</td>
-<td>yes</td>
-</tr>
-<tr>
-<td>VMIFS</td>
-<td>–enable-vmifs=yes</td>
-<td>yes</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Extra features</strong><br>Support of Rekall profiles: yes</p>
-<p>Build并安装LibVMI：</p>
-<pre><code>make
-sudo make install
-echo &quot;exportLD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/usr/local/lib&quot; &gt;&gt; ~/.bashrc
-cd tools/pyvmi
-python setup.py build
-sudo python setup.py install
-cd ../../..
-</code></pre><p>下载Volatility：</p>
-<pre><code>git clone https://github.com/volatilityfoundation/volatility
-cd volatility
-cp ../libvmi/tools/pyvmi/pyvmiaddressspace.pyvolatility/plugins/addrspaces
-python setup.py build
-sudo python setup.py install
-cd ..
-</code></pre><p>下载Rekall并安装：</p>
-<pre><code>git clone --branch v1.4.1     https://github.com/google/rekall
-cd rekall/rekall-core
-python setup.py build
-sudo python setup.py install
-cd ../..
-</code></pre><p>接下来我们要为Windows域创建Rekall档案，首先我们要用LibVMI win-guid工具获得WIndows内核的调试信息。例如：</p>
-<pre><code>$ xl list
-Name             ID   Mem   VCPUs   State     Time(s)
-Domain-0         0    4024    4     r-----     848.8
-windows7-sp1-x86 7    3000    1     -b----      94.7
-$ win-guid name windows7-sp1-x86
-Windows Kernel found @ 0x2604000
-            Version:32-bit Windows 7
-            PEGUID: 4ce78a09412000
-            PDBGUID: 684da42a30cc450f81c535b4d18944b12
-            Kernelfilename: ntkrpamp.pdb
-            Multi-processorwith PAE (version 5.0 and higher)
-            Signature:17744.
-            Machine:332.
-            # ofsections: 22.
-            # ofsymbols: 0.
-            Timestamp:1290242569.
-            Characteristics:290.
-            Optionalheader size: 224.
-            Optionalheader type: 0x10b
-            Section1: .text
-            Section2: _PAGELK
-            Section3: POOLMI
-            Section4: POOLCODE
-            Section5: .data
-            Section6: ALMOSTRO
-            Section7: SPINLOCK
-            Section8: PAGE
-            Section9: PAGELK
-            Section10: PAGEKD
-            Section11: PAGEVRFY
-            Section12: PAGEHDLS
-            Section13: PAGEBGFX
-            Section14: PAGEVRFB
-            Section15: .edata
-            Section16: PAGEDATA
-            Section17: PAGEKDD
-            Section18: PAGEVRFC
-            Section19: PAGEVRFD
-            Section20: INIT
-            Section21: .rsrc
-            Section22: .reloc
-</code></pre><p>关键的地方：</p>
-<pre><code>PDB GUID: 684da42a30cc450f81c535b4d18944b12
-Kernel filename: ntkrpamp.pdb
-</code></pre><p>生成Rekall档案：</p>
-<pre><code>cd /tmp
-rekall fetch_pdb --pdb_filename ntkrpamp.pdb --guid684da42a30cc450f81c535b4d18944b12
-rekall parse_pdb ntkrpamp.pdb &gt; windows7-sp1.rekall.json
-sudo mv windows7-sp1.rekall.json /root
-</code></pre><p>档案生成后我们可以创建LibVMI config：</p>
-<pre><code>sudo su
-printf &quot;windows7-sp1 { \n\
-ostype =\&quot;Windows\&quot;; \n\
-sysmap =\&quot;/root/windows7-sp1.rekall.json\&quot;; \n\
-}&quot; &gt; /etc/libvmi.conf
-</code></pre><p>用进程列表查看LibVMI是否在运行</p>
-<pre><code>process-list windows7-sp1
-</code></pre><p>输出结果应该类似于：</p>
-<pre><code>Process listing for VM windows7-sp1-x86 (id=7)
-[    4] System (structaddr:84aba980)
-[  220] smss.exe(struct addr:85a44020)
-[  300] csrss.exe(struct addr:85f67a68)
-[  336] wininit.exe(struct addr:8601e030)
-[  348] csrss.exe(struct addr:84ba4030)
-[  384] winlogon.exe(struct addr:85966d40)
-[  444] services.exe(struct addr:8614c030)
-[  460] lsass.exe(struct addr:86171030)
-[  468] lsm.exe(struct addr:8617b4f8)
-[  564] svchost.exe(struct addr:861d9bc8)
-[  628] svchost.exe(struct addr:863fb8a8)
-[  816] sppsvc.exe(struct addr:86426838)
-[  856] svchost.exe(struct addr:854abd40)
-[  880] svchost.exe(struct addr:854c5030)
-[  916] svchost.exe(struct addr:854d7a70)
-[ 1240] svchost.exe (struct addr:8614cb80)
-[ 1280] svchost.exe (struct addr:854f7d40)
-[ 1608] spoolsv.exe (struct addr:85578660)
-[ 1636] svchost.exe (struct addr:85554af0)
-[  792] SearchIndexer.(struct addr:8562ac08)
-[ 1128] taskhost.exe (struct addr:858d9d40)
-[ 1524] dwm.exe (struct addr:857f3a60)
-[ 1728] explorer.exe (struct addr:858d9180)
-[ 1720] regsvr32.exe (struct addr:8605f398)
-[  248] svchost.exe(struct addr:863ed030)
-[ 1024] svchost.exe (struct addr:86420390)
-[  256] WmiPrvSE.exe (structaddr:854014a0)
-</code></pre><p>开始build并安装DRAKVUF：</p>
-<pre><code>git clone https://github.com/tklengyel/drakvuf
-cd drakvuf
-autoreconf -vi
-./configure
-make
-</code></pre><p>追踪系统的执行：</p>
-<pre><code>./src/drakvuf -r &lt;rekall profile&gt; -d &lt;domid&gt;
-</code></pre><p>例如：</p>
-<pre><code>./src/drakvuf -r /root/windows7-sp1.rekall.json -d 7
-</code></pre><hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170302/drakvuf/" target="_blank" rel="external">虚拟机监控-DRAKVUF</a>》</p>
-<hr>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">10</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Introspection/">Introspection</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/XEN/">XEN</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-virtualization-overview"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170301/virtualization-overview/">虚拟化技术大观</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170301/virtualization-overview/" class="article-date">
-	  <time datetime="2017-03-01T09:19:42.000Z" itemprop="datePublished">三月 1, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者：<a href="http://ring0.me/2014/12/virtualization-overview/" target="_blank" rel="external">Bojie Li</a> 来源：<a href="http://ring0.me/2014/12/virtualization-overview/" target="_blank" rel="external">http://ring0.me/2014/12/virtualization-overview/</a></p>
-<hr>
-<p><strong>CSysSec注</strong>： 本文是一篇虚拟机技术的科普文，从虚拟化历史，到CPU虚拟化，内存虚拟化，设备虚拟化，操作系统虚拟化，以及Docker技术，循序渐进，全面有序。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170301/virtualization-overview/" target="_blank" rel="external">虚拟化技术大观</a>》</p>
-<hr>
-<p>虚拟化技术大家都不陌生，我们大都使用过诸如 VMWare、VirtualBox<br>的虚拟机软件。一些人认为，虚拟化技术是近几年跟着云计算的潮流才火起来的，十年前只是桌面用户测试其他操作系统的玩具。非也。只要计算机上同时运行着多个任务，就会有任务隔离的需求，虚拟化就是让每个任务看起来独占整个计算机、隔离任务之间影响的技术。早在计算机还是庞然大物的 20 世纪 60 年代，虚拟化技术就开始发展了。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview1.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview1.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<h3 id="IBM-7044-黑历史：硬件虚拟化"><a href="#IBM-7044-黑历史：硬件虚拟化" class="headerlink" title="IBM 7044  黑历史：硬件虚拟化"></a>IBM 7044  黑历史：硬件虚拟化</h3><p>1964 年的 IBM M44/44X 被认为是世界上第一个支持虚拟化的系统。它采用专门的硬件和软件，能够在一台物理机器上虚拟多个当时流行的 IBM 7044 大型机。它使用的虚拟化方法是非常原始的：像分时系统一样，在每个时间片，一个 IBM 7044 大型机独占所有硬件资源来运行。</p>
-<p>值得一提的是，这个研究用的原型系统不仅开启了虚拟化技术的时代，也提出了 “分页” 这样一个重要的概念（因为每个虚拟机需要使用虚拟地址，这就需要一层虚拟地址到物理地址的映射）。</p>
-<p>在那个 “进程” 概念尚未被发明的年代，多任务操作系统和虚拟化技术事实上是难以分开的，因为 “虚拟机” 就是一个任务，而且当时还没有 Intel x86 这种霸主地位的体系结构，各家的大型机各自为政，也谈不上兼容别家的体系结构。这种 “任务级” 或者说 “进程级” 虚拟化，从概念上延续到今天，就是以 LXC 和 OpenVZ 为代表的操作系统级虚拟化。</p>
-<p>这种主要依赖定制的硬件来实现虚拟化的技术，史称 “硬件虚拟化”。在这个什么都要 “软件定义” 的时代，大型机已经日薄西山，大部分依赖硬件的虚拟化也进了历史博物馆。今天我们看到的虚拟化技术，大多是软件为主，硬件为辅。下图所示的划分没有严格的界限，而且一种虚拟化解决方案可能同时使用了下图中的多种技术，因此不要在意这些细节啦~</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview2.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview2.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<h3 id="从模拟执行到二进制翻译"><a href="#从模拟执行到二进制翻译" class="headerlink" title="从模拟执行到二进制翻译"></a>从模拟执行到二进制翻译</h3><p>前面提到大型机时代各大厂商各有各的体系结构和指令集，为什么没有出现各种指令集之间的翻译软件呢？须知，思科就是靠兼容各家网络设备和协议起家的（这里面还有八卦，创办思科的那对小情侣希望使用计算机网络传递情书，但网络设备五花八门的，于是他们就发明了兼容多种协议的路由器）。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview3.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview3.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>在网络协议之间翻译和在指令集之间翻译，都是机械、冗长、繁琐的事情，能把它做对，考虑到各种边角情况，是需要无比天才和细心的事情。指令集比网络协议麻烦的地方是，指令的边界（哪里是第一条指令，哪里是最后一条指令）未知，可能执行特权操作（如重启），还能把动态生成的数据作为代码来执行（冯·诺依曼体系结构中，数据和代码共享线性内存空间）。因此，在二进制代码运行之前就做好指令集之间的静态翻译，是不可能的。</p>
-<p>最简单粗暴的解决方法是 “模拟执行”。开一个大数组当 “虚拟机” 的内存，拿来指令集手册，写一个无数个 case 的 switch 语句，判断当前要执行的是什么指令，按照手册的说法模拟执行。这样做自然是可行的，但效率就不敢恭维了，虚拟机至少比物理机慢一个数量级。所谓的 “动态类型语言”，如 Python、PHP、Ruby，在编译成中间代码后，大多也是用这种 “模拟执行” 的方法，因此快不起来。著名的 x86 模拟器 Bochs 就是模拟执行的，虽然慢，但兼容性好，而且不容易有安全漏洞。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview4.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview4.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>不能因为指令翻译难做就因噎废食，一个运行 1 亿次的 for 循环，里面如果都是加加减减一类的操作，翻译成机器码直接执行，肯定比模拟执行要快。在二进制翻译前面，要加上 “动态” 两个字，也就是在程序执行的过程中，能翻译的部分翻译成目标架构的机器码直接执行（并缓存起来以便重复利用），不能翻译的部分就陷入到模拟器里，模拟执行特权指令，再对后面的代码进行翻译。如今 Java、.NET、JavaScript 等使用的 JIT（Just-In-Time）技术也是类似的套路。</p>
-<p>有人会问，如果我只是虚拟相同的体系结构，比如在 64 位 x86 系统上虚拟一个 64 位 x86 系统，需要做指令翻译吗？需要的。比如，虚拟机可能读取特权寄存器 GDT、LDT、IDT 和 TR，并不会触发处理器异常（即虚拟机管理器无法捕获到这样的行为），但这些特权寄存器的值又是需要对虚拟机 “伪造”<br>的。这就需要在虚拟机读取特权寄存器的指令执行之前，把它替换成调用虚拟机管理器的指令。</p>
-<p>遗憾的是，在大型机年代，能把动态二进制翻译这件事做好的天才级人物 Fabrice Bellard 才刚刚出生（1972 年）。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview5.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview5.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>Fabrice Bellard 的 QEMU（Quick EMUlator）是目前最流行的采用动态二进制翻译技术的虚拟化软件。它可以模拟 x86、x86_64、ARM、MIPS、SPARC、<br>PowerPC 等多种处理器架构，无修改地运行这些架构上的操作系统。当我们享受视听的乐趣，当我们流畅地运行各种架构的虚拟机系统时，不应忘记 ffmpeg 和 qemu 的创造者 Fabrice Bellard 大神。</p>
-<p>以我们最熟悉的 Intel x86 架构为例，分为四个特权级 0~3。一般情况下，操作系统内核（特权代码）运行在 ring 0（最高特权级），而用户进程（非特权代码）运行在 ring 3（最低特权级）。（即使你是 root，你的进程也在 ring 3！只有进了内核才是 ring 0，无上的权力意味着巨大的责任，内核编程的限制很多，吐槽一下）</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview6.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview6.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>使用了虚拟机之后，虚拟机（Guest OS）运行在 ring 1，主机操作系统（VMM，Virtual Machine Monitor）运行在 ring 0。比如在 Windows 上装个 Linux 虚拟机，Windows 内核运行在 ring 0，而被虚拟的 Linux 内核运行在 ring 1，Linux 系统里的应用程序则运行在 ring 3。</p>
-<p>当虚拟机系统需要执行特权指令时，虚拟机管理器（VMM）就会立即捕<br>获它（谁让 ring 0 比 ring 1的特权级高呢！）并模拟执行这条特权指令，再返回到虚拟机系统。为了提高系统调用、中断处理的性能，有时会利用动态二进制翻译的技术，在运行前把这些特权指令替换成调用虚拟机管理器 API 的指令。如果所有特权指令都模拟得天衣无缝，虚拟机系统就像运行在物理机器上一样，完全不能发现自己运行在虚拟机里。（当然，事实上还是有一些破绽的）</p>
-<p>请虚拟机系统和 CPU 来帮忙，动态二进制翻译虽然比模拟执行快了很多，但由于每条特权指令都要到虚拟机管理器里绕一圈（模拟执行），离物理机的性能仍然有不小的差距。要让虚拟机快起来，人们想到两种方法：</p>
-<ul>
-<li>让虚拟机操作系统帮忙，所谓 “半虚拟化”（paravirtualization）或 OS-assisted virtualization</li>
-<li>让 CPU 帮忙，所谓 “硬件辅助虚拟化”（hardware-assisted virtualization）<br>这两种方法不是互斥的。现代的很多虚拟化解决方案，如 Xen、VMware，都同时使用了两种方法。</li>
-</ul>
-<h3 id="半虚拟化（paravirtualization）"><a href="#半虚拟化（paravirtualization）" class="headerlink" title="半虚拟化（paravirtualization）"></a>半虚拟化（paravirtualization）</h3><p>既然动态二进制翻译的难点和性能瓶颈在于模拟执行那些杂七杂八的特权指令，我们能不能修改虚拟机系统的内核，把那些特权指令改得好看些？毕竟在多数情况下，我们并不需要对虚拟机刻意 “隐瞒” 虚拟化层的存在，而是要在虚拟机之间提供必要的隔离，同时又不造成太多性能开销。</p>
-<p>Paravirtualization 这个单词的前缀是 para-，即 “with” “alongside” 之意。也就是虚拟机系统与虚拟化层（主机系统）不再是严格的上下级关系，而是互信合作的关系，虚拟化层要在一定程度上信任虚拟机系统。在 x86 架构中，虚拟化层（Virtualization Layer）和虚拟机系统的内核（Guest OS）都运行在 ring 0。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview7.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview7.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>虚拟机系统的内核需要经过特殊修改，把特权指令改成对虚拟化层 API 的调用。在现代操作系统中，由于这些体系结构相关的特权操作都被封装起来了（例如 Linux 内核源码中的 arch/ 目录），比起二进制翻译需要考虑各种边角情况，这种对虚拟机内核源码的修改就简单一些了。</p>
-<p>相比使用二进制翻译的全虚拟化（full virtualization），半虚拟化是牺牲了通用性来换取性能，因为任何操作系统都可以无修改地运行在全虚拟化平台上，而每个半虚拟化的操作系统内核都要经过人肉修改。</p>
-<h3 id="硬件辅助的虚拟化"><a href="#硬件辅助的虚拟化" class="headerlink" title="硬件辅助的虚拟化"></a>硬件辅助的虚拟化</h3><p>同样的功能，专用硬件实现几乎总是比软件实现更快，几乎是一条金科玉律了。在虚拟化这件事上，比尔搞不定的事情，自然也要请安迪来帮忙。（比尔是微软公司创始人，安迪是 Intel 公司创始人）</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview8.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview8.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>让硬件帮助软件实现虚拟化的概念也不是新东西了。早在 1974 年，著名论文 Formal requirements for virtualizable third generation architectures 就提出了可虚拟化体系结构的三个基本条件：</p>
-<ul>
-<li>虚拟机管理器提供了与真实机器一模一样的虚拟环境；</li>
-<li>运行在虚拟机里的程序在最坏情况下也比物理机慢得不多；</li>
-<li>虚拟机管理器能够完全控制所有的系统资源。<ul>
-<li>虚拟机里的程序不能访问未分配给它的资源</li>
-<li>在某些情况下，虚拟机管理器能够收回已经分配给虚拟机的资源</li>
-</ul>
-</li>
-</ul>
-<p>早期的 x86 指令集不满足上述条件，因此需要虚拟机管理器做复杂的动态二进制翻译。既然二进制翻译的主要开销在 “捕获” 虚拟机系统的特权指令上，CPU 能做的事就是帮忙把 “捕获” 的事情给做了。Intel 家的解决方案叫做 Virtual Machine Control Structures (VT-x)，于 2005 年冬天推出；AMD 也不甘人后，随后推出了类似的 Virtual Machine Control Blocks (AMD-V)。</p>
-<p>Intel 在原有的四个特权级基础上，增加了一个专供虚拟机管理器（VMM）使用的 “Root Mode”。这就好像是天不怕地不怕的孙悟空（ring 0）逃不出如来佛（Root Mode）的手掌心。这样，虚拟机系统尽管运行在 ring 0，其执行的特权指令仍然会被 CPU 自动捕获（触发异常），陷入到 Root Mode 的虚拟机管理器里，处理后再使用 VMLAUNCH 或 VMRESUME 指令返回到虚拟机系统。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview9.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview9.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-
-<p>为了方便半虚拟化（paravirtualization）中用 API 调用替代 CPU 异常捕获，Intel 还提供了从虚拟机（Non-root Mode）到虚拟机管理器（Root Mode）的 “系统调用”：VMCALL 指令。</p>
-<p>看起来很美好，不是吗？事实上，对刚刚开始支持硬件辅助虚拟化的<br>CPU，使用这个方式未必比动态二进制翻译性能高。因为硬件辅助虚拟化模式对每条特权指令，需要切换到 Root Mode，处理完后再返回，这个模式切换就像实模式和保护模式切换一样，需要初始化很多寄存器，还要保存和恢复现场，更不用说对TLB、高速缓存的影响了。不过，Intel 和 AMD 的工程师也不是吃白饭的，在较新的 CPU 里，硬件辅助虚拟化的性能开销已经比动态二进制翻译做得更好了。</p>
-<p>最后说点实用的：在大多数 BIOS 里，硬件辅助虚拟化都是有开关选项的。只有使能了 Intel Virtualization Technology 这样的选项，虚拟机管理器才能用上硬件加速。因此在使用虚拟机的时候，不要忘了进 BIOS 检查一下。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview10.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview10.png" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>CPU 虚拟化不是一切前面说了这么多，给大家一种假象：只要虚拟了 CPU 指令就万事大吉了。CPU 固然是计算机的大脑，但计算机的其他组件也不容忽略。这些组件包括与 CPU 朝夕共处的内存和硬盘、显卡、网卡等形形<em>*</em>的外设。</p>
-<h3 id="内存虚拟化"><a href="#内存虚拟化" class="headerlink" title="内存虚拟化"></a>内存虚拟化</h3><p>前面讲虚拟化的鼻祖 IBM M44/44X 的时候，提到它提出了 “分页”<br>的概念。也就是每个任务（虚拟机）似乎独占所有内存空间，分页机制负责把不同任务的内存地址映射到物理内存。如果物理内存不够了，操作系统就会把不常用的任务的内存交换到磁盘之类的外部存储，等那个不常用任务需要执行时再加载回来（当然，这种机制是后来才发明的）。这样，程序的开发者就不需要考虑物理内存空间有多大，也不需要考虑不同任务的内存地址是否会冲突。</p>
-<p>现在我们用的计算机都有分页机制，应用程序（用户态进程）看到的是一片广阔无涯的虚拟内存（Virtual Memory），似乎整台机器都被自己独占；操作系统负责设置用户态进程的虚拟内存到物理内存的映射关系（如下图 VM1<br>框内所示）；CPU 中的 MMU（Memory Management Unit）负责在用户态程序运行时，通过查询映射关系（所谓的页表），把指令中的虚拟地址翻译成物理地址。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview11.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview11.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>有了虚拟机，事情就麻烦了一层。虚拟机之间要隔离，虚拟机的操作系统也就不能直接看到物理内存。上图中的红色部分即 “机器内存”（MA）由虚拟化层负责管理，而虚拟机看到的 “物理内存”（PA）事实上是被虚拟化的，也就是形成了两级地址映射关系。</p>
-<p>在Intel 的 Nehalem 架构之前（感谢 jonathan 指正），内存管理器（MMU）只知道按照经典的分段、分页机制来进行内存寻址，不知道虚拟化层的存在。虚拟化层需要负责把两级地址映射 “压缩”<br>成一级映射，如上图红色箭头所示。虚拟化层的做法是：</p>
-<ul>
-<li>当切换到一台虚拟机时，就用这台虚拟机的内存映射关系（页表）作为物理机的页表；</li>
-<li>如果虚拟机操作系统试图修改指向页表的 CR3 寄存器（如在进程间切换页表），会被替换成对 “影子页表” 内存地址的访问（通过动态二进制翻译，或者在硬件辅助虚拟化方案中，触发异常后陷入虚拟化层）；</li>
-<li>如果虚拟机操作系统试图修改页表的内容，例如将一块新的物理内存（PA）映射到一个进程的虚拟内存（VA），虚拟化层需要将其截获，为物理地址（PA）在机器内存（MA）中分配空间，并将 “影子页表” 中的虚拟内存（VA）映射到机器内存（MA）；</li>
-<li>如果虚拟机访问一个页面时它被换出到外部存储了，就会触发缺页异常，虚拟化层要负责把缺页异常分发到该虚拟机的操作系统。</li>
-</ul>
-<p>每个对页表的操作都从虚拟化层那里绕一圈是不小的开销。作为硬件辅助虚拟化的一部分，Intel 从 Nehalem 架构开始引入了 EPT (Extent Page Table) 技术，AMD 也引入了 NPT (Nest Page Table)，让内存管理单元（MMU）支持二级内存翻译（Second Level Address Translation，SLAT）：给虚拟化层提供另一套页表，首先根据虚拟地址（VA）查原来的页表得到物理地址（PA），再查新的页表得到机器地址（MA）。这样就不再需要 “影子页表” 了。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview12.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview12.png" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>有人也许会担心增加的一级映射关系会减慢内存访问速度，事实上不论是否启用二级内存翻译（SLAT），页表高速缓存（Translation Lookaside Buffer，TLB）都会存储虚拟地址（VA）到机器地址（MA）的映射。如果 TLB 的命中率较高，则增加的一级内存翻译不会显著影响内存访问性能。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview13.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview13.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<h3 id="设备虚拟化"><a href="#设备虚拟化" class="headerlink" title="设备虚拟化"></a>设备虚拟化</h3><p>除了 CPU 和内存以外的组件，被统称为外设。CPU 与外设之间的通信就是 I/O 了。每台虚拟机需要有硬盘、网络，甚至显卡、鼠标、键盘、光驱等。如果大家使用过虚拟机，应该对这些配置不陌生。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview14.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview14.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<p><strong>Hyper-V 中的虚拟设备配置</strong></p>
-<ul>
-<li>虚拟设备，共享使用</li>
-<li>直接分配，独占访问</li>
-<li>在物理设备的辅助下，虚拟出多个 “小设备”</li>
-</ul>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview15.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview15.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>我们以网卡为例，看看上述三种设备虚拟化方式是怎样的：</p>
-<ul>
-<li>最经典的做法：<br>对每个虚拟机虚拟出一个与物理设备无关的网卡，虚拟机访问网卡时，就会陷入到虚拟机管理器（VMM）。这个虚拟网卡仿佛有 A/B 两面，A<br>面在虚拟机内，B 面在虚拟机管理器（主机）里。从 A 面发出的数据包会被送到 B 面，而从 B 面的发出的数据包会被送到 A<br>面。虚拟机管理器里有一个虚拟交换机，在各个虚拟机的 B 面以及物理网卡间进行转发。显然，纯软件实现的虚拟交换机是系统的性能瓶颈。</li>
-<li>最土豪的做法：<br>给每个虚拟机分配一个真实的物理网卡，把网卡的 PCI-E 地址空间映射到虚拟机内。当虚拟机访问该网卡的 PCI-E 地址空间时，如果 CPU 支持 I/O 虚拟化，CPU 中的 I/O MMU 就会把物理地址（PA）映射到机器地址（MA）；如果 CPU 不支持 I/O 虚拟化，就会触发异常并陷入虚拟机管理器，由虚拟机管理器软件完成从物理地址到机器地址的翻译，并发出真正的 PCI-E 请求。当 CPU 支持 I/O虚拟化时，虚拟机访问网卡不需要经过虚拟化层，性能是比较高的，但这需要每个虚拟机独占一块物理网卡，土豪才能玩得起。</li>
-<li>最时髦的做法：<br>物理网卡支持虚拟化，可以虚拟出多个 Virtual Function（VF），虚拟化管理器可以把每个 Virtual Function<br>分配给一个虚拟机，虚拟机里使用定制的驱动程序，就能看到一个独立的 PCI-E 设备。虚拟机访问网卡时也是通过 CPU 的 I/O MMU 直接进行地址翻译，不需要经过虚拟化层。物理网卡内部则有一个简单的交换机，能够在 Virtual Functions和外面连接的网线<br>之间做转发。这种方法可以用单块网卡实现高性能，但需要比较高端的网卡，需要 CPU 支持 I/O虚拟化，还需要虚拟机系统内使用定制的驱动程序。</li>
-</ul>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview16.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview16.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>I/O MMU 是让外设和虚拟机能够直接通信的硬件组件，绕过了虚拟机管理器（VMM），提高了 I/O 性能。Intel 的名字叫做 VT-d，而AMD 的名字叫做 AMD-Vi。它可以把设备寄存器和 DMA请求中的物理地址（PA）翻译成机器地址（MA），还可以把设备产生的中断分发到虚拟机里。</p>
-<p>又到了实用时间：跟硬件辅助虚拟化一样，I/O MMU 在 BIOS 里也是有开关的，别忘了打开哦~</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview17.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview17.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>设备虚拟化也有 “全虚拟化” 和 “半虚拟化” 之分。如果虚拟机系统里的驱动程序能够修改，就可以直接调用虚拟机管理器（VMM）的 API，减少模拟硬件设备的开销，这种修改虚拟机内的驱动程序来提高性能的行为就属于半虚拟化。</p>
-<p>通过在虚拟机系统里安装额外的驱动程序，还可以实现一些主机与虚拟机之间的交互（如共享剪贴板、拖动传文件）。这些驱动程序会在虚拟机系统中加载钩子，调用虚拟化管理器提供的 API 完成与主机系统的交互。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview18.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview18.png" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>在虚拟机里安装额外的驱动程序做个小结，大家可以去喝杯茶，回味一下：</p>
-<ul>
-<li>根据虚拟化管理器的实现方式，分为硬件虚拟化和软件虚拟化，硬件虚拟化已经退出历史舞台；</li>
-<li>根据虚拟机操作系统是否需要修改，分为全虚拟化（Full Virtualization）和半虚拟化（Paravirtualization）；</li>
-<li>根据如何处理特权指令，分为模拟执行（效率很低）、二进制翻译（QEMU）和硬件辅助的虚拟化（KVM 等）。</li>
-</ul>
-<h3 id="操作系统级虚拟化"><a href="#操作系统级虚拟化" class="headerlink" title="操作系统级虚拟化"></a>操作系统级虚拟化</h3><p>很多时候，我们并不是想在虚拟机里运行任意的操作系统，而是希望在不同的任务间实现一定程度的隔离。前面提到的虚拟化技术，每个虚拟机都是一个独立的操作系统，有自己的任务调度、内存管理、文件系统、设备驱动程序等，还会运行一定数量的系统服务（如刷新磁盘缓冲区、日志记录器、定时任务、ssh 服务器、时间同步服务），这些东西都会消耗系统资源（主要是内存），而且虚拟机和虚拟机管理器的两层任务调度、设备驱动等也会增加时间开销。能不能让虚拟机共享操作系统内核，又保持一定的隔离性呢？</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview19.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview19.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>两河缘何入一渠。为了方便开发和测试，1979 年的 UNIX 第七版引入了 chroot 机制。chroot 就是让一个进程把指定的目录作为根目录，它的所有文件系统操作都只能在这个指定目录里进行，这样就不会危害到主机系统。尽管 chroot<br>存在经典的跳出漏洞，而且它没有对进程、网络等资源进行任何隔离，chroot 至今仍然被用作构建和测试软件的干净环境。<br>要成为一个真正的虚拟化解决方案，只有文件系统隔离是不够的。另外两个重要的方面是：</p>
-<ul>
-<li>进程、网络、IPC（进程间通信）、用户等命名空间的隔离。使得虚拟机内部只能看到自己的进程，只能使用自己的虚拟网卡，进程间通信时不会干扰到虚拟机外面，虚拟机内的 UID/GID 与外面的独立。</li>
-<li>资源的限制和审计。不能因为虚拟机内的程序 “跑飞了”，就占掉物理机器的所有 CPU、内存、硬盘等资源。必须要能统计虚拟机占了多少资源，并能够对资源进行限制。</li>
-</ul>
-<p>上述两件事情就是 BSD 和 Linux 社区在进入 21 世纪以来逐步在做的。在 Linux 中，命名空间的隔离叫做用户命名空间，在创建进程时，通过指定 clone 系统调用的参数来创建新的命名空间；资源的限制和审计是 cgroups 做的，它的 API 位于 proc 虚拟文件系统中。</p>
-<p>这种虚拟机里运行一个或多个进程、虚拟机与主机共享一个内核的虚拟化方案，被称为 “操作系统级虚拟化” 或 “任务级虚拟化”。由于 Linux Containers（LXC）从 Linux 3.8 版本开始被纳入内核主线，操作系统级虚拟化又被称为<br>“容器”（container）。为了与虚拟机是一个完整的操作系统的虚拟化方案相区分，被隔离执行的进程（进程组）往往不称为 “虚拟机”，而称为 “容器”。由于没有多余的一层操作系统内核，容器比虚拟机更加轻量，启动更快，内存开销、调度开销也更小，更重要的是访问磁盘等 I/O 设备不需要经过虚拟化层，没有性能损失。</p>
-<p>Linux 上的操作系统级虚拟化并不是从 LXC 开始有的，恰恰相反，LXC 是<br>“长江后浪推前浪” 的典型。Linux-Vserver、OpenVZ、Parallels Containers 都是在 Linux 内核里实现操作系统级虚拟化的解决方案。尽管小字辈们赢得了更多的眼球，作为一个长者，OpenVZ 还是比 LXC 多一些 “企业级” 的功能：<br>可以审计并限制每个容器的磁盘配额，通过目录级别的磁盘空间审计来实现（这也是 freeshell 使用 OpenVZ 而非 LXC 的主要原因）；<br>支持检查点（checkpoint）、热迁移（live migration）；<br>free -m、df -lh 等内存和磁盘的容量，在 OpenVZ 容器里看到的是它的配额，而 LXC 里看到的是物理机的容量；<br>支持 swap 空间，当发生 OOM（Out Of Memory）时杀死进程的行为与物理机器相同，而 LXC 会直接分配不出内存。<br>但是，由于 OpenVZ 坚持走 RHEL 路线，RHEL 6 还是 2.6.32 的老内核，RHEL 7 刚发布 OpenVZ 还没跟进，OpenVZ 内核现在看来已经很老了，连新版本的 systemd 都运行不起来，更不用说 3.x 内核的各种酷炫新功能了。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview20.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview20.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<h3 id="容器的好管家-Docker"><a href="#容器的好管家-Docker" class="headerlink" title="容器的好管家 Docker"></a>容器的好管家 Docker</h3><p>好马配好鞍，这么好用的 Linux 容器，自然也要有个好管家。从哪里获得系统镜像？如何对镜像进行版本控制？Docker 就是近来大红大紫的 Linux 容器好管家，据说连巨硬都向 Docker 示好，要为 Windows 开发容器支持了。</p>
-<p>Docker 其实是为系统运维而生的，它大大降低了软件安装、部署的成本。软件的安装之所以是个麻烦事，是因为</p>
-<ul>
-<li>软件之间存在依赖关系。<br>比如，Linux 上依赖标准 C 库 glibc，依赖密码学库 OpenSSL，依赖 Java 运行环境；Windows 上依赖 .NET<br>Framework，依赖 Flash 播放器。如果每个软件都带上它所有的依赖，那就太臃肿了，如何找到并安装软件的依赖，是一门大学问，也是各个<br>Linux 发行版的特色所在。</li>
-<li>软件之间存在冲突。比如，程序 A 依赖<br>glibc 2.13，而程序 B 依赖 glibc 2.14；甲脚本需要 Python 3，乙脚本需要 Python 2；Apache 和<br>Nginx 两个 Web 服务器都想要监听 80 端口。互相冲突的软件安装在同一个系统里，总是容易带来一些混乱，比如 Windows 早期的<br>DLL Hell。解决软件冲突之道就是隔离，让多个版本在系统里共存，并提供方法来找到匹配的版本。</li>
-</ul>
-<p>我们看看 Docker 如何解决这两个问题：</p>
-<ul>
-<li>把软件的所有依赖关系和运行环境打包在一个镜像里，而不是使用复杂的脚本来在未知的环境里 “安装” 软件；</li>
-<li>这个包含了所有依赖的包一定很大，因此 Docker 的镜像是层次化的，即应用程序的镜像一般是基于基本系统镜像，只需要传输和存储增量部分就行了；</li>
-<li>Docker 使用基于容器的虚拟化，把每个软件运行在独立的容器里，避免了不同软件的文件系统路径冲突和运行时的资源冲突。</li>
-</ul>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview21.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview21.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure> 
-
-<p>其中，Docker 的层次化镜像结构依赖于 Linux 的 AUFS（Another Union File System），AUFS 可以把基础目录 A、增量目录 B 合并挂载为一个目录 C，C 中能够同时看到 A、B 中的文件（有冲突以 B 中的为准），对 C 的修改会被写入 B。当一个 Docker 容器被启动时，就会生成一个增量目录并与作为基础目录的 Docker 镜像合并挂载，Docker 容器的所有写操作都被写入增量目录，而不会修改基础目录。这样就以比较低的开销实现了文件系统的 “版本控制”，也减小了软件的分发体积（只需分发增量部分，基础镜像是大多数人已经有的）。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview22.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview22.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>Docker、LXC 与内核组件的关系Docker 的虚拟化则是基于 libcontainer（上图比较老了，那时还是基于 LXC）。libcontainer 和 LXC 事实上都是基于 Linux 内核提供的 cgroups 资源审计、chroot 文件系统隔离、命名空间隔离等机制。<br>插播：Freeshell 是如何启动的我们知道 freeshell 采用的是 OpenVZ 虚拟化技术，经常有人问能不能换内核，还有人问 freeshell 系统是从哪里启动的。事实上，跟普通的 Linux 系统一样，freeshell 是从虚拟机里的 /sbin/init 开始运行的（看看是不是 1 号进程？），后面就是虚拟机系统自己的启动过程了。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview23.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview23.png" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>Freeshell 控制面板一角事实上，不同类型的虚拟化技术是从不同的地方开始引导虚拟机系统的：</p>
-<ul>
-<li>从模拟的 BIOS 开始引导的，支持 MBR、EFI、PXE 等启动方式，如 QEMU、VMWare；</li>
-<li>从内核开始引导的，虚拟机镜像内不包含内核，如 KVM、Xen；</li>
-<li>从 init 进程开始引导的，虚拟机是一个与主机共享内核的容器，会按照操作系统的引导过程启动各种系统服务，如 LXC、OpenVZ；</li>
-</ul>
-<p>只运行一个特定的应用程序或服务的，也是基于容器，如 Docker。<br>云操作系统 OpenStack前面讲的都是实现虚拟化的具体技术。但要让最终用户用上虚拟机，还需要有管理虚拟机的平台，或称 “云操作系统”。OpenStack 是目前最火的云操作系统。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview24.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview24.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-
-<p>OpenStack 云操作系统OpenStack（或者任何靠谱的云操作系统）要对云上的各种资源进行虚拟化，它的管理组件称为 Nova。</p>
-<ul>
-<li>计算：本文所说的虚拟化技术就是计算的虚拟化。OpenStack 可以使用多种多样的虚拟化解决方案，如Xen、KVM、QEMU、Docker。管理组件 Nova根据各物理节点的负载决定把虚拟机调度到哪台物理机，再调用这些虚拟化解决方案的 API来创建、删除、开机、关机等。</li>
-<li>存储：虚拟机镜像如果只能存储在计算节点本地，那么不仅不利于数据的冗余，也不利于虚拟机的迁移。因此在云中，一般采用逻辑上集中、物理上分布式的存储系统，独立于计算节点，也就是计算节点对数据磁盘的访问一般是通过网络访问。</li>
-<li>网络：每个客户要有自己的虚拟网络，如何让不同客户的虚拟网络在物理网络上互不干扰，就是网络虚拟化的事情，参见我的另一篇博客《网络虚拟化技术大观》。除了最核心的虚拟化管理器 Nova，OpenStack 还有虚拟机镜像管理器 Glance、对象存储 Swift、块存储 Cinder、虚拟网络 Neutron、身份认证服务 Keystone、控制面板 Horizon 等众多组件。</li>
-</ul>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview25.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview25.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>OpenStack 控制面板（Horizon）下面两张图展示了 Nova 分别使用 Docker 和 Xen 作为虚拟化解决方案的架构。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview26.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview26.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>Docker 受 OpenStack Nova 计算组件的调用</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/virtualization-overview27.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/virtualization-overview27.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>使用 Xen 作为 OpenStack 的计算虚拟化方案</p>
-<h3 id="结语"><a href="#结语" class="headerlink" title="结语"></a>结语</h3><p>任务隔离的需求催生了虚拟化，我们都既希望任务隔离得彻底一些，又不希望损失太多的性能。从隔离性最高但慢到不实用的模拟执行，到现代全虚拟化技术所采用的动态二进制翻译与硬件辅助虚拟化，再到修改虚拟机系统的半虚拟化，再到共享内核、基于容器的操作系统级虚拟化，性能始终是虚拟化技术浪潮的第一推动力。不过，当我们选择虚拟化技术时，还是要根据实际需求，在隔离性与性能的天平上找到平衡点。</p>
-<p>古老的计算虚拟化技术，加上相对新生的存储、网络虚拟化技术，构成了云操作系统的基石。九层之台，起于垒土，当我们享受云端似乎取之不尽用之不竭的计算资源时，如果能剥开一层层的封装，洞悉计算的本质，也许我们会更加珍惜云端的计算资源，更加赞叹虚拟化技术大厦的宏伟与精致，也更加崇敬和膜拜那些引领人类走进云时代的计算机大师。</p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170301/virtualization-overview/" target="_blank" rel="external">虚拟化技术大观</a>》</p>
-<hr>
+<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 
       
     </div>
@@ -967,7 +157,7 @@ make
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/QEMU/">QEMU</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
 
       
     </footer>
@@ -978,7 +168,7 @@ make
 <!-- Table of Contents -->
 
   
-    <article id="post-recordreplay-papers"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-qemukvm-source1"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -986,7 +176,7 @@ make
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170301/recordreplay-papers/">虚拟机记录与重放论文推荐</a>
+      <a class="article-title" href="/20170504/qemukvm-source1/">Qemu-KVM虚拟机初始化及创建过程源码简要分析（一）</a>
     </h1>
   
 
@@ -994,45 +184,43 @@ make
     
     <div class="article-meta">
       
-	Posted on <a href="/20170301/recordreplay-papers/" class="article-date">
-	  <time datetime="2017-03-01T06:56:40.000Z" itemprop="datePublished">三月 1, 2017</time>
+	Posted on <a href="/20170504/qemukvm-source1/" class="article-date">
+	  <time datetime="2017-05-04T07:01:06.000Z" itemprop="datePublished">五月 4, 2017</time>
 	</a>
 
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <hr>
-<p><strong>CSysSec注</strong>： 本系列文章旨在收集相关领域经典论文阅读列表，持续更新中。<br><strong>转载请注明：</strong> <a href="http://www.csyssec.org/20170301/recordreplay-papers/" target="_blank" rel="external">《虚拟机记录与重放论文推荐》</a></p>
+        <p><strong>作者:</strong> <a href="http://blog.csdn.net/mrbuffoon" target="_blank" rel="external">Mr_buffoon</a></p>
+<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
-<ul>
-<li><a href="https://www.cs.utah.edu/~regehr/papers/vee16-xentt.pdf" target="_blank" rel="external">Abstractions for Practical Virtual Machine Replay, VEE’16</a></li>
-<li><a href="http://www.cl.cam.ac.uk/research/srg/netos/vee_2012/papers/p227.pdf" target="_blank" rel="external">V2e: combining hardware virtualization and softwareemulation for transparent and extensible malware analysis,VEE’12</a></li>
-<li><a href="http://www.ispras.ru/en/publications/deterministic_replay_of_system_s_execution_with_multi_target_qemu_simulator_for_dynamic_analysis.pdf" target="_blank" rel="external">Deterministic replay of system’s execution with multi-target QEMU simulator for dynamic analysis and reverse debugging</a></li>
-<li><a href="">A KVM-Based Logging and Replay System for Debugging Non-Deterministic Executions A KVM-Based Logging and Replay System for Debugging Non-Deterministic Executions</a></li>
-<li><a href="http://net.pku.edu.cn/vc/papers/atc16-final298.pdf" target="_blank" rel="external">Samsara: Efficient Deterministic Replay in Multiprocessor Environments with Hardware Virtualization Extensions,ATC’16</a></li>
-<li><a href="https://pdfs.semanticscholar.org/d7c7/5388f0fcc2ac107570066001c191c4e7cbc7.pdf" target="_blank" rel="external">Execution Replay of Multiprocessor Virtual Machines,VEE’08</a></li>
-<li><a href="http://web.eecs.umich.edu/virtual/papers/dunlap02.pdf" target="_blank" rel="external">ReVirt: Enabling intrusion analysis through virtual-machine logging and replay,OSDI’02</a></li>
-<li><a href="">Don’T Panic: Reverse Debugging of Kernel Drivers</a></li>
-<li><a href="http://www.jhuapl.edu/techdigest/TD/td3202/32_02-Grizzard.pdf" target="_blank" rel="external">Analysis of virtual machine record and replay for trustworthy computing,2013</a></li>
-<li><a href="http://www-mount.ece.umn.edu/~jjyi/MoBS/2007/program/01C-Xu.pdf" target="_blank" rel="external">ReTrace: Collecting Execution Trace with Virtual Machine Deterministic Replay</a></li>
-<li><a href="">XenLR: Xen-based logging for deterministic replay</a></li>
-<li><a href="https://www.cse.iitb.ac.in/synerg/lib/exe/fetch.php?media=public:students:kumaran:report.pdf" target="_blank" rel="external">Implementation and Applications of Virtual Machine Record and Replay</a></li>
-</ul>
+<p> 我们知道，Qemu-KVM实际上包括Qemu和KVM两部分，那么在创建以及初始化虚拟机时，实际上也是在这两部分进行的。</p>
+<p>KVM实际上就是kvm内核模块，包括kvm.ko、kvm-intel.ko、kvm-amd.ko三部分，后两部分分别对应Intel体系的VMX技术以及AMD体系的SVM技术。</p>
+<p>首先，我们需要加载模块，当我们加载kvm-xxx.ko模块时，会调用对应的module_init()函数，然后调用vmx_init()或者svm_init()函数，最后进入到统一的kvm.ko模块中的kvm_init()函数，现在正式开始进行虚拟机的初始化工作。</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/2-1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/2-1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">module_init(vmx_init)    <span class="comment">//位于vmx.c文件</span></div></pre></td></tr></table></figure>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">static</span> <span class="keyword">int</span> __<span class="function">init <span class="title">vmx_init</span><span class="params">(<span class="keyword">void</span>)</span>    <span class="comment">//位于vmx.c文件  </span></span></div><div class="line">&#123;  </div><div class="line">       ..............<span class="comment">//省略部分代码  </span></div><div class="line">       r= kvm_init(&amp;vmx_x86_ops, <span class="keyword">sizeof</span>(<span class="keyword">struct</span> vcpu_vmx),  </div><div class="line">                   __alignof__(<span class="keyword">struct</span> vcpu_vmx),THIS_MODULE);  </div><div class="line">       ................<span class="comment">//省略部分代码  </span></div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">kvm_init</span><span class="params">(voidvoid *opaque, <span class="keyword">unsigned</span> vcpu_size,<span class="keyword">unsigned</span> vcpu_align,  </span></span></div><div class="line">                <span class="keyword">struct</span> <span class="keyword">module</span> *<span class="keyword">module</span>)    <span class="comment">//位于kvm_main.c文件  </span></div><div class="line">&#123;  </div><div class="line">       ......................<span class="comment">//省略部分代码  </span></div><div class="line">       r= kvm_arch_init(opaque);  </div><div class="line">       ........................<span class="comment">//省略部分代码  </span></div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p> 在进入到kvm_init()函数后，进行了很多初始化的相关工作，这里单独强调一下kvm_arch_init()函数。<br>    在vmx.c文件中声明并定义了一个结构体vmx_x86_ops，这是函数指针的集合，其实就是各种操作的一个集合。内部很多函数是后续的初始化工作需要具体调用到的，比如很多Qemu层的ioctl调用到内核层实际上就是执行这内部的一些函数。具体的内容如下：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div><div class="line">73</div><div class="line">74</div><div class="line">75</div><div class="line">76</div><div class="line">77</div><div class="line">78</div><div class="line">79</div><div class="line">80</div><div class="line">81</div><div class="line">82</div><div class="line">83</div><div class="line">84</div><div class="line">85</div><div class="line">86</div><div class="line">87</div><div class="line">88</div><div class="line">89</div><div class="line">90</div><div class="line">91</div><div class="line">92</div><div class="line">93</div><div class="line">94</div><div class="line">95</div><div class="line">96</div><div class="line">97</div><div class="line">98</div><div class="line">99</div><div class="line">100</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">static</span> <span class="keyword">struct</span> kvm_x86_ops vmx_x86_ops = &#123;  </div><div class="line">       .cpu_has_kvm_support= cpu_has_kvm_support,  </div><div class="line">       .disabled_by_bios= vmx_disabled_by_bios,  </div><div class="line">       .hardware_setup= hardware_setup,  </div><div class="line">       .hardware_unsetup= hardware_unsetup,  </div><div class="line">       .check_processor_compatibility= vmx_check_processor_compat,  </div><div class="line">       .hardware_enable= hardware_enable,  </div><div class="line">       .hardware_disable= hardware_disable,  </div><div class="line">       .cpu_has_accelerated_tpr= report_flexpriority,  </div><div class="line">   </div><div class="line">       .vcpu_create= vmx_create_vcpu,  </div><div class="line">       .vcpu_free= vmx_free_vcpu,  </div><div class="line">       .vcpu_reset= vmx_vcpu_reset,  </div><div class="line">   </div><div class="line">       .prepare_guest_switch= vmx_save_host_state,  </div><div class="line">       .vcpu_load= vmx_vcpu_load,  </div><div class="line">       .vcpu_put= vmx_vcpu_put,  </div><div class="line">   </div><div class="line">       .update_db_bp_intercept= update_exception_bitmap,  </div><div class="line">       .get_msr= vmx_get_msr,  </div><div class="line">       .set_msr= vmx_set_msr,  </div><div class="line">       .get_segment_base= vmx_get_segment_base,  </div><div class="line">       .get_segment= vmx_get_segment,  </div><div class="line">       .set_segment= vmx_set_segment,  </div><div class="line">       .get_cpl= vmx_get_cpl,  </div><div class="line">       .get_cs_db_l_bits= vmx_get_cs_db_l_bits,  </div><div class="line">       .decache_cr0_guest_bits= vmx_decache_cr0_guest_bits,  </div><div class="line">       .decache_cr3= vmx_decache_cr3,  </div><div class="line">       .decache_cr4_guest_bits= vmx_decache_cr4_guest_bits,  </div><div class="line">       .set_cr0= vmx_set_cr0,  </div><div class="line">       .set_cr3= vmx_set_cr3,  </div><div class="line">       .set_cr4= vmx_set_cr4,  </div><div class="line">       .set_efer= vmx_set_efer,  </div><div class="line">       .get_idt= vmx_get_idt,  </div><div class="line">       .set_idt= vmx_set_idt,  </div><div class="line">       .get_gdt= vmx_get_gdt,  </div><div class="line">       .set_gdt= vmx_set_gdt,  </div><div class="line">       .set_dr7= vmx_set_dr7,  </div><div class="line">       .cache_reg= vmx_cache_reg,  </div><div class="line">       .get_rflags= vmx_get_rflags,  </div><div class="line">       .set_rflags= vmx_set_rflags,  </div><div class="line">       .fpu_activate= vmx_fpu_activate,  </div><div class="line">       .fpu_deactivate= vmx_fpu_deactivate,  </div><div class="line">   </div><div class="line">       .tlb_flush= vmx_flush_tlb,  </div><div class="line">   </div><div class="line">       .run= vmx_vcpu_run,  </div><div class="line">       .handle_exit= vmx_handle_exit,  </div><div class="line">       .skip_emulated_instruction= skip_emulated_instruction,  </div><div class="line">       .set_interrupt_shadow= vmx_set_interrupt_shadow,  </div><div class="line">       .get_interrupt_shadow= vmx_get_interrupt_shadow,  </div><div class="line">       .patch_hypercall= vmx_patch_hypercall,  </div><div class="line">       .set_irq= vmx_inject_irq,  </div><div class="line">       .set_nmi= vmx_inject_nmi,  </div><div class="line">       .queue_exception= vmx_queue_exception,  </div><div class="line">       .cancel_injection= vmx_cancel_injection,  </div><div class="line">       .interrupt_allowed= vmx_interrupt_allowed,  </div><div class="line">       .nmi_allowed= vmx_nmi_allowed,  </div><div class="line">       .get_nmi_mask= vmx_get_nmi_mask,  </div><div class="line">       .set_nmi_mask= vmx_set_nmi_mask,  </div><div class="line">       .enable_nmi_window= enable_nmi_window,  </div><div class="line">       .enable_irq_window= enable_irq_window,  </div><div class="line">       .update_cr8_intercept= update_cr8_intercept,  </div><div class="line">       .set_virtual_x2apic_mode= vmx_set_virtual_x2apic_mode,  </div><div class="line">       .vm_has_apicv= vmx_vm_has_apicv,  </div><div class="line">       .load_eoi_exitmap= vmx_load_eoi_exitmap,  </div><div class="line">       .hwapic_irr_update= vmx_hwapic_irr_update,  </div><div class="line">       .hwapic_isr_update= vmx_hwapic_isr_update,  </div><div class="line">       .sync_pir_to_irr= vmx_sync_pir_to_irr,  </div><div class="line">       .deliver_posted_interrupt= vmx_deliver_posted_interrupt,  </div><div class="line">   </div><div class="line">       .set_tss_addr= vmx_set_tss_addr,  </div><div class="line">       .get_tdp_level= get_ept_level,  </div><div class="line">       .get_mt_mask= vmx_get_mt_mask,  </div><div class="line">   </div><div class="line">       .get_exit_info= vmx_get_exit_info,  </div><div class="line">   </div><div class="line">       .get_lpage_level= vmx_get_lpage_level,  </div><div class="line">   </div><div class="line">       .cpuid_update= vmx_cpuid_update,  </div><div class="line">   </div><div class="line">       .rdtscp_supported= vmx_rdtscp_supported,  </div><div class="line">       .invpcid_supported= vmx_invpcid_supported,  </div><div class="line">   </div><div class="line">       .set_supported_cpuid= vmx_set_supported_cpuid,  </div><div class="line">   </div><div class="line">       .has_wbinvd_exit= cpu_has_vmx_wbinvd_exit,  </div><div class="line">   </div><div class="line">       .set_tsc_khz= vmx_set_tsc_khz,  </div><div class="line">       .read_tsc_offset= vmx_read_tsc_offset,  </div><div class="line">       .write_tsc_offset= vmx_write_tsc_offset,  </div><div class="line">       .adjust_tsc_offset= vmx_adjust_tsc_offset,  </div><div class="line">       .compute_tsc_offset= vmx_compute_tsc_offset,  </div><div class="line">       .read_l1_tsc= vmx_read_l1_tsc,  </div><div class="line">   </div><div class="line">       .set_tdp_cr3= vmx_set_cr3,  </div><div class="line">   </div><div class="line">       .check_intercept= vmx_check_intercept,  </div><div class="line">       .handle_external_intr= vmx_handle_external_intr,  </div><div class="line">&#125;;</div></pre></td></tr></table></figure></p>
+<p>这个结构体作为参数传递到kvm_init()函数，再传递到kvm_arch_init()函数，再传递到全局变量kvm_x86_ops中，注册各种操作函数，后续可以调用。随后还进行了一些内部<strong>数据结构</strong>以及定时器、调试信息等的一些初始化工作。与此同时，qemu层也会进行大部分的初始化工作，这一部分后一篇再讲。</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/2-2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/2-2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
 <hr>
-<p><strong>转载请注明：</strong> <a href="http://www.csyssec.org/20170301/recordreplay-papers/" target="_blank" rel="external">《虚拟机记录与重放论文推荐》</a></p>
-<hr>
+<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 
       
     </div>
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放<span class="article-category-count">1</span></a>
+    <a class="article-category-link" href="/categories/虚拟化基础/">虚拟化基础<span class="article-category-count">6</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Papers/">Papers</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/RR/">RR</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/QEMU/">QEMU</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtulization/">Virtulization</a></li></ul>
 
       
     </footer>
@@ -1043,7 +231,7 @@ make
 <!-- Table of Contents -->
 
   
-    <article id="post-compile-link"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-keylogger"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -1051,7 +239,7 @@ make
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170301/compile-link/">理清编译链接的那些事儿</a>
+      <a class="article-title" href="/20170401/keylogger/">Keylogger检测</a>
     </h1>
   
 
@@ -1059,61 +247,235 @@ make
     
     <div class="article-meta">
       
-	Posted on <a href="/20170301/compile-link/" class="article-date">
-	  <time datetime="2017-03-01T05:26:03.000Z" itemprop="datePublished">三月 1, 2017</time>
+	Posted on <a href="/20170401/keylogger/" class="article-date">
+	  <time datetime="2017-04-01T03:12:56.000Z" itemprop="datePublished">四月 1, 2017</time>
 	</a>
 
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
-<p><strong>CSysSec注</strong>： 本文来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/05/25/lib-compile-link/" target="_blank" rel="external">个人博客</a>，主要介绍了Linux内核中一系列的内存分配函数及其原理<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170301/compile-link/" target="_blank" rel="external">理清编译链接的那些事儿</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
-<p>当你在linux下写C/C++代码的时候，是不是会遇到许多编译链接的问题？ 时不时报个glibc,gcc，g++等相关的错误？ 很多时候都无从下手，而且比较混乱。 这也是编译链接过程中经常出现的问题。</p>
-<p>这篇文章不是去介绍如何编译链接，而是理清编译链接过程中碰到的一些概念和出现的问题。尤其是，libc,,glib,glibc,eglibc，libc++，libstdc++，gcc,g++。 </p>
-<p>从libc说起。<br>libc是Linux下原来的标准C库，也就是当初写hello world时包含的头文件#include &lt; stdio.h> 定义的地方。 </p>
-<p>后来逐渐被glibc取代，也就是传说中的GNU C Library,在此之前除了有libc，还有klibc,uclibc。现在只要知道用的最多的是glibc就行了，主流的一些linux操作系统如 Debian, Ubuntu，Redhat等用的都是glibc（或者其变种，下面会说到).</p>
-<p>那glibc都做了些什么呢？ glibc是Linux系统中最底层的API，几乎其它任何的运行库都要依赖glibc。 glibc最主要的功能就是对系统调用的封装，你想想看，你怎么能在C代码中直接用fopen函数就能打开文件？ 打开文件最终还是要触发系统中的sys_open系统调用，而这中间的处理过程都是glibc来完成的。<a href="http://www.chongh.wiki/blog/2016/04/08/linux-syscalls/" target="_blank" rel="external">这篇文章</a>详细介绍了glibc是如何与上层应用程序和系统调用交互的。除了封装系统调用，glibc自身也提供了一些上层应用函数必要的功能,如string,malloc,stdlib,linuxthreads,locale,signal等等。</p>
-<p>好了，那eglibc又是什么？ 这里的e是Embedded的意思，也就是前面说到的变种glibc。eglibc的主要特性是为了更好的支持嵌入式架构，可以支持不同的shell(包括嵌入式)，但它是二进制兼容glibc的，就是说如果你的代码之前依赖eglibc库，那么换成glibc后也不需要重新编译。ubuntu系统用的就是eglibc（而不是glibc）,不信，你执行 ldd –version 或者 /lib/i386-linux-gnu/libc.so.6<br>(64位系统运行/lib/x86_64-linux-gnu）看看，便会显示你系统中eglibc/glibc的版本信息。  这里提到了libc.so.6,这个文件就是eglibc/glibc编译后的生成库文件。</p>
-<p>好了，还有一个glib看起来也很相似，那它又是什么呢？glib也是个c程序库，不过比较轻量级，glib将C语言中的数据类型统一封装成自己的数据类型，提供了C语言常用的数据结构的定义以及处理函数，有趣的宏以及可移植的封装等(注：glib是可移植的，说明你可以在linux下，也可以在windows下使用它）。那它跟glibc有什么关系吗？其实并没有，除非你的程序代码会用到glib库中的数据结构或者函数，glib库在ubuntu系统中并不会默认安装(可以通过apt-get install libglib2.0-dev手动安装)，著名的GTK+和Gnome底层用的都是glib库。想更详细了解glib？ 可以参考 <a href="https://developer.gnome.org/glib/" target="_blank" rel="external">这里</a></p>
-<p>看到这里，你应该知道这些库有多重要了吧？ 你写的C代码在编译的过程中有可能出现明明是这些库里面定义的变,却量还会出现’Undefined’, ‘Unreference’等错误，这时候你可能会怀疑是不是这些库出问题了？ 是不是该动手换个gilbc/eglibc了？ 这里强调一点，在你准备更换/升级这些库之前，你应该好好思考一下，你真的要更换/升级吗？你要知道你自己在做什么！你要时刻知道glibc/eglibc的影响有多大，不管你之前部署的什么程序，linux系统的ls,cd,mv,ps等等全都得依赖它，很多人在更换/升级都有过惨痛的教训，甚至让整个系统奔溃无法启动。所以，强烈不建议更换/升级这些库！</p>
-<p>当然如果你写的是C++代码，还有两个库也要非常重视了，libc++/libstdc++,这两个库有关系吗？有。两个都是C++标准库。libc++是针对clang编译器特别重写的C++标准库，那libstdc++自然就是gcc的事儿了。libstdc++与gcc的关系就像clang与libc++. 其中的区别这里不作详细介绍了。</p>
-<p>再说说libstdc++，glibc的关系。 libstdc++与gcc是捆绑在一起的，也就是说安装gcc的时候会把libstdc++装上。 那为什么glibc和gcc没有捆绑在一起呢？<br>相比glibc，libstdc++虽然提供了c++程序的标准库，但它并不与内核打交道。对于系统级别的事件，libstdc++首先是会与glibc交互，才能和内核通信。相比glibc来说，libstdc++就显得没那么基础了。</p>
-<p>说完了这些库，这些库最终都是拿来干嘛的？当然是要将它们与你的程序链接在一起！ 这时候就不得不说说gcc了(当然还有前文提到的clang以及llvm等编译器，本文就不细说它们的区别了)。</p>
-<p>你写的C代码.c文件通过gcc首先转化为汇编.S文件，之后汇编器as将.S文件转化为机器代码.o文件，生成的.o文件再与其它.o文件，或者之前提到的libc.so.6库文件通过ld链接器链接在一块生成可执行文件。当然，在你编译代码使用gcc的时候，gcc命令已经帮你把这些细节全部做好了。</p>
-<p>那g++是做什么的? 慢慢说来，不要以为gcc只能编译C代码，g++只能编译c++代码。 后缀为.c的，gcc把它当作是C程序，而g++当作是c++程序；后缀为.cpp的，两者都会认为是c++程序，注意，虽然c++是c的超集，但是两者对语法的要求是有区别的。在编译阶段，g++会调用gcc,对于c++代码，两者是等价的，但是因为gcc命令不能自动和C++程序使用的库联接，需要这样，gcc -lstdc++, 所以如果你的Makefile文件并没有手动加上libstdc++库，一般就会提示错误，要求你安装g++编译器了。</p>
-<p>好了，就说到这，理清这些库与编译器之间的关系，相信会对你解决编译链接过程中遇到的错误起到一点帮助。</p>
-<p>如果你的编译器不支持一些新的C/C++特性，想升级gcc/g++, 这里也给出一个基于ubuntu系统的参考方法。</p>
-<p>添加ppa</p>
-<pre><code>sudo add-apt-repository ppa:ubuntu-toolchain-r/test
-sudo apt-get update
-</code></pre><p>添加ppa，是因为你所用的ubuntu版本的更新源中可能并没有你想要的gcc/g++版本。</p>
-<p>安装新版gcc/g++</p>
-<pre><code>sudo apt-get install gcc-4.8
-sudo apt-get install g++-4.8
-</code></pre><p>可以到/usr/bin/gcc查看新安装的gcc,g++</p>
-<p>配置系统gcc/g++</p>
-<p>使用update-alternatives,统一更新gcc/g++</p>
-<pre><code>sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.6 60 --slave /usr/bin/g++ g++ /usr/bin/g++-4.6
-sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8 80 --slave /usr/bin/g++ g++ /usr/bin/g++-4.8
-sudo update-alternatives --config gcc
-</code></pre><p>数字优先级(如60，80)高的会被系统选择为默认的编译器,也可以执行第三条命令就是来手动配置系统的gcc,此处按照提示,选择4.8版本的即可。</p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170301/compile-link/" target="_blank" rel="external">理清编译链接的那些事儿</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
+        <p>Source：<a href="https://www.lastline.com/labsblog/detecting-keyloggers-on-dynamic-analysis-systems/" target="_blank" rel="external">https://www.lastline.com/labsblog/detecting-keyloggers-on-dynamic-analysis-systems/</a><br>Author： <a href="https://www.lastline.com/author/clemens/" target="_blank" rel="external">Clemens Kolbitsch</a></p>
+<pre><code>Clemens is a Security Researcher and engine developer at Lastline. As a lead-developer of Anubis, he has gained profound expertise in analyzing current, malicious code found in the wild. He has observed various trends in the malware community and successfully published peer-reviewed research papers. In the past, he also investigated offensive technologies presenting results at conferences such as BlackHat.
+</code></pre><hr>
+<p>One notorious functionality present in many variants of today’s advanced malware is the ability to steal sensitive user information. Taking control of a targeted machine, an adversary has basically unlimited abilities to secretly monitor the actions performed by an unsuspecting victim who uses the infected machine. The type of data stored on a typical machine, and to which the attacker has access to, ranges from user account credentials (such as usernames and passwords), to financial data (such as credit card numbers or transaction secrets), and even personal data (such as social security numbers).</p>
+<p>Very often, malware is specialized in capturing and identifying different types of information typed by the victim, allowing the collection of very specific information in which the attacker is interested. Typical examples are information entered in a login form for a specific URL, or values that resemble social security numbers (SSN) or credit card numbers.</p>
+<p>Automatic identification of this type of attack using traditional dynamic analysis (inside a sandbox) is tricky, as most activity requires a user to trigger the attack. Such a trigger could be using username and password to authenticate to a service, or entering user-sensitive information into an application or website.</p>
+<p>In this post, we describe some of the ways attackers manage to collect sensitive information on an infected machine and how Lastline’s high-resolution dynamic analysis engine is able to trigger and detect this type of malware.</p>
+<h2 id="How-Keyloggers-Capture-Data"><a href="#How-Keyloggers-Capture-Data" class="headerlink" title="How Keyloggers Capture Data"></a>How Keyloggers Capture Data</h2><p>When looking at keyloggers, we can typically distinguish three basic types: User-mode keyloggers, kernel-mode keyloggers and hardware-based keyloggers. In this post, we will focus on the first two types – software-based keyloggers. Hardware-based keyloggers work by intercepting data sent from external devices (such as keyboard or mouse) to the computer hardware, and are thus outside the reach of most remote attackers.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/kerlogger1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/kerlogger1.png" width="450"></a><br>    <figcaption>Overview of keylogger methods</figcaption><br></figure>
+
+
+<p>In user-mode keyloggers, a very common approach used to steal information typed by the user is through the use of the windows API SetWindowsHook. This API can be used to intercept events from the system, such as keyboard and mouse activity. When the to-be-intercepted action is triggered, a function of the attacker’s choosing is executed. Another user-mode method for capturing keystrokes that we found in many malware variants consists of continuously checking the system’s keyboard state using the GetAsyncKeyState or GetKeyState API functions. Different from the first method, which notifies you at every keyboard event, the attacker here needs to actively monitor which keys are pressed.</p>
+<p>Kernel-mode keyloggers are more powerful than their user-mode counterparts, as they work with higher privileges, but are inherently more complex to implement. This type of  keylogger uses filter drivers to intercept keystrokes received from the keyboard or modify internal Windows kernel structures in order to capture input data. The complexity and mostly-undocumented nature of kernel code can lead to malfunction of the system if a sample is executed on an unsupported system, making user-mode keyloggers a more prominent approach.</p>
+<h2 id="Analyzing-Keylogger-Software"><a href="#Analyzing-Keylogger-Software" class="headerlink" title="Analyzing Keylogger Software"></a>Analyzing Keylogger Software</h2><p>As mentioned earlier, when executing malware with keylogging abilities on a traditional analysis system, this functionality typically remains unnoticed. This is because, unless a user triggers specific actions, the malware will not be able to capture anything during the analysis.</p>
+<p>To reveal this type of behavior during the automated analysis of a sample, the system needs to mimic user interactions such as keyboard typing and mouse movement. Interestingly, this is far from simple since some malware families only capture data when the key is pressed within a specific application or window, such as Internet Explorer or Firefox, for example.</p>
+<p>Further, the analysis framework must be able to identify the type of application and/or information that is relevant for the malware under analysis. For instance, if a keylogger only targets information on financial transactions (such as in a breach of Point-of-Sale terminals late last year), injecting other user information would not reveal any interesting behavior. If the sandbox fails to identify the data in which the attacker is interested, the keylogger remains inactive, disguising itself from the analysis system.</p>
+<h2 id="High-Resolution-Analysis-of-Keyloggers"><a href="#High-Resolution-Analysis-of-Keyloggers" class="headerlink" title="High-Resolution Analysis of Keyloggers"></a>High-Resolution Analysis of Keyloggers</h2><p>The Lastline high-resolution dynamic analysis engine has the ability to simulate specific user interactions during the analysis of a sample. Additionally, the system identifies the type of data that the malware sample is searching for and can simulate user behavior accordingly. For example, the system instruments a virtual user to use fake credit card information to do financial transactions, post user credentials to various services, or use email addresses in a way that might attract the attacker’s attention.</p>
+<p>Once the keylogger starts collecting the injected data, the system tracks how the malware under analysis uses the stolen information, which gives vital information on the attacker’s goals. For example, the system tracks if the stolen data is written to the file-system or is sent to the attacker using a command-and-control channel.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/keylogger2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/keylogger2.png" width="450"></a><br>    <figcaption>Chewbacca analysis report</figcaption><br></figure>
+
+
+
+<h2 id="Chasing-Chewbacca-with-Lastline"><a href="#Chasing-Chewbacca-with-Lastline" class="headerlink" title="Chasing Chewbacca with Lastline"></a>Chasing Chewbacca with Lastline</h2><p>Chewbacca [2] is a trojan used in a Point-of-Sale malware operation to log keyboard data of certain systems [3]. Besides capturing keyboard activity, the malware can also scan the memory of other processes for credit card numbers using regular expressions. Clearly, all of this happens without any signs of infections visible to the user.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/keylogger3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/keylogger3.png" width="450"></a><br>    <figcaption>Windows desktop showing no signs of the keylogger</figcaption><br></figure>
+
+<p>When executed, the malware creates a copy of itself named spoolsv.exe under the Windows Startup folder. After that, it will start capturing all keyboard events from the system, logging them to a file named system.log.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/keylogger4.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/keylogger4.png" width="450"></a><br>    <figcaption>Chewbacca data collection hook installation</figcaption><br></figure>
+
+<p>The above figure shows the code used by Chewbacca to install the hook procedure on the system after its execution. We can see that the malware uses the Windows API SetWindowsHookEx to install the hook, with hook type WH_KEYBOARD_LL, which is used to capture low-level keyboard input. Also, to capture all keystrokes from the system, the malware sets parameter dwThreadId=0, which will install the hook on all existing threads running on the same desktop.</p>
+<p>During its execution, whenever a keypress event happens, the callback KEYLOG_$$_HOOKPROC$LONGINT$LONGINT$LONGINT$$LONGINT will record the keys pressed along with the window title on which the keypress was recorded. Additionally, the software records when the window focus changes, logging the captured information to system.log.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/keylogger5.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/keylogger5.png" width="450"></a><br>    <figcaption>The Lastline analysis engine gives access to files generated and network traffic captured during the analysis</figcaption><br></figure>
+
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/keylogger6.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/keylogger6.png" width="450"></a><br>    <figcaption>Captured data shown in the analysis report</figcaption><br></figure>
+
+<p>When analyzing Chewbacca inside Lastline’s high-resolution analysis engine, the system identifies the keylogging functionality, clearly marking it in the report overview. Additionally, the report contains detailed examples of data the malware sample extracted, as can be seen in the figure above.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/keylogger7.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/keylogger7.png" width="450"></a><br>    <figcaption>Text content of the data captured by the keylogger into file C:Users…Tempsystem.log</figcaption><br></figure>
+
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/keylogger8.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/keylogger8.png" width="450"></a><br>    <figcaption>Raw file content of the data captured by the keylogger into file C:Users…Tempsystem.log</figcaption><br></figure>
+
+
+<p>As one can see, the report even shows examples of the sensitive data that was targeted by the attacker, which, in this case, includes credit card information and user passwords.</p>
+<p>Conclusion<br>Keylogging functionality in advanced malware is a severe threat to user data, but traditional analysis systems are often blind to this vector of attack. Lastline’s high-resolution analysis engine tackles this threat in two ways: First, the analysis engine identifies that a keylogger was installed on the victim machine and identifies the type of information the attacker is targeting. Second, the system uses the collected information to instrument a virtual user to inject specific data to trigger the keylogger’s functionality. The injected data is then tracked throughout the analysis system to monitor how the malware processes (and potentially leaks) the stolen information.</p>
+<p>REFERENCES:</p>
+<p>[1] <a href="http://msdn.microsoft.com/en-us/library/windows/desktop/ms644990%28v=vs.85%29.aspx" target="_blank" rel="external">http://msdn.microsoft.com/en-us/library/windows/desktop/ms644990%28v=vs.85%29.aspx</a></p>
+<p>[2] <a href="https://www.virustotal.com/en/file/31d4e1b2e67706fda51633b450b280554c0c4eb595b3a0606ef4ab8421a04dc9/analysis/" target="_blank" rel="external">https://www.virustotal.com/en/file/31d4e1b2e67706fda51633b450b280554c0c4eb595b3a0606ef4ab8421a04dc9/analysis/</a></p>
+<p>[3] <a href="https://blogs.rsa.com/rsa-uncovers-new-pos-malware-operation-stealing-payment-card-personal-information/" target="_blank" rel="external">https://blogs.rsa.com/rsa-uncovers-new-pos-malware-operation-stealing-payment-card-personal-information/</a></p>
 
       
     </div>
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/系统内核/">系统内核<span class="article-category-count">7</span></a>
+    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">14</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Compiler/">Compiler</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-winkernelmal"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170401/winkernelmal/">深入探索windows内核rootkit动态分析</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170401/winkernelmal/" class="article-date">
+	  <time datetime="2017-04-01T02:48:38.000Z" itemprop="datePublished">四月 1, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Source: <a href="https://www.lastline.com/labsblog/high-resolution-dynamic-analysis-of-windows-kernel-rootkits/" target="_blank" rel="external">https://www.lastline.com/labsblog/high-resolution-dynamic-analysis-of-windows-kernel-rootkits/</a></p>
+<p>Author: <a href="https://www.lastline.com/author/clemens/" target="_blank" rel="external">Clemens Kolbitsch</a></p>
+<pre><code>Clemens is a Security Researcher and engine developer at Lastline. As a lead-developer of Anubis, he has gained profound expertise in analyzing current, malicious code found in the wild. He has observed various trends in the malware community and successfully published peer-reviewed research papers. In the past, he also investigated offensive technologies presenting results at conferences such as BlackHat.
+</code></pre><hr>
+<p>Many recently-discovered sophisticated attacks against Windows users have been found to use at least one component executing in the kernel of the operating system. Examples for such APT attacks are Equation, Regin, Dark Hotel, or Turla/Uroburos, and they have received a lot of scrutiny from the security and research community.</p>
+<p>These threats are particularly pernicious because their kernel components are running with the highest level of permissions available on a computer system. As such, it is very difficult for traditional antivirus systems to detect (or protect) a computer system from these attacks, because the attacker is running with the same (or higher!) permissions as the AV solution.</p>
+<p>At the same time, it is far from trivial to analyze such kernel-based APTs inside a traditional sandboxing system, as kernel behavior often lies outside the scope of what can be monitored using traditional hooking mechanisms.</p>
+<p>In this post, we will show how the latest release of the Lastline Breach Detection Platform using a full-system emulation approach defeats even the latest version of kernel-based attacks. In a series of follow-up posts, we will focus on individual APT families and techniques, and detail how our sandbox can be used to analyze and detect these threats.</p>
+<h2 id="Analysis-of-Malicious-Code-in-the-Kernel"><a href="#Analysis-of-Malicious-Code-in-the-Kernel" class="headerlink" title="Analysis of Malicious Code in the Kernel"></a>Analysis of Malicious Code in the Kernel</h2><p>Most traditional sandboxes available today are based on intercepting API function invocations by placing hooks into the user-mode libraries loaded by a program under analysis. The idea is to intercept – and sometimes even tamper with – any parameters passed to functions that can be used to perform security-relevant behavior on a system.</p>
+<p>Some slightly more advanced sandboxes are also able to intercept system calls invoked by the analyzed program, to address the case in which evasive malware bypasses user-mode functions and interacts with the operating system kernel directly. In both systems, the core idea is to interrupt the execution of malicious code at certain points of interest in order to extract and log the functions (and their arguments) that represent the actions performed by the program under analysis.</p>
+<p>When malware manages to load one of its components into the kernel (for example via an exploit, as we will cover in a follow-up post), this malicious component is loaded indistinguishably from trusted, operating-system code. At this point, it is no longer feasible to monitor actions triggered by malware code using traditional hooking mechanisms, as the malware behaviors do not rely on invocations of user-mode APIs or system calls any longer.<br>With the rise and prevalence of kernel-mode APTs, it is crucial to overcome this problem in order to defend against these recent attacks.</p>
+<p>Lastline’s high-resolution sandbox uses a full-system emulation approach, which allows the sandbox to see every instruction executed inside the analysis environment. This allows our engine to interrupt the execution of an interesting piece of code at any time (and not only when an API function or system call is invoked) to extract behavior, regardless of whether the malicious code is running in the context of a user-application or the operating system’s kernel. At the same time, our approach allows us to track which code has been loaded or modified from the context of untrusted operations (such as newly-loaded drivers) and thus track which code belongs to the original, trusted kernel, and what code is part of the malware threat and, therefore, requires special attention.</p>
+<h2 id="Anatomy-of-Traditional-Kernel-Rootkits"><a href="#Anatomy-of-Traditional-Kernel-Rootkits" class="headerlink" title="Anatomy of Traditional Kernel-Rootkits"></a>Anatomy of Traditional Kernel-Rootkits</h2><p>To start off, let us take a brief look at how kernel-based attacks have worked in the past. While some of the attacks described below are rather well-understood, they nevertheless highlight a few key concepts a next-generation analysis sandbox has to fulfill to allow for the analysis of kernel-based malicious code.</p>
+<p>Most traditional rootkits have the ability to hide the user-mode components of a malicious program. This is typically used to hide these components from AV software or analysts looking for signs of an infection. This can be achieved by hooking or modifying critical system tables, such as SSDT or IDT, or by modifying other kernel memory regions, such as code or data sections of system modules.</p>
+<p>For such rootkits, the infection typically works as follows: First, an attacker exploits a user system (for example, the attacker tricks the user to visit a URL serving a drive-by download exploit attacking the user’s browser), loading a piece of malicious code into the kernel. This code then intercepts any system call invoked by user-mode applications, and filters any data returned to a program that would reveal the infection. For example, if a security product is looking for newly-generated files in a directory, this filter function would simply remove any malicious files before returning a directory listing to the requesting program. In a similar way, these hooks can filter and hide the presence of registry modifications, running processes, or any other event generated by the attacker.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>As one might have guessed, the presence of such filtering code loaded into the kernel is very indicative of malicious activity. Therefore, the Lastline analysis engine is able to analyze any code that is newly loaded into the kernel of the operating system under analysis.</p>
+<p>Additionally, whenever a critical function or memory location is hooked or modified, the analysis system uses this information to classify the origin of this code as malicious. At the same time, the analysis report exposes all this information with details on the type of function that was hooked or modified, providing analysts with highly-valuable information about the attack:</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal2.png" width="450"></a><br>    <figcaption>Analysis report showing kernel modification </figcaption><br></figure>
+
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal3.png" width="450"></a><br>    <figcaption>Analysis report showing SSDT hooks modification</figcaption><br></figure>
+
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal4.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal4.png" width="450"></a><br>    <figcaption>Analysis report showing critical kernel memory region modification</figcaption><br></figure>
+
+<p>Anatomy of Kernel-Based APTs<br>Recent waves of APT-attacks, such as Regin, Dark Hotel, or Turla/Uroburos, have shown that malware authors are using these rootkit techniques not only to hide the presence of other user-mode components, but also to leverage the privileges of kernel-code and integrate much more sophisticated behavior directly into the kernel-components. Examples of such added functionality are the ability to inject arbitrary code into running processes, or code to download and install further code, directly from the context of the kernel.</p>
+<p>At the same time, these APTs have also become more evasive against traditional, signature-based detection systems. Very often, they use encryption and loading in multiple stages to hinder analysis. Often they use hidden and encrypted files in unpartitioned sections of the file-system to hide their presence, even when the system is booted using a trusted, uncompromised kernel to analyze an infected host.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal5.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal5.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p>With full visibility into any malicious code running in user or kernel context, the Lastline sandbox is able to perform comprehensive analysis of any such components. Whenever the engine sees that untrusted code tampers with or injects code into another user-mode process, the system includes any behavior exhibited by the modified user-process in the analysis.</p>
+<p>This way, our analysis results reflect the full chain of infection, from the initial exploit modifying the kernel, all the way to kernel code spreading to other user-mode processes.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal6.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal6.png" width="450"></a><br>    <figcaption>Analysis report showing kernel-memory hooking and user-mode injections</figcaption><br></figure>
+
+<h2 id="Understanding-Kernel-Modifications-Necrus"><a href="#Understanding-Kernel-Modifications-Necrus" class="headerlink" title="Understanding Kernel Modifications: Necrus"></a>Understanding Kernel Modifications: Necrus</h2><p>As we have described in a <a href="http://lastline.wpengine.com/labsblog/exploit-analysis-via-process-snapshotting" target="_blank" rel="external">previous post on process snapshotting</a>, the Lastline analysis engine allows a security analyst to expose memory dumps from various stages of the malware execution in addition to the detailed description of the behavior observed during analysis.</p>
+<p>This is no different for kernel-based malicious code, so let us use a variant of the Necrus Rootkit to take a deeper look at how this malware behaves as part of the kernel.</p>
+<p>As any analyst who has worked on Necrus (or really any kernel rootkit) knows, it is very tedious to analyze and understand the various decryption loops obfuscating the interesting payload of a kernel driver.</p>
+<p>The following snippet of code shows just one such decryption loop present in Necrus:</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal7.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal7.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>In addition to using various obfuscation/decryption loops, Necrus also contains fake entries in the import table that are not related to any payload functionality:</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal8.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal8.png" width="450"></a><br>    <figcaption>Function Exports in IDA</figcaption><br></figure>
+
+<p>Luckily for this analysis, we can skip the description of how to set up a kernel debugger to intercept execution when the kernel component has decrypted itself. The Lastline analysis engine does all of this automatically and provides us with a decrypted, de-obfuscated, repackaged executable snapshot that can be loaded via IDA Pro.</p>
+<p>Once opened in IDA, the snapshot reveals all information about the decrypted payload. For example, the Rebuilt APIs section contains information about imports pointing to decrypted payload functionality:</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal9.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal9.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>Starting from this table, it is trivial to find a particular hook the analyst is interested in. For example, we can follow KeServiceDescriptorTable, which reveals that the sample patches the SSDT, and sets hooks at NtOpenProcess and NtOpenThread to the code seen below:</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal10.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal10.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>The routine first maps the Service Descriptor Table in memory to find the function addresses of NtOpenProcess and NtOpenThread. These pointers are then overwritten with addresses of the corresponding hook functions. Subsequently, calls to NtOpenProcess or NtOpenThread from any user-mode application execute the hijacked functions of the rootkit.</p>
+<p>Summary<br>Kernel-based malicious code has become part of the most advanced and sophisticated attacks seen in recent months. As a result, security solutions and analysis sandboxes need to adapt and provide the ability for analyzing and understanding kernel code to protect users from these threats.</p>
+<p>Lastline’s high-resolution sandbox uses a full-system emulation approach and is able to perform effective analysis of code running in both kernel and user spaces. This allows us to obtain a complete picture of the malicious behavior to detect and mitigate these advanced threats.</p>
+<p>To learn more about Lastline’s rootkit analysis capabilities, <a href="https://www.lastline.com/press/deep-kernel-malware-analysis-launch-industry-first/" target="_blank" rel="external">read the announcement</a> that we made today in a press release.</p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">14</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-buildsandbox"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170401/buildsandbox/">如何构建一个有效地恶意代码分析沙盒</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170401/buildsandbox/" class="article-date">
+	  <time datetime="2017-04-01T02:26:11.000Z" itemprop="datePublished">四月 1, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Source: <a href="https://www.lastline.com/labsblog/different-sandboxing-techniques-to-detect-advanced-malware/" target="_blank" rel="external">https://www.lastline.com/labsblog/different-sandboxing-techniques-to-detect-advanced-malware/</a><br>Author: <a href="https://www.lastline.com/author/christopher/" target="_blank" rel="external">Dr. Christopher Kruegel</a></p>
+<pre><code>Currently on leave from his position as Professor of Computer Science at UC Santa Barbara, Christopher Kruegel’s research interests focus on computer and communications security, with an emphasis on malware analysis and detection, web security, and intrusion detection. Christopher previously served on the faculty of the Technical University Vienna, Austria. He has published more than 100 peer-reviewed papers in top computer security conferences and has been the recipient of the NSF CAREER Award, MIT Technology Review TR35 Award for young innovators, IBM Faculty Award, and several best paper awards. He regularly serves on program committees of leading computer security conferences. Christopher was the Program Committee Chair of the Usenix Workshop on Large Scale Exploits and Emergent Threats (LEET, 2011), the International Symposium on Recent Advances in Intrusion Detection (RAID, 2007), and the ACM Workshop on Recurring Malcode (WORM, 2007). He was also the head of a working group that advised the European Commission (EC) on defenses to mitigate future threats against the Internet and Europe&apos;s cyber-infrastructure.
+</code></pre><hr>
+<p>Automated malware analysis systems (or sandboxes) are one of the latest weapons in the arsenal of security vendors. Such systems execute an unknown malware program in an instrumented environment and monitor their execution. While such systems have been used as part of the manual analysis process for a while, they are increasingly used as the core of automated detection processes. The advantage of the approach is clear: It is possible to identify previously unseen (zero day) malware, as the observed activity in the sandbox is used as the basis for detection.</p>
+<p>For a high level overview of this topic, please read <a href="http://www.csyssec.org/20170401/sandbox/" target="_blank" rel="external">Next-Generation Sandbox Offers Comprehensive Detection of Advanced Malware</a>.</p>
+<h2 id="Goals-of-a-dynamic-analysis-system-sandbox"><a href="#Goals-of-a-dynamic-analysis-system-sandbox" class="headerlink" title="Goals of a dynamic analysis system (sandbox)"></a>Goals of a dynamic analysis system (sandbox)</h2><p>A good malware analysis sandbox has to achieve three goals: Visibility, resistance to detection, and scalability.</p>
+<p>First, a sandbox has to see as much as possible of the execution of a program. Otherwise, it might miss relevant activity and cannot make solid deductions about the presence or absence of malicious behaviors. Second, a sandbox has to perform monitoring in a  fashion that makes it difficult to detect. Otherwise, it is easy for malware to identify the presence of the sandbox and, in response, alter its behavior to evade detection. The third goal captures the desire to run many samples through a sandbox, in a way that the execution of one sample does not interfere with the execution of subsequent malware programs. Also, scalability means that it must be possible to analyze many samples in an automated fashion.</p>
+<h2 id="What-information-should-a-sandbox-collect"><a href="#What-information-should-a-sandbox-collect" class="headerlink" title="What information should a sandbox collect?"></a>What information should a sandbox collect?</h2><p>In this post, we discuss different ways in which a sandbox can monitor the execution of malware that runs in user mode (either as a regular user or administrator). This leaves out malicious code that tampers with the kernel, such as rootkits. We leave those for a future post. Also, the vast majority of malware runs as regular user mode processes, and even rootkits typically leverage user mode components to install kernel drivers or to modify the operating system code.</p>
+<p>When monitoring the behavior of a user mode process, almost all sandboxes look at the system call interface or the Windows API. System calls are functions that the operating system exposes to user mode processes so that they can interact with their environment and get stuff done, such as reading from files, sending packets over the network, and reading a registry entry on Windows. Monitoring system calls (and Windows API function calls) makes sense, but it is only one piece of the puzzle. The problem is that a sandbox that monitors only such invocations is blind to everything that happens in between these calls. That is, a sandbox might see that a malware program reads from a file, but it cannot determine how the malware actually processes the data that it has just read. A lot of interesting information can be gathered from looking deeper into the execution of a program. Thus, some sandboxes go one step further than just hooking function calls (such as system calls or Windows API functions), and also monitor the instructions that a program executes between these invocations.</p>
+<h2 id="Emulation-versus-virtualization"><a href="#Emulation-versus-virtualization" class="headerlink" title="Emulation versus virtualization"></a>Emulation versus virtualization</h2><p>Now that we know what information we want to collect, the next question is how we can build a sandbox that can collect this data in a way that makes it difficult for malware to detect. The two main options are virtualization and emulation.</p>
+<p>An emulator is a software program that simulates the functionality of another program or a piece of hardware. Since an emulator implements functionality in software, it provides great flexibility. For example, consider an emulator that simulates the system hardware (such as the CPU and physical memory). When you run a guest program P on top of this emulated hardware, the system can collect very detailed information about the execution of P. The guest program might even be written for a different CPU architecture than the actual CPU that the emulator runs on. This mechanism allows, for example, to run an Android program, written for ARM, on top of an emulator that runs on an x86 host. The drawback of emulation is that the software layer incurs a performance penalty. The potential performance impact has to be carefully addressed to make the analysis system scalable.</p>
+<p>With virtualization, the guest program P actually runs on the underlying hardware. The virtualization software (the hypervisor) only controls and mediates the accesses of different programs (or different virtual machines) to the underlying hardware. In this fashion, the different virtual machines are independent and isolated from each other. However, when a program in a virtual machine is executing, it is occupying the actual physical resources, and as a result, the hypervisor (and the malware analysis system) cannot run simultaneously. This makes detailed data collection challenging. Moreover, it is hard to entirely hide the hypervisor from the prying eyes of malware programs. The advantage is that programs in virtual machines can run at essentially native speed.</p>
+<h2 id="Leveraging-emulation-and-virtualization-for-malware-analysis"><a href="#Leveraging-emulation-and-virtualization-for-malware-analysis" class="headerlink" title="Leveraging emulation and virtualization for malware analysis"></a>Leveraging emulation and virtualization for malware analysis</h2><p>As mentioned previously, the task of an emulator is to provide a simulated (runtime) environment in which a malware program can execute. There are two main options for this environment. First, one can emulate the operating system (this is called OS emulation). Intuitively, this makes sense. A program runs in user mode and needs to make system calls to interact with its environment. So, why not simply emulate these systems calls? While the malware is running, one can get a close look at its activity (one can see every instruction). When the malware tries to make a system call, this information can be easily recorded. At this point, the emulator simply pretends that the system call was successfully executed and returns the proper result to the program.</p>
+<p>This sounds simple enough in theory, but it is not quite as easy in practice. One problem is that the (native) system call interface in Windows is not documented, and Microsoft reserves the right to change it at will. Thus, an emulator would typically target the Windows API, a higher-level set of library functions on top of the native system calls. Unfortunately, there are tens of thousands of these Windows API functions. Moreover, the Windows OS is a huge piece of software, and emulating it faithfully requires an emulator that has a comparable complexity of Windows itself! Since faithful emulation is not practical, emulators typically focus on a popular subset of functionality that works “reasonably well” for most programs. Of course, malware authors know about this. They can simply invoke less frequently used functions and check whether the system behaves as expected (that is, like a real Windows OS). OS emulators invariably fail to behave as expected, and such sandboxes are quite easy for malware to detect and evade. Security vendors that leverage OS emulation are actually well aware of this limitations. They typically include OS emulation only as one part of their solution, complemented by other detection techniques.</p>
+<p>As the second option for an emulator, one can simulate the hardware (in particular, CPU and physical memory). This is called (whole) system emulation. System emulation has several advantages. First, one can install and run an actual operating system on top of the emulator. Thus, the malware is executed inside a real OS, making the analysis environment much more difficult to detect for malware. The second advantage is that the interface offered by a processor is (much) simpler than the interface provided by Windows. Yes, there are hundreds of instructions, but they are very well documented, and they essentially never change. After all, Intel, AMD and ARM want an operating system (or application) developer to know exactly what to expect when she targets their platform. Finally, and most importantly, a system emulator has great visibility. A sandbox based on system emulation sees every instruction that a malware program executes on top of the emulated processor, and it can monitor every single access to emulated memory.</p>
+<p>Virtualization platforms provides significantly fewer options for collecting detailed information. The easiest way is to record the system calls that programs perform. This can be done in two different ways. First, one could instrument the guest operating system. This has the obvious drawback that a malware program might be able to detect the modified OS environment. Alternatively, one can perform system call monitoring in the hypervisor. System calls are privileged operations. Thus, when a program in a guest VM performs such an operation, the hypervisor is notified. At this point, control passes back to the sandbox, which can then gather the desired data. The big challenge is that it is very hard to efficiently record the individual instructions that a guest process executes without being detected. After all, the sandbox relinquishes control to this process between the system calls. This is a fundamental limitation for any sandbox that uses virtualization technology.</p>
+<h2 id="How-is-our-sandbox-built"><a href="#How-is-our-sandbox-built" class="headerlink" title="How is our sandbox built?"></a>How is our sandbox built?</h2><p>We think that more visibility is better, especially facing malware that becomes increasingly aware of virtual machines and sandbox analysis. We have seen malware that tries to detect the presence of VMware for many years. Even if one builds a custom sandbox based on virtualization technology, the fundamental visibility limitations remain. Of course, when a malware program checks for specific files or processes that a well-known hypervisor like VMware introduces, these checks will fail, and the custom sandbox will be successful in seeing malicious activity. However, virtualization, by definition, means that malicious code is run directly on the underlying hardware. And while the malicious code is running, the sandbox is paused. It is only woken up at specific points, such as system calls. This is a problem, and a major reason why we decided to implement our sandbox as a system emulator.</p>
+<p>Why does not everybody use system emulation, since it seems such a great idea? The reason is that one needs to overcome two technical challenges to make a system emulator work in practice. One challenge is called the semantic gap, the other one is performance. The semantic gap is related to the problem that a system emulator sees instructions executed on the CPU, as well as the physical memory that the guest OS uses. However, it is not immediately clear how to connect CPU instructions and bytes in memory to objects that make sense in the context of the guest OS. After all, we want to know about the files that a process creates, or the Windows registry entries that it reads. To bridge the semantic gap, one needs to gain a deep understanding into the inner workings of the guest operating system. By doing this, we can then map the detailed, low level view of our system to high level information about files, processes and network traffic that are shown in our report.</p>
+<p>The second question is about performance. Isn’t emulation terribly slow? The answer is yes, if implemented in a naive way. If we emulated every instruction in software, the system would indeed not scale very well. However, we have done many clever things to speed up emulation, to a level where it is (almost) as fast as native execution. For example, one does not need to emulate all code. A lot of code can be trusted, such as Windows itself. Well, we can trust the kernel most of the time – of course, it can be compromised by rootkits. Only the malicious program (and code that this program interacts with) needs to be analyzed in detail. Also, one can perform dynamic translation. With dynamic translation, every instruction is examined in software once, and then translated into a much more efficient form that can be run directly.</p>
+<h2 id="Summary"><a href="#Summary" class="headerlink" title="Summary"></a>Summary</h2><p>A sandbox offers the promise of zero day detection capabilities. As a result, most security vendors offer some kind of sandbox as part of their solutions. However, not all sandboxes are alike, and the challenge is not to build a sandbox, but rather to build a good one. Most sandboxes leverage virtualization and rely on system calls for their detection. This is not enough, since these tools fundamentally miss a significant amount of potentially relevant behaviors. Instead, we believe that a sandbox must be an analysis platform that sees all instructions that a malware program executes, thus being able to see and react to attempts by malware authors to fingerprint and detect the runtime environment. As far as we know, Lastline is the only vendor that uses a sandbox based on system emulation, combining the visibility of an emulator with the resistance to detection (and evasion) that one gets from running the malware inside the real operating system.</p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">14</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Sandbox/">Sandbox</a></li></ul>
 
       
     </footer>
@@ -1128,7 +490,7 @@ sudo update-alternatives --config gcc
 
   <nav id="page-nav">
     
-    <a class="extend prev" rel="prev" href="/page/6/">上一页</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/5/">5</a><a class="page-number" href="/page/6/">6</a><span class="page-number current">7</span><a class="page-number" href="/page/8/">8</a><a class="page-number" href="/page/9/">9</a><span class="space">&hellip;</span><a class="page-number" href="/page/16/">16</a><a class="extend next" rel="next" href="/page/8/">下一页</a>
+    <a class="extend prev" rel="prev" href="/page/6/">上一页</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/5/">5</a><a class="page-number" href="/page/6/">6</a><span class="page-number current">7</span><a class="page-number" href="/page/8/">8</a><a class="page-number" href="/page/9/">9</a><span class="space">&hellip;</span><a class="page-number" href="/page/20/">20</a><a class="extend next" rel="next" href="/page/8/">下一页</a>
   </nav>
 
 </section>
@@ -1223,7 +585,7 @@ sudo update-alternatives --config gcc
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/monitoring-int80/">X86/Intel虚拟化技术监控/陷入软件中断INT80H系统调用</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/cfi-development/">控制流完整性的发展历程</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1235,7 +597,7 @@ sudo update-alternatives --config gcc
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/unpriviledged-ins/">非特权指令的内核信息泄露</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/cfi-ccs05/">控制流完整性-CCS05年论文</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1247,7 +609,7 @@ sudo update-alternatives --config gcc
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/hav-exception/">对硬件虚拟化异常的思考(#VE)</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/rop-intel/">因特尔发布新的技术规范去防御 ROP 攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1259,7 +621,7 @@ sudo update-alternatives --config gcc
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/monitoring-syscall/">X86虚拟化技术监控/陷入SYSCALL的另一种方法</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/ropjop-research/">ROP/JOP攻击与防御最新研究进展</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1271,7 +633,7 @@ sudo update-alternatives --config gcc
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/vmcs-vmxon/">VT-x技术VMXON与VMCS区域的思考-从安全的角度</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/nmi-virtual/">虚拟化技术的NMI窗口退出</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1283,7 +645,7 @@ sudo update-alternatives --config gcc
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/monitoring-schduling/">使用硬件虚拟化技术无感监控Windows OS调度事件</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/lbr-ret2dir/">利用LBR特性检测ret2dir攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1295,7 +657,7 @@ sudo update-alternatives --config gcc
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/mtf/">MTF在基于EPT的客户机物理内存监控中的使用</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/virtual-ret2dir/">利用虚拟化技术防御ret2dir攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1307,7 +669,7 @@ sudo update-alternatives --config gcc
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/hardware-security-x86arm/">X86&amp;ARM架构处理器硬件安全特性</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/smep-nx/">利用NX位实现基于软件的SMEP</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1319,7 +681,7 @@ sudo update-alternatives --config gcc
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/xen-snapshot/">XEN快照机制</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/smep-virtual/">如何利用虚拟化技术实现基于软件的SMEP(监督模式执行)</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1331,7 +693,7 @@ sudo update-alternatives --config gcc
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/xen-event/">XEN事件通道机制及其实例</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/tsx-exploit/">TSX处理器技术对漏洞利用意味着什么？</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1343,7 +705,7 @@ sudo update-alternatives --config gcc
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/kvm-migration/">KVM迁移中脏页位图机制源码分析</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/lbr-idthooking/">使用LRB(最近分支记录)特性检测IDT Hooking</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1355,7 +717,7 @@ sudo update-alternatives --config gcc
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/kvm-exception/">KVM异常处理流程源码简要分析</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/bitvisor/">BitVisor- 一种实施I/O设备安全的轻量级Hypervisor</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1367,7 +729,7 @@ sudo update-alternatives --config gcc
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/qemukvm-source2/">Qemu-KVM虚拟机初始化及创建过程源码简要分析（二）</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/xencolor/">Xen模式：你的XEN是什么颜色？</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1379,7 +741,7 @@ sudo update-alternatives --config gcc
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/qemukvm-source1/">Qemu-KVM虚拟机初始化及创建过程源码简要分析（一）</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/securekernel-design/">这是Linux内核中一种好的安全设计吗- thread_info和内核栈的联系</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1391,8 +753,8 @@ sudo update-alternatives --config gcc
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170401/keylogger/">Keylogger检测</a></h6>
-          <!--  <span>四月 1, 2017</span> -->
+              <h6 style="margin: 0;"><a href="/20170504/secureos/">安全操作系统内核设计：一种阻止恶意软件覆盖关键系统内核数据结构的思想</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
             </div>
 
           </li>
@@ -1403,8 +765,8 @@ sudo update-alternatives --config gcc
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170401/winkernelmal/">深入探索windows内核rootkit动态分析</a></h6>
-          <!--  <span>四月 1, 2017</span> -->
+              <h6 style="margin: 0;"><a href="/20170504/rop-jop/">一种运行时无感的方法防御ROP和JOP攻击</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
             </div>
 
           </li>
@@ -1419,7 +781,7 @@ sudo update-alternatives --config gcc
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">10</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">8</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">10</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -1429,7 +791,7 @@ sudo update-alternatives --config gcc
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.73px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 18.18px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.73px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 11.82px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.91px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 17.27px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 16.36px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.45px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.82px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 12.73px;">Monitoring</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.91px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.91px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 16.36px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.82px;">Rootkit</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.91px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.09px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 12.73px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 11.82px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.43px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.14px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.71px;">Binary</a> <a href="/tags/CFI/" style="font-size: 10.71px;">CFI</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.14px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 12.86px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 17.86px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.14px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 14.29px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.71px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.71px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.57px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.43px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.14px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 12.86px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 12.86px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.71px;">Malware</a> <a href="/tags/Memory/" style="font-size: 12.86px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.43px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 12.14px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.71px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.71px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.71px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.14px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.71px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.43px;">Rootkit</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.71px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.71px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.57px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.43px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.29px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 12.14px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 12.86px;">XEN</a>
     </div>
   </div>
 

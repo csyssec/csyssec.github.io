@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>bitvisor- 一种实施i/o设备安全的轻量级hypervisor | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="Author：Bing Zhu 
+Source：http://hypervsir.blogspot.com/2014/11/paper-read-bitvisor-thin-hypervisor-for.html
+转载请注明：原作者信息以及CSysSec
+
+This post is wrote to share an idea of the paper (BitVisor: A Thin Hype">
+<meta property="og:type" content="article">
+<meta property="og:title" content="BitVisor- 一种实施I/O设备安全的轻量级Hypervisor">
+<meta property="og:url" content="http://yoursite.com/20170504/bitvisor/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="Author：Bing Zhu 
+Source：http://hypervsir.blogspot.com/2014/11/paper-read-bitvisor-thin-hypervisor-for.html
+转载请注明：原作者信息以及CSysSec
+
+This post is wrote to share an idea of the paper (BitVisor: A Thin Hype">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/MMU_and_IOMMU.png">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/BitVisor.png">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/BitVisor-layer.png">
+<meta property="og:updated_time" content="2017-05-04T10:26:23.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="BitVisor- 一种实施I/O设备安全的轻量级Hypervisor">
+<meta name="twitter:description" content="Author：Bing Zhu 
+Source：http://hypervsir.blogspot.com/2014/11/paper-read-bitvisor-thin-hypervisor-for.html
+转载请注明：原作者信息以及CSysSec
+
+This post is wrote to share an idea of the paper (BitVisor: A Thin Hype">
+<meta name="twitter:image" content="http://oij0laovn.bkt.clouddn.com/MMU_and_IOMMU.png">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">FROM 0 TO 1</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">系统结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/courses">名人课堂</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-bitvisor" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      BitVisor- 一种实施I/O设备安全的轻量级Hypervisor
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/bitvisor/" class="article-date">
+	  <time datetime="2017-05-04T10:25:16.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
+<p>Source：<a href="http://hypervsir.blogspot.com/2014/11/paper-read-bitvisor-thin-hypervisor-for.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/paper-read-bitvisor-thin-hypervisor-for.html</a></p>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>This post is wrote to share an idea of the paper (<a href="http://dl.acm.org/citation.cfm?id=1508311" target="_blank" rel="external">BitVisor: A Thin Hypervisor for Enforcing I/O Device Security</a>) that I read recently. It innovates a <strong>hypervisor-based solution for enforcing storage/disk encryption of ATA devices</strong>.<br>As we know that Direct memory access (DMA) is a feature in computer system that allows certain hardware subsystems to directly access main system memory independently of the CPU/processor. </p>
+<p>As shown in picture below (from <a href="http://en.wikipedia.org/wiki/IOMMU" target="_blank" rel="external">wikipedia</a>), processor MMU (if present) cannot directly intercept data movement between external DMA-capable devices and the main memory. Even in a virtualization environment, extended page table (EPT or NPT) MMU configured by Hypervisor cannot protect the main memory resource, this is one of reasons of why the technology IOMMU like VT-d (<a href="https://software.intel.com/en-us/articles/intel-virtualization-technology-for-directed-io-vt-d-enhancing-intel-platforms-for-efficient-virtualization-of-io-devices" target="_blank" rel="external">Intel Virtualization Technology for Directed I/O</a>) is introduced to prevent malicious device drivers from attacking against the main memory even hypervisor owned memory space. </p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/MMU_and_IOMMU.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/MMU_and_IOMMU.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p><strong>Although the processor has no chance to intercept the data transferred between device and main memory, it still has chances to intercept the access to DMA control data regions like DMA descriptors that store transferring information,<br>such as the buffer address and the size of the data.</strong></p>
+<p>Because basically all the DMA host controllers are using some specific command control registers to configure and trigger DMA data transfers. Those registers are commonly represented as I/O based or/and MMIO based registers, the former registers are accessed with I/O port (e.g. IN/OUT or INTS/OUTS instructions in x86 system), and the latter registers are accessed with <a href="http://en.wikipedia.org/wiki/Memory-mapped_I/O" target="_blank" rel="external">memory-mapped I/O</a> method with generic memory movement instructions (like MOV instruction).</p>
+<p>In x86 virtualization, both accesses with I/O port and MMIO can be monitored by hypervisor (e.g. through I/O port bitmap VMCS configuration, and appropriate EPT page permission settings). </p>
+<p>In BitVisor, <strong>a thin hypervisor intercepts any read/write access to the ATA DMA host controller’s command-block registers and control-block register. Therefore, it is easy to obtain information necessary to enforce encryption</strong>. For example, the hypervisor can obtain the LBA and sector count by intercepting writes to these registers. Similarly, the corresponding ATA disk DMA descriptor can also be monitored and controlled by BitVisor hypervisor. </p>
+<p><strong>With intercepting all the information as mentioned above, the hypervisor has knowledge of where the DMA buffer (physical address) will be transferred to/from, when to start/stop data transfers, and what size in bytes will be transferred to/from external device.</strong></p>
+<p>This paper presents a novel idea of <strong><em>shadow DMA descriptors</em></strong> (see Figure below, click it to enlarge) for safely intercepting the content of data transferred by DMA. A shadow DMA descriptor is a shadow of the DMA descriptor of the guest OS (guest DMA descriptor).The hypervisor sets the shadow DMA descriptors to the host controller (rather than the real guest DMA descriptor). The shadow DMA descriptor specifies a memory region controlled by the hypervisor as a temp buffer, called the shadow buffer. </p>
+<p>When data movement starts, the DMA host controller transfers data between the shadow buffer (rather than the real guest buffer) and the device, based on the shadow DMA descriptors. After data movement is completed, the hypervisor emulates the host controller behaviors by copying data between the shadow buffer and the guest buffer that is specified in the real guest DMA descriptor.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/BitVisor.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/BitVisor.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>Now that hypervisor can fully control and intercept the DMA data content, the encryption and decryption become easy. When guest software writes the data to ATA disk, the hypervisor can enforce encryption from guest buffer to shadow buffer (that eventually goes to disk), and in reverse order when guest software reads data from ATA disk, the hypervisor will decrypt data from shadow buffer (coming from disk) to guest buffer. </p>
+<p>On the other side, as a pretty good side effort, <strong><em>we can utilize this solution to enforce protection from device-specific DMA attacks on a platform that is lack of IOMMU (e.g. VT-d) capability</em></strong>. For instance, the hypervisor can verify the address of guest buffers specified in the guest DMA descriptors so that the address (plus the data size) does not point to the hypervisor memory regions and any other protected guest memory regions.  </p>
+<p>As we can see that the hypervisor can capture the event when DMA starts. However, the end of DMA transfer is usually notified by a hardware interrupt, but BitVisor cannot identify the ATA device that issues hardware interrupts. Instead, BitVisor captures I/O access to status registers, because device drivers usually read status registers to check whether DMA transfer has finished successfully or not, and write registers to acknowledge interrupts. <strong><em>As an alternative, the solution in <a href="http://hypervsir.blogspot.com/2014/10/monitortrap-software-interrupt-int-08h.html" target="_blank" rel="external">my previous post</a> can solve this issue by monitoring the ATA disk external interrupt.</em></strong></p>
+<p>To download the source code of latest BitVisor, please go to the official site <a href="http://www.bitvisor.org/" target="_blank" rel="external">http://www.bitvisor.org/</a></p>
+<p>See below <a href="https://www.bitvisor.org/summit/slides/BitVisor-Summit-04-matsubara.pdf" target="_blank" rel="external">snapshot</a> (and other one <a href="http://www.slideshare.net/shinagawa/20121204-bitvisor-summit" target="_blank" rel="external">BitVisor Summit @2012</a>), it uses the Ring3 layer in VMX-root to hold various services. </p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/BitVisor-layer.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/BitVisor-layer.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<hr>
+<p><strong><em>References:</em></strong><br>TreVisor:<br>OS-Independent Software-Based Full Disk Encryption &amp; Secure Against Main Memory Attacks<br><a href="http://www1.cs.fau.de/filepool/projects/trevisor/trevisor.pdf" target="_blank" rel="external">http://www1.cs.fau.de/filepool/projects/trevisor/trevisor.pdf</a></p>
+<p>OSb: OSv on BitVisor<br><a href="http://www.slideshare.net/yushiomote/osb-osv-on-bitvisor" target="_blank" rel="external">http://www.slideshare.net/yushiomote/osb-osv-on-bitvisor</a></p>
+<p>Takahiro Shinagawa: Introduction to the BitVisor and Comparison with Xen<br><a href="http://www.slideshare.net/xen_com_mgr/xs-japan-2008-bitvisor-english" target="_blank" rel="external">http://www.slideshare.net/xen_com_mgr/xs-japan-2008-bitvisor-english</a></p>
+<p>Dependable Cloud Computing<br><a href="http://www.slideshare.net/kazuhikokato/121127-37898979" target="_blank" rel="external">http://www.slideshare.net/kazuhikokato/121127-37898979</a></p>
+<p>Kernel Memory Protection by an Insertable Hypervisor which has VM Introspection and Stealth Breakpoints (IWSEC2014)<br><a href="http://www.slideshare.net/suzaki/international-workshop-on-security-iwsec2014" target="_blank" rel="external">http://www.slideshare.net/suzaki/international-workshop-on-security-iwsec2014</a></p>
+<p>A Hypervisor IPS based on Hardware Assisted Virtualization Technology<br><a href="http://www.slideshare.net/ffri/bh-usa08murakami" target="_blank" rel="external">http://www.slideshare.net/ffri/bh-usa08murakami</a></p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/Hypervisor安全/">Hypervisor安全<span class="article-category-count">1</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+        
+	<div id="comment">
+	
+	<!-- 多说评论框 start -->
+	 <div class="ds-thread" data-thread-key="/20170504/bitvisor/" data-title="BitVisor- 一种实施I/O设备安全的轻量级Hypervisor" data-url="http://yoursite.com/20170504/bitvisor/"></div>
+	<!-- 多说评论框 end -->
+	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+	<script type="text/javascript">
+	var duoshuoQuery = {short_name:"csyssec"};
+	  (function() {
+	    var ds = document.createElement('script');
+	    ds.type = 'text/javascript';ds.async = true;
+	    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+	    ds.charset = 'UTF-8';
+	    (document.getElementsByTagName('head')[0] 
+	     || document.getElementsByTagName('body')[0]).appendChild(ds);
+	  })();
+	  </script>
+	<!-- 多说公共JS代码 end -->
+	
+	</div>
+	<link rel="stylesheet" href="/css/comment.css">
+
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/20170504/lbr-idthooking/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">上一篇</strong>
+      <div class="article-nav-title">
+        
+          使用LRB(最近分支记录)特性检测IDT Hooking
+        
+      </div>
+    </a>
+  
+  
+    <a href="/20170504/xencolor/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">Xen模式：你的XEN是什么颜色？</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+    <ol class="toc">无</ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+       <!--  自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a> --> 
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/courses" class="mobile-nav-link">Courses</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>

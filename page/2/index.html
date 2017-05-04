@@ -106,7 +106,7 @@
         
           <section id="main">
   
-    <article id="post-monitoring-schduling"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-lbr-ret2dir"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -114,7 +114,7 @@
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/monitoring-schduling/">使用硬件虚拟化技术无感监控Windows OS调度事件</a>
+      <a class="article-title" href="/20170504/lbr-ret2dir/">利用LBR特性检测ret2dir攻击</a>
     </h1>
   
 
@@ -122,45 +122,37 @@
     
     <div class="article-meta">
       
-	Posted on <a href="/20170504/monitoring-schduling/" class="article-date">
-	  <time datetime="2017-05-04T07:49:55.000Z" itemprop="datePublished">五月 4, 2017</time>
+	Posted on <a href="/20170504/lbr-ret2dir/" class="article-date">
+	  <time datetime="2017-05-04T10:38:55.000Z" itemprop="datePublished">五月 4, 2017</time>
 	</a>
 
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/09/windows-os-thread-scheduling-monitoring.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/09/windows-os-thread-scheduling-monitoring.html</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
+<p>Source：<a href="http://hypervsir.blogspot.com/2014/12/using-lbr-last-branch-record-feature-to.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/12/using-lbr-last-branch-record-feature-to.html</a></p>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
-<p>A <strong><a href="http://en.wikipedia.org/wiki/Rootkit" target="_blank" rel="external">rootkit</a></strong> is a stealthy type of software, typically malicious, designed to hide the existence of itself or certain processes/programs from normal methods of detection and enable continued privileged access to a computer. However, even though the malicious process/program can be invisible to users, internally it must have to get time slices for running, otherwise if it has no chance to get scheduled by CPU, such an existence is meaningless for malware author. </p>
-<p>This article provides a solution to detect the malware and inspect its behaviors by monitoring each OS thread scheduling event.</p>
-<p>This article is organized into two parts: 1) explain Windows scheduling things and related data structures; 2) then explain how to get notified in underlying VMM software without any changes to guest Windows OS.</p>
-<p>####<strong>Windows thread scheduling</strong><br>Thread (rather than Process) is the fundamental schedulable entity in the Windows operating system. It is represented by a <strong><a href="http://www.nirsoft.net/kernel_struct/vista/ETHREAD.html" target="_blank" rel="external">_ETHREAD</a></strong> structure that includes a <strong><a href="http://www.nirsoft.net/kernel_struct/vista/KETHREAD.html" target="_blank" rel="external">_KTHREAD structure</a></strong>. For every thread in the system there is an ETHREAD structure, including threads in the System Idle Process. The ETHREAD.<strong><em>Tcb</em></strong> field (Thread Control Block)/KTHREAD is used to store information related to thread scheduling. Every process stores a list of ETHREAD structures, representing all the threads running in that process, in the <strong><em>TheadListHead</em></strong> field of the <strong><a href="http://www.nirsoft.net/kernel_struct/vista/_EPROCESS.html" target="_blank" rel="external">_EPROCESS</a></strong> structure.</p>
-<p>In a SMP system, each processor (CPU) has a unique <strong><a href="http://www.nirsoft.net/kernel_struct/vista/KPCR.html" target="_blank" rel="external">KPCR</a></strong> (Kernel Processor Control Region) structure, which contains per-CPU information shared by the kernel and the HAL. In this structure, there is a <strong><em>Prcb</em></strong> field, contains an embedded <strong><a href="http://www.nirsoft.net/kernel_struct/vista/KPRCB.html" target="_blank" rel="external">KPRCB</a></strong> structure that represents the Kernel Processor Control Block. And in this KPRCB structure, there is a field <strong><em>CurrentThread</em></strong> that pointers to the KTHREAD of current running thread on this processor. </p>
-<p>Here is the interesting thing, before scheduling to a particular thread for running, the OS scheduler will update the pointer field <strong><em>CurrentThread</em></strong> with that corresponding KTHEAD structure. Besides, in a 32bit Windows OS, the KPCR of the current CPU is always accessible at FS:[0] in kernel, while in a x64 Windows OS it is always at GS:[0] in kernel space.  Here below illustrates the relationship:</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/FS-GS.png" target="_blank" rel="external"><br>    <img src="http://oij0laovn.bkt.clouddn.com/FS-GS.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>As long as we get the address of KTHREAD structure of particular thread, we can also get the address of ETHREAD structure, because the KTHRAD is embedded in (not pointed by) the ETHREAD structure, and KTHREAD is the first field of ETHREAD, the address of ETHREAD and KTHREAD is the same for a particular thread. Besides, we can also get the address of EPROCESS information structure by KTHEAD-&gt;Process for the process which that running thread belongs to. </p>
-<p>Once we get this process information, we can analyze it and check if it is a hidden malicious process for example by analyzing this process signatures. </p>
-<p>So now the question is how to get notified before a particular thread gets scheduled to run? The second part below explains one of implementations.</p>
-<p><br></p>
-<p>####<strong>Monitoring thread scheduling events with debug register.</strong><br>In order to monitor the changes to the field “PKTHREAD <strong><em>CurrentThread</em></strong> “ in _KPRCB structure, one of approaches is presented in <strong><a href="http://hypervsir.blogspot.com/2014/09/debug-registers-on-intel-x86-processor.html" target="_blank" rel="external">my previous blog for Debug Register usages</a></strong>. We can set the address of that field into one of DR0~DR3 registers, and configure the hardware breakpoint condition as WRITE triggering. Whenever the OS scheduler updates that field, a #DB exception will be generated by processor. If such an exception is configured by VMM to generate a VMexit, then the corresponding VMM exit handler will be invoked to handle this event. </p>
-<p>Now, the problem is how to get the address of that field “PKTHREAD <strong><em>CurrentThread</em></strong> “. See the picture above, originally we must have to retrieve the segment base address for FS segment or GS segment. Fortunately, we can directly read the guest FS_BASE_MSR (one of <strong><a href="http://en.wikipedia.org/wiki/Model-specific_register" target="_blank" rel="external">Model Specific Registers</a></strong>, the index is 0xC0000100) on 32bit OS and GS_BASE_MSR (0xC0000101) on 64bit OS to get that base address value. After getting this address value, we can walk through the KPCR and KPRCB structure to get the address of that field “PKTHREAD <strong><em>CurrentThread</em></strong> “. </p>
-<p>However, this solution might be only for academic/research or education purposes because it has some limitations, for example, all the data structures (KPCR, KPRCB, THREAD, ETHREAD) might be changed from OS version to version so it is not to walk through the data structure for all OS versions, it also may have compatibility issue with 3rd party software debugger because it must have to use one of debug registers, performance overhead might also be a problem because whenever a thread scheduling event occurs, there will be a #DB exception triggered. </p>
-<p> &lt; The End&gt;</p>
+<p>SMEP (Supervisor Mode Execution Prevention) is a mitigation that aims to prevent the CPU from running code from user-mode while in kernel-mode, however this post (<strong><a href="https://labs.mwrinfosecurity.com/blog/2014/08/15/windows-8-kernel-memory-protections-bypass/" target="_blank" rel="external">Windows 8 Kernel Memory Protections Bypass</a></strong>) presents a generic technique for exploiting kernel vulnerabilities with bypassing SMEP. Unlike my previous post (<strong><a href="http://hypervsir.blogspot.com/2014/11/page-structure-table-corruption-attacks.html" target="_blank" rel="external">Page Table Structure Corruption Attacks - How to Mitigate it?</a></strong>) that presented a mitigation to that attack, this post will present a solution to detect such a ret2usr attack due to MMU paging structure corruption.</p>
+<p>In Intel/x86 recent processors, the LBR (last branch record) feature has some filtering capabilities like CPL (current privilege level) filtering and indirect jmp/call filterings. </p>
+<p>For instance, for a specific suspicious process or application, we can configure LBR to only record last branch recording addresses (like LastBranchToIP) for indirect jmp/call and ret branch instructions in kernel mode (CPL=0). </p>
+<p>Therefore, by analyzing the LastBranchToIP addresses in BTS (branch trace store) buffer resident in system RAM, we can get to know that whether or not a “ret2usr” attack occurred. </p>
+<p>The rule is pretty simple:<br><strong><em>check all the LastBranchToIP addresses, if we can find out that any one or more of addresses are located in the range of 0~2GB, then it indicates that a “ret2usr” attack occurred in a “monitored” process or application.</em></strong></p>
+<p>This is typically because the user mode virtual address space range is 0~2GB by default on a 32-bit Windows Operating system, even if the paging-structure entry (e.g. PTE) U/S bit is corrupted by a write-what-where vulnerability which causes a user mode memory to be interpreted as a kernel memory.  </p>
 <hr>
-<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 
       
     </div>
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">10</span></a>
+    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">14</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/HAV/">HAV</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Monitoring/">Monitoring</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Attack/">Attack</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Hardware/">Hardware</a></li></ul>
 
       
     </footer>
@@ -171,7 +163,7 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-mtf"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-virtual-ret2dir"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -179,7 +171,7 @@
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/mtf/">MTF在基于EPT的客户机物理内存监控中的使用</a>
+      <a class="article-title" href="/20170504/virtual-ret2dir/">利用虚拟化技术防御ret2dir攻击</a>
     </h1>
   
 
@@ -187,37 +179,47 @@
     
     <div class="article-meta">
       
-	Posted on <a href="/20170504/mtf/" class="article-date">
-	  <time datetime="2017-05-04T07:46:37.000Z" itemprop="datePublished">五月 4, 2017</time>
+	Posted on <a href="/20170504/virtual-ret2dir/" class="article-date">
+	  <time datetime="2017-05-04T10:34:43.000Z" itemprop="datePublished">五月 4, 2017</time>
 	</a>
 
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>作者：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>来源：<a href="http://hypervsir.blogspot.com/2014/11/monitor-trap-flag-mtf-usage-in-ept.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/monitor-trap-flag-mtf-usage-in-ept.html</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
+<p>Source：<a href="http://hypervsir.blogspot.com/2014/11/defending-against-ret2dir-attacks.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/defending-against-ret2dir-attacks.html</a></p>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
-<p>Monitor Trap Flag (MTF) is a flag specifically designed for single-stepping in x86/Intel hardware virtualization VT-x technology. When MTF is set, the guest will trigger a VM Exit after executing each instruction (need to consider NMI or other interrupt delivery boundary). This <a href="https://www.cerias.purdue.edu/assets/pdf/bibtex_archive/2013-5.pdf" target="_blank" rel="external">paper</a> presents an idea to use MTF for memory write allowing when monitoring modification to guest virtual-to-physical mapping (page table entries) tables. </p>
-<p>In that paper (SPIDER: Stealthy Binary Program Instrumentation and Debugging via Hardware Virtualization), it details a solution to trap guest virtual-to-physical mapping address changes by monitoring the corresponding guest page tables. <strong>Based upon my previous experience, monitoring page table entries (with read-only permission in EPT PTE settings) will cause significant performance cost</strong>. In this post, I am not challenging that solution since it is not a product after all.</p>
-<p>As we all know that EPT can be configured to monitor guest physical memory access with appropriate RWX permission settings. For example, for a guest data page, we can configure the corresponding EPT page table entry with !W permission, then whenever the processor fetches the instructions in that guest physical page for execution (e.g. code injection for shellcode execution), an EPT violation vmexit (or <a href="http://hypervsir.blogspot.com/2014/10/thoughts-on-virtualization-exception.html" target="_blank" rel="external">#VE interrupt</a>) will occur. </p>
-<p>However, the contents of some guest physical page might be swapped out to disk by OS under a low memory pressure condition, and then that physical page might be remapped to another guest virtual address used for by other process. In this case, we must restore the EPT permission to default (e.g. RWX), otherwise there are many unwanted EPT violations occur. </p>
-<p>One of solutions is to monitor guest virtual-to-physical mapping page table entries just as what the paper does. For example, we can monitor guest PTE page (guest physical address) with EPT Read-Only permission. Whenever a page remapping is required, the guest OS kernel will update the corresponding guest PTE entry. </p>
-<p>Since the PTE entry in EPT permission is read-only, any change to that entry will trigger EPT violation vmexit. After hypervisor captures this event, it will record the current values of PTE entry, then temporarily set the PTE page to writable and let the guest single-step (through enabling MTF) through the instruction that performs the write access. <strong>After the single-stepping, hypervisor will read the new values of PTE entry and see which ones of them have been modified, and take appropriate actions based up mapping updates. After that, hypervisor will disable MTF flag and set the PTE page back to read-only to capture future remapping event.</strong></p>
-<p>In the real case, the guest page table may have multiple levels, also changes to page table entries<br>may be very frequent, and minimal EPT page granularity is 4KB (too large), therefore this can only be an experimental solution due to huge performance penalty.</p>
-<p>However, using MTF flag to grant a data write access and/or inspect the write content on a data page that is wrote less frequently is acceptable.</p>
+<p>I was so excited when recently reading the paper (<strong><a href="http://www.cs.columbia.edu/~vpk/papers/ret2dir.sec14.pdf" target="_blank" rel="external">ret2dir: Rethinking Kernel Isolation</a></strong> from <strong><a href="http://www.cs.columbia.edu/~vpk/" target="_blank" rel="external">Vasileios P. Kemerlis</a></strong>. This post is basically going to introduce the idea of ret2dir attack, and how to prevent such an attack with hardware virtualization technology, actually partially. </p>
+<p>ret2dir (Return-to-Direct-Mapped-Memory) attack abuses <strong><em>physmap</em></strong> design in kernel virtual memory management system of many Linux/Unix OSs, it can bypass the SMEP/SMAP, PXN, KERNEXEC/UDEREF. </p>
+<p>So, what is <strong><em>physmap</em></strong>? </p>
+<p>It is Address Aliasing technique, which is designed for performance improvement. According to the author, “Given the existence of physmap, whenever the kernel (buddy allocator) maps a page frame to user space, it effectively creates an alias ( synonym) of user content in kernel space!”</p>
+<p>To be more specific, the key point is that <strong><em>for the same physical memory address space in physmap region, there might have two virtual address addresses that will be translated or mapped to the same physical memory space, aka, N:1 mapping, here N is 2</em></strong>. One virtual address is in kernel address space (Page table U/S bit =0), and the other is in user address space (U/S=1). See picture below from ret2dir paper.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/ret2dir.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/ret2dir.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>In order to make this kind of attacks work, the paper presents several innovative solutions. For example, how to force user memory allocation physical pages emerge in physmap area, how to get PFN info through information leak, and how to do physmap spaying (<strong><a href="http://hypervsir.blogspot.com/2014/11/what-does-transactional-synchronization.html" target="_blank" rel="external">Can TSX help x-spaying exploit writing</a></strong>?) , etc. </p>
+<p>Besides, the author also innovates a solution in Linux kernel to mitigate this ret2dir attack: eXclusive Page Frame Ownerwhip (XPFO). </p>
+<p>The basic idea is very straightforward, it enforces exclusive ownership (of page frames) by either the kernel or userland unless explicitly requested by a kernel component(e.g., to implement zero-copy shared buffers). It means whenever a page frame is allocated to userland, it unmaps it from <strong><em>physmap</em></strong> ; when such a page frame is reclaimed from userland, it puts it back to <strong><em>physmap</em></strong>. </p>
+<p><strong>In a virtualization environment, however, this solution (</strong><a href="http://hypervsir.blogspot.com/2014/11/how-to-implement-software-based.html" target="_blank" rel="external">How to Implement a software-based SMEP with Virtualization/Hypervisor Technology</a><strong>) in my previous post may be able to stop or defend against ret2dir attacks. But it also has a limitation: the virtualization-based software SMEP can only stop execution of shellcode/payload in physmem area.</strong></p>
+<p><strong>In order to stop read/write access to payload from kernel space with ret2dir attacks (which could be used to do ROP attacks, e.g. use the payload as kernel stack after stack pivoting), technically, we can extend that solution to implement a virtualization-based software SMAP to defend against ret2dir attacks…</strong></p>
 <hr>
-<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<p><strong><em>References:</em></strong><br>ret2dir: Rethinking Kernel Isolation – paper:<br><a href="http://www.cs.columbia.edu/~vpk/papers/ret2dir.sec14.pdf" target="_blank" rel="external">http://www.cs.columbia.edu/~vpk/papers/ret2dir.sec14.pdf</a></p>
+<p>and its slides:<br><a href="https://www.usenix.org/sites/default/files/conference/protected-files/sec14_slides_kemerlis.pdf" target="_blank" rel="external">https://www.usenix.org/sites/default/files/conference/protected-files/sec14_slides_kemerlis.pdf</a></p>
+<p>OPENBSD FIX TO REMOVE EXECUTABLE PERMISSION IN DIRECT-MAP PAGES (RECENTLY):<br><a href="https://secure.freshbsd.org/commit/openbsd/52e8e9f52ef21a21a315187623fafe4800efd868" target="_blank" rel="external">https://secure.freshbsd.org/commit/openbsd/52e8e9f52ef21a21a315187623fafe4800efd868</a></p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 
       
     </div>
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">10</span></a>
+    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">14</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/HAV/">HAV</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Hardware/">Hardware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Monitoring/">Monitoring</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Attack/">Attack</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
 
       
     </footer>
@@ -228,7 +230,7 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-hardware-security-x86arm"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-smep-nx"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -236,7 +238,7 @@
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/hardware-security-x86arm/">X86&amp;ARM架构处理器硬件安全特性</a>
+      <a class="article-title" href="/20170504/smep-nx/">利用NX位实现基于软件的SMEP</a>
     </h1>
   
 
@@ -244,230 +246,242 @@
     
     <div class="article-meta">
       
-	Posted on <a href="/20170504/hardware-security-x86arm/" class="article-date">
-	  <time datetime="2017-05-04T07:43:17.000Z" itemprop="datePublished">五月 4, 2017</time>
+	Posted on <a href="/20170504/smep-nx/" class="article-date">
+	  <time datetime="2017-05-04T10:32:55.000Z" itemprop="datePublished">五月 4, 2017</time>
 	</a>
 
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>作者：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>来源：<a href="http://hypervsir.blogspot.com/2014/10/introduction-on-hardware-security.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/introduction-on-hardware-security.html</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
+<p>Source：<a href="http://hypervsir.blogspot.com/2014/11/implement-software-based-smep-with-non.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/implement-software-based-smep-with-non.html</a></p>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
-<p>x86 and ARM processors both provide many hardware enforced security features, e.g. NX (No-eXecute) for executable space protection, to help system software engineers to build a secure computing environment. </p>
-<p>This article summaries those security features for both x86/Intel and ARM architectures, and explains how are they used by Operating System.</p>
-<p>####<strong><em>X86/INTEL PROCESSOR ARCHITECTURE:</em></strong></p>
+<p>In my <a href="http://hypervsir.blogspot.com/2014/11/how-to-implement-software-based.html" target="_blank" rel="external">previous post</a>, I talked about how to implement a software-based SMEP (Supervisor Mode Execution Protection) with virtualization/hypervisor for fun. In this post, I’m going to detail yet another solution to implement software-based SMEP without virtualization technology. </p>
+<p>In modern operating systems, like Linux and Windows, all the processes share the same kernel virtual address space, but have separate user virtual address space, see below for <a href="http://blogs.technet.com/b/askperf/archive/2007/09/28/memory-management-x86-virtual-address-space.aspx" target="_blank" rel="external">Windows 32bit OS</a>. The system can achieve this by configuring separate page structures pointed by a translation table base register (e.g. CR3 register on x86/Intel MMU architecture) for each process, and switch among them.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/SMEP1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/SMEP1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>To simplify the discussion, I’m assuming that we are working with a Linux 64bit OS system on x86_64/Intel architecture. </p>
+<p>So, from here (<a href="https://www.kernel.org/doc/Documentation/x86/x86_64/mm.txt" target="_blank" rel="external">https://www.kernel.org/doc/Documentation/x86/x86_64/mm.txt</a>), we can know that the virtual address range below belongs to user space. </p>
+<pre><code>0000000000000000 - 00007fffffffffff (=47 bits) user space, different per mm
+</code></pre><p>And, we also get to know that x86_64 bit Linux OS uses Intel IA-32e paging as below (w/ 4KB page size as an example), which has CR3 register pointing to the physical base address of a PML4 table. Each process/task has a corresponding PML4 table. </p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/SMEP2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/SMEP2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>When a task gets scheduled, the corresponding <strong><em>physical base address</em></strong> of PML4 table will be wrote to CR3 register by a mov-to-cr3 instruction, so that the task/process virtual address space can be switched accordingly.</p>
+<p>Since the Linux user address space range is 0000000000000000 - 00007fffffffffff, we can infer that the first 256 PML4 entries (index 0~255) will eventually pointer to user virtual address space for each process/task. See below picture. </p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/SMEP4.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/SMEP4.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>In each PML4 entry above, there are some processor-“Ignored” bits and a XD (eXecute-Disable) bit as picture indicated below.<strong>The “XD” bit can control whether or not the referenced physical pages can be fetched for execution. If it is set, then an instruction fetch will trigger a #PF exception (assuming MSR IA32_EFER.NXE = 1). This is the key point for implementing software-base SMEP solution.</strong></p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/SMEP3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/SMEP3.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>So, the solution now is:</p>
 <ol>
-<li><p><strong>Protection rings or privilege levels</strong>. In computer science, it is called hierarchical protection domains. In x86 architecture, it has 4 levels or layers of rings, from ring 0 through ring 3, which are arranged in a hierarchy from most privileged to least privileged. </p>
-<p>On most modern operating systems, Ring 0 mode is often referred to as <strong><em>Kernel mode</em></strong>, and Ring 3 mode is called <strong><em>User mode</em></strong>. Ring 1 and Ring 2 mode are often not used except that some hypervisors use it as called ring compression for software virtualization. The privilege level of the currently executing program or task is indicated by the value of CPL (Current Privilege Level, in CS and SS segment registers).</p>
-<p>Some rules are defined and enforced by protection rings: </p>
-<p>1) There are some instructions that can only be executed in privileged level (ring 0) to prevent the critical processor resources from being accessed by unprivileged levels (ring 1~3), e.g. RDMSR, WRMSR, LIDT, LGDT.</p>
-<p>2) Privilege switching is also restricted, and can only be achieved by some special instructions or events. e.g. syscall/sysenter, interrupt/exception. </p>
-<p>3) Access to memory resource is also controlled based on Ring levels and page level protection (see later).</p>
+<li><strong>Whenever a process enters kernel mode (CPL=0, for example, through a syscall or sysenter instruction), OS kernel sets the bit PML4E.XD bit for all the PML4 table entries (index 0 through 255, can be optimized)</strong>. And then flush TLB (performance cost).<br><strong>In this way, any attempt to fetch user virtual address memory in kernel mode will cause a #PF exception</strong>, but read/write access to user virtual address memory is allowed (for example, copy_to/from_user() functions).</li>
+<li><p>OS kernel can use some “Ignored” bits to record this intended behavior for easy virtual address management.</p>
 </li>
-<li><p><strong>Page level protections</strong>. Modern system generally uses   page-structure hierarchy to manage virtual address to physical address translation. The system software is responsible for configuring those page structures (like page table entries), and the processor will enforce the protections by two levels of checks: one is the restriction of privilege/ring mode; the other is the page type restrictions (e.g. read-only, read/write, non-executable…). </p>
-<p>The remainder of this section details each of those checks:</p>
-<p>1) <strong>Privilege level protections by checking “U/S” bit, User/Supervisor</strong>, in each level of page structures. </p>
-<p>The basic rule is that if the current privilege level (CPL) is user mode, it cannot access the memories whose corresponding page structure has U/S bit clear. In other words, a user mode task or program cannot read (write, or fetch) access to the memory that belongs to supervisor or privileged mode. </p>
-<p>This kind of protection is very useful, for example, the malicious software is not allowed to read or modify the kernel/system resources, and many extensible protection mechanisms below are based on this privilege level state.</p>
-<p>2) <strong>Executable space protection</strong>, sometimes called as <strong>XD (eXecute Disable), NX (No-eXecute)</strong>. </p>
-<p>Operating system uses this feature to mark some region of memory spaces not executable. For example, stack or heap memory space may be marked as NX. This helps to prevent certain buffer-overflow exploits from succeeding, particularly those that inject code and and execute in controlled stack or heap space. </p>
-<p>On Windows OS, it is used as “Hardware DEP”, Data Execution Prevention. On some other systems, it might be used as “W^X”, which means they marks writable pages by default as non-executable.</p>
-<p>Note that this feature is introduced when 32bit-PAE (Physical Address Extension) mode or 64bit mode is enabled. On modern operating system, this is true. </p>
-<p>3) <strong>Supervisor Mode Execution Protection</strong> (<strong>SMEP</strong>, might be introduced in Ivy Bridge processor). </p>
-<p>I think SMEP is definitely a very very powerful security feature, and easy to deploy by system software. In my experiences, it can block most of (up to 90%+) public exploits for kernel privilege escalation in The Exploit Database (<a href="http://www.exploit-db.com/" target="_blank" rel="external">http://www.exploit-db.com/</a>).</p>
-<p>This feature is enabled by setting a bit in the CR4 control register, and then CPU will generate a fault whenever ring0/kernel mode attempts to execute code from a page marked with the user bit (U/S = 1) set. </p>
-<p><strong>It means that with SMEP enabled, it’s no longer possible to map arbitrary exploit payloads in user mode, since the CPU will trigger a fault if it attempts to execute those controlled user arbitrary exploit pages in kernel mode.</strong></p>
-<p>4) <strong>Supervisor Mode Access Protection</strong> (<strong>SMAP</strong>, introduced in Broadwell or Haswell??). </p>
-<p>It defines a new SMAP bit in the CR4 control register; when that bit is set, any attempt to access user-space memory while running in a privileged mode will lead to a page fault. </p>
-<p>In other words, SMAP will prevent <strong>unintended</strong> data accesses to userland memory, but care must be taken because it has to be disabled/enabled around <strong>legitimate</strong> access functions in the kernel, for example, copy_to_user(), copy_from_user() functions. </p>
-<p>Intel has added two new instructions for this purpose(CLAC/STAC) to temporary disable/enable SMAP for those legitimate accesses. These two instructions are used to clear and set RFLAGS.AC bit. If the SMAP bit is set in the CR4 register, explicit supervisor-mode data accesses to user-mode pages are allowed if and only if  RFLAGS.AC bit is 1, here the AC bit is also used for alignment checks of user mode data access.</p>
-<p><strong><em>What does SMAP mean for security?</em> The user-mode memory accessed in unintended ways by kernel mode will be prohibited</strong> , e.g., attacker controlled pointers can no longer target user-mode memory directly, but even simple kernel bugs such as NULL pointer based dereferences will just trigger a SMAP access violation (page fault , #PF) instead of letting the attacker take over kernel data flow. Because here the memory access dereferenced by NULL pointer is just located at user mode address, the kernel code cannot write/read the crafted data on that memory address when SMAP is active.</p>
-<p>5) <strong>WP (Write protection)</strong>. This feature is a very old feature, controlled by CR0.WP bit. </p>
-<p>When set, inhibits supervisor mode code from writing into read-only pages; when clear, allows supervisor mode code write into read-only pages (regardless of the U/S bit setting). </p>
-<p>This flag are often used to protect the kernel mode code sections, since those code section will be configured as read-only pages, a hardware CPU exception(page fault #GP) will be triggered whenever a malicious kernel software (e.g. kernel rootkits) attempts to modify the kernel code pages (e.g. doing inline hooks for detour). And WP can also be used by protecting kernel static data sections which must not be changed at system runtime.</p>
-<p>Besides, this flag facilitates implementation of the copy-on-write (COW) method of creating a new process (forking) used by operating systems such as Unix. </p>
+<li><p>Before leaving kernel mode, the OS kernel change PML4.XD bit (and some “Ignored” bits) back to the original state.  </p>
 </li>
 </ol>
-<p><br></p>
-<p>####<strong><em>ARM Architecture</em></strong></p>
-<p>Like x86/Intel processor architecture, ARM also provides some equivalent hardware-enforced security features.</p>
-<p>ARM architecture defines different levels of execution privilege: <strong>PL0(unprivileged, for user, application), PL1 (privileged, for all modes other than User mode and Hyp mode. Normally operating system software executes at this level), PL2 (Hyp mode, normally used by a hypervisor for Hardware Virtualization, and only Non-Secure State has this privilege level).</strong> </p>
-<p>Normally when the processor running at higher privilege level can access the resource (memory, register) available at the same and lower privilege levels. A Data Abort Exception is generated if the processor attempts a data access that the access rights do not permit. For example, a Data Abort exception is generated if the processor is at PL0 and attempts to access a memory region that is marked as only accessible to privileged (PL1) memory accesses.</p>
-<p>However, in an ARM processor including <strong><em>Security Extension</em></strong>, note that Non-secure Hyp mode executes at PL2 does not indicate that it is more privileged than the Secure PL1 modes. Secure PL1 modes can change the configuration and control settings for Non-secure operation in all modes, but Non-secure modes (even PL2) can never change the configuration and control settings for Secure operation.</p>
-<p>Like NX or XD attribute in x86/Intel processor, ARM also has the same security feature called <strong>XN (eXecute-Never)</strong>. </p>
-<p>When this bit is 1 in the corresponding long(or short, for some cases)-descriptor tables, a <strong><em>Permission fault</em></strong> is generated if the processor attempts to execute an instruction fetched from the corresponding memory region. </p>
-<p>In addition, the Virtualization Extensions provide controls that enforce the XN restrictions, regardless of the settings in the translation tables: </p>
-<ul>
-<li><p><strong>Restriction on Secure instruction fetch (SCR.SIF</strong> in Secure Configuration Register). </p>
-<p>When this bit is set to 1, any attempt in Secure state to execute an instruction fetched from Non-secure physical memory causes a Permission fault.</p>
+<p>Similarly, if we don’t consider performance cost, we are even able to implement a software-based SMAP (Supervisor Mode Access Protection) with “Present” bit clear, but I’m not explaining the details in this post.</p>
+<the end="">
+
+<hr>
+<p><strong><em>Update:</em></strong><br>I didn’t do enough homework before. Previously UDEREF from PAX used 32bit segmentation (and its limit) to emulate SMEP/SMAP behaviors, but thanks to someone from PAX team commenting it as below, I got the UDEREF for 64bit here:<br><a href="https://github.com/opntr/pax-docs-mirror/blob/master/uderef-amd64.txt" target="_blank" rel="external">https://github.com/opntr/pax-docs-mirror/blob/master/uderef-amd64.txt</a></p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+</the>
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">8</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Hardware/">Hardware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/NX/">NX</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-smep-virtual"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/smep-virtual/">如何利用虚拟化技术实现基于软件的SMEP(监督模式执行)</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/smep-virtual/" class="article-date">
+	  <time datetime="2017-05-04T10:31:10.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
+<p>Source：<a href="http://hypervsir.blogspot.com/2014/11/how-to-implement-software-based.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/how-to-implement-software-based.html</a></p>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>As <a href="http://hypervsir.blogspot.com/2014/10/introduction-on-hardware-security.html" target="_blank" rel="external">my previous post</a> indicated, SMEP is a powerful security feature, and easy to deploy in modern commodity OS. However this feature requires H/W processor’s support, for those processors that are not SMEP-capable, this post presents a software-based solution to emulate SMEP functionality with the help of Virtualization/Hypervisor technology. </p>
+<p>When x86 processor CR4.SMEP bit is set, the system software executing in kernel mode (CPL&lt;3) cannot fetch instructions from any linear address with a translation for which the U/S flag is 1 (User) in every paging-structure entries controlling the translation. In other words, If SMEP is enabled, software operating in supervisor mode cannot fetch instructions from linear addresses that are accessible in user mode. When such an instruction fetch occurs, a #PF exception will be generated by SMEP-capable processor.</p>
+<p>So, how to implement a software-based SMEP feature? </p>
+<p>This paper (<a href="https://www.cs.cmu.edu/~arvinds/pubs/secvisor.pdf" target="_blank" rel="external">SecVisor: A Tiny Hypervisor to Provide Lifetime Kernel Code Integrity for Commodity OSes</a> from CyLab/CMU) presents an great idea: <strong>Create two separate EPT protection memory views for guest kernel (ring 0) and user (ring 3) mode respectively, with different EPT permissions for corresponding GPA-&gt;HPA translations, and then switch these two EPT page table views by intercepting kernel&lt;-&gt;kernel mode switches</strong>. In x86/Intel processor, hypervisor can configure different VMCS EPTP pointers (which points to different Extended Page Tables) and switch among them at appropriate time.</p>
+<p>To make the discussion easier, we can call these two guest memory translation tables (pointed by two different EPTP pointers) as protected memory views: <strong>one is used in guest Kernel mode, named as <em>Kernel View</em> ; the other is for User mode, named as <em>User View</em></strong>. </p>
+<p>Besides, as that paper indicates, for both views, the identity map (GPA=HPA) is created in both EPT page tables by default. But EPT page table entry permissions may be different for the same GPA addresses. The latter is the key part for emulating SMEP behaviors, I will talk about it later.</p>
+<p>By intercepting guest kernel/user mode switches, we can do this below in hypervisor:</p>
+<ol>
+<li>Switch to use <strong><em>Kernel View</em></strong> when guest logical processor entering Kernel mode;<br>As we know that, in x86 processor, there are several ways to cause logical processor enter Kernel mode, for example in Windows OS, interrupt/fault/trap (through IDT table), syscall instructions. Based upon my previous project experience, some others like task gate (only NMI on 32bit OS), call gate, are not never used in Windows OS.</li>
+<li>Switch to use <strong><em>User View</em></strong>  when guest logical processor leaving kernel (or entering User mode);</li>
+</ol>
+<p>So, the question now is that - how to get hypervisor be notified whenever a kernel/user mode switch happens?</p>
+<p>The SecVisor does it like pictures below (snapshots from this <a href="http://quning.org/self/cmu_secvisor_ppt.pdf" target="_blank" rel="external">link</a>): In <strong><em>User View</em></strong>, the <strong>Execution</strong> permission is removed in the EPT page tables for Kernel Code pages , whenever entering kernel mode to fetch the entry point instruction from Kernel code page, an EPT violation vmexit occurs, then the control is transferred to hypervisor (SecVisor), so SecVisor can switch to <strong><em>Kernel View</em></strong> by updating the corresponding EPTP pointer in VMCS. Similarly, we can switch to <strong><em>User View</em></strong> whenever leaving kernel mode. </p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/secvisor1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/secvisor1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/secvisor2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/secvisor2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p><strong>Now, obviously we can get to know how to emulate SMEP behaviors.</strong></p>
+<p>Assumed that the guest logical processor is running Kernel mode, and EPTP hence points to the mapping tables in <strong><em>Kernel View</em></strong> and also assumed that <strong>only</strong> approved code (e.g. Kernel and trusted LKM modules) has EPT execution permission in <strong><em>Kernel View</em></strong>, see picture below in the meanwhile, provided that there is a kernel vulnerability that can be exploited by malware to execute arbitrary user mode code. When the logical processor starts to execution user accessible code in kernel mode, an EPT violation will be generated because that user mode code cannot be executable in EPT <strong><em>Kernel View</em></strong>. </p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/secvisor3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/secvisor3.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p><strong>When hypervisor gets the control, the following policy could be applied to check the execution (instruction fetch) violate SMEP functionality:</strong></p>
+<ol>
+<li><strong>Read the current CPL value from corresponding guest VMCS area to see if it is ZERO (kernel mode);</strong></li>
+<li><strong>Get the current guest CR3 value (also from VMCS) and guest violation linear address (actually for EPT violation due to execution fault, that address is guest RIP) from corresponding VMCS area, then traverse the guest page table to see if U/S bit (accessible in user mode) flags in every page structures are ONE.</strong><br><br></li>
+</ol>
+<p><strong>If both conditions above are true, then we catch a SMEP-like violation in guest kernel mode.</strong><br><br></p>
+<hr>
+<p> <strong><em>Challenges:</em></strong><br>However, there are many challenges to implement this software-based SMEP feature with virtualization technology.</p>
+<ol>
+<li><p>Performance impacts.<br>Because in that paper, we create two EPT memory protection views (Kernel View and User View), in order to switch back and forth at run time, the hypervisor must have to trap every event of entering and leaving kernel. This introduces significant performance cost because kernel-user mode switches are normally very frequent.<br><br><br><strong>I think one of solutions of switching EPTP pointers (Views) without VMExit is to leverage the latest Virtualization features, like <a href="http://hypervsir.blogspot.com/2014/10/thoughts-on-virtualization-exception.html" target="_blank" rel="external">Virtualization Exception (#VE) and EPTP switching function (VMFUNC) in my previous post</a>, and also use <a href="http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html" target="_blank" rel="external">IDT Shadow/Virtualization technique</a> in my another post to trap every kernel/user mode switches due to interrupt/trap/fault events</strong>. However, on those #VE/VMFUNC-capable machines, SMEP is also available:-)<br><br><br>For the mode switches due to syscall/sysret, you can brainstorm how to handle it without vmexit!</p>
 </li>
-<li><p><strong>Preventing execution from writable locations</strong>. When the corresponding stage 1 MMU is enabled, force writable memory to be treated as XN, regardless of the setting of the XN bit. </p>
-<p>In other words, for example, the memory regions with unprivileged write permission will be treated as XN for any access from software that is executing at PL1. </p>
-<p>Check these control bits in ARMv7-A (with Virtualization Extension) reference manual, SCTLR.WXN (for Secure and Non-secure PL1&amp;0 stage 1 translations), HSCTLR.WXN (for Non-secure PL2 stage 1 translations) for details. </p>
+<li><p>In <strong><em>Kernel View</em></strong>, we configure all the kernel code executable in EPT tables. When there is an LKM module loaded or unloaded, we must update the module memory to be executable in <strong><em>Kernel View</em></strong> and to be non-executable in <strong><em>User View</em></strong> immediately.<br><br><br>The author in the paper has a solution to solve it by adding code in load_module() and the free_module() function.<br><br><br>However, without guest kernel code changes, for module loading, I think we can use a <strong>lazy solution</strong> to solve it, for example, when a new loaded LKM module starts to run at the first time in Kernel mode, a EPT violation occurs, then in hypervisor we can check if it is a trusted LKM module, if yes, then we just allow that LKM code page executable in <strong><em>Kernel View</em></strong>, and remove the execution permissions in <strong><em>User View</em></strong>. But how to update the LKM code page EPT permissions in <strong><em>Kernel View</em></strong> when such a LKM module gets unloaded from kernel?</p>
+</li>
+<li>In the case of low memory pressure, will Linux OS page out or swap out LKM code pages to the disk storage?<br>I know this is true on Windows OS system, but I have no idea if Linux will do the same thing. (Anybody can tell me?)<br>If it is the case on Linux system, then without guest kernel hooks, it is also a challenge to update LKM code page permissions in EPT <strong><em>Kernel View</em></strong> and <strong><em>User View</em></strong>.</li>
+</ol>
+<p><strong>Note that what I’m talking about in this post is for fun. I don’t think it is worth doing all those things just only for emulating SMEP-like feature with virtualization technology:(. As a matter of fact, I have yet another solution to implement a software-based SMEP feature without Virtualization/Hypervisor. Please stay tuned…in my next post.</strong></p>
+<hr>
+<p><strong><em>Update:</em></strong><br>Question: thinking of how to implement a software SMAP (Supervisor Mode Access Protection) with virtualization technology……</p>
+<hr>
+<p><strong><em>References:</em></strong><br><a href="https://www.cs.cmu.edu/~arvinds/pubs/secvisor.pdf" target="_blank" rel="external">SecVisor: A Tiny Hypervisor to Provide Lifetime Kernel Code Integrity for Commodity OSes</a>, and its presentation <a href="http://quning.org/self/cmu_secvisor_ppt.pdf" target="_blank" rel="external">link</a>．</p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">8</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Hardware/">Hardware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-tsx-exploit"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/tsx-exploit/">TSX处理器技术对漏洞利用意味着什么？</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/tsx-exploit/" class="article-date">
+	  <time datetime="2017-05-04T10:29:25.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
+<p>Source：<a href="http://hypervsir.blogspot.com/2014/11/what-does-transactional-synchronization.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/what-does-transactional-synchronization.html</a></p>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p><a href="http://en.wikipedia.org/wiki/Transactional_Synchronization_Extensions" target="_blank" rel="external">Intel Transactional Synchronization Extensions</a> (TSX) was introduced since from Haswell processor with adding hardware <a href="http://en.wikipedia.org/wiki/Transactional_memory" target="_blank" rel="external">transactional memory</a> support. It was originally design to speed up execution of multi-threaded software through lock elision. Every new technology has both good side and evil side, then how about TSX extension? What can we use it to do for vulnerability exploits and its defenses?</p>
+<p><br><br>According to Intel SDM, TSX provides two software interfaces for programmers:</p>
+<ul>
+<li><strong>Hardware Lock Elision</strong> (HLE) is a legacy compatible instruction set extension (comprising the XACQUIRE and XRELEASE prefixes).</li>
+<li><strong>Restricted Transactional Memory</strong> (RTM) is a new instruction set interface (comprising the XBEGIN, XABORT, and XEND instructions).</li>
+</ul>
+<p>This post is focusing on the RTM interface, as the specification indicates below.</p>
+<ul>
+<li><p><em>Software uses the XBEGIN instruction to specify the <strong>start of the transactional region</strong> and the XEND instruction to specify the <strong>end of the transactional region</strong>.</em></p>
+</li>
+<li><p><em>The XBEGIN instruction takes an operand that provides a relative offset to the <strong>fallback instruction address</strong> if the transactional region could not be successfully executed transactionally.</em></p>
+</li>
+<li><p><strong>*A processor may abort transactional execution for many reasons</strong>. The hardware automatically detects transactional abort conditions and restarts execution from the <strong>fallback instruction address</strong> with the architectural state corresponding to that at the start of the XBEGIN instruction and the EAX register updated to describe the abort status.*</p>
 </li>
 </ul>
-<p><br><br>Like <strong><em>SMEP</em></strong> in x86/Intel architecture, ARM provides the similar security feature called <strong><em>PXN (Privileged eXecute-Never).</em></strong></p>
-<p>A Permission fault is generated if the processor is executing at PL1 and attempts to execute an instruction fetched from the corresponding memory region when this PXN bit is 1. If Virtualization Extension is supported in ARM architecture, for Secure and Non-secure PL1&amp;0 stage 1 translations, when SCTLR.UWXN is set to 1, an instruction fetch is forced to be treated as accessing a <strong>PXN</strong> region if it accesses a region that software executing at PL0 can write to.</p>
-<p>However, it seems that a SMAP-like security feature is not provided by ARM architecture currently. Please correct me if I’m wrong. </p>
-<p>For example, <strong><em>how to restrict the read or/and write access to PL0 memory when a system software executes at PL1?</em></strong></p>
-<p>The AP (Access Permission) bits of page translation table descriptors in ARMv7 VMSA (Virtual Memory System Architecture), or AP bits of DRACR or IRACR (Data/Instruction Region Access Control Register) in ARMv7 PMSA (Protected Memory System Architecture) provide some kinds of memory read &amp; write protections, but all the definitions indicate that PL1 always has higher access permission than PL0.  </p>
-<hr>
-<p>####<strong>[Update]:</strong><br>See the Memory <strong><em>Protection Keys</em></strong> mechanism:<br><a href="http://en.wikipedia.org/wiki/Memory_protection#Protection_keys" target="_blank" rel="external">http://en.wikipedia.org/wiki/Memory_protection#Protection_keys</a> </p>
-<p><strong><em>Intel MPX</em></strong><br>Intel MPX (Memory Protection Extensions, <a href="http://en.wikipedia.org/wiki/Intel_MPX" target="_blank" rel="external">http://en.wikipedia.org/wiki/Intel_MPX</a>) is a set of extensions to the x86 instruction set architecture. With compiler, runtime library and operating system support, Intel MPX brings increased security to software by checking pointer references whose normal compile-time intentions are maliciously exploited at runtime due to buffer overflows. Intel MPX will introduce new registers, and new instruction set extensions that operate on these registers.</p>
-<hr>
-<p>####<strong><em>REFERENCES:</em></strong></p>
+<p><br><br>The interesting things here are as follows:</p>
 <ol>
-<li><a href="http://en.wikipedia.org/wiki/Protection_ring" target="_blank" rel="external">http://en.wikipedia.org/wiki/Protection_ring</a></li>
-<li>SMEP, What is It, and How to Beat It on Linux: <a href="http://vulnfactory.org/blog/2011/06/05/smep-what-is-it-and-how-to-beat-it-on-linux/" target="_blank" rel="external">http://vulnfactory.org/blog/2011/06/05/smep-what-is-it-and-how-to-beat-it-on-linux/</a></li>
-<li>Supervisor mode access prevention: <a href="http://lwn.net/Articles/517475/" target="_blank" rel="external">http://lwn.net/Articles/517475/</a></li>
-<li>Supervisor Mode Access Prevention - by PaX: <a href="https://forums.grsecurity.net/viewtopic.php?f=7&amp;t=3046" target="_blank" rel="external">https://forums.grsecurity.net/viewtopic.php?f=7&amp;t=3046</a></li>
-<li>RECENT ARM SECURITY IMPROVEMENTS<br><a href="https://forums.grsecurity.net/viewtopic.php?f=7&amp;t=3292" target="_blank" rel="external">https://forums.grsecurity.net/viewtopic.php?f=7&amp;t=3292</a> </li>
+<li><strong>What reasons can cause a transactional execution abort?</strong></li>
+<li><strong>What does it look like when a transactional execution abort happens?</strong></li>
 </ol>
+<p>For the 2nd question above, the TSX specification says below, </p>
+<ul>
+<li><em>The architecture ensures that updates performed within a transactional region that subsequently <strong>aborts execution will never become visible</strong>. Only a committed transactional execution updates architectural state. Transactional aborts never cause functional failures and only affect performance.</em></li>
+</ul>
+<p>which means <strong>after a TSX abort occurs, all the physical memory and processor register updates (after XBEGIN instruction) will be discarded</strong>, and from user’s perspective, the memory and register states are “restored” to the states at the start of XBEGIN instruction. This seems to be the same with the behaviors of try/catch or setjmp/longjmp functionalities. </p>
+<p>However, there are some differences. For instance, any fault or trap in a transactional region that must be exposed to software will be suppressed, as if the fault or trap had never occurred. If any exception is not masked, that will result in a transactional abort and it will be as if the exception had never occurred. </p>
+<p><strong>As matter of fact, all the synchronous exception events (like #GP, #PF) that occur during transactional execution are suppressed as if they had never occurred, and those events won’t be delivered to processor for handling.</strong> </p>
+<p>Then regarding the 1st question above, there are a couple of reasons that might cause a TSX abort, like XABORT, CPUID, Software INT, VMX instructions, IO instructions, ring transitions (e.g. syscall), VMExit (ept violation), etc.</p>
+<p>So, now let’s think about something about Intel TSX!</p>
+<p>Provided that <strong><em>a malicious software attempts to access (e.g. write or execute) a protected memory, normally it will trigger a #PF fault, then it could be detected and terminated subsequently by OS kernel. But if the malicious software attempts to do the same thing in TSX state after an XBEGIN instruction, as we pointed out above, such a #PF exception will be suppressed, which means the OS kernel cannot even detect this access violation.</em></strong></p>
+<p>The similar case also applies to the access to protected memory by EPT (extended page table) in a VMM/Hypervisor. Because when guest software attempts to access the physical memory protected with EPT in a hypervisor, an EPT violation vmexit will be triggered, but in TSX state, such a vmexit won’t be triggered, so the hypervisor won’t detect it. </p>
+<p>So basically, <strong>it means that, To malicious software, before a successful attack, it can make more attempts (e.g. brute-forcing) to do bad things without being caught by OS kernel or even hypervisor.</strong> </p>
+<p>But now I don’t have an idea on how to use it to do something “real bad”. Maybe someone else does have ideas…. </p>
 <hr>
-<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<p><strong><em>UPDATE:</em></strong><br>Interesting!!! got this….<br>TSX improves timing attacks against KASLR<br><a href="http://labs.bromium.com/2014/10/27/tsx-improves-timing-attacks-against-kaslr/" target="_blank" rel="external">http://labs.bromium.com/2014/10/27/tsx-improves-timing-attacks-against-kaslr/</a> </p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 
       
     </div>
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">3</span></a>
+    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">8</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Hardware/">Hardware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-xen-snapshot"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/xen-snapshot/">XEN快照机制</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/xen-snapshot/" class="article-date">
-	  <time datetime="2017-05-04T07:13:37.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者:<a href="http://blog.csdn.net/mrbuffoon" target="_blank" rel="external">Mr_buffoon</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>虚拟机快照技术是指，在虚拟机运行过程中将虚拟机的完整运行状态，包括内存、磁盘、 CPU、网络等，保存到持久化的外部设备中，从而当虚拟机发生故障时可以通过备份的数据恢复虚拟机的运行。快照里面内存的快照又是非常重要非常关键的一部分。<br>内存快照主要实现机制主要有三种：停机拷贝机制（stop-and-copy），预拷贝机制（pre-copy），后拷贝机制（post-copy）。</p>
-<p><strong>停机拷贝机制（stop-and-copy）</strong><br>    在进行虚拟机快照的时刻要先将虚拟机挂起，然后在保存完虚拟机的完整状态后再恢复虚拟机的运行。<br>    这种方式简单，但使得整个快照过程的虚拟机停机时间完全取决于虚拟机的内存大小，而且该时间可以达到几十秒，严重影响虚拟机的性能。<br>    主流kvm、xen、vmware等都是基于停机拷贝方式实现快照功能。</p>
-<p><strong>预拷贝机制（pre-copy）</strong><br>    通过多轮迭代的方式对内存页面进行保存。每一轮保存自上一轮以来变脏的内存页面，当需要保存的内 存页面数量收敛到可以在一个较短的停机时间内完成保存的时刻，虚拟机停机。<br>    写密集时，收敛时间较长，多轮拷贝影响性能。“状态漂移”现象。<br>    Vnsnap等基于预拷贝机制实现快照。</p>
-<p><strong>后拷贝机制（post-copy）</strong><br>    首先停机，将cpu、设备等状态信息以及少量内存页面保存，然后开机，并在发生缺页中断时将相应内存页面保存。<br>    个人认为在分布式快照时优势比较明显。</p>
-<p>研究了一下xen快照部分的代码，其实xen-4.1.2的内存快照实现函数是跟迁移共用的，迁移已经是采用预拷贝机制来实现内存的迁移，所以说内存快照部分的代码其实是实现了预拷贝快照的。只是有一个参数live进行控制，live为1那么就是预拷贝，live为0就是停机拷贝。<br>快照部分函数入口及调用关系如下：</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-1.png" width="450"></a><br>    <figcaption></figcaption><br></figure><br> 注意，xen-4.4.1版本及以上使用xl命令，不再是之前版本的xm命令，也就是不再用xend，而是成了toolstack，所以上层入口有所变化，但是最底层的xc_domain_save()函数是不变的。<br><br><strong>预拷贝过程中关键数据:</strong><br><br><figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p><strong>预拷贝主流程：</strong></p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-3.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p><strong>页判定代码：</strong></p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-4.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-4.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p><strong>代码分析</strong><br>    页判定主要是判定该轮迭代要传送哪些页面。<br>    last_iter=1表示最后一轮迭代，置1后下一轮就进行停机拷贝。<br>    superpages=1表示全虚拟化，iter=1表示第一轮迭代，test_bit(n,xx)表示xx位图第n位的值，为1或0。<br><strong>判定规则</strong><br>    (1)to_send为1且to_skip为0的页<br>    (2)全虚拟化形式下第一轮迭代to_send为1的页面<br>    (3)最后一轮迭代to_send为1的页面<br>    (4)最后一轮迭代to_fix为1的页面<br>以上四种页面是本轮迭代需要传送的页面。</p>
-<p><strong>to_send、to_skip、to_fix置位时机</strong></p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-5.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-5.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>  to_fix是每一轮迭代页判断，当该页还没有被映射时就置为1。</p>
-<p><strong>页判定规则原理</strong><br>    to_send在第i-1轮迭代结束时候获取，收集的是第i-1轮迭代过程中变脏的页面，即第i轮可能拷贝页面的全集。    to_skip是第i轮迭代开始时获取，收集的是第i-1轮迭代结束到第i轮迭代开始这一短暂时间间隔内再次变脏的页面。    当to_skip为1表示这很短时间内某页面又再次被修改，也就可以认为该页频繁访问，为避免该页被重复拷贝，可以暂缓拷贝。<br>    第一轮迭代时候，to_send被初始化为全1，to_skip实际上是没有获取的，所以可以不必考虑to_skip。<br>    最后一轮迭代时候，to_fix、to_skip都需要一并拷贝，以保证内存拷贝的完整。</p>
-<p><strong>后处理代码：</strong></p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-6.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-6.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p><strong>代码分析</strong><br>    后处理主要是判定是否进行最后一轮迭代，如果是最后一轮置标记并申请停机。<br>    判定规则：<br>    如果     迭代次数iter大于等于预设最大迭代次数max_iters<br>    或者     本轮拷贝页面数与跳过页面数之和小于50<br>    或者      整个迭代过程拷贝总页面数大于迭代因子倍的P2M表对应页面数量<br>    则          进入停机拷贝。</p>
-<p>设备状态的拷贝是在XendCheckpoint.py中的save()函数中实现的。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-7.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-7.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<hr>
-<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机快照/">虚拟机快照<span class="article-category-count">1</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Snapshot/">Snapshot</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/XEN/">XEN</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-xen-event"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/xen-event/">XEN事件通道机制及其实例</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/xen-event/" class="article-date">
-	  <time datetime="2017-05-04T07:11:11.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者:<a href="http://blog.csdn.net/mrbuffoon" target="_blank" rel="external">Mr_buffoon</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>事件通道机制是xen用于Domain和Xen之间，或者Domain和Domain之间的异步事件通知机制。事件通道在xen中应用非常广泛，像物理中断，虚拟中断以及域间通信等均是通过事件通道实现的。<br>    根据用途划分，事件通道一般分为四类：域间通信，域内通信，虚拟中断，物理中断。域间通信主要用于Domain与Domain之间通信，或者Xen与Domain之间通信。域内通信就是同一个域内不同VCPU之间通信。物理中断与虚拟中断都是绑定中断源，实现Xen的中断。<br>    Xen在内核态和用户态代码中都封装了很多事件通道相关的操作函数，像分配通道，绑定通道，置pending位等，如果需要可以自己研究源码。『Xen虚拟化技术（石磊 邹得清 金海）』一书中对事件通道的原理，函数，数据结构讲解的比较全面，可以参考。<br>    我这里主要是简单讲一下我自己实现的Domain0与Xen进行通信的例子。</p>
-<p>因为项目需要，我需要实现Xen给Domain0发送事件通知，Domain0收到事件通知后就执行某些操作。这里使用域间通信来实现，大概的流程就是Xen内核态代码中先为Domain0分配一个事件通道端口，用户态通过超级调用获取这个事件通道，并进行通道绑定。然后用户态陷入循环等待中，等待Xen内核发来事件通知，收到通知后就执行预先写好的那部分代码。</p>
-<p>具体代码：<br>内核态分配通道端口：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//save_domid这里指定为0  </span></div><div class="line"><span class="keyword">int</span> event_channel_port=alloc_unbound_xen_event_channel(current, save_domid, <span class="literal">NULL</span>);</div></pre></td></tr></table></figure></p>
-<p>内核态分配了端口后，传到用户态，即event_channel_port。<br>用户态进行绑定：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line">xc_evtchn *xc_event_iface = xc_evtchn_open(<span class="literal">NULL</span>,<span class="number">0</span>);  </div><div class="line"><span class="keyword">if</span>(!xc_event_iface)  </div><div class="line">&#123;  </div><div class="line">    PERROR(<span class="string">"Could not open interface to libxc event channels"</span>);  </div><div class="line">&#125;  </div><div class="line">  </div><div class="line">  </div><div class="line"><span class="keyword">int</span> event_port = xc_evtchn_bind_interdomain(xc_event_iface, DOMID_SELF, event_channel_port);  </div><div class="line"><span class="keyword">if</span>(event_port != <span class="number">-1</span>)  </div><div class="line">&#123;  </div><div class="line">    PERROR(<span class="string">"event_port is: %d"</span>,event_port);  </div><div class="line">&#125;  </div><div class="line"><span class="keyword">else</span>  </div><div class="line">&#123;  </div><div class="line">    PERROR(<span class="string">"Could not bind xen port to local port"</span>);  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>用户态绑定后，可以设置一个循环等待事件通知的到来，当然根据自己的需求进行修改。<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">while</span>(<span class="number">1</span>)  </div><div class="line">&#123;  </div><div class="line">    <span class="keyword">int</span> pending_port = xc_evtchn_pending(xc_event_iface);  </div><div class="line">    <span class="keyword">if</span>(pending_port == event_port)<span class="comment">//收到事件通知  </span></div><div class="line">    &#123;             </div><div class="line">    <span class="keyword">if</span>(xc_evtchn_unmask(xc_event_iface, event_port) == <span class="number">-1</span>)  </div><div class="line">    &#123;  </div><div class="line">        perror(<span class="string">"Could not unmask event port in loop"</span>);  </div><div class="line">        <span class="keyword">break</span>;  </div><div class="line">    &#125;  </div><div class="line">    <span class="comment">//下面就是自定义的收到事件通知后的处理代码  </span></div><div class="line">        <span class="comment">//。。。。。。。。。  </span></div><div class="line">        。  </div><div class="line">        。  </div><div class="line">        。  </div><div class="line">        。  </div><div class="line">    &#125;  </div><div class="line">    <span class="keyword">else</span>  </div><div class="line">    &#123;  </div><div class="line">    PERROR(<span class="string">"Unknown event port pending: %d"</span>, pending_port);  </div><div class="line">    &#125;  </div><div class="line">&#125;<span class="comment">//end while  </span></div><div class="line"><span class="comment">//事件通道使用完了后进行解绑释放  </span></div><div class="line">xc_evtchn_unbind(xc_event_iface, event_port);  </div><div class="line">xc_evtchn_close(xc_event_iface);  </div><div class="line"><span class="built_in">free</span>(xc_event_iface);</div></pre></td></tr></table></figure></p>
-<p>内核态发送通知代码如下：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">notify_via_specific_xen_event_channel</span><span class="params">(<span class="keyword">struct</span> domain *ld, <span class="keyword">int</span> lport)</span>  </span></div><div class="line">&#123;  </div><div class="line">    <span class="keyword">struct</span> evtchn *lchn, *rchn;  </div><div class="line">    <span class="keyword">struct</span> domain *rd;  </div><div class="line">    <span class="keyword">int</span>            rport;  </div><div class="line">  </div><div class="line">  </div><div class="line">    spin_lock(&amp;ld-&gt;event_lock);  </div><div class="line">  </div><div class="line">  </div><div class="line">    <span class="keyword">if</span> ( unlikely(ld-&gt;is_dying) )  </div><div class="line">    &#123;  </div><div class="line">        spin_unlock(&amp;ld-&gt;event_lock);  </div><div class="line">        <span class="keyword">return</span>;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">  </div><div class="line">    ASSERT(port_is_valid(ld, lport));  </div><div class="line">    lchn = evtchn_from_port(ld, lport);<span class="comment">//bind local event channel  </span></div><div class="line">    ASSERT(consumer_is_xen(lchn));  </div><div class="line">  </div><div class="line">  </div><div class="line">    <span class="keyword">if</span> ( likely(lchn-&gt;state == ECS_INTERDOMAIN) )  </div><div class="line">    &#123;  </div><div class="line">        rd    = lchn-&gt;u.interdomain.remote_dom;  </div><div class="line">        rport = lchn-&gt;u.interdomain.remote_port;  </div><div class="line">        rchn  = evtchn_from_port(rd, rport);  </div><div class="line">        evtchn_set_pending(rd-&gt;vcpu[rchn-&gt;notify_vcpu_id], rport);  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">  </div><div class="line">    spin_unlock(&amp;ld-&gt;event_lock);  </div><div class="line">&#125;  </div><div class="line">  </div><div class="line">  </div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">notify_domu_before_page_modify</span><span class="params">(<span class="keyword">void</span>)</span>  </span></div><div class="line">&#123;  </div><div class="line">    <span class="keyword">struct</span> domain *ld;  </div><div class="line">    ld = rcu_lock_domain_by_id(save_domid);  </div><div class="line">    notify_via_specific_xen_event_channel(ld,event_channel_port);  </div><div class="line">    rcu_unlock_domain(ld);  </div><div class="line">&#125;  </div><div class="line">  </div><div class="line">  </div><div class="line">notify_domu_before_page_modify();</div></pre></td></tr></table></figure></p>
-<p>  这样，Xen就可以向Domain0发送事件通知了。</p>
-<hr>
-<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟化基础/">虚拟化基础<span class="article-category-count">6</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/XEN/">XEN</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Hardware/">Hardware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/TSX/">TSX</a></li></ul>
 
       
     </footer>
@@ -482,7 +496,7 @@
 
   <nav id="page-nav">
     
-    <a class="extend prev" rel="prev" href="/">上一页</a><a class="page-number" href="/">1</a><span class="page-number current">2</span><a class="page-number" href="/page/3/">3</a><a class="page-number" href="/page/4/">4</a><span class="space">&hellip;</span><a class="page-number" href="/page/16/">16</a><a class="extend next" rel="next" href="/page/3/">下一页</a>
+    <a class="extend prev" rel="prev" href="/">上一页</a><a class="page-number" href="/">1</a><span class="page-number current">2</span><a class="page-number" href="/page/3/">3</a><a class="page-number" href="/page/4/">4</a><span class="space">&hellip;</span><a class="page-number" href="/page/20/">20</a><a class="extend next" rel="next" href="/page/3/">下一页</a>
   </nav>
 
 </section>
@@ -577,7 +591,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/monitoring-int80/">X86/Intel虚拟化技术监控/陷入软件中断INT80H系统调用</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/cfi-development/">控制流完整性的发展历程</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -589,7 +603,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/unpriviledged-ins/">非特权指令的内核信息泄露</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/cfi-ccs05/">控制流完整性-CCS05年论文</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -601,7 +615,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/hav-exception/">对硬件虚拟化异常的思考(#VE)</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/rop-intel/">因特尔发布新的技术规范去防御 ROP 攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -613,7 +627,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/monitoring-syscall/">X86虚拟化技术监控/陷入SYSCALL的另一种方法</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/ropjop-research/">ROP/JOP攻击与防御最新研究进展</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -625,7 +639,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/vmcs-vmxon/">VT-x技术VMXON与VMCS区域的思考-从安全的角度</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/nmi-virtual/">虚拟化技术的NMI窗口退出</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -637,7 +651,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/monitoring-schduling/">使用硬件虚拟化技术无感监控Windows OS调度事件</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/lbr-ret2dir/">利用LBR特性检测ret2dir攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -649,7 +663,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/mtf/">MTF在基于EPT的客户机物理内存监控中的使用</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/virtual-ret2dir/">利用虚拟化技术防御ret2dir攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -661,7 +675,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/hardware-security-x86arm/">X86&amp;ARM架构处理器硬件安全特性</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/smep-nx/">利用NX位实现基于软件的SMEP</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -673,7 +687,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/xen-snapshot/">XEN快照机制</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/smep-virtual/">如何利用虚拟化技术实现基于软件的SMEP(监督模式执行)</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -685,7 +699,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/xen-event/">XEN事件通道机制及其实例</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/tsx-exploit/">TSX处理器技术对漏洞利用意味着什么？</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -697,7 +711,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/kvm-migration/">KVM迁移中脏页位图机制源码分析</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/lbr-idthooking/">使用LRB(最近分支记录)特性检测IDT Hooking</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -709,7 +723,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/kvm-exception/">KVM异常处理流程源码简要分析</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/bitvisor/">BitVisor- 一种实施I/O设备安全的轻量级Hypervisor</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -721,7 +735,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/qemukvm-source2/">Qemu-KVM虚拟机初始化及创建过程源码简要分析（二）</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/xencolor/">Xen模式：你的XEN是什么颜色？</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -733,7 +747,7 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170504/qemukvm-source1/">Qemu-KVM虚拟机初始化及创建过程源码简要分析（一）</a></h6>
+              <h6 style="margin: 0;"><a href="/20170504/securekernel-design/">这是Linux内核中一种好的安全设计吗- thread_info和内核栈的联系</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -745,8 +759,8 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170401/keylogger/">Keylogger检测</a></h6>
-          <!--  <span>四月 1, 2017</span> -->
+              <h6 style="margin: 0;"><a href="/20170504/secureos/">安全操作系统内核设计：一种阻止恶意软件覆盖关键系统内核数据结构的思想</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
             </div>
 
           </li>
@@ -757,8 +771,8 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
-              <h6 style="margin: 0;"><a href="/20170401/winkernelmal/">深入探索windows内核rootkit动态分析</a></h6>
-          <!--  <span>四月 1, 2017</span> -->
+              <h6 style="margin: 0;"><a href="/20170504/rop-jop/">一种运行时无感的方法防御ROP和JOP攻击</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
             </div>
 
           </li>
@@ -773,7 +787,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">10</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">8</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">10</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -783,7 +797,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.73px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 18.18px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.73px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 11.82px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.91px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 17.27px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 16.36px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.45px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.82px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 12.73px;">Monitoring</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.91px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.91px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 16.36px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.82px;">Rootkit</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.91px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.09px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 12.73px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 11.82px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.43px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.14px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.71px;">Binary</a> <a href="/tags/CFI/" style="font-size: 10.71px;">CFI</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.14px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 12.86px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 17.86px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.14px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 14.29px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.71px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.71px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.57px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.43px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.14px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 12.86px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 12.86px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.71px;">Malware</a> <a href="/tags/Memory/" style="font-size: 12.86px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.43px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 12.14px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.71px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.71px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.71px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.14px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.71px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.43px;">Rootkit</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.71px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.71px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.57px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.43px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.29px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 12.14px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 12.86px;">XEN</a>
     </div>
   </div>
 
