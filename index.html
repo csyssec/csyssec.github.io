@@ -106,7 +106,7 @@
         
           <section id="main">
   
-    <article id="post-xen-snapshot"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-unpriviledged-ins"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -114,7 +114,7 @@
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/xen-snapshot/">XEN快照机制</a>
+      <a class="article-title" href="/20170504/unpriviledged-ins/">非特权指令的内核信息泄露</a>
     </h1>
   
 
@@ -122,55 +122,127 @@
     
     <div class="article-meta">
       
-	Posted on <a href="/20170504/xen-snapshot/" class="article-date">
-	  <time datetime="2017-05-04T07:13:37.000Z" itemprop="datePublished">五月 4, 2017</time>
+	Posted on <a href="/20170504/unpriviledged-ins/" class="article-date">
+	  <time datetime="2017-05-04T08:09:19.000Z" itemprop="datePublished">五月 4, 2017</time>
 	</a>
 
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>作者:<a href="http://blog.csdn.net/mrbuffoon" target="_blank" rel="external">Mr_buffoon</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/kernel-information-leak-with.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/kernel-information-leak-with.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
-<p>虚拟机快照技术是指，在虚拟机运行过程中将虚拟机的完整运行状态，包括内存、磁盘、 CPU、网络等，保存到持久化的外部设备中，从而当虚拟机发生故障时可以通过备份的数据恢复虚拟机的运行。快照里面内存的快照又是非常重要非常关键的一部分。<br>内存快照主要实现机制主要有三种：停机拷贝机制（stop-and-copy），预拷贝机制（pre-copy），后拷贝机制（post-copy）。</p>
-<p><strong>停机拷贝机制（stop-and-copy）</strong><br>    在进行虚拟机快照的时刻要先将虚拟机挂起，然后在保存完虚拟机的完整状态后再恢复虚拟机的运行。<br>    这种方式简单，但使得整个快照过程的虚拟机停机时间完全取决于虚拟机的内存大小，而且该时间可以达到几十秒，严重影响虚拟机的性能。<br>    主流kvm、xen、vmware等都是基于停机拷贝方式实现快照功能。</p>
-<p><strong>预拷贝机制（pre-copy）</strong><br>    通过多轮迭代的方式对内存页面进行保存。每一轮保存自上一轮以来变脏的内存页面，当需要保存的内 存页面数量收敛到可以在一个较短的停机时间内完成保存的时刻，虚拟机停机。<br>    写密集时，收敛时间较长，多轮拷贝影响性能。“状态漂移”现象。<br>    Vnsnap等基于预拷贝机制实现快照。</p>
-<p><strong>后拷贝机制（post-copy）</strong><br>    首先停机，将cpu、设备等状态信息以及少量内存页面保存，然后开机，并在发生缺页中断时将相应内存页面保存。<br>    个人认为在分布式快照时优势比较明显。</p>
-<p>研究了一下xen快照部分的代码，其实xen-4.1.2的内存快照实现函数是跟迁移共用的，迁移已经是采用预拷贝机制来实现内存的迁移，所以说内存快照部分的代码其实是实现了预拷贝快照的。只是有一个参数live进行控制，live为1那么就是预拷贝，live为0就是停机拷贝。<br>快照部分函数入口及调用关系如下：</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-1.png" width="450"></a><br>    <figcaption></figcaption><br></figure><br> 注意，xen-4.4.1版本及以上使用xl命令，不再是之前版本的xm命令，也就是不再用xend，而是成了toolstack，所以上层入口有所变化，但是最底层的xc_domain_save()函数是不变的。<br><br><strong>预拷贝过程中关键数据:</strong><br><br><figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p><strong>预拷贝主流程：</strong></p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-3.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p><strong>页判定代码：</strong></p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-4.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-4.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p><strong>代码分析</strong><br>    页判定主要是判定该轮迭代要传送哪些页面。<br>    last_iter=1表示最后一轮迭代，置1后下一轮就进行停机拷贝。<br>    superpages=1表示全虚拟化，iter=1表示第一轮迭代，test_bit(n,xx)表示xx位图第n位的值，为1或0。<br><strong>判定规则</strong><br>    (1)to_send为1且to_skip为0的页<br>    (2)全虚拟化形式下第一轮迭代to_send为1的页面<br>    (3)最后一轮迭代to_send为1的页面<br>    (4)最后一轮迭代to_fix为1的页面<br>以上四种页面是本轮迭代需要传送的页面。</p>
-<p><strong>to_send、to_skip、to_fix置位时机</strong></p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-5.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-5.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>  to_fix是每一轮迭代页判断，当该页还没有被映射时就置为1。</p>
-<p><strong>页判定规则原理</strong><br>    to_send在第i-1轮迭代结束时候获取，收集的是第i-1轮迭代过程中变脏的页面，即第i轮可能拷贝页面的全集。    to_skip是第i轮迭代开始时获取，收集的是第i-1轮迭代结束到第i轮迭代开始这一短暂时间间隔内再次变脏的页面。    当to_skip为1表示这很短时间内某页面又再次被修改，也就可以认为该页频繁访问，为避免该页被重复拷贝，可以暂缓拷贝。<br>    第一轮迭代时候，to_send被初始化为全1，to_skip实际上是没有获取的，所以可以不必考虑to_skip。<br>    最后一轮迭代时候，to_fix、to_skip都需要一并拷贝，以保证内存拷贝的完整。</p>
-<p><strong>后处理代码：</strong></p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-6.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-6.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p><strong>代码分析</strong><br>    后处理主要是判定是否进行最后一轮迭代，如果是最后一轮置标记并申请停机。<br>    判定规则：<br>    如果     迭代次数iter大于等于预设最大迭代次数max_iters<br>    或者     本轮拷贝页面数与跳过页面数之和小于50<br>    或者      整个迭代过程拷贝总页面数大于迭代因子倍的P2M表对应页面数量<br>    则          进入停机拷贝。</p>
-<p>设备状态的拷贝是在XendCheckpoint.py中的save()函数中实现的。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-7.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-7.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
+<p>In computer security, information leaking is one of threats to software security. For example, the memory address of kernel critical resource should not be visible to user mode. Address space layout randomization (ASLR) is just one of techniques to prevent an attacker from reliably getting a particular exploited function in memory. </p>
+<p>However, I’m just very curious about why x86 processor leaks kernel data structures by some unprivileged instructions. Is this a bad CPU design?</p>
+<p>Here is an example. </p>
+<p>x86 IDTR register holds the base memory address for the Interrupt Descriptor Table entries (vector 0 through 255). As long as we gets its address, we can calculate and get all the ISR memory addresses of all exceptions/interrupts in a system. </p>
+<p><strong>But an user program can simply get the IDTR address by executing SIDT instruction.</strong></p>
+<p>See these two real-world example exploits below, <strong>if SIDT instruction in x86 were not allowed to execute in user mode, then one more roadblock would be placed to mitigate such an attack.</strong></p>
+<p>1) Linux Kernel ptrace/sysret - Local Privilege Escalation<br>    <a href="http://www.exploit-db.com/exploits/34134/" target="_blank" rel="external">http://www.exploit-db.com/exploits/34134/</a></p>
+<p>2) Ubuntu 12.04.0-2LTS x64 - perf_swevent_init Kernel Local Root Exploit<br>    <a href="http://www.exploit-db.com/exploits/33589/" target="_blank" rel="external">http://www.exploit-db.com/exploits/33589/</a></p>
+<p>So the questions:  </p>
+<ul>
+<li><strong>Why does Intel/x86 allow such an instruction to be executed by unprivileged program/task in user mode?</strong></li>
+<li><strong>Is there any legitimate application in user mode that must have to use this instruction to get kernel structure address?</strong></li>
+</ul>
+<p>The similar instructions are SGDT (retrieving Global Descriptor Table Register), and even seldom used instructions like STR, SLDT, SMSW. </p>
+<p>Anybody (Intel processor architect or application software developer) can tell me the reason of that? </p>
 <hr>
-<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<p>####<strong><em>Update:</em></strong><br><strong><a href="https://groups.google.com/forum/#!msg/comp.arch/RV4w6yfDxtA/05g1URTkdcIJ" target="_blank" rel="external">Why SIDT/SGDT instructions are allowed to execute in user mode (x86/Intel)?</a></strong></p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 
       
     </div>
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机快照/">虚拟机快照<span class="article-category-count">1</span></a>
+    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">3</span></a>
+
+
+      
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-hav-exception"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/hav-exception/">对硬件虚拟化异常的思考(#VE)</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/hav-exception/" class="article-date">
+	  <time datetime="2017-05-04T08:06:43.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/thoughts-on-virtualization-exception.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/thoughts-on-virtualization-exception.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>Recently in the latest <a href="http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html" target="_blank" rel="external">Intel SDM</a>, you can find that there is a new exception type, <strong>Virtualization Exception</strong>, in Chapter 6 (Interrupt and Exception Handling) of  VOL2.</p>
+<p>What is it? How to use it? …<br>x86 Hardware Virtualization technology introduces a stage 2 virtual memory translation mechanism which translates guest physical address to (host or machine) physical address in real RAM space. It is called as Extended Page Table (Intel VT-x). </p>
+<p>According to the specification, when EPT is in use, certain addresses that would normally be treated as physical addresses (and used to access memory) are instead treated as guest-physical addresses. Guest-physical addresses are translated by traversing a set of EPT paging structures to produce physical addresses that are used to access memory. </p>
+<p>In addition to translating a guest-physical address to a physical address, EPT specifies the privileges that software is allowed when accessing the address. Attempts at disallowed accesses (e.g. write to an read-only guest physical address, or access to non-present address) in vmx non-root mode are called EPT violations and cause VM exits into vmx root mode (host) in previous VT-x architecture w/o #VE implementation. <strong>However, when #VE is available and enabled, such an virtualization exception will induce an guest exception in VMX non-root mode instead that will be handled with a ISR in vector 20 of GUEST IDT (interrupt descriptor table)</strong>. </p>
+<p><br></p>
+<p>####<strong>Some key information on understanding #VE, Virtualization Exception:</strong></p>
+<ul>
+<li>This exception (#VE) is reserved on a processor that has no VT-x support, or VMX is off, or #VE is disabled or not available. </li>
+<li>Normally, it is guest’s responsibility to configure and setup #VE ISR (Interrupt Service Routine).</li>
+<li>Even though it is enabled, not all EPT violations cause virtualization exceptions. See Intel SDM for more details.</li>
+<li>Like other exceptions, the processor also provides the corresponding exception information in Virtualization-Exception Information Area used by ISR, e.g. the violation permissions, guest linear and physical address. This area is populated by processor when such an exception happens. However, VMM or #VE ISR is responsible for pre-allocating physical memory space for that area (4KB size currently) before activating #VE.</li>
+<li>Even though EPT violation can cause #VE exception, it doesn’t mean only EPT violation can cause such an exception. It seems that Intel wants it also to be used for other virtualization exception types (e.g. CPU events) in future. But now, only EPT violation exception.</li>
+<li>Unlike EPT vmexit, it will induce processor VMX mode switch overhead (VMEXIT and VMENTRY or VMRESUME). #VE doesn’t introduce VMX mode switch. Therefore, it achieves better performance when handling a virtualization exception. </li>
+</ul>
+<p><br></p>
+<p>####<strong><em>So, how to use it probably?</em></strong></p>
+<p>Whatever you are using EPT to do, you can consider using #VE to catch EPT exceptions and handle them in guest OS directly without introducing extra EPT violation VMEXIT/VMRESUME overhead. In this manner, I don’t think there is any other difference but performance improvement. </p>
+<p>However, if you look at the Intel SDM for #VE exception description, you probably can see this </p>
+<p><em>“After the virtualization exception handler has corrected the violation (for example, by executing the EPTP-switching VM function), execution of the program or task can be resumed.”</em></p>
+<p>… here the manual says “<strong><em>EPTP-switching VM function</em></strong> “. </p>
+<p>Actually, it is a new VMX instruction, VMFUNC, which can only be executed in guest OS (VMX non-root mode). According to the Intel manual, this instruction allows software in VMX non-root operation (guest) to invoke a VM function, which is processor functionality enabled and configured by software in VMX root operation (host). However, It seems that Intel currently defines only one VM function, EPTP-switching.  </p>
+<p><strong>This EPTP-switching VM function allows software in VMX non-root operation to load a new value for the EPT pointer (EPTP), thereby establishing a different EPT paging-structure hierarchy.</strong> However, software is limited to selecting from a list of potential EPTP values configured in advance by software in VMX root operation. Imagine that, in a traditional system configuration , CR3 (page directory base register) is pointing to a virtual address translation structure hierarchy, switching CR3 means switching different virtual address spaces. EPT pointer is just like CR3 pointer, but the difference is that EPT pointer establishes the translation structure from guest physical address to host physical address, CR3 pointer establishes the translation structure from guest virtual address to guest physical address. </p>
+<p>So, in a typical system, different VMs can be configured to use different EPT paging-structures pointed by different EPT pointers, when guest VM switches, the host VMM software can change to different EPTP pointers accordingly, hence the different VM can has different memory map view (memory isolation). <strong>However, even one single VM software (guest OS) can also be configured to use different EPT paging-structures</strong>, for example host VMM software can configure two different EPT paging-structure mappings pointed by two different EPTP pointer, one is a “privileged”, the other is “unprivileged”. When code running with “unprivileged” mapping attempts to access the guest physical memory referenced in “privileged” mapping, an EPT violation vmexit might happen, and then VMM can switch EPTP pointers to let access success if such an access is legitimate. </p>
+<p><strong>EPTP-switching VM function is introduced to do such a switch without transferring control to VMX root mode (HOST), because it allows guest software do it directly in VMX non-root mode, hence it can reduce performance overhead as well.</strong></p>
+<p>Note that in guest OS software, we cannot directly see the real value of each particular EPTP pointer, instead, we can only see the the EPTP-index value (0~511) that is corresponded to each one of available  EPTP pointer value. So it is VMM software’s responsibility to maintain/update the mapping between EPTP-index and real EPTP pointer value with a EPTP-list structure (4KB page, so total 512 entries at most currently).</p>
+<p>So now when you combine these two new features: VMFUNC (EPTP-switching) and #VE, you probably could understand </p>
+<p><em>“After the virtualization exception handler has corrected the violation (for example, by executing the EPTP-switching VM function), execution of the program or task can be resumed.”</em></p>
+<p> said in Intel manual. Eventually, it has two purposes: </p>
+<ul>
+<li><strong>handle EPT violation directly in guest OS context without EPT violation VMEXIT;</strong> </li>
+<li><strong>switch EPTP pointer (hence EPT paging-structure hierarchy) directly in guest OS context without transferring control or exiting to VMM.</strong> </li>
+</ul>
+<p><br><br>Performance matters!!! </p>
+<p>but wait… questions: VMWare, XEN or any other public well-known hypervisor use it? and for what?  Anyone knows?</p>
+<p>&lt; The End&gt;</p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">3</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Snapshot/">Snapshot</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/XEN/">XEN</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exception/">Exception</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/HAV/">HAV</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Hardware/">Hardware</a></li></ul>
 
       
     </footer>
@@ -181,7 +253,7 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-xen-event"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-monitoring-syscall"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -189,7 +261,7 @@
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/xen-event/">XEN事件通道机制及其实例</a>
+      <a class="article-title" href="/20170504/monitoring-syscall/">X86虚拟化技术监控/陷入SYSCALL的另一种方法</a>
     </h1>
   
 
@@ -197,36 +269,56 @@
     
     <div class="article-meta">
       
-	Posted on <a href="/20170504/xen-event/" class="article-date">
-	  <time datetime="2017-05-04T07:11:11.000Z" itemprop="datePublished">五月 4, 2017</time>
+	Posted on <a href="/20170504/monitoring-syscall/" class="article-date">
+	  <time datetime="2017-05-04T08:02:12.000Z" itemprop="datePublished">五月 4, 2017</time>
 	</a>
 
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>作者:<a href="http://blog.csdn.net/mrbuffoon" target="_blank" rel="external">Mr_buffoon</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/yet-another-solution-to-monitortrap.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/yet-another-solution-to-monitortrap.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
-<p>事件通道机制是xen用于Domain和Xen之间，或者Domain和Domain之间的异步事件通知机制。事件通道在xen中应用非常广泛，像物理中断，虚拟中断以及域间通信等均是通过事件通道实现的。<br>    根据用途划分，事件通道一般分为四类：域间通信，域内通信，虚拟中断，物理中断。域间通信主要用于Domain与Domain之间通信，或者Xen与Domain之间通信。域内通信就是同一个域内不同VCPU之间通信。物理中断与虚拟中断都是绑定中断源，实现Xen的中断。<br>    Xen在内核态和用户态代码中都封装了很多事件通道相关的操作函数，像分配通道，绑定通道，置pending位等，如果需要可以自己研究源码。『Xen虚拟化技术（石磊 邹得清 金海）』一书中对事件通道的原理，函数，数据结构讲解的比较全面，可以参考。<br>    我这里主要是简单讲一下我自己实现的Domain0与Xen进行通信的例子。</p>
-<p>因为项目需要，我需要实现Xen给Domain0发送事件通知，Domain0收到事件通知后就执行某些操作。这里使用域间通信来实现，大概的流程就是Xen内核态代码中先为Domain0分配一个事件通道端口，用户态通过超级调用获取这个事件通道，并进行通道绑定。然后用户态陷入循环等待中，等待Xen内核发来事件通知，收到通知后就执行预先写好的那部分代码。</p>
-<p>具体代码：<br>内核态分配通道端口：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//save_domid这里指定为0  </span></div><div class="line"><span class="keyword">int</span> event_channel_port=alloc_unbound_xen_event_channel(current, save_domid, <span class="literal">NULL</span>);</div></pre></td></tr></table></figure></p>
-<p>内核态分配了端口后，传到用户态，即event_channel_port。<br>用户态进行绑定：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line">xc_evtchn *xc_event_iface = xc_evtchn_open(<span class="literal">NULL</span>,<span class="number">0</span>);  </div><div class="line"><span class="keyword">if</span>(!xc_event_iface)  </div><div class="line">&#123;  </div><div class="line">    PERROR(<span class="string">"Could not open interface to libxc event channels"</span>);  </div><div class="line">&#125;  </div><div class="line">  </div><div class="line">  </div><div class="line"><span class="keyword">int</span> event_port = xc_evtchn_bind_interdomain(xc_event_iface, DOMID_SELF, event_channel_port);  </div><div class="line"><span class="keyword">if</span>(event_port != <span class="number">-1</span>)  </div><div class="line">&#123;  </div><div class="line">    PERROR(<span class="string">"event_port is: %d"</span>,event_port);  </div><div class="line">&#125;  </div><div class="line"><span class="keyword">else</span>  </div><div class="line">&#123;  </div><div class="line">    PERROR(<span class="string">"Could not bind xen port to local port"</span>);  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>用户态绑定后，可以设置一个循环等待事件通知的到来，当然根据自己的需求进行修改。<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">while</span>(<span class="number">1</span>)  </div><div class="line">&#123;  </div><div class="line">    <span class="keyword">int</span> pending_port = xc_evtchn_pending(xc_event_iface);  </div><div class="line">    <span class="keyword">if</span>(pending_port == event_port)<span class="comment">//收到事件通知  </span></div><div class="line">    &#123;             </div><div class="line">    <span class="keyword">if</span>(xc_evtchn_unmask(xc_event_iface, event_port) == <span class="number">-1</span>)  </div><div class="line">    &#123;  </div><div class="line">        perror(<span class="string">"Could not unmask event port in loop"</span>);  </div><div class="line">        <span class="keyword">break</span>;  </div><div class="line">    &#125;  </div><div class="line">    <span class="comment">//下面就是自定义的收到事件通知后的处理代码  </span></div><div class="line">        <span class="comment">//。。。。。。。。。  </span></div><div class="line">        。  </div><div class="line">        。  </div><div class="line">        。  </div><div class="line">        。  </div><div class="line">    &#125;  </div><div class="line">    <span class="keyword">else</span>  </div><div class="line">    &#123;  </div><div class="line">    PERROR(<span class="string">"Unknown event port pending: %d"</span>, pending_port);  </div><div class="line">    &#125;  </div><div class="line">&#125;<span class="comment">//end while  </span></div><div class="line"><span class="comment">//事件通道使用完了后进行解绑释放  </span></div><div class="line">xc_evtchn_unbind(xc_event_iface, event_port);  </div><div class="line">xc_evtchn_close(xc_event_iface);  </div><div class="line"><span class="built_in">free</span>(xc_event_iface);</div></pre></td></tr></table></figure></p>
-<p>内核态发送通知代码如下：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">notify_via_specific_xen_event_channel</span><span class="params">(<span class="keyword">struct</span> domain *ld, <span class="keyword">int</span> lport)</span>  </span></div><div class="line">&#123;  </div><div class="line">    <span class="keyword">struct</span> evtchn *lchn, *rchn;  </div><div class="line">    <span class="keyword">struct</span> domain *rd;  </div><div class="line">    <span class="keyword">int</span>            rport;  </div><div class="line">  </div><div class="line">  </div><div class="line">    spin_lock(&amp;ld-&gt;event_lock);  </div><div class="line">  </div><div class="line">  </div><div class="line">    <span class="keyword">if</span> ( unlikely(ld-&gt;is_dying) )  </div><div class="line">    &#123;  </div><div class="line">        spin_unlock(&amp;ld-&gt;event_lock);  </div><div class="line">        <span class="keyword">return</span>;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">  </div><div class="line">    ASSERT(port_is_valid(ld, lport));  </div><div class="line">    lchn = evtchn_from_port(ld, lport);<span class="comment">//bind local event channel  </span></div><div class="line">    ASSERT(consumer_is_xen(lchn));  </div><div class="line">  </div><div class="line">  </div><div class="line">    <span class="keyword">if</span> ( likely(lchn-&gt;state == ECS_INTERDOMAIN) )  </div><div class="line">    &#123;  </div><div class="line">        rd    = lchn-&gt;u.interdomain.remote_dom;  </div><div class="line">        rport = lchn-&gt;u.interdomain.remote_port;  </div><div class="line">        rchn  = evtchn_from_port(rd, rport);  </div><div class="line">        evtchn_set_pending(rd-&gt;vcpu[rchn-&gt;notify_vcpu_id], rport);  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">  </div><div class="line">    spin_unlock(&amp;ld-&gt;event_lock);  </div><div class="line">&#125;  </div><div class="line">  </div><div class="line">  </div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">notify_domu_before_page_modify</span><span class="params">(<span class="keyword">void</span>)</span>  </span></div><div class="line">&#123;  </div><div class="line">    <span class="keyword">struct</span> domain *ld;  </div><div class="line">    ld = rcu_lock_domain_by_id(save_domid);  </div><div class="line">    notify_via_specific_xen_event_channel(ld,event_channel_port);  </div><div class="line">    rcu_unlock_domain(ld);  </div><div class="line">&#125;  </div><div class="line">  </div><div class="line">  </div><div class="line">notify_domu_before_page_modify();</div></pre></td></tr></table></figure></p>
-<p>  这样，Xen就可以向Domain0发送事件通知了。</p>
+<p>This article describes an idea to monitor SYSCALL with x86 Hardware Virtualization Technology. It doesn’t require visible guest code/data modification, so that in some cases, even Kernel Patch Protection (e.g. Windows x64 PatchGuard) cannot detect it. Here the SYSCALL could also be SYSENTER or INT 80h for system calls.</p>
+<p>Actually this solution can be extended to other resource monitoring, so at the end of this article I will give an overview on how to extend this as a generic solution (in a new post, LINK?).</p>
+<p>In x86/Intel, <strong>syscall</strong> (Fast System Call) instruction is invoked by a user application at privilege level 0 to call an OS system-call handler at privilege level 0. In ARM architecture, supervisor Call (<strong>SVC</strong>, formerly SWI) does the similar thing to request privileged operations or access to system resources from an operating system. </p>
+<p>To be more specific, x86/Intel syscall does so by loading RIP from the IA32_LSTAR MSR(after saving the address of the instruction following SYSCALL, returning RIP, into RCX, so when returning back from ring 0, sysret can load that user mode RIP from RCX, and continue to execute program). The WRMSR instruction ensures that the IA32_LSTAR MSR always contain a canonical address (A #GP will be triggered if an address is not canonical when WRMSR to IA32_LSTAR).</p>
+<p>The memory address in IA32_LSTAR MSR is an entry point of kernel system-call handler, it can only be configured by software software (OS kernel, normally), and cannot be a non-canonical address. </p>
+<p><strong><em>However, the key point is here: what if that address saved in IA32_LSTAR is an invalid canonical memory address (or Non-eXecute memory address)</em></strong>. When this happens, a CPU Page Fault (#PF) will be triggered at that address. And the error code indicates that this is a page-not-present instruction fetch exception (For simplicity, we don’t consider setting Non-eXecute memory address), and CR2 control register content is just that pre-set invalid canonical memory address. </p>
+<p><strong><em>Hence, whenever a syscall is invoked by application, an intended page-not-present instruction fetch #PF will be triggered</em></strong>. Then this exception is normally handled by #PF (vector = 14) handler specified in OS IDT. </p>
+<p>In a x86/Intel virtualization environment, page faults (exception vector = 14) can be configured to trigger a VMEXIT. And even more, we can selectively make only certain type of #PFs generate VMexit by configuring the VMCS page-fault error-code mask and page-fault error-code match. For example, only page-not-present instruction fetch #PF can generate a VMexit, any other #PF exceptions (like read/write access to invalid or disallowed memory) won’t generate VMexit, instead, they are handled in guest IDT #PF handler normally. By doing so, the performance impact will be minimized. </p>
+<p>So, to summarize this solution, we could do it like this to monitor every syscall invoked by user application without guest OS changes:</p>
+<ol>
+<li><p>VMM software traps any write access to IA32_LSTAR MSR, whenever a WRMSR to IA32_LSTAR happens, VMM records the original MSR value that points to the real entry point address of kernel system-call handler, and replace it with a MAGIC &amp; INVALID memory address.</p>
+</li>
+<li><p>VMM software configures relevant VMCS structures to cause only page-not-present instruction fetch #PF trigger a VMexit.</p>
+</li>
+<li><p>At runtime, whenever such a VMexit type happens, VMM software checks guest CR2 value, if it is equal to the predefined MAGIC and INVALID value, then it means this is an intended #PF exception VMexit (not considering malicious (in)direct call to that MAGIC address), we should discard this #PF, and directly resume guest OS back with a new RIP value (it is just the original MSR value that points to the real entry point address of kernel system-call handler).</p>
+<p>Otherwise, if this #PF VMexit indicates that it is an ordinary #PF, VMM software injects this exception event back to guest OS without doing anything, then it will be normally handled by #PF handler in guest IDT table.</p>
+</li>
+</ol>
+<p>Therefore, in this way, whenever a syscall is invoked in user mode application, VMM software will get an notification.</p>
+<p>But there is a problem here. You can see that we don’t need to change any guest OS kernel, however, the Kernel Patch Protection module (like PatchGuard) will probably detect this by reading MSR IA32_LSTAR and comparing it with the original value. It is very easy to solve this issue by monitoring RDMSR to IA32_LSTAR register, and hiding the real value with a return of the original value previously configured by OS kernel. </p>
+<p>Actually, there is another solution that can also works, see my previous blog on <a href="http://hypervsir.blogspot.com/2014/09/debug-registers-on-intel-x86-processor.html" target="_blank" rel="external">Debug Register usages</a>… by enabling Debug breakpoint on the original address stored in IA32_LSTAR MSR by OS kernel. </p>
+<p><strong>As an aforementioned generic solution to monitor/trap a specific event that we’re interested in, here it is:</strong></p>
+<ol>
+<li><strong>Attempt to change guest software for the purpose of making some certain instruction execution generate an intended exception. (Here it is the syscall execution in this post),</strong></li>
+<li><strong>Then the virtualization software, VMM or Hypervisor, monitors that intended exception by configuring the corresponding VMCS data structures (e.g. Exception-Bitmap VMCS).</strong></li>
+</ol>
+<p><br><br>I will write a new post to explain this solution in greater details later.</p>
 <hr>
-<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 
       
     </div>
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟化基础/">虚拟化基础<span class="article-category-count">6</span></a>
+    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">9</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/XEN/">XEN</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Monitoring/">Monitoring</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Syscall/">Syscall</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtulization/">Virtulization</a></li></ul>
 
       
     </footer>
@@ -237,7 +329,7 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-kvm-migration"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-vmcs-vmxon"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -245,7 +337,7 @@
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/kvm-migration/">KVM迁移中脏页位图机制源码分析</a>
+      <a class="article-title" href="/20170504/vmcs-vmxon/">VT-x技术VMXON与VMCS区域的思考-从安全的角度</a>
     </h1>
   
 
@@ -253,46 +345,65 @@
     
     <div class="article-meta">
       
-	Posted on <a href="/20170504/kvm-migration/" class="article-date">
-	  <time datetime="2017-05-04T07:09:30.000Z" itemprop="datePublished">五月 4, 2017</time>
+	Posted on <a href="/20170504/vmcs-vmxon/" class="article-date">
+	  <time datetime="2017-05-04T07:59:28.000Z" itemprop="datePublished">五月 4, 2017</time>
 	</a>
 
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>作者:<a href="http://blog.csdn.net/mrbuffoon" target="_blank" rel="external">Mr_buffoon</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/09/thoughts-on-vmxon-and-vmcs-regions-in.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/09/thoughts-on-vmxon-and-vmcs-regions-in.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
-<p>我们都知道KVM支持在线迁移，而其在线迁移是通过内存预拷贝（迭代拷贝）机制来实现的。预拷贝的一个思想就是不断记录脏页并每一轮迭代拷贝脏页面，直至达到一定的条件就退出迭代，进行最后的停机拷贝。关于预拷贝的原理我之前有博客进行了简单分析，在这里就不重复说明了。那这篇文章主要是就其中的脏页记录机制从源码层面进行分析。</p>
-<p>这里分析的代码版本是kvm3.10.1和qemu 1.5.3。我们直接进入到迁移（migration）的线程函数Migration.c—&gt;migration_thread()，直接看代码：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">void</span> *<span class="title">migration_thread</span><span class="params">(<span class="keyword">void</span> *opaque)</span>  </span></div><div class="line">&#123;  </div><div class="line">    <span class="comment">//.........//省略部分代码  </span></div><div class="line">    qemu_savevm_state_begin(s-&gt;file, &amp;s-&gt;params);  </div><div class="line">  </div><div class="line">    <span class="keyword">while</span> (s-&gt;state == MIG_STATE_ACTIVE) &#123;  </div><div class="line">        <span class="keyword">int64_t</span> current_time;  </div><div class="line">        <span class="keyword">uint64_t</span> pending_size;  </div><div class="line">  </div><div class="line">        <span class="keyword">if</span> (!qemu_file_rate_limit(s-&gt;file)) &#123;  </div><div class="line">            DPRINTF(<span class="string">"iterate\n"</span>);  </div><div class="line">            pending_size = qemu_savevm_state_pending(s-&gt;file, max_size);  </div><div class="line">            DPRINTF(<span class="string">"pending size %lu max %lu\n"</span>, pending_size, max_size);  </div><div class="line">            <span class="keyword">if</span> (pending_size &amp;&amp; pending_size &gt;= max_size) &#123;  </div><div class="line">                qemu_savevm_state_iterate(s-&gt;file);  </div><div class="line">            &#125; <span class="keyword">else</span> &#123;  </div><div class="line">                <span class="comment">//..........//省略部分代码  </span></div><div class="line">                qemu_savevm_state_complete(s-&gt;file);  </div><div class="line">                <span class="comment">//..........//省略部分代码  </span></div><div class="line">            &#125;  </div><div class="line">        &#125;  </div><div class="line">  </div><div class="line">        <span class="comment">//..........//省略部分代码  </span></div><div class="line">          </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">    <span class="comment">//..........//省略部分代码  </span></div><div class="line">  </div><div class="line">    <span class="keyword">return</span> <span class="literal">NULL</span>;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p> 这个函数主要是完成迁移的初始化以及内存拷贝过程，这里先看一下里面qemu_savevm_state_begin()这个函数，他里面调用了save_live_setup这个函数指针，这个函数指针在之前被注册，指向了ram_save_setup()这个函数，具体的注册过程这里不进行分析，根据代码追一下可以追到的。ram_save_setup()主要是进行一些初始化的工作，下面看ram_save_setup()这个函数：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">int</span> <span class="title">ram_save_setup</span><span class="params">(QEMUFile *f, <span class="keyword">void</span> *opaque)</span>  </span></div><div class="line">&#123;  </div><div class="line">    ........  </div><div class="line">  </div><div class="line">    migration_bitmap = bitmap_new(ram_pages);  </div><div class="line">    bitmap_set(migration_bitmap, <span class="number">0</span>, ram_pages);  </div><div class="line">    migration_dirty_pages = ram_pages;  </div><div class="line">  </div><div class="line">    ........  </div><div class="line">  </div><div class="line">    memory_global_dirty_log_start();  </div><div class="line">    migration_bitmap_sync();  </div><div class="line">    ........  </div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>我们看这个函数，里面有一个migration_bitmap，没错，这就是迁移过程中用到的脏页位图，看其定义可以发现这是一个unsigned long *类型的全局变量，这个函数代码中首先给位图分配了内存空间，然后初始化为全0。memory_global_dirty_log_start()这个函数是开启脏页记录，实际上就是对内存页面进行写保护，这里略过不谈。migration_bitmap_sync()函数是同步脏页位图。那为什么要同步脏页位图呢？到底有多少脏页位图？我们下面来思考一下。</p>
-<p>我们知道脏页就是修改了内存页面，kvm可以认为是qemu和kvm内核两个层次，I/O主要是在qemu层次进行的，那qemu层可能会有大量的内存的修改。那kvm内核有没有页面的修改呢？实际上，kvm内核也可能发生少量的内存的修改。这样，kvm就需要在两个层次都要维持各自的脏页位图，并且要将这两层的位图进行同步。通过分析代码，kvm两个层次我们可以认为维护了三套位图：一是kvm内核维护的脏页位图memslot-&gt;dirty_bitmap，这个位图记录kvm内核中的脏页，kvm内核中所有的对内存页面的修改都会对应着修改这个位图的位；二是qemu层次维护的一个脏页位图ram_list_phys_dirty[]，qemu层次对内存页面的修改都会相应的修改这个位图的位，并且它还会通过系统调用获取内核中的位图，并进行同步修改；三是迁移时具体使用的位图migration_btimap，这也是在qemu层的，但是它是复制ram_list_phys_dirty[]的相应位。</p>
-<p><br><br>我们一项一项分析，先看看migration_bitmap是如何复制ram_list_phys_dirty[]的。这个复制的过程是在migration_bitmap_sync()函数实现的，先看代码：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">void</span> <span class="title">migration_bitmap_sync</span><span class="params">(<span class="keyword">void</span>)</span>  </span></div><div class="line">&#123;  </div><div class="line">    ........  </div><div class="line">    trace_migration_bitmap_sync_start();  </div><div class="line">    memory_global_sync_dirty_bitmap(get_system_memory());  </div><div class="line">  </div><div class="line">    QTAILQ_FOREACH(block, &amp;ram_list.blocks, next) &#123;  </div><div class="line">        <span class="keyword">for</span> (addr = <span class="number">0</span>; addr &lt; block-&gt;length; addr += TARGET_PAGE_SIZE) &#123;  </div><div class="line">            <span class="keyword">if</span> (memory_region_test_and_clear_dirty(block-&gt;mr,  </div><div class="line">                                                   addr, TARGET_PAGE_SIZE,  </div><div class="line">                                                   DIRTY_MEMORY_MIGRATION)) &#123;  </div><div class="line">                migration_bitmap_set_dirty(block-&gt;mr, addr);  </div><div class="line">            &#125;  </div><div class="line">        &#125;  </div><div class="line">    &#125;  </div><div class="line">    trace_migration_bitmap_sync_end(migration_dirty_pages  </div><div class="line">                                    - num_dirty_pages_init);  </div><div class="line">    ........  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>我们分析这个函数，里面memory_global_sync_dirty_bitmap()就是将kvm内核中的位图同步到ram_list_phys_dirty[]中，这样就保证了现在ram_list_phys_dirty[]是完整的位图。memory_region_test_and_clear_dirty()是判断ram_list_phys_dirty[]该位是否置位，如果置位则清位，migration_bitmap_set_dirty()这个函数则是将migration_bitmap置位，这两个函数结合，就将ram_list_phys_dirty[]中为1的位复制到了migration_bitmap中。这里引申一点做个说明，迁移时，如果migration_bitmap相应位为1，就将页面保存，并将migration_bitmap位图相应位清位（migration_bitmap_find_and_reset_dirty()函数来实现的），这样就能保证migration_bitmap的准确性和实时性。</p>
-<p>我们再分析一下前面提到的几个函数。memory_global_sync_dirty_bitmap()这里先不分析，后面在分析内核与qemu位图同步时候再分析。先看memory_region_test_and_clear_dirty()这个函数：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">bool</span> <span class="title">memory_region_test_and_clear_dirty</span><span class="params">(MemoryRegion *mr, hwaddr addr,  </span></span></div><div class="line">                                        hwaddr size, <span class="keyword">unsigned</span> client)  </div><div class="line">&#123;  </div><div class="line">    <span class="keyword">bool</span> ret;  </div><div class="line">    assert(mr-&gt;terminates);  </div><div class="line">    ret = cpu_physical_memory_get_dirty(mr-&gt;ram_addr + addr, size,  </div><div class="line">                                        <span class="number">1</span> &lt;&lt; client);  </div><div class="line">    <span class="keyword">if</span> (ret) &#123;  </div><div class="line">        cpu_physical_memory_reset_dirty(mr-&gt;ram_addr + addr,  </div><div class="line">                                        mr-&gt;ram_addr + addr + size,  </div><div class="line">                                        <span class="number">1</span> &lt;&lt; client);  </div><div class="line">    &#125;  </div><div class="line">    <span class="keyword">return</span> ret;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p> cpu_physical_memory_get_dirty()  —&gt;  cpu_physical_memory_get_dirty_flag()  –&gt;  return ram_list.phys_dirty[addr &gt;&gt; TARGET_PAGE_BITS]  这就获得了ram_list.phys_dirty[]相应位的数值，然后判断如果是1，执行cpu_physical_memory_reset_dirty()  –&gt;  cpu_physical_memory_mask_dirty_range()  –&gt;  cpu_physical_memory_clear_dirty_flags()  –&gt;  ram_list.phys_dirty[addr &gt;&gt; TARGET_PAGE_BITS] &amp;= mask  ，这就清了相应位。</p>
-<p>再看 migration_bitmap_set_dirty()这个函数：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keyword">bool</span> <span class="title">migration_bitmap_set_dirty</span><span class="params">(MemoryRegion *mr,  </span></span></div><div class="line">                                              <span class="keyword">ram_addr_t</span> offset)  </div><div class="line">&#123;  </div><div class="line">    <span class="keyword">bool</span> ret;  </div><div class="line">    <span class="keyword">int</span> nr = (mr-&gt;ram_addr + offset) &gt;&gt; TARGET_PAGE_BITS;  </div><div class="line">  </div><div class="line">    ret = test_and_set_bit(nr, migration_bitmap);  </div><div class="line">  </div><div class="line">    <span class="keyword">if</span> (!ret) &#123;  </div><div class="line">        migration_dirty_pages++;  </div><div class="line">    &#125;  </div><div class="line">    <span class="keyword">return</span> ret;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p> 里面test_and_set_bit(nr, migration_bitmap)，这个函数将migration_bitmap置位。</p>
-<p><br><br>分析完migration_bitmap是如何复制ram_list_phys_dirty[]的，我们再分析ram_list_phys_dirty[]是如何维护的。跟内核的同步这一部分前面也提到过，具体的后面讲解。这里就分析qemu中如何随时修改的这个位图。实际上修改这个位图的函数是cpu_physical_memory_set_dirty_flags()，qemu中大概有几十处直接或间接调用这个函数，在这里就不再一一讲解。</p>
-<p>最后我们分析内核与qemu位图的同步以及内核中位图的维护。内核中的位图是memslot-&gt;dirty_bitmap，它的修改是通过mark_page_dirty_in_slot()这个函数，而mark_page_dirty_in_slot()这个函数又被kvm_write_guest_cached()和mark_page_dirty()这两个函数调用，kvm中大概有十几处调用了这两个函数，这里也不一一讲解了。</p>
-<p>关于内核与qemu位图的同步我们前面提到过memory_global_sync_dirty_bitmap()这个函数，这个过程实际上是qemu主动发起的系统调用，具体分析其代码：<br>memory_global_sync_dirty_bitmap()  –&gt;  log_sync  –&gt;  kvm_log_sync() –&gt;  kvm_physical_sync_dirty_bitmap()，分析kvm_physical_sync_dirty_bitmap()这个函数，里面有几行代码如下：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line"><span class="built_in">memset</span>(d.dirty_bitmap, <span class="number">0</span>, allocated_size);  </div><div class="line">  </div><div class="line">d.slot = mem-&gt;slot;  </div><div class="line">  </div><div class="line"><span class="keyword">if</span> (kvm_vm_ioctl(s, KVM_GET_DIRTY_LOG, &amp;d) == <span class="number">-1</span>) &#123;  </div><div class="line">    DPRINTF(<span class="string">"ioctl failed %d\n"</span>, errno);  </div><div class="line">    ret = <span class="number">-1</span>;  </div><div class="line">    <span class="keyword">break</span>;  </div><div class="line">&#125;  </div><div class="line">  </div><div class="line">kvm_get_dirty_pages_log_range(section, d.dirty_bitmap);</div></pre></td></tr></table></figure></p>
-<p>  我们可以看到，这就是ioctl系统调用，命令参数是KVM_GET_DIRTY_LOG，将内核中的位图复制到了d.dirty_bitmap中，后面又利用d来修改了ram_list_phys_dirty[]。既然是系统调用，那我们追踪到kvm内核中来看，找到kvm_vm_ioctl()函数，其中一段代码：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">case</span> KVM_GET_DIRTY_LOG: &#123;  </div><div class="line">    <span class="keyword">struct</span> kvm_dirty_log <span class="built_in">log</span>;  </div><div class="line">  </div><div class="line">    r = -EFAULT;  </div><div class="line">    <span class="keyword">if</span> (copy_from_user(&amp;<span class="built_in">log</span>, argp, <span class="keyword">sizeof</span> <span class="built_in">log</span>))  </div><div class="line">        <span class="keyword">goto</span> out;  </div><div class="line">    r = kvm_vm_ioctl_get_dirty_log(kvm, &amp;<span class="built_in">log</span>);  </div><div class="line">    <span class="keyword">break</span>;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>这一段代码里看一下kvm_vm_ioctl_get_dirty_log()函数：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">kvm_vm_ioctl_get_dirty_log</span><span class="params">(<span class="keyword">struct</span> kvm *kvm, <span class="keyword">struct</span> kvm_dirty_log *<span class="built_in">log</span>)</span>  </span></div><div class="line">&#123;  </div><div class="line">    ......  </div><div class="line">  </div><div class="line">    dirty_bitmap = memslot-&gt;dirty_bitmap;  </div><div class="line">    r = -ENOENT;  </div><div class="line">    <span class="keyword">if</span> (!dirty_bitmap)  </div><div class="line">        <span class="keyword">goto</span> out;  </div><div class="line">  </div><div class="line">    n = kvm_dirty_bitmap_bytes(memslot);  </div><div class="line">  </div><div class="line">    dirty_bitmap_buffer = dirty_bitmap + n / <span class="keyword">sizeof</span>(<span class="keyword">long</span>);  </div><div class="line">    <span class="built_in">memset</span>(dirty_bitmap_buffer, <span class="number">0</span>, n);  </div><div class="line">  </div><div class="line">    spin_lock(&amp;kvm-&gt;mmu_lock);  </div><div class="line">  </div><div class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; n / <span class="keyword">sizeof</span>(<span class="keyword">long</span>); i++) &#123;  </div><div class="line">        <span class="keyword">unsigned</span> <span class="keyword">long</span> mask;  </div><div class="line">        <span class="keyword">gfn_t</span> offset;  </div><div class="line">  </div><div class="line">        <span class="keyword">if</span> (!dirty_bitmap[i])  </div><div class="line">            <span class="keyword">continue</span>;  </div><div class="line">  </div><div class="line">        is_dirty = <span class="literal">true</span>;  </div><div class="line">  </div><div class="line">        mask = xchg(&amp;dirty_bitmap[i], <span class="number">0</span>);  </div><div class="line">        dirty_bitmap_buffer[i] = mask;  </div><div class="line">  </div><div class="line">        offset = i * BITS_PER_LONG;  </div><div class="line">        kvm_mmu_write_protect_pt_masked(kvm, memslot, offset, mask);  </div><div class="line">    &#125;  </div><div class="line">    <span class="keyword">if</span> (is_dirty)  </div><div class="line">        kvm_flush_remote_tlbs(kvm);  </div><div class="line">  </div><div class="line">    spin_unlock(&amp;kvm-&gt;mmu_lock);  </div><div class="line">  </div><div class="line">    r = -EFAULT;  </div><div class="line">    <span class="keyword">if</span> (copy_to_user(<span class="built_in">log</span>-&gt;dirty_bitmap, dirty_bitmap_buffer, n))  </div><div class="line">        <span class="keyword">goto</span> out;  </div><div class="line">  </div><div class="line">    r = <span class="number">0</span>;  </div><div class="line">out:  </div><div class="line">    mutex_unlock(&amp;kvm-&gt;slots_lock);  </div><div class="line">    <span class="keyword">return</span> r;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>这个函数实际上是将memslot-&gt;dirty_bitmap最终通过copy_to_user()函数复制到了qemu层。这就实现了两个层次的位图同步。</p>
+<p>Previously when I was working on a Hypervisor based on Intel VT-x. I always did exactly as what I’m told to do in the VT-x specification when programing VMM software.<br>But now I’m going to revisit this again starting by asking these questions: What if I won’t do it as what we’re told to do? Is Intel VT-x exploitable? Can we find vulnerabilities in hardware VT-x implementation? Is it possible to do “reverse-engineering” to get internals on VT-x CPU implementation? Can we take advantage of VT-x to attack other privileged resource? Can we bypass EPT layer?  However, those are just some open questions, I don’t have answers either, but it has a lot of fun when you look into it.</p>
+<p>####<strong>VMXON Region</strong><br>If you take a look at the Intel SDM (<a href="http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html" target="_blank" rel="external">Software Development Manual</a>), you can see some words about VMXON region like below:</p>
+<ul>
+<li><em>“Before executing VMXON, software allocates a region of memory (called the VMXON region) that the logical processor uses to support VMX operation….. Software should use a separate region for each logical processor and should not access or modify the VMXON region of a logical processor between execution of VMXON and VMXOFF on that logical processor. Doing otherwise may lead to unpredictable behaviors”</em></li>
+<li><em>“Before entering VMX operation, the host VMM allocates a VMXON region. A VMM can host several virtual machines and have many VMCSs active under its management. A unique VMCS region is required for each virtual machine; a VMXON region is required for the VMM itself.”</em><br><br></li>
+</ul>
+<p>When you are reading these texts, probably some questions will come out in your mind: What’re unpredictable behaviors if we modify the content of VMXON region? How is the VMXON region layout organized?*</p>
+<p>We know that basically in the IA32 specification, almost all the operations/instructions have the corresponding defined behaviors even if they are the exceptions. Why are there so many undefined behaviors for VT-x specification, can we inspect the “so-called undefined behaviors” if we modify VMXON region during the period of VMX operation?</p>
+<p>According to the VT-x specification, we also are told that the format of VMXON region is not architecturally defined, meaning that its format varies from processor generations to generations. Therefore, <strong>can we assume that “Intel says theire behaviors are unpredictable just because the format is different between VT-capable processors”? In other words, for a particular processor, the behaviors of read/write access to the VMXON region might be well-defined to some extent</strong>. If this happens to be true, then the question now is how to explore the internal structure/format of VMXON region? What are we able to do if we can exactly know the format for a particular processor? Are we able to control the VMX operation behaviors by simply programming the VMXON region with ordinary read/write access operation instructions like MOV? </p>
+<p>I don’t know the answers. But I will talk about a prototype later about how to inspect the internal format/layout of VMXON region and other VT-x regions with a software solution. </p>
+<p><br></p>
+<p>####<strong>VMCS Regions</strong><br>Now let’s take a look at VMCS structure. </p>
+<p>  “Software should use the VMREAD and VMWRITE instructions to access the different fields in the current VMCS. Software should never access or modifythe VMCS data of an active VMCS using ordinary memory operations, <em>in part because the format used to store the VMCS data is implementation-specific and not architecturally defined, and also because a logical processor may maintain some VMCS data of an active VMCS on the processor and <strong>not in the VMCS region (then where?)</strong></em>. The following items detail some of the hazards of accessing VMCS data using ordinary memory operations:</p>
+<ul>
+<li>Any data read from a VMCS with an ordinary memory read does not reliably reflect the state of the VMCS. Results may vary from time to time or from logical processor to logical processor.</li>
+<li>Writing to a VMCS with an ordinary memory write is not guaranteed to have a deterministic effect on the VMCS. Doing so may cause the VMCS to become corrupted (see below).<br>(Software can avoid these hazards by removing any linear-address mappings to a VMCS region before executing a VMPTRLD for that region and by not remapping it until after executing VMCLEAR for that region.)<br>This section has identified operations that may cause a VMCS to become corrupted. These operations may cause the VMCS’s data to become undefined. Behavior may be unpredictable if that VMCS used subsequently on any logical processor. The following items detail some hazards of VMCS corruption: </li>
+<li>VM entries may fail for unexplained reasons or may load undesired processor state. </li>
+<li>The processor may not correctly support VMX non-root operation as documented and may generate unexpected VM exits. </li>
+<li>VM exits may load undesired processor state, save incorrect state into the VMCS, or cause the logical processor to transition to a shutdown state.”</li>
+</ul>
+<p>So, we know that the behaviors of VMX operations (root mode and non-root mode) are also controlled by VMCS regions, and the format/layout of those regions are also undefined, and read/write access to them with ordinary memory operations are unpredictable too.</p>
+<p><strong>How to do ‘reverse-engineering’-like things to look into the internal <em>VMXON/VMCS</em>  region memory layout</strong><br>Here is an idea (software solution, without any hardware device but a particular VT-capable processor):</p>
+<ul>
+<li>Implement a tiny VMM/Hypervisor and a tiny Guest VM software, both with only code running in ring 0 mode. No need complex things like thread, multiple processor, scheduling, interrupt/exceptions, etc.. just a piece of code that can execute in VMX root mode and non-root mode respectively. </li>
+<li>Hypervisor allocates machine physical memory spaces for VMXON and VMCS region, and make these areas visible to guest VM software so that the guest software can read/write the VMXON/VMCS memory regions directly to inspect the content. </li>
+<li>After environment is setup, we can do inspections instruction by instruction or event by event.. for example, if we want to know what memory bits are changed during a vmentry, then we can do it like this:<br>(1)  In VMX-root mode, the VMM software logs all the contents of VMCS/VMXON regions right prior to calling VMRESUME;<br>(2)  Just right after resuming back to guest, the VM software logs all the contents of VMCS/VMXON regions again, then compares the differences between this two points;<br>(3)  The difference in some of memory areas might indicate something important that can control the behaviors of VMX operations. </li>
+<li>Repeatedly do above things again and again for all kinds of VMX transition events. </li>
+<li>Besides, for VMCS regions, we can read the contents before and after a legal VMCS write instruction, for example, VMCS_WRITE(GUEST_RIP) to get what has been changed for GUEST_RIP area.</li>
+</ul>
+<p>I didn’t do this, but I think this must be fun once you can get the VT-x internals. </p>
+<p>However, even though we could get the internal VMCS/VMXON data structure layout, what can we do? Imaging that there is a bug in a Hypervisor (XEN, KVM…), e.g. a buffer/stack overflow, that can lead to arbitrary memory overwriting… see below…:-)</p>
+<p>One more question:</p>
+<ul>
+<li><strong>How does the processor determine if the current processor execution mode is in VMX root mode or non-root mode? Does it look at some certain VMX mode state bit in VMXON region or VMCS regions before executing any instruction?</strong> This is unknown to us. But if my guess is true (hope not), then we can change that corresponding bit to control instruction behavior. For example, provided that there is a vulnerability in Hypervisor that can lead us overwrite arbitrary memory including VMCS/VMXON region, we can take advantage of it to change “such a bit”, and then any malicious code that is executed in VMX non-root mode will be treated as execution in VMX root mode… this is horrible, since for example we can bypass EPT to directly write machine physical memory space even in VMX non-root mode.<br>&lt; Note that, however, for other process modes like protected mode and real mode, we can easily check CR0.PE bit, for different privilege modes (ring), we can check CPL bit of CS selector to determine ring 0~3 &gt;</li>
+</ul>
+<p>&lt; The End&gt;</p>
 <hr>
-<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 
       
     </div>
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机迁移/">虚拟机迁移<span class="article-category-count">3</span></a>
+    <a class="article-category-link" href="/categories/硬件虚拟化/">硬件虚拟化<span class="article-category-count">1</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Migration/">Migration</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/HAV/">HAV</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/VT-x/">VT-x</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
 
       
     </footer>
@@ -303,7 +414,7 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-kvm-exception"  class="article article-type-post" itemscope itemprop="blogPost" >
+    <article id="post-monitoring-schduling"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
     
@@ -311,7 +422,7 @@
         
   
     <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/kvm-exception/">KVM异常处理流程源码简要分析</a>
+      <a class="article-title" href="/20170504/monitoring-schduling/">使用硬件虚拟化技术无感监控Windows OS调度事件</a>
     </h1>
   
 
@@ -319,94 +430,31 @@
     
     <div class="article-meta">
       
-	Posted on <a href="/20170504/kvm-exception/" class="article-date">
-	  <time datetime="2017-05-04T07:06:21.000Z" itemprop="datePublished">五月 4, 2017</time>
+	Posted on <a href="/20170504/monitoring-schduling/" class="article-date">
+	  <time datetime="2017-05-04T07:49:55.000Z" itemprop="datePublished">五月 4, 2017</time>
 	</a>
 
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>作者:<a href="http://blog.csdn.net/mrbuffoon" target="_blank" rel="external">Mr_buffoon</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/09/windows-os-thread-scheduling-monitoring.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/09/windows-os-thread-scheduling-monitoring.html</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
-<p>前面文章中我们讲过Qemu、KVM、Guest OS这三种层次以及对应的三种模式，也知道这三种模式之间的配合，下面上一张图回顾一下。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/4-1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/4-1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>  
+<p>A <strong><a href="http://en.wikipedia.org/wiki/Rootkit" target="_blank" rel="external">rootkit</a></strong> is a stealthy type of software, typically malicious, designed to hide the existence of itself or certain processes/programs from normal methods of detection and enable continued privileged access to a computer. However, even though the malicious process/program can be invisible to users, internally it must have to get time slices for running, otherwise if it has no chance to get scheduled by CPU, such an existence is meaningless for malware author. </p>
+<p>This article provides a solution to detect the malware and inspect its behaviors by monitoring each OS thread scheduling event.</p>
+<p>This article is organized into two parts: 1) explain Windows scheduling things and related data structures; 2) then explain how to get notified in underlying VMM software without any changes to guest Windows OS.</p>
+<p>####<strong>Windows thread scheduling</strong><br>Thread (rather than Process) is the fundamental schedulable entity in the Windows operating system. It is represented by a <strong><a href="http://www.nirsoft.net/kernel_struct/vista/ETHREAD.html" target="_blank" rel="external">_ETHREAD</a></strong> structure that includes a <strong><a href="http://www.nirsoft.net/kernel_struct/vista/KETHREAD.html" target="_blank" rel="external">_KTHREAD structure</a></strong>. For every thread in the system there is an ETHREAD structure, including threads in the System Idle Process. The ETHREAD.<strong><em>Tcb</em></strong> field (Thread Control Block)/KTHREAD is used to store information related to thread scheduling. Every process stores a list of ETHREAD structures, representing all the threads running in that process, in the <strong><em>TheadListHead</em></strong> field of the <strong><a href="http://www.nirsoft.net/kernel_struct/vista/_EPROCESS.html" target="_blank" rel="external">_EPROCESS</a></strong> structure.</p>
+<p>In a SMP system, each processor (CPU) has a unique <strong><a href="http://www.nirsoft.net/kernel_struct/vista/KPCR.html" target="_blank" rel="external">KPCR</a></strong> (Kernel Processor Control Region) structure, which contains per-CPU information shared by the kernel and the HAL. In this structure, there is a <strong><em>Prcb</em></strong> field, contains an embedded <strong><a href="http://www.nirsoft.net/kernel_struct/vista/KPRCB.html" target="_blank" rel="external">KPRCB</a></strong> structure that represents the Kernel Processor Control Block. And in this KPRCB structure, there is a field <strong><em>CurrentThread</em></strong> that pointers to the KTHREAD of current running thread on this processor. </p>
+<p>Here is the interesting thing, before scheduling to a particular thread for running, the OS scheduler will update the pointer field <strong><em>CurrentThread</em></strong> with that corresponding KTHEAD structure. Besides, in a 32bit Windows OS, the KPCR of the current CPU is always accessible at FS:[0] in kernel, while in a x64 Windows OS it is always at GS:[0] in kernel space.  Here below illustrates the relationship:</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/FS-GS.png" target="_blank" rel="external"><br>    <img src="http://oij0laovn.bkt.clouddn.com/FS-GS.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
 
-<p>那现在我们就从代码的角度来讲一下这三层之间具体是如何配合的。</p>
-<p>前面我们也讲过，首先Qemu层用户发起启动虚拟机命令后会通过ioctl调用进入到kvm内核层，完成相关初始化工作之后就运行虚拟机。</p>
-<p>在kvm内核层中，当接收到ioctl的KVM_RUN命令后，实际调用的是kvm_arch_vcpu_ioctl_run()函数。<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">case</span> KVM_RUN:  </div><div class="line">                   r = -EINVAL;  </div><div class="line">                   <span class="keyword">if</span> (arg)  </div><div class="line">                            <span class="keyword">goto</span> out;  </div><div class="line">                   r =kvm_arch_vcpu_ioctl_run(vcpu, vcpu-&gt;run);<span class="comment">//  </span></div><div class="line">                   trace_kvm_userspace_exit(vcpu-&gt;run-&gt;exit_reason,r);  </div><div class="line">                   <span class="keyword">break</span>;</div></pre></td></tr></table></figure></p>
-<p> 随后依次调用__vcpu_run()，vcpu_enter_guest()，kvm_x86_ops-&gt;run()，vmx_vcpu_run()，在vmx_vcpu_run()函数中有一段汇编语言被调用，这段汇编中执行了ASM_VMX_VMLAUNCH或者ASM_VMX_VMRESUME指令进入到客户模式。<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">asm</span>(  </div><div class="line">                   .........<span class="comment">//省略部分代码  </span></div><div class="line">                   <span class="comment">/* Enter guest mode */</span>  </div><div class="line">                   <span class="string">"jne 1f \n\t"</span>  </div><div class="line">                   __ex(ASM_VMX_VMLAUNCH)<span class="string">"\n\t"</span>  </div><div class="line">                   <span class="string">"jmp 2f \n\t"</span>  </div><div class="line">                   <span class="string">"1: "</span>__ex(ASM_VMX_VMRESUME) <span class="string">"\n\t"</span>  </div><div class="line">        ........<span class="comment">//省略部分代码  </span></div><div class="line">);</div></pre></td></tr></table></figure></p>
-<p>执行汇编指令进入到客户模式能够实现是因为KVM采用了硬件虚拟化的技术，比如Intel的芯片上提供了硬件支持并提供了相关一系列指令。再具体我也不知道了，查看Intel手册吧。那么进入到客户模式后，客户模式因为一些异常需要退出到KVM内核进行处理，这个是怎么实现的呢？</p>
-<p>首先我们要说一下一个与异常处理相关的重要的数据结构VMCS。VMCS是虚拟机控制结构，他分为三部分：版本信息；终止标识符；VMCS数据域。其中VMCS数据域包含六类信息：客户状态域，宿主机状态域，VM-Entry控制域，VM-Execution控制域，VM-Exit控制域以及VM-Exit信息域。宿主机状态域保存了基本的寄存器信息，其中CS:RIP指向KVM中异常处理程序的入口地址，VM-Exit信息域中存放异常退出原因等信息。实际上，在KVM内核初始化vcpu时就将异常处理程序入口地址装载进VMCS中CS:RIP寄存器结构，当客户机发生异常时，就根据这个入口地址退出到内核模式执行异常处理程序。</p>
-<p>KVM内核中异常处理总入口函数是vmx_handle_exit()函数。<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">static</span> <span class="title">intvmx_handle_exit</span><span class="params">(<span class="keyword">struct</span> kvm_vcpu *vcpu)</span>  </span></div><div class="line">&#123;  </div><div class="line">         <span class="keyword">struct</span> vcpu_vmx *vmx = to_vmx(vcpu);  </div><div class="line">         u32 exit_reason = vmx-&gt;exit_reason;  </div><div class="line">         ........<span class="comment">//一些处理，省略这部分代码  </span></div><div class="line">         <span class="keyword">if</span> (exit_reason &lt;kvm_vmx_max_exit_handlers  </div><div class="line">            &amp;&amp; kvm_vmx_exit_handlers[exit_reason])  </div><div class="line">                   returnkvm_vmx_exit_handlers[exit_reason](vcpu);  </div><div class="line">         <span class="keyword">else</span> &#123;  </div><div class="line">                   vcpu-&gt;run-&gt;exit_reason= KVM_EXIT_UNKNOWN;  </div><div class="line">                   vcpu-&gt;run-&gt;hw.hardware_exit_reason= exit_reason;  </div><div class="line">         &#125;  </div><div class="line">         <span class="keyword">return</span> <span class="number">0</span>;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>该函数中，首先读取exit_reason，然后进行一些必要的处理，最后调用kvm_vmx_exit_handlers<a href="vcpu">exit_reason</a>，我们来看一下这个结构，实际上是一个函数指针数组，里面对应着所有的异常相应的异常处理函数。<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">static</span> <span class="title">int</span><span class="params">(*<span class="keyword">const</span> kvm_vmx_exit_handlers[])</span><span class="params">(<span class="keyword">struct</span> kvm_vcpu *vcpu)</span> </span>= &#123;  </div><div class="line">         [EXIT_REASON_EXCEPTION_NMI]           = handle_exception,  </div><div class="line">         [EXIT_REASON_EXTERNAL_INTERRUPT]      = handle_external_interrupt,  </div><div class="line">         [EXIT_REASON_TRIPLE_FAULT]            = handle_triple_fault,  </div><div class="line">         [EXIT_REASON_NMI_WINDOW]          = handle_nmi_window,  </div><div class="line">         [EXIT_REASON_IO_INSTRUCTION]          = handle_io,  </div><div class="line">         [EXIT_REASON_CR_ACCESS]               = handle_cr,  </div><div class="line">         [EXIT_REASON_DR_ACCESS]               = handle_dr,  </div><div class="line">         [EXIT_REASON_CPUID]                   = handle_cpuid,  </div><div class="line">         [EXIT_REASON_MSR_READ]                = handle_rdmsr,  </div><div class="line">         [EXIT_REASON_MSR_WRITE]               = handle_wrmsr,  </div><div class="line">         [EXIT_REASON_PENDING_INTERRUPT]       = handle_interrupt_window,  </div><div class="line">         [EXIT_REASON_HLT]                     = handle_halt,  </div><div class="line">         [EXIT_REASON_INVD]                     = handle_invd,  </div><div class="line">         [EXIT_REASON_INVLPG]               = handle_invlpg,  </div><div class="line">         [EXIT_REASON_RDPMC]                   = handle_rdpmc,  </div><div class="line">         [EXIT_REASON_VMCALL]                  = handle_vmcall,  </div><div class="line">         [EXIT_REASON_VMCLEAR]                    = handle_vmclear,  </div><div class="line">         [EXIT_REASON_VMLAUNCH]                = handle_vmlaunch,  </div><div class="line">         [EXIT_REASON_VMPTRLD]                 = handle_vmptrld,  </div><div class="line">         [EXIT_REASON_VMPTRST]                 = handle_vmptrst,  </div><div class="line">         [EXIT_REASON_VMREAD]                  = handle_vmread,  </div><div class="line">         [EXIT_REASON_VMRESUME]                = handle_vmresume,  </div><div class="line">         [EXIT_REASON_VMWRITE]                 = handle_vmwrite,  </div><div class="line">         [EXIT_REASON_VMOFF]                   = handle_vmoff,  </div><div class="line">         [EXIT_REASON_VMON]                    = handle_vmon,  </div><div class="line">         [EXIT_REASON_TPR_BELOW_THRESHOLD]     = handle_tpr_below_threshold,  </div><div class="line">         [EXIT_REASON_APIC_ACCESS]             = handle_apic_access,  </div><div class="line">         [EXIT_REASON_APIC_WRITE]              = handle_apic_write,  </div><div class="line">         [EXIT_REASON_EOI_INDUCED]             = handle_apic_eoi_induced,  </div><div class="line">         [EXIT_REASON_WBINVD]                  = handle_wbinvd,  </div><div class="line">         [EXIT_REASON_XSETBV]                  = handle_xsetbv,  </div><div class="line">         [EXIT_REASON_TASK_SWITCH]             = handle_task_switch,  </div><div class="line">         [EXIT_REASON_MCE_DURING_VMENTRY]      = handle_machine_check,  </div><div class="line">         [EXIT_REASON_EPT_VIOLATION]         = handle_ept_violation,  </div><div class="line">         [EXIT_REASON_EPT_MISCONFIG]           = handle_ept_misconfig,  </div><div class="line">         [EXIT_REASON_PAUSE_INSTRUCTION]       = handle_pause,  </div><div class="line">         [EXIT_REASON_MWAIT_INSTRUCTION]       =handle_invalid_op,  </div><div class="line">         [EXIT_REASON_MONITOR_INSTRUCTION]     = handle_invalid_op,  </div><div class="line">&#125;;</div></pre></td></tr></table></figure></p>
-<p>这里面比如handle_ept_violation就是影子页（EPT页）缺页异常的处理函数。</p>
-<p>我们以handle_ept_violation()为例向下说明，依次调用kvm_mmu_page_fault()，vcpu-&gt;arch.mmu.page_fault()，tdp_page_fault()等后续函数完成缺页处理。</p>
-<p>在这里，我们要注意kvm_vmx_exit_handlers<a href="vcpu">exit_reason</a>的返回值，比如当实际调用handle_ept_violation()时返回值大于0，就直接切回客户模式。但是有时候可能需要Qemu的协助。在实际调用（r = kvm_x86_ops-&gt;handle_exit(vcpu);）时，返回值大于0，那么就说明KVM已经处理完成，可以再次切换进客户模式，但如果返回值小于等于0，那就说明需要Qemu的协助，KVM会在run结构体中的exit_reason中记录退出原因，并进入到Qemu中进行处理。这个判断过程是在__vcpu_run()函数中进行的，实际是一个while循环。<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">static</span> <span class="title">int__vcpu_run</span><span class="params">(<span class="keyword">struct</span> kvm_vcpu *vcpu)</span>  </span></div><div class="line">&#123;  </div><div class="line">         ......<span class="comment">//省略部分代码  </span></div><div class="line">         r = <span class="number">1</span>;  </div><div class="line">         <span class="keyword">while</span> (r &gt; <span class="number">0</span>) &#123;  </div><div class="line">                   <span class="keyword">if</span> (vcpu-&gt;arch.mp_state ==KVM_MP_STATE_RUNNABLE &amp;&amp;  </div><div class="line">                       !vcpu-&gt;arch.apf.halted)  </div><div class="line">                            r =vcpu_enter_guest(vcpu);  </div><div class="line">                   <span class="keyword">else</span> &#123;  </div><div class="line">                            ......<span class="comment">//省略部分代码  </span></div><div class="line">                   &#125;  </div><div class="line">                   <span class="keyword">if</span> (r &lt;= <span class="number">0</span>)  </div><div class="line">                            <span class="keyword">break</span>;  </div><div class="line">           ......<span class="comment">//省略部分代码  </span></div><div class="line">         &#125;  </div><div class="line">         srcu_read_unlock(&amp;kvm-&gt;srcu,vcpu-&gt;srcu_idx);  </div><div class="line">         vapic_exit(vcpu);  </div><div class="line">         <span class="keyword">return</span> r;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>上面函数中vcpu_enter_guest()我们前面讲过，是在kvm内核中转入客户模式的函数，他处于while循环中，也就是如果不需要Qemu的协助，即r&gt;0，那就继续循环，然后重新切换进客户系统运行，如果需要Qemu的协助，那返回值r&lt;=0,退出循环，向上层返回r。</p>
-<p>上面说的r一直往上层返回，直到kvm_vcpu_ioctl()函数中的<br>case KVM_RUN：<br>trace_kvm_userspace_exit(vcpu-&gt;run-&gt;exit_reason, r);<br>这一条语句就是将退出原因注入到Qemu层。<br>Qemu层这时候读取到ioctl的返回值，然后继续执行，就会判断有没有KVM的异常注入，这里其实我在前一篇文章中简单提及了一下<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">kvm_cpu_exec</span><span class="params">(CPUArchState *env)</span>  </span></div><div class="line">&#123;  </div><div class="line">    .......  </div><div class="line">    <span class="keyword">do</span> &#123;  </div><div class="line">        ......  </div><div class="line">        run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN,<span class="number">0</span>);  </div><div class="line">        ......  </div><div class="line">        trace_kvm_run_exit(cpu-&gt;cpu_index,run-&gt;exit_reason);  </div><div class="line">        <span class="keyword">switch</span> (run-&gt;exit_reason) &#123;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_IO:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_MMIO:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_IRQ_WINDOW_OPEN:  </div><div class="line">            .......  </div><div class="line">           <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_SHUTDOWN:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_UNKNOWN:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_INTERNAL_ERROR:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">default</span>:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        &#125;  </div><div class="line">    &#125; <span class="keyword">while</span> (ret == <span class="number">0</span>);  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p> trace_kvm_run_exit(cpu-&gt;cpu_index,run-&gt;exit_reason);这条语句就是接收内核注入的退出原因，后面switch语句进行处理，每一个case对应一种退出原因，这里你也可以自己添加的。因为也是在while循环中，处理完一次后又进行ioctl调用运行虚拟机并切换到客户模式，这就形成了一个完整的闭环。</p>
-<hr>
-<p> <strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟化基础/">虚拟化基础<span class="article-category-count">6</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtulization/">Virtulization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-qemukvm-source2"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/qemukvm-source2/">Qemu-KVM虚拟机初始化及创建过程源码简要分析（二）</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/qemukvm-source2/" class="article-date">
-	  <time datetime="2017-05-04T07:02:19.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者: <a href="http://blog.csdn.net/mrbuffoon" target="_blank" rel="external">Mr_buffoon</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p> 前面我们讲了KVM内核层创建及初始化虚拟机的一些工作过程，现在讲一下Qemu层的流程以及与KVM内核层的配合过程。<br>Qemu层是从vl.c中的main()函数开始的，这里通过在代码中添加一些注释的方式来进行讲解,中间省略了很多不重要或者我也没有搞清楚的代码。<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div><div class="line">73</div><div class="line">74</div><div class="line">75</div><div class="line">76</div><div class="line">77</div><div class="line">78</div><div class="line">79</div><div class="line">80</div><div class="line">81</div><div class="line">82</div><div class="line">83</div><div class="line">84</div><div class="line">85</div><div class="line">86</div><div class="line">87</div><div class="line">88</div><div class="line">89</div><div class="line">90</div><div class="line">91</div><div class="line">92</div><div class="line">93</div><div class="line">94</div><div class="line">95</div><div class="line">96</div><div class="line">97</div><div class="line">98</div><div class="line">99</div><div class="line">100</div><div class="line">101</div><div class="line">102</div><div class="line">103</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, charchar **argv, charchar **envp)</span>  </span></div><div class="line">&#123;  </div><div class="line">    ......  </div><div class="line">    atexit(qemu_run_exit_notifiers);<span class="comment">//注册了Qemu的退出函数  </span></div><div class="line">    ......  </div><div class="line">    module_call_init(MODULE_INIT_QOM);<span class="comment">//初始化Qemu的各个模块，具体见下面注释  </span></div><div class="line">      </div><div class="line"><span class="comment">/* </span></div><div class="line">    module_call_init实际上是设计了一个函数链表ModuleTypeList，参数作为一个Type，相关的函数注册到这个函数链表上， </div><div class="line">    然后内部通过调用e-&gt;init()函数完成所有Type相关的设备的初始化。关于e-&gt;init()的具体内容后面再细说。 </div><div class="line">    Type总计有这些类型： </div><div class="line">    typedef enum &#123; </div><div class="line">    MODULE_INIT_BLOCK, </div><div class="line">    MODULE_INIT_MACHINE, </div><div class="line">    MODULE_INIT_QAPI, </div><div class="line">    MODULE_INIT_QOM, </div><div class="line">    MODULE_INIT_MAX </div><div class="line">    &#125; module_init_type; </div><div class="line">*/   </div><div class="line">  </div><div class="line">    qemu_add_opts(&amp;qemu_drive_opts);<span class="comment">//将各种函数指针（也就是操作）集合添加到链表中   </span></div><div class="line">    qemu_add_opts(&amp;qemu_chardev_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_device_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_netdev_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_net_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_rtc_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_global_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_mon_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_trace_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_option_rom_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_machine_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_boot_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_sandbox_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_add_fd_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_object_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_tpmdev_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_realtime_opts);  </div><div class="line">     ......   </div><div class="line">    init_clocks();<span class="comment">//时钟初始化相关   </span></div><div class="line">    rtc_clock = host_clock;   </div><div class="line">    ......   </div><div class="line">    module_call_init(MODULE_INIT_MACHINE);   </div><div class="line">    machine = find_default_machine();  </div><div class="line">    ......   </div><div class="line">    ......   </div><div class="line">    cpudef_init();<span class="comment">//初始化CPU def相关  </span></div><div class="line">     ......   </div><div class="line">    <span class="keyword">if</span> (log_mask) &#123;<span class="comment">//日志相关的设置，KVM对外的日志在这里配置   </span></div><div class="line">        <span class="keyword">int</span> mask;   </div><div class="line">        <span class="keyword">if</span> (log_file) &#123;   </div><div class="line">            qemu_set_log_filename(log_file);   </div><div class="line">        &#125;  </div><div class="line">        mask = qemu_str_to_log_mask(log_mask);   </div><div class="line">        <span class="keyword">if</span> (!mask) &#123;   </div><div class="line">            qemu_print_log_usage(<span class="built_in">stdout</span>);   </div><div class="line">            <span class="built_in">exit</span>(<span class="number">1</span>);   </div><div class="line">        &#125;  </div><div class="line">        qemu_set_log(mask);  </div><div class="line">     &#125;   </div><div class="line">    ......   </div><div class="line">    configure_accelerator();<span class="comment">//进行虚拟机模拟器的配置，这里重点注意，它内部调用了accel_list[i].init()函数   </span></div><div class="line">  </div><div class="line"><span class="comment">/* </span></div><div class="line">    for (i = 0; i &lt; ARRAY_SIZE(accel_list); i++) &#123; </div><div class="line">        if (strcmp(accel_list[i].opt_name, buf) == 0) &#123; </div><div class="line">            if (!accel_list[i].available()) &#123; </div><div class="line">                printf("%s not supported for this target\n",accel_list[i].name); </div><div class="line">                continue; </div><div class="line">            &#125; </div><div class="line">            *(accel_list[i].allowed) = true; </div><div class="line">            ret = accel_list[i].init(); </div><div class="line">            if (ret &lt; 0) &#123; </div><div class="line">                init_failed = true; </div><div class="line">                fprintf(stderr, "failed to initialize %s: %s\n",accel_list[i].name,strerror(-ret)); </div><div class="line">               *(accel_list[i].allowed) = false;         </div><div class="line">            &#125; else &#123;             </div><div class="line">                accel_initialised = true;        </div><div class="line">            &#125;        </div><div class="line">            break;    </div><div class="line">         &#125; </div><div class="line">     &#125;  </div><div class="line">    //accel_list定义如下，实际上在kvm平台，我们就关注kvm_init即可。     </div><div class="line">    static struct &#123; </div><div class="line">        const char *opt_name;   </div><div class="line">        const char *name;   </div><div class="line">        int (*available)(void); </div><div class="line">        int (*init)(void); </div><div class="line">        bool *allowed;  </div><div class="line">    &#125; accel_list[] = &#123; </div><div class="line">       &#123; "tcg", "tcg", tcg_available, tcg_init, &amp;tcg_allowed &#125;, </div><div class="line">       &#123; "xen", "Xen", xen_available, xen_init, &amp;xen_allowed &#125;, </div><div class="line">       &#123; "kvm", "KVM", kvm_available, kvm_init, &amp;kvm_allowed &#125;, </div><div class="line">       &#123; "qtest", "QTest", qtest_available, qtest_init, &amp;qtest_allowed &#125;,  </div><div class="line">    &#125;;     </div><div class="line">    //kvm_init函数内首先打开用于用户层以及内核层交互的字符设备文件/dev/kvm，然后通过kvm_ioctl()与内核进行交互，比如     KVM_GET_API_VERSION，KVM_CREATE_VM等命令，其中KVM_CREATE_VM命令创建虚拟机并获得虚拟机句柄，后续kvm_arch_init()、 kvm_irqchip_create()等函数就可以通过kvm_vm_ioctl系统调用进行更进一步的一些配置。这些系统调用实际上是传递到内核层，由内核来完成相应的操作并返回到用户层，内核层的相关函数很多就是前一篇文章注册过的函数指针。 </div><div class="line">*/  </div><div class="line">    ......       </div><div class="line">    ......       </div><div class="line">    cpu_exec_init_all();<span class="comment">//记录CPU执行前的一些初始化工作     </span></div><div class="line">    ......      </div><div class="line">    ......       </div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>前面提到过e-&gt;init()函数，并没有展开细说，现在来说一下这个函数。实际上e-&gt;init()函数是在machine_init(pc_machine_init)函数注册时注册到ModuleTypeList的ModuleEntry上的，module_call_init()针对X86架构时调用amchine_init(),随即调用pc_machine_init()函数，代码如下：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">void</span> <span class="title">pc_machine_init</span><span class="params">(<span class="keyword">void</span>)</span>  </span></div><div class="line">&#123;  </div><div class="line">    qemu_register_machine(&amp;pc_i440fx_machine_v1_5);  </div><div class="line">    qemu_register_machine(&amp;pc_i440fx_machine_v1_4);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v1_3);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v1_2);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v1_1);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v1_0);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_15);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_14);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_13);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_12);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_11);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_10);  </div><div class="line">    qemu_register_machine(&amp;isapc_machine);  </div><div class="line"><span class="meta">#<span class="meta-keyword">ifdef</span> CONFIG_XEN  </span></div><div class="line">    qemu_register_machine(&amp;xenfv_machine);  </div><div class="line"><span class="meta">#<span class="meta-keyword">endif</span>  </span></div><div class="line">&#125;  </div><div class="line">  </div><div class="line">machine_init(pc_machine_init);</div></pre></td></tr></table></figure></p>
-<p>注意这里注册的第一个为pc_i440fx_machine_v1_5，这个结构体定义为下：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">static</span> QEMUMachine pc_i440fx_machine_v1_5 = &#123;  </div><div class="line">    .name = <span class="string">"pc-i440fx-1.5"</span>,  </div><div class="line">    .alias = <span class="string">"pc"</span>,  </div><div class="line">    .desc = <span class="string">"Standard PC (i440FX + PIIX, 1996)"</span>,  </div><div class="line">    .init = pc_init_pci,  </div><div class="line">    .hot_add_cpu = pc_hot_add_cpu,  </div><div class="line">    .max_cpus = <span class="number">255</span>,  </div><div class="line">    .is_default = <span class="number">1</span>,  </div><div class="line">    DEFAULT_MACHINE_OPTIONS,  </div><div class="line">&#125;;</div></pre></td></tr></table></figure></p>
-<p> .init=pc_init_pci, pc_init_pci()即为初始化时候调用的函数，一路跟下去，其实最终调到pc_init1()这个函数。再看pc_init1()这个函数，这里面进行了内存（pc_memory_init）、cpu（pc_cpus_init）、中断等等多种的初始化，这里不细说，重点看cpu的初始化。</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">pc_cpus_init</span><span class="params">(<span class="keyword">const</span> charchar *cpu_model, DeviceState *icc_bridge)</span>  </span></div><div class="line">&#123;  </div><div class="line">    <span class="keyword">int</span> i;  </div><div class="line">    X86CPU *cpu = <span class="literal">NULL</span>;  </div><div class="line">    Error *error = <span class="literal">NULL</span>;  </div><div class="line">  </div><div class="line">    <span class="comment">/* init CPUs */</span>  </div><div class="line">    <span class="keyword">if</span> (cpu_model == <span class="literal">NULL</span>) &#123;  </div><div class="line"><span class="meta">#<span class="meta-keyword">ifdef</span> TARGET_X86_64  </span></div><div class="line">        cpu_model = <span class="string">"qemu64"</span>;  </div><div class="line"><span class="meta">#<span class="meta-keyword">else</span>  </span></div><div class="line">        cpu_model = <span class="string">"qemu32"</span>;  </div><div class="line"><span class="meta">#<span class="meta-keyword">endif</span>  </span></div><div class="line">    &#125;  </div><div class="line">    current_cpu_model = cpu_model;  </div><div class="line">  </div><div class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; smp_cpus; i++) &#123;  </div><div class="line">        cpu = pc_new_cpu(cpu_model, x86_cpu_apic_id_from_index(i),<span class="comment">//对每一个CPU进行初始化及创建  </span></div><div class="line">                         icc_bridge, &amp;error);  </div><div class="line">        <span class="keyword">if</span> (error) &#123;  </div><div class="line">            <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>, <span class="string">"%s\n"</span>, error_get_pretty(error));  </div><div class="line">            error_free(error);  </div><div class="line">            <span class="built_in">exit</span>(<span class="number">1</span>);  </div><div class="line">        &#125;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">    <span class="comment">/* map APIC MMIO area if CPU has APIC */</span>  </div><div class="line">    <span class="keyword">if</span> (cpu &amp;&amp; cpu-&gt;env.apic_state) &#123;  </div><div class="line">        <span class="comment">/* <span class="doctag">XXX:</span> what if the base changes? */</span>  </div><div class="line">        sysbus_mmio_map_overlap(SYS_BUS_DEVICE(icc_bridge), <span class="number">0</span>,  </div><div class="line">                                APIC_DEFAULT_ADDRESS, <span class="number">0x1000</span>);  </div><div class="line">    &#125;  </div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<p> 该函数内调用pc_new_cpu()函数对每一个CPU进行初始化，其后依次调用关系为：</p>
- <figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/3-1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/3-1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>下面来看kvm_init_vcpu()函数<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">kvm_init_vcpu</span><span class="params">(CPUState *cpu)</span>  </span></div><div class="line">&#123;  </div><div class="line">    KVMState *s = kvm_state;  </div><div class="line">    <span class="keyword">long</span> mmap_size;  </div><div class="line">    <span class="keyword">int</span> ret;  </div><div class="line">  </div><div class="line">    DPRINTF(<span class="string">"kvm_init_vcpu\n"</span>);  </div><div class="line">  </div><div class="line">    ret = kvm_vm_ioctl(s, KVM_CREATE_VCPU, (voidvoid *)kvm_arch_vcpu_id(cpu));<span class="comment">//通过ioctl调用向内核发起创建CPU请求，内核完成相关工作。  </span></div><div class="line">    <span class="keyword">if</span> (ret &lt; <span class="number">0</span>) &#123;  </div><div class="line">        DPRINTF(<span class="string">"kvm_create_vcpu failed\n"</span>);  </div><div class="line">        <span class="keyword">goto</span> err;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">    cpu-&gt;kvm_fd = ret;  </div><div class="line">    cpu-&gt;kvm_state = s;  </div><div class="line">    cpu-&gt;kvm_vcpu_dirty = <span class="literal">true</span>;  </div><div class="line">  </div><div class="line">    mmap_size = kvm_ioctl(s, KVM_GET_VCPU_MMAP_SIZE, <span class="number">0</span>);<span class="comment">//通过ioctl调用获取内核与用户层共享的内存大小，这部分内存以内存映射的方式进行共享。  </span></div><div class="line">    <span class="keyword">if</span> (mmap_size &lt; <span class="number">0</span>) &#123;  </div><div class="line">        ret = mmap_size;  </div><div class="line">        DPRINTF(<span class="string">"KVM_GET_VCPU_MMAP_SIZE failed\n"</span>);  </div><div class="line">        <span class="keyword">goto</span> err;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">    cpu-&gt;kvm_run = mmap(<span class="literal">NULL</span>, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,<span class="comment">//获取内存大小后，用户层进行共享内存映射。  </span></div><div class="line">                        cpu-&gt;kvm_fd, <span class="number">0</span>);  </div><div class="line">    <span class="keyword">if</span> (cpu-&gt;kvm_run == MAP_FAILED) &#123;  </div><div class="line">        ret = -errno;  </div><div class="line">        DPRINTF(<span class="string">"mmap'ing vcpu state failed\n"</span>);  </div><div class="line">        <span class="keyword">goto</span> err;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">    <span class="keyword">if</span> (s-&gt;coalesced_mmio &amp;&amp; !s-&gt;coalesced_mmio_ring) &#123;  <span class="comment">//mmio相关的一部分共享内存设置  </span></div><div class="line">        s-&gt;coalesced_mmio_ring =  </div><div class="line">            (voidvoid *)cpu-&gt;kvm_run + s-&gt;coalesced_mmio * PAGE_SIZE;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">    ret = kvm_arch_init_vcpu(cpu);<span class="comment">//相关初始化  </span></div><div class="line">    <span class="keyword">if</span> (ret == <span class="number">0</span>) &#123;  </div><div class="line">        qemu_register_reset(kvm_reset_vcpu, cpu);  </div><div class="line">        kvm_arch_reset_vcpu(cpu);  </div><div class="line">    &#125;  </div><div class="line">err:  </div><div class="line">    <span class="keyword">return</span> ret;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>回到上面一些列调用中的qemu_kvm_cpu_thread_fn()函数中，在调用了kvm_init_vcpu()函数完成cpu的初始化之后，又调用kvm_cpu_exec()函数运行cpu，也就是运行了整个虚拟机。<br>我们来看kvm_cpu_exec()这个函数<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">kvm_cpu_exec</span><span class="params">(CPUArchState *env)</span>  </span></div><div class="line">&#123;  </div><div class="line">    .......  </div><div class="line">    <span class="keyword">do</span>&#123;   </div><div class="line">        run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, <span class="number">0</span>);  </div><div class="line">  </div><div class="line">       .......  </div><div class="line">        trace_kvm_run_exit(cpu-&gt;cpu_index, run-&gt;exit_reason);  </div><div class="line">        <span class="keyword">switch</span> (run-&gt;exit_reason) &#123;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_IO:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_MMIO:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_IRQ_WINDOW_OPEN:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_SHUTDOWN:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_UNKNOWN:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_INTERNAL_ERROR:  </div><div class="line">           ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">default</span>:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        &#125;  </div><div class="line">    &#125; <span class="keyword">while</span> (ret == <span class="number">0</span>);  </div><div class="line">  </div><div class="line">    .......  </div><div class="line">    <span class="keyword">return</span> ret;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>首先一个kvm_vcpu_ioctl系统调用，向内核请求运行虚拟机，然后内核运行虚拟机，kvm_cpu_exec()内是有一个while循环，只要是没有错误就会不断运行不会终止，后面的switch语句实际上是接收内核传来的退出原因，因为I/O等是需要Qemu即用户层来完成的，这样虚拟机运行时内核层遇到I/O等就需要退出到Qemu层并记录退出原因，Qemu根据退出原因执行相关操作，完成后再次执行ioctl操作转到内核层继续运行虚拟机。关于异常退出的具体流程下篇文章再详细讲解。<br><br></p>
-<p>关于内存初始化相关工作，在之前提到过的kvm初始化主函数kvm_init()函数里，依次调用：<br>    memory_listener_register(&amp;kvm_memory_listener, &amp;address_space_memory);<br>    listener_add_address_space(listener, as);<br>    listener-&gt;region_add(listener, &amp;section);<br>    .region_add = kvm_region_add,<br>    kvm_set_phys_mem(section, true);<br>    err = kvm_set_user_memory_region(s, mem);<br>    return kvm_vm_ioctl(s, KVM_SET_USER_MEMORY_REGION, &amp;mem);<br>    这些函数依次调用，基本完成内存初始化过程，这里最后的ioctl调用是设置影子页表信息以及设置页面访问权限等。<br><br></p>
-<p>最终，在内核与用户层的配合下完成整个虚拟机的创建和初始化工作，并运行虚拟机。</p>
+<p>As long as we get the address of KTHREAD structure of particular thread, we can also get the address of ETHREAD structure, because the KTHRAD is embedded in (not pointed by) the ETHREAD structure, and KTHREAD is the first field of ETHREAD, the address of ETHREAD and KTHREAD is the same for a particular thread. Besides, we can also get the address of EPROCESS information structure by KTHEAD-&gt;Process for the process which that running thread belongs to. </p>
+<p>Once we get this process information, we can analyze it and check if it is a hidden malicious process for example by analyzing this process signatures. </p>
+<p>So now the question is how to get notified before a particular thread gets scheduled to run? The second part below explains one of implementations.</p>
+<p><br></p>
+<p>####<strong>Monitoring thread scheduling events with debug register.</strong><br>In order to monitor the changes to the field “PKTHREAD <strong><em>CurrentThread</em></strong> “ in _KPRCB structure, one of approaches is presented in <strong><a href="http://hypervsir.blogspot.com/2014/09/debug-registers-on-intel-x86-processor.html" target="_blank" rel="external">my previous blog for Debug Register usages</a></strong>. We can set the address of that field into one of DR0~DR3 registers, and configure the hardware breakpoint condition as WRITE triggering. Whenever the OS scheduler updates that field, a #DB exception will be generated by processor. If such an exception is configured by VMM to generate a VMexit, then the corresponding VMM exit handler will be invoked to handle this event. </p>
+<p>Now, the problem is how to get the address of that field “PKTHREAD <strong><em>CurrentThread</em></strong> “. See the picture above, originally we must have to retrieve the segment base address for FS segment or GS segment. Fortunately, we can directly read the guest FS_BASE_MSR (one of <strong><a href="http://en.wikipedia.org/wiki/Model-specific_register" target="_blank" rel="external">Model Specific Registers</a></strong>, the index is 0xC0000100) on 32bit OS and GS_BASE_MSR (0xC0000101) on 64bit OS to get that base address value. After getting this address value, we can walk through the KPCR and KPRCB structure to get the address of that field “PKTHREAD <strong><em>CurrentThread</em></strong> “. </p>
+<p>However, this solution might be only for academic/research or education purposes because it has some limitations, for example, all the data structures (KPCR, KPRCB, THREAD, ETHREAD) might be changed from OS version to version so it is not to walk through the data structure for all OS versions, it also may have compatibility issue with 3rd party software debugger because it must have to use one of debug registers, performance overhead might also be a problem because whenever a thread scheduling event occurs, there will be a #DB exception triggered. </p>
+<p> &lt; The End&gt;</p>
 <hr>
 <p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 
@@ -415,12 +463,12 @@
     <footer class="entry-meta entry-footer">
       
 	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟化基础/">虚拟化基础<span class="article-category-count">6</span></a>
+    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">9</span></a>
 
 
       
   <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/QEMU/">QEMU</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/HAV/">HAV</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Monitoring/">Monitoring</a></li></ul>
 
       
     </footer>
@@ -435,7 +483,7 @@
 
   <nav id="page-nav">
     
-    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><a class="page-number" href="/page/3/">3</a><span class="space">&hellip;</span><a class="page-number" href="/page/15/">15</a><a class="extend next" rel="next" href="/page/2/">下一页</a>
+    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><a class="page-number" href="/page/3/">3</a><span class="space">&hellip;</span><a class="page-number" href="/page/16/">16</a><a class="extend next" rel="next" href="/page/2/">下一页</a>
   </nav>
 
 </section>
@@ -523,6 +571,90 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/unpriviledged-ins/">非特权指令的内核信息泄露</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/hav-exception/">对硬件虚拟化异常的思考(#VE)</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/monitoring-syscall/">X86虚拟化技术监控/陷入SYSCALL的另一种方法</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/vmcs-vmxon/">VT-x技术VMXON与VMCS区域的思考-从安全的角度</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/monitoring-schduling/">使用硬件虚拟化技术无感监控Windows OS调度事件</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/mtf/">MTF在基于EPT的客户机物理内存监控中的使用</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/hardware-security-x86arm/">X86&amp;ARM架构处理器硬件安全特性</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -632,90 +764,6 @@
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170401/sandbox/">下一代沙盒</a></h6>
-          <!--  <span>四月 1, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170401/unmasking/">揭开内核漏洞利用的神秘面纱</a></h6>
-          <!--  <span>四月 1, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170331/raid/">RAID十年录用论文</a></h6>
-          <!--  <span>三月 31, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170330/kernelmalware/">内核层恶意代码分析</a></h6>
-          <!--  <span>三月 30, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170330/poker/">内核Rootkit行为的多方面解析</a></h6>
-          <!--  <span>三月 30, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170315/valgrind-memcheck/">如何使用Valgrind memcheck工具进行C/C++的内存漏洞检测</a></h6>
-          <!--  <span>三月 15, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170312/phd-expectations-realities/">PhD expectations and reality</a></h6>
-          <!--  <span>三月 12, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -726,7 +774,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -736,7 +784,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.67px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.83px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.5px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.33px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.5px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.83px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.83px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.17px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 16.67px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 15.83px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.33px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.33px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.33px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.67px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.83px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.83px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.83px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.5px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15.83px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.67px;">Rootkit</a> <a href="/tags/Sandbox/" style="font-size: 10.83px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.83px;">Stack</a> <a href="/tags/System/" style="font-size: 19.17px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.67px;">Systemcall</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 18.33px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 10.83px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 11.67px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.73px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 18.18px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.73px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 11.82px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.91px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 17.27px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 16.36px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.45px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.82px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 11.82px;">Monitoring</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.91px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.91px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 16.36px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.82px;">Rootkit</a> <a href="/tags/Sandbox/" style="font-size: 10.91px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.09px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 11.82px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 11.82px;">XEN</a>
     </div>
   </div>
 

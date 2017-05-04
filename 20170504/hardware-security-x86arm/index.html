@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>x86&amp;arm架构处理器硬件安全特性 | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="作者：Bing Zhu来源：http://hypervsir.blogspot.com/2014/10/introduction-on-hardware-security.html转载请注明：原作者信息以及CSysSec
+
+x86 and ARM processors both provide many hardware enforced security features, e.g. NX (N">
+<meta property="og:type" content="article">
+<meta property="og:title" content="X86&ARM架构处理器硬件安全特性">
+<meta property="og:url" content="http://yoursite.com/20170504/hardware-security-x86arm/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="作者：Bing Zhu来源：http://hypervsir.blogspot.com/2014/10/introduction-on-hardware-security.html转载请注明：原作者信息以及CSysSec
+
+x86 and ARM processors both provide many hardware enforced security features, e.g. NX (N">
+<meta property="og:updated_time" content="2017-05-04T07:44:36.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="X86&ARM架构处理器硬件安全特性">
+<meta name="twitter:description" content="作者：Bing Zhu来源：http://hypervsir.blogspot.com/2014/10/introduction-on-hardware-security.html转载请注明：原作者信息以及CSysSec
+
+x86 and ARM processors both provide many hardware enforced security features, e.g. NX (N">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">FROM 0 TO 1</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">系统结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/courses">名人课堂</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-hardware-security-x86arm" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      X86&amp;ARM架构处理器硬件安全特性
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/hardware-security-x86arm/" class="article-date">
+	  <time datetime="2017-05-04T07:43:17.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>来源：<a href="http://hypervsir.blogspot.com/2014/10/introduction-on-hardware-security.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/introduction-on-hardware-security.html</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>x86 and ARM processors both provide many hardware enforced security features, e.g. NX (No-eXecute) for executable space protection, to help system software engineers to build a secure computing environment. </p>
+<p>This article summaries those security features for both x86/Intel and ARM architectures, and explains how are they used by Operating System.</p>
+<p>####<strong><em>X86/INTEL PROCESSOR ARCHITECTURE:</em></strong></p>
+<ol>
+<li><p><strong>Protection rings or privilege levels</strong>. In computer science, it is called hierarchical protection domains. In x86 architecture, it has 4 levels or layers of rings, from ring 0 through ring 3, which are arranged in a hierarchy from most privileged to least privileged. </p>
+<p>On most modern operating systems, Ring 0 mode is often referred to as <strong><em>Kernel mode</em></strong>, and Ring 3 mode is called <strong><em>User mode</em></strong>. Ring 1 and Ring 2 mode are often not used except that some hypervisors use it as called ring compression for software virtualization. The privilege level of the currently executing program or task is indicated by the value of CPL (Current Privilege Level, in CS and SS segment registers).</p>
+<p>Some rules are defined and enforced by protection rings: </p>
+<p>1) There are some instructions that can only be executed in privileged level (ring 0) to prevent the critical processor resources from being accessed by unprivileged levels (ring 1~3), e.g. RDMSR, WRMSR, LIDT, LGDT.</p>
+<p>2) Privilege switching is also restricted, and can only be achieved by some special instructions or events. e.g. syscall/sysenter, interrupt/exception. </p>
+<p>3) Access to memory resource is also controlled based on Ring levels and page level protection (see later).</p>
+</li>
+<li><p><strong>Page level protections</strong>. Modern system generally uses   page-structure hierarchy to manage virtual address to physical address translation. The system software is responsible for configuring those page structures (like page table entries), and the processor will enforce the protections by two levels of checks: one is the restriction of privilege/ring mode; the other is the page type restrictions (e.g. read-only, read/write, non-executable…). </p>
+<p>The remainder of this section details each of those checks:</p>
+<p>1) <strong>Privilege level protections by checking “U/S” bit, User/Supervisor</strong>, in each level of page structures. </p>
+<p>The basic rule is that if the current privilege level (CPL) is user mode, it cannot access the memories whose corresponding page structure has U/S bit clear. In other words, a user mode task or program cannot read (write, or fetch) access to the memory that belongs to supervisor or privileged mode. </p>
+<p>This kind of protection is very useful, for example, the malicious software is not allowed to read or modify the kernel/system resources, and many extensible protection mechanisms below are based on this privilege level state.</p>
+<p>2) <strong>Executable space protection</strong>, sometimes called as <strong>XD (eXecute Disable), NX (No-eXecute)</strong>. </p>
+<p>Operating system uses this feature to mark some region of memory spaces not executable. For example, stack or heap memory space may be marked as NX. This helps to prevent certain buffer-overflow exploits from succeeding, particularly those that inject code and and execute in controlled stack or heap space. </p>
+<p>On Windows OS, it is used as “Hardware DEP”, Data Execution Prevention. On some other systems, it might be used as “W^X”, which means they marks writable pages by default as non-executable.</p>
+<p>Note that this feature is introduced when 32bit-PAE (Physical Address Extension) mode or 64bit mode is enabled. On modern operating system, this is true. </p>
+<p>3) <strong>Supervisor Mode Execution Protection</strong> (<strong>SMEP</strong>, might be introduced in Ivy Bridge processor). </p>
+<p>I think SMEP is definitely a very very powerful security feature, and easy to deploy by system software. In my experiences, it can block most of (up to 90%+) public exploits for kernel privilege escalation in The Exploit Database (<a href="http://www.exploit-db.com/" target="_blank" rel="external">http://www.exploit-db.com/</a>).</p>
+<p>This feature is enabled by setting a bit in the CR4 control register, and then CPU will generate a fault whenever ring0/kernel mode attempts to execute code from a page marked with the user bit (U/S = 1) set. </p>
+<p><strong>It means that with SMEP enabled, it’s no longer possible to map arbitrary exploit payloads in user mode, since the CPU will trigger a fault if it attempts to execute those controlled user arbitrary exploit pages in kernel mode.</strong></p>
+<p>4) <strong>Supervisor Mode Access Protection</strong> (<strong>SMAP</strong>, introduced in Broadwell or Haswell??). </p>
+<p>It defines a new SMAP bit in the CR4 control register; when that bit is set, any attempt to access user-space memory while running in a privileged mode will lead to a page fault. </p>
+<p>In other words, SMAP will prevent <strong>unintended</strong> data accesses to userland memory, but care must be taken because it has to be disabled/enabled around <strong>legitimate</strong> access functions in the kernel, for example, copy_to_user(), copy_from_user() functions. </p>
+<p>Intel has added two new instructions for this purpose(CLAC/STAC) to temporary disable/enable SMAP for those legitimate accesses. These two instructions are used to clear and set RFLAGS.AC bit. If the SMAP bit is set in the CR4 register, explicit supervisor-mode data accesses to user-mode pages are allowed if and only if  RFLAGS.AC bit is 1, here the AC bit is also used for alignment checks of user mode data access.</p>
+<p><strong><em>What does SMAP mean for security?</em> The user-mode memory accessed in unintended ways by kernel mode will be prohibited</strong> , e.g., attacker controlled pointers can no longer target user-mode memory directly, but even simple kernel bugs such as NULL pointer based dereferences will just trigger a SMAP access violation (page fault , #PF) instead of letting the attacker take over kernel data flow. Because here the memory access dereferenced by NULL pointer is just located at user mode address, the kernel code cannot write/read the crafted data on that memory address when SMAP is active.</p>
+<p>5) <strong>WP (Write protection)</strong>. This feature is a very old feature, controlled by CR0.WP bit. </p>
+<p>When set, inhibits supervisor mode code from writing into read-only pages; when clear, allows supervisor mode code write into read-only pages (regardless of the U/S bit setting). </p>
+<p>This flag are often used to protect the kernel mode code sections, since those code section will be configured as read-only pages, a hardware CPU exception(page fault #GP) will be triggered whenever a malicious kernel software (e.g. kernel rootkits) attempts to modify the kernel code pages (e.g. doing inline hooks for detour). And WP can also be used by protecting kernel static data sections which must not be changed at system runtime.</p>
+<p>Besides, this flag facilitates implementation of the copy-on-write (COW) method of creating a new process (forking) used by operating systems such as Unix. </p>
+</li>
+</ol>
+<p><br></p>
+<p>####<strong><em>ARM Architecture</em></strong></p>
+<p>Like x86/Intel processor architecture, ARM also provides some equivalent hardware-enforced security features.</p>
+<p>ARM architecture defines different levels of execution privilege: <strong>PL0(unprivileged, for user, application), PL1 (privileged, for all modes other than User mode and Hyp mode. Normally operating system software executes at this level), PL2 (Hyp mode, normally used by a hypervisor for Hardware Virtualization, and only Non-Secure State has this privilege level).</strong> </p>
+<p>Normally when the processor running at higher privilege level can access the resource (memory, register) available at the same and lower privilege levels. A Data Abort Exception is generated if the processor attempts a data access that the access rights do not permit. For example, a Data Abort exception is generated if the processor is at PL0 and attempts to access a memory region that is marked as only accessible to privileged (PL1) memory accesses.</p>
+<p>However, in an ARM processor including <strong><em>Security Extension</em></strong>, note that Non-secure Hyp mode executes at PL2 does not indicate that it is more privileged than the Secure PL1 modes. Secure PL1 modes can change the configuration and control settings for Non-secure operation in all modes, but Non-secure modes (even PL2) can never change the configuration and control settings for Secure operation.</p>
+<p>Like NX or XD attribute in x86/Intel processor, ARM also has the same security feature called <strong>XN (eXecute-Never)</strong>. </p>
+<p>When this bit is 1 in the corresponding long(or short, for some cases)-descriptor tables, a <strong><em>Permission fault</em></strong> is generated if the processor attempts to execute an instruction fetched from the corresponding memory region. </p>
+<p>In addition, the Virtualization Extensions provide controls that enforce the XN restrictions, regardless of the settings in the translation tables: </p>
+<ul>
+<li><p><strong>Restriction on Secure instruction fetch (SCR.SIF</strong> in Secure Configuration Register). </p>
+<p>When this bit is set to 1, any attempt in Secure state to execute an instruction fetched from Non-secure physical memory causes a Permission fault.</p>
+</li>
+<li><p><strong>Preventing execution from writable locations</strong>. When the corresponding stage 1 MMU is enabled, force writable memory to be treated as XN, regardless of the setting of the XN bit. </p>
+<p>In other words, for example, the memory regions with unprivileged write permission will be treated as XN for any access from software that is executing at PL1. </p>
+<p>Check these control bits in ARMv7-A (with Virtualization Extension) reference manual, SCTLR.WXN (for Secure and Non-secure PL1&amp;0 stage 1 translations), HSCTLR.WXN (for Non-secure PL2 stage 1 translations) for details. </p>
+</li>
+</ul>
+<p><br><br>Like <strong><em>SMEP</em></strong> in x86/Intel architecture, ARM provides the similar security feature called <strong><em>PXN (Privileged eXecute-Never).</em></strong></p>
+<p>A Permission fault is generated if the processor is executing at PL1 and attempts to execute an instruction fetched from the corresponding memory region when this PXN bit is 1. If Virtualization Extension is supported in ARM architecture, for Secure and Non-secure PL1&amp;0 stage 1 translations, when SCTLR.UWXN is set to 1, an instruction fetch is forced to be treated as accessing a <strong>PXN</strong> region if it accesses a region that software executing at PL0 can write to.</p>
+<p>However, it seems that a SMAP-like security feature is not provided by ARM architecture currently. Please correct me if I’m wrong. </p>
+<p>For example, <strong><em>how to restrict the read or/and write access to PL0 memory when a system software executes at PL1?</em></strong></p>
+<p>The AP (Access Permission) bits of page translation table descriptors in ARMv7 VMSA (Virtual Memory System Architecture), or AP bits of DRACR or IRACR (Data/Instruction Region Access Control Register) in ARMv7 PMSA (Protected Memory System Architecture) provide some kinds of memory read &amp; write protections, but all the definitions indicate that PL1 always has higher access permission than PL0.  </p>
+<hr>
+<p>####<strong>[Update]:</strong><br>See the Memory <strong><em>Protection Keys</em></strong> mechanism:<br><a href="http://en.wikipedia.org/wiki/Memory_protection#Protection_keys" target="_blank" rel="external">http://en.wikipedia.org/wiki/Memory_protection#Protection_keys</a> </p>
+<p><strong><em>Intel MPX</em></strong><br>Intel MPX (Memory Protection Extensions, <a href="http://en.wikipedia.org/wiki/Intel_MPX" target="_blank" rel="external">http://en.wikipedia.org/wiki/Intel_MPX</a>) is a set of extensions to the x86 instruction set architecture. With compiler, runtime library and operating system support, Intel MPX brings increased security to software by checking pointer references whose normal compile-time intentions are maliciously exploited at runtime due to buffer overflows. Intel MPX will introduce new registers, and new instruction set extensions that operate on these registers.</p>
+<hr>
+<p>####<strong><em>REFERENCES:</em></strong></p>
+<ol>
+<li><a href="http://en.wikipedia.org/wiki/Protection_ring" target="_blank" rel="external">http://en.wikipedia.org/wiki/Protection_ring</a></li>
+<li>SMEP, What is It, and How to Beat It on Linux: <a href="http://vulnfactory.org/blog/2011/06/05/smep-what-is-it-and-how-to-beat-it-on-linux/" target="_blank" rel="external">http://vulnfactory.org/blog/2011/06/05/smep-what-is-it-and-how-to-beat-it-on-linux/</a></li>
+<li>Supervisor mode access prevention: <a href="http://lwn.net/Articles/517475/" target="_blank" rel="external">http://lwn.net/Articles/517475/</a></li>
+<li>Supervisor Mode Access Prevention - by PaX: <a href="https://forums.grsecurity.net/viewtopic.php?f=7&amp;t=3046" target="_blank" rel="external">https://forums.grsecurity.net/viewtopic.php?f=7&amp;t=3046</a></li>
+<li>RECENT ARM SECURITY IMPROVEMENTS<br><a href="https://forums.grsecurity.net/viewtopic.php?f=7&amp;t=3292" target="_blank" rel="external">https://forums.grsecurity.net/viewtopic.php?f=7&amp;t=3292</a> </li>
+</ol>
+<hr>
+<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">3</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Hardware/">Hardware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
+
+      
+        
+	<div id="comment">
+	
+	<!-- 多说评论框 start -->
+	 <div class="ds-thread" data-thread-key="/20170504/hardware-security-x86arm/" data-title="X86&ARM架构处理器硬件安全特性" data-url="http://yoursite.com/20170504/hardware-security-x86arm/"></div>
+	<!-- 多说评论框 end -->
+	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+	<script type="text/javascript">
+	var duoshuoQuery = {short_name:"csyssec"};
+	  (function() {
+	    var ds = document.createElement('script');
+	    ds.type = 'text/javascript';ds.async = true;
+	    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+	    ds.charset = 'UTF-8';
+	    (document.getElementsByTagName('head')[0] 
+	     || document.getElementsByTagName('body')[0]).appendChild(ds);
+	  })();
+	  </script>
+	<!-- 多说公共JS代码 end -->
+	
+	</div>
+	<link rel="stylesheet" href="/css/comment.css">
+
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/20170504/mtf/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">上一篇</strong>
+      <div class="article-nav-title">
+        
+          MTF在基于EPT的客户机物理内存监控中的使用
+        
+      </div>
+    </a>
+  
+  
+    <a href="/20170504/xen-snapshot/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">XEN快照机制</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+    <ol class="toc">无</ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+       <!--  自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a> --> 
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/courses" class="mobile-nav-link">Courses</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>
