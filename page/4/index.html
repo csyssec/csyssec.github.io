@@ -106,6 +106,224 @@
         
           <section id="main">
   
+    <article id="post-securekernel-design"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/securekernel-design/">这是Linux内核中一种好的安全设计吗- thread_info和内核栈的联系</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/securekernel-design/" class="article-date">
+	  <time datetime="2017-05-04T10:19:40.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/in-linux-kernel-threadinfo-is-small-cpu.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/in-linux-kernel-threadinfo-is-small-cpu.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>In Linux kernel, <strong><em>thread_info</em></strong> is a small CPU-specific data structure that stores some low-level task data for corresponding process, it also has a pointer to <strong><em>task_struct</em></strong>, which is a processor-independent process control block data structure, e.g. scheduling, virtual memory structures.<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* x86 * 64 */</span></div><div class="line"><span class="keyword">struct</span> thread_info &#123;</div><div class="line"><span class="keyword">struct</span> task_struct   *task;        <span class="comment">/* main task structure */</span></div><div class="line"><span class="keyword">struct</span> exec_domain  *exec_domain; <span class="comment">/* execution domain */</span></div><div class="line">__u32               flags;        <span class="comment">/* low level flags */</span></div><div class="line">__u32               status;       <span class="comment">/* thread synchronous flags*/</span></div><div class="line">__u32                cpu;          <span class="comment">/* current CPU */</span></div><div class="line"><span class="keyword">int</span>                  saved_preempt_count;</div><div class="line"><span class="keyword">mm_segment_t</span>         addr_limit;</div><div class="line"><span class="keyword">struct</span> restart_block restart_block;</div><div class="line"><span class="keyword">void</span> __user          *sysenter_return;</div><div class="line"><span class="keyword">unsigned</span> <span class="keyword">int</span>         sig_on_uaccess_error:<span class="number">1</span>;</div><div class="line"><span class="keyword">unsigned</span> <span class="keyword">int</span>         uaccess_err:<span class="number">1</span>; <span class="comment">/* uaccess failed */</span></div><div class="line">&#125;;</div></pre></td></tr></table></figure></p>
+<p>Every user process has its unique two stacks, one is for code running in user mode, and the other is <strong><em>kernel stack</em></strong> for code execution running in kernel mode. </p>
+<p>The current design is like below picture, the kernel stack space of process and its thread_info structure are located together (at two ends because stack grows down). This is because it offers a key benefit in terms of efficiency: the kernel can easily obtain the address of the <em>*</em>thread_info structure of the process currently running on a CPU from the value of its kernel ESP register. </p>
+<p>For example as below, %eax eventually holds the pointer to <strong><em>thread_info</em></strong> structure.<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">movl $<span class="number">0xFFFFE000</span>, %eax</div><div class="line">andl %esp,        %eax (mask out last <span class="number">13</span> bits)</div></pre></td></tr></table></figure></p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/thread_info_stack%281%29.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/thread_info_stack%281%29.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/thread_info_stack%282%29.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/thread_info_stack%282%29.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<ul>
+<li>Note that these pictures above are from Junfeng’s operating system course slides.<br><a href="http://www.cs.columbia.edu/~junfeng/10sp-w4118/syllabus.html" target="_blank" rel="external">http://www.cs.columbia.edu/~junfeng/10sp-w4118/syllabus.html</a> (or <a href="http://www.cs.columbia.edu/~junfeng/" target="_blank" rel="external">link</a>).</li>
+</ul>
+<p>From security’s point of view, this means that whenever the address of kernel stack is leaked for some reasons (e.g. a bug, vulnerability), the address of corresponding <strong><em>thread_info</em></strong> structure will also be leaked. And as you can see that we can also get the address of <strong><em>task_struct</em></strong> as long as the address of thread_info is gotten. </p>
+<p>The <strong><em>task_struct</em></strong> is a one of very critical kernel data structures in Linux system, for example, it contains the credentials (uid, gid, suid, sgid…). Provided that there is a kernel vulnerability that can cause arbitrary kernel memory overwrite, then those credential fields could be clear by an exploit to get root privilege even without executing any code in kernel mode. </p>
+<p>So, the question: is this a bad security design? Could we do something to improve it? </p>
+<p>See my <a href="http://hypervsir.blogspot.com/2014/09/windows-os-thread-scheduling-monitoring.html" target="_blank" rel="external">previous post</a> for monitoring Windows thread scheduling, it seems that Windows operating system uses FS (or GS) to retrieve thread-related structure for current running thread. However, as far as I know, in Linux system, fs/gs are used for LTS (Local Thread Storage) purpose. </p>
+<hr>
+<p><strong>UPDATE:</strong></p>
+<ol>
+<li><strong>Fortunately I got an idea (not too bad idea:-) to mitigate this issue, I will talk about it later in a new post.</strong></li>
+<li>Add references for “stack overflow” attack against this bad design.</li>
+</ol>
+<p><br><br>Exploiting Stack Overflows in the Linux Kernel<br><a href="https://jon.oberheide.org/blog/2010/11/29/exploiting-stack-overflows-in-the-linux-kernel/" target="_blank" rel="external">https://jon.oberheide.org/blog/2010/11/29/exploiting-stack-overflows-in-the-linux-kernel/</a></p>
+<p>Exploiting stack overflows<br><a href="https://jon.oberheide.org/files/infiltrate12-thestackisback.pdf" target="_blank" rel="external">https://jon.oberheide.org/files/infiltrate12-thestackisback.pdf</a></p>
+<p>Exploiting the Futex Bug and uncovering Towelroot<br><a href="http://tinyhack.com/2014/07/07/exploiting-the-futex-bug-and-uncovering-towelroot/" target="_blank" rel="external">http://tinyhack.com/2014/07/07/exploiting-the-futex-bug-and-uncovering-towelroot/</a></p>
+<p>SMEP: What is It, and How to Beat It on Linux<br><a href="http://vulnfactory.org/blog/2011/06/05/smep-what-is-it-and-how-to-beat-it-on-linux/" target="_blank" rel="external">http://vulnfactory.org/blog/2011/06/05/smep-what-is-it-and-how-to-beat-it-on-linux/</a></p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统内核/">系统内核<span class="article-category-count">11</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-secureos2"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/secureos2/">安全操作系统设计-Linux内核关键数据结构写保护</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/secureos2/" class="article-date">
+	  <time datetime="2017-05-04T10:18:05.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/11/security-os-design-cont-write.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/security-os-design-cont-write.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>To be continued for <a href="http://hypervsir.blogspot.com/2014/10/security-os-design-idea-to-prevent.html" target="_blank" rel="external">previous post</a>, let me review what must be changed in Linux kernel in order to prevent buffer overrun/overflow attacks from modifying the critical kernel data structures, like GDT, IDT, task_struct, mm_struct, etc.</p>
+<p>There are some kernel data structures that are never changed at runtime as long as the operating system completes their initialization. For example, the GDT and IDT table, the system call table, or SSDT (pointed by nt!KeServiceDescriptorTable, see this <a href="http://resources.infosecinstitute.com/hooking-system-service-dispatch-table-ssdt/" target="_blank" rel="external">link</a> for SSDT hooking in Windows OS). Note that in Linux system, some of GDT table entries will also be updated by kernel. </p>
+<p>For those data structures, we can directly configure them with Read-Only memory permission in page table entries. </p>
+<p>However, there are many kernel data structures like task_struct, mm_struct, GDT, which must have to be configured with Read-Write attribute because they are changed very frequently during OS runtime. </p>
+<p>But the good thing is that those data are only changed by kernel itself. Basically, the system drivers or other LKMs must not change them, and we can even think that any changes to them by those LKMs are illegitimate, and not desired behaviors. </p>
+<p>So, with this assumption we can now take a look at what we should have to do on existing Linux kernel system or a new operating system started from scratch.</p>
+<h3 id="Kernel-virtual-memory-management-subsystem"><a href="#Kernel-virtual-memory-management-subsystem" class="headerlink" title="Kernel virtual memory management subsystem:"></a><strong>Kernel virtual memory management subsystem:</strong></h3><p>First of all, add a new type of memory allocation to support Read-Only memory allocation (with kmalloc() or even vmalloc() ), for example, adding a new parameter GFP_ROMEM. </p>
+<p>This means that the kernel internal memory management subsystem (e.g. Linux slab allocator) must be extended to group RO memory chunks together in a single or multiple RO pages (4KB or 2MB in size), and traditional RW memory chunks into other multiple RW pages in 4KB or 2MB size. This might greatly increase the complicity of memory management system design. </p>
+<h3 id="Memory-allocation-for-kernel-itself-and-drivers-or-any-LKMs"><a href="#Memory-allocation-for-kernel-itself-and-drivers-or-any-LKMs" class="headerlink" title="Memory allocation for kernel itself and drivers (or any LKMs)"></a><strong>Memory allocation for kernel itself and drivers (or any LKMs)</strong></h3><p>Once we add a new type GFP_ROMEM, we must define the rules to use it. </p>
+<p>The first rule #1 is … for the data structures that will only be modified by kernel module itself, we must use this new type for memory allocation in kernel (e.g. scheduler). All the drivers (or other LKMs) are disallowed to use this new type, we can use code static analysis tool to enforce this usage. </p>
+<p>The second rule #2 is … since the data structure are now RO attribute, and by default CR0.WP bit is set, so kernel module must have to disable CR0.WP before writing access to those data structures. So the code logic is as below:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">disable_wp();                              // clear CR0.WP bit.</div><div class="line">write access to RO data fields.</div><div class="line">enable_wp();                             // set CR0.WP bit again.</div></pre></td></tr></table></figure>
+<p> At the same time, any legitimate drivers (LKMs) are not allowed to change CR0.WP bit (code scanning to enforce this).</p>
+<p>With solution, we can prevent many buffer overflow attacks like, some driver bug that causes arbitrary kernel memory overwriting. However, ROP (JOP) attacks might bypass this solution, but this security design is not intended to address such a specific attack like ROP. </p>
+<p>Problems: </p>
+<ol>
+<li>This will increase tremendous changes to existing Linux kernel system. But it would be good if we plan to write our own operating system starting from scratch. </li>
+<li>Performance impact. Too many extra cycles for disabling/enabling CR0.WP bit. But we can optimize it, the real impact might not so big.</li>
+<li>Need to consider the interrupts or NMIs between disable_wp() and enable_wp() functions. This is just an implementation consideration. It can be solved very easily. </li>
+</ol>
+<p>Any other big issues? </p>
+<hr>
+<h3 id="Update"><a href="#Update" class="headerlink" title="[Update]:"></a><strong>[Update]:</strong></h3><p>The memory <strong><em>Protection Keys</em></strong> feature can do kind of similar protection for key data structures. With this feature enabled, each process also has a protection key value associated with it. On a memory access the hardware checks that the current process’s protection key matches the value associated with the memory block being accessed; if not, an exception occurs. </p>
+<p>See the wikipedia page for details: <a href="http://en.wikipedia.org/wiki/Memory_protection#Protection_keys" target="_blank" rel="external">http://en.wikipedia.org/wiki/Memory_protection#Protection_keys</a></p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统内核/">系统内核<span class="article-category-count">11</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-secureos"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/secureos/">安全操作系统内核设计-一种阻止恶意软件覆盖关键系统内核数据结构的思想</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/secureos/" class="article-date">
+	  <time datetime="2017-05-04T10:16:12.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/security-os-design-idea-to-prevent.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/security-os-design-idea-to-prevent.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>Recently, when reading this paper “<strong><a href="http://www.csc.ncsu.edu/faculty/jiang/pubs/OAKLAND10.pdf" target="_blank" rel="external">HyperSafe - A Lightweight Approach to Provide Lifetime Hypervisor Control-Flow Integrity</a></strong>“, an idea just comes out from my mind: using write protection (CR0.WP) and read-only (RO) page attribute to prevent the critical kernel data structures being overwritten by malicious software through buffer (stack, heap) overflow in an exploitable kernel module.</p>
+<p>In a virtual memory management system, OS kernel can configure a Read-Only (RO) virtual page by clearing R/W bit in corresponding page table entry (PTE) so that a virtual page cannot be modified by OS kernel and/or application.</p>
+<p>Write Protection (CR0.WP) allows virtual pages to be protected from supervisor-mode writes. If CR0.WP = 0, supervisor-mode write accesses are allowed to linear addresses with read-only access rights; if CR0.WP = 1, such write accesses are not allowed. However, note that user-mode write accesses are never allowed to virtual addresses with Read-Only access rights, regardless of the value of CR0.WP.</p>
+<p>In a modern operating system design, Write Protection bit by default is always set by kernel, which means that even the kernel code cannot directly modify the Read-Only pages. And basically the Read-Only access permission are used in these two ways below:</p>
+<ol>
+<li><p>COW (Copy-On-Write). WP and RO facilitates implementation of the copy-on-write method of creating a new process (fork()). &gt;<br>When a new child process is created, the OS kernel doesn’t create a whole bunch of things at one time, instead, the child process shares most of pages with its parent process, and OS kernel only clears corresponding PTE.R/W bit for those shared pages. Whenever a process (parent or child) modifies a shared page, a write access violation (#PF) occurs, then a separate copy of that particular page alone will be made by the #PF handler for that process (parent or child).</p>
+</li>
+<li><p>Write protection for kernel code and static data. Obviously, at OS runtime, those pages (except Self-Modified Code) should never be changed by any legitimate software. So generally speaking OS kernel must configure them with Read-Only access right.</p>
+</li>
+</ol>
+<p>However, this post presents a 3rd usage in OS kernel design: <strong><em>Setting Read-Only  access permission even for the critical system kernel data structures that previously are configured with write access permission</em></strong>. Here are the reasons.</p>
+<p>Like <a href="http://hypervsir.blogspot.com/2014/10/in-linux-kernel-threadinfo-is-small-cpu.html" target="_blank" rel="external">my last post</a> explained, thread_info structure is just one of critical data structures. Its field addr_limit can be overwritten by exploiting stack overflows existing in any kernel module/driver. This is because the thread_info structure is a writable page (the corresponding PTE.R/W bit = 1). </p>
+<p>So the question is - what if we configure that page (e.g. thread_info page) with Read-Only permission? </p>
+<p>In this way, we can prevent such those stack overflow attacks, because whenever a kernel module has an exploitable bug that attempts to overwrite this read-only structure, a write access violation (#PF, page fault) will be triggered.</p>
+<p>But this will cause a problem, when a kernel legitimately writes/modifies that read-only structure, an access violation will happen too. To solve this problem, the legitimate kernel code must turn off write protection (clearing CR0.WP bit) before writing that read-only structure, and turn it on back after write access. </p>
+<p>In a summary, the OS kernel designer can arrange the critical data structures together as possible as we can, and set those pages with read-only access permission. Whenever the OS kernel attempts to modify them, it turns off WP, and after modification turns it on again. And as a security design rule, the kernel module (e.g. *.ko) should not directly modify any kernel critical data structures, only kernel itself can modify the those write-protected kernel data structures (actually, this is the case in any modern operating system design).</p>
+<p>However, this introduces performance issue (but not too bad), for example, on each legitimate write access, extra CPU cycles will be consumed by writing CR0.WP bit. However, we can reduce this by grouping those legitimate access code to decrease the times of writing CR0.WP bit. Another problem might be interrupts. During the window of disabling CR0.WP and enabling it, an interrupt might happen. We can solve this by disabling interrupt (or preemption) or saving/restoring CR0.WP bit in the interrupt handler (ISR).  </p>
+<hr>
+<p><strong><em>UPDATE:</em></strong><br>thread_info is not a good example, because it shares the same space with kernel stack which must have to be configured as Read-Write attribute. </p>
+<p>Some other kernel structures, like task_struct, mm_struct might be good examples for this design. </p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统内核/">系统内核<span class="article-category-count">11</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-rop-jop"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -245,203 +463,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-armtrustzone"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/armtrustzone/">ARM TrustZone安全扩展和虚拟化扩展 vs X86虚拟化技术</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/armtrustzone/" class="article-date">
-	  <time datetime="2017-05-04T10:09:56.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/09/arm-trustzone-security-extension-and_28.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/09/arm-trustzone-security-extension-and_28.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>A typical virtualization system on both x86 and ARM includes three major parts:</p>
-<ul>
-<li>CPU virtualization</li>
-<li>Memory virtualization, and </li>
-<li>I/O virtualization (device, interrupt virtualization). </li>
-</ul>
-<p>Because the 3rd one above normally requires additional platform/chipset support, in this article I’m going to only talk about the first two virtualization extensions that are related only to processor architectures. I will back to the 3rd one later as another topic especially for device I/O virtualization and emulation.</p>
-<p>&lt; TO-BE-STARTED&gt;</p>
-<hr>
-<p><strong><em>Update:</em></strong><br>I found there is very very good lecture about ARM Virtualization Technology from National Tsing Hua University, the link is here:<br><a href="http://www.cs.nthu.edu.tw/~ychung/slides/Virtualization/VM-Lecture-7-2-Hardware%20support-ARM.pptx" target="_blank" rel="external">http://www.cs.nthu.edu.tw/~ychung/slides/Virtualization/VM-Lecture-7-2-Hardware%20support-ARM.pptx</a></p>
-<hr>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">8</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/TrustZone/">TrustZone</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-monitoring-int80"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/monitoring-int80/">X86/Intel虚拟化技术监控/陷入软件中断INT80H系统调用</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/monitoring-int80/" class="article-date">
-	  <time datetime="2017-05-04T08:12:04.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/monitortrap-software-interrupt-int-08h.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/monitortrap-software-interrupt-int-08h.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>In an unix-like system, before syscall/sysret and/or sysenter/sysexit instructions were introduced by x86/Intel processors, software interrupt “<strong>INT 80h</strong>“ was used as system call interface. Unlike <a href="http://hypervsir.blogspot.com/2014/10/yet-another-solution-to-monitortrap.html" target="_blank" rel="external">my previous post</a>, this one is going to talk about how to monitor this old type system call.</p>
-<p>The INT n instruction is the general mnemonic for executing a software-generated call to an interrupt handler. So when INT 80h is executed in an user application, the processor will immediately switch to kernel mode (normally ring 0, depends on the 0x80 interrupt descriptor settings), and jump to the corresponding interrupt handler. After the request is served by the handler in kernel mode, IRET (interrupt return) is executed, and processor then will switch back to user mode and continue to execute user mode application.</p>
-<p>In a x86 hardware virtualization environment, <strong><em>Intel VT-x technology unfortunately doesn’t provide a means to make software interrupt through INTn instruction generate a VMexit, which means that the system call INT 80h cannot be monitored directly by VMM software.</em></strong> </p>
-<p>However, we can still have a small trick so that VMM can monitor and trap any INT 80h system call. The idea is basically the same as the one that is summarized as <a href="http://hypervsir.blogspot.com/2014/10/yet-another-solution-to-monitortrap.html" target="_blank" rel="external">a generic solution in my previous post</a>.</p>
-<p>If you take a look at the <a href="http://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-instruction-set-reference-manual-325383.pdf" target="_blank" rel="external">Intel Architecture Instruction Set Reference Manual</a>, you may see there is a special exception type for INT instruction execution in protected mode, as below. </p>
-<p>  <strong>#NP(error_code)<br>   If code segment, interrupt-, trap-, or task gate, or TSS is not present.</strong></p>
-<p>Here, the #NP is exception <strong><em>Segment Not Present</em></strong> , one of Intel reserved exception type whose vector is 11. According to Intel Software Development Manual, </p>
-<p><em>“A not-present indication in a gate descriptor, however, does not indicate that a segment is not present (because gates do not correspond to segments). The operating system may use the present flag for gate descriptors to trigger exceptions of special significance to the operating system”</em></p>
-<p>In other words, if we intentionally clear the “<strong><em>present</em></strong> “ bit in the interrupt or trap gate descriptor of vector 80h in IDT table, all the software interrupts through INT 80h system call, will trigger a #NP exception, hence the CPU control will instead be transferred to the fault handler in vector 11 (#NP) of IDT.</p>
-<p>Meanwhile, by checking the corresponding “error_code” for this exception in the exception stack, and decoding the instruction address at which the #NP exception was triggered, we can easily know that this #NP fault is generated intentionally by executing “INT 80h” system call.  </p>
-<p>In a virtualization environment, similarly VMM software can configure <strong><em>Exception-Bitmap VMCS</em></strong> structure to make such an #NP fault generate a VMexit. </p>
-<p><strong><em>So, finally here is the idea to monitor and trap the Linux/Unix system call through software interrupt INT 0x80:</em></strong></p>
-<ol>
-<li>VMM software locates the interrupt descriptor of vector 0x80 in guest IDT table, and clears the “present” bit;</li>
-<li>VMM software also configures Exception-Bitmap VMCS structure to trap guest #NP fault exception, which means that all the guest #NP exceptions will incur a VMexit, instead of being handled directly by guest #NP handler in guest IDT;</li>
-<li>At runtime, all the system call “INT 0x80” from user mode application will generate a CPU #NP fault because the corresponding 0x80 descriptor “present” bit is clear in step 1 above;</li>
-<li>Such a #NP fault will then cause a VMexit because of step 2 settings above;</li>
-<li>Then, VMM software can check various VMexit VMCS information structures (e.g. VM-Exit Interruption-Information Field, IDT-vectoring information Field, and IDT-vectoring Error Code Field), and decode the fault instruction to determine whether or not this #NP fault VMexit is an intended exception by executing system call “INT 0x80”:</li>
-</ol>
-<ul>
-<li>If yes, VMM software emulates the “INT 0x80” behavior, discards this #NP exception, and resumes back to guest with RIP pointing to the system call handler that is defined in vector 0x80 interrupt descriptor of guest IDT table.</li>
-<li>Otherwise, inject this exception back to guest OS, and let guest OS handle the #NP fault as normally.</li>
-</ul>
-<p>With this idea, whenever a system call through INT 0x80 is made by user application software, VMM software can get notified immediately. <br></p>
-<hr>
-<h4 id="Update"><a href="#Update" class="headerlink" title="Update:"></a><strong><em>Update:</em></strong></h4><p>The same idea can apply to any external interrupt (vector 32~255) traps, e.g. ATA device, Audio interrupts. </p>
-<hr>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">10</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Monitoring/">Monitoring</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/SYSCALL/">SYSCALL</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtulization/">Virtulization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-unpriviledged-ins"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/unpriviledged-ins/">非特权指令的内核信息泄露</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/unpriviledged-ins/" class="article-date">
-	  <time datetime="2017-05-04T08:09:19.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/kernel-information-leak-with.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/kernel-information-leak-with.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>In computer security, information leaking is one of threats to software security. For example, the memory address of kernel critical resource should not be visible to user mode. Address space layout randomization (ASLR) is just one of techniques to prevent an attacker from reliably getting a particular exploited function in memory. </p>
-<p>However, I’m just very curious about why x86 processor leaks kernel data structures by some unprivileged instructions. Is this a bad CPU design?</p>
-<p>Here is an example. </p>
-<p>x86 IDTR register holds the base memory address for the Interrupt Descriptor Table entries (vector 0 through 255). As long as we gets its address, we can calculate and get all the ISR memory addresses of all exceptions/interrupts in a system. </p>
-<p><strong>But an user program can simply get the IDTR address by executing SIDT instruction.</strong></p>
-<p>See these two real-world example exploits below, <strong>if SIDT instruction in x86 were not allowed to execute in user mode, then one more roadblock would be placed to mitigate such an attack.</strong></p>
-<p>1) Linux Kernel ptrace/sysret - Local Privilege Escalation<br>    <a href="http://www.exploit-db.com/exploits/34134/" target="_blank" rel="external">http://www.exploit-db.com/exploits/34134/</a></p>
-<p>2) Ubuntu 12.04.0-2LTS x64 - perf_swevent_init Kernel Local Root Exploit<br>    <a href="http://www.exploit-db.com/exploits/33589/" target="_blank" rel="external">http://www.exploit-db.com/exploits/33589/</a></p>
-<p>So the questions:  </p>
-<ul>
-<li><strong>Why does Intel/x86 allow such an instruction to be executed by unprivileged program/task in user mode?</strong></li>
-<li><strong>Is there any legitimate application in user mode that must have to use this instruction to get kernel structure address?</strong></li>
-</ul>
-<p>The similar instructions are SGDT (retrieving Global Descriptor Table Register), and even seldom used instructions like STR, SLDT, SMSW. </p>
-<p>Anybody (Intel processor architect or application software developer) can tell me the reason of that? </p>
-<hr>
-<h4 id="Update"><a href="#Update" class="headerlink" title="Update:"></a><strong><em>Update:</em></strong></h4><p><strong><a href="https://groups.google.com/forum/#!msg/comp.arch/RV4w6yfDxtA/05g1URTkdcIJ" target="_blank" rel="external">Why SIDT/SGDT instructions are allowed to execute in user mode (x86/Intel)?</a></strong></p>
-<hr>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">8</span></a>
-
-
-      
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -534,6 +555,18 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/cf-exception/">控制流分支指令上的控制流处理器异常(单步执行)</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -697,31 +730,19 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
+              <h6 style="margin: 0;"><a href="/20170504/cloud-osv/">Unikernels为云设计的库操作系统(OSv)</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
               <h6 style="margin: 0;"><a href="/20170504/securekernel-design/">这是Linux内核中一种好的安全设计吗- thread_info和内核栈的联系</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/secureos/">安全操作系统内核设计：一种阻止恶意软件覆盖关键系统内核数据结构的思想</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/rop-jop/">一种运行时无感的方法防御ROP和JOP攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -737,7 +758,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">8</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">10</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">10</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -747,7 +768,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.43px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.14px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.71px;">Binary</a> <a href="/tags/CFI/" style="font-size: 10.71px;">CFI</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.14px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 12.86px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 17.86px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.14px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 14.29px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.71px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.71px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.57px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.43px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.14px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 12.86px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 12.86px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.71px;">Malware</a> <a href="/tags/Memory/" style="font-size: 12.86px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.43px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 12.14px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.71px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.43px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.71px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.14px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.71px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.43px;">Rootkit</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.71px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.71px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.57px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.43px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.29px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 12.14px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 12.86px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.43px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.14px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.71px;">Binary</a> <a href="/tags/CFI/" style="font-size: 11.43px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.14px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 12.86px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 17.14px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.14px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 14.29px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.71px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.71px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.57px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.43px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.86px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 12.86px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 12.86px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.71px;">Malware</a> <a href="/tags/Memory/" style="font-size: 12.86px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.43px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 12.14px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.71px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.43px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.71px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.14px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.71px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.43px;">Rootkit</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.71px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.71px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.57px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.43px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.29px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 12.14px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 12.86px;">XEN</a>
     </div>
   </div>
 

@@ -106,6 +106,83 @@
         
           <section id="main">
   
+    <article id="post-cf-exception"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/cf-exception/">控制流分支指令上的控制流处理器异常(单步执行)</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/cf-exception/" class="article-date">
+	  <time datetime="2017-05-04T12:06:50.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2015/01/processor-exception-after-control.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2015/01/processor-exception-after-control.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>“single-stepping on branches” is processor hardware feature of x86/Intel architecture. When it is enabled, the processor generates a single-step debug exception <strong>only after instructions that cause a branch</strong>. This mechanism allows a debugger to single-step on <strong>control transfers caused by branches</strong>. What does this imply to defense against control-flow hijacking attacks (e.g. ROP or JOP) ? </p>
+<h3 id="Control-flow-Transfer-Instructions"><a href="#Control-flow-Transfer-Instructions" class="headerlink" title="Control-flow Transfer Instructions"></a><strong>Control-flow Transfer Instructions</strong></h3><p>Control-flow hijacking attacks allow an attacker to overwrite a value that is loaded into the program counter (EIP) of a running program, typically redirecting execution to his own injected code or existing ROP/JOP gadget chains for executing arbitrary malicious code. In general, the value that is subverted could a jump target address, function pointer, or return address in a user-controlled stack. </p>
+<p>Call/Jmp/Ret instructions, called as control-transfer branch instructions, are used by control-flow hijacking attacks to redirect CPU execution. There are many software tools that can perform binary analysis on those instructions, for example, by dynamically instrumenting control-flow graph (CFG) for control-flow integrity (CFI) enforcement. So it would be good if the hardware processor can generate an exception on (or after) those control-transfer instructions. </p>
+<h3 id="Single-stepping-on-Branches"><a href="#Single-stepping-on-Branches" class="headerlink" title="Single-stepping on Branches"></a><strong>Single-stepping on Branches</strong></h3><p>In x86/Intel processor architecture, there is a bit (Trap Flag, TF) in EFLAGS register as below. It is set to enable single-step mode for debugging, clear to disable single-step mode. </p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/control-flow1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/control-flow1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>In single-step mode, the processor generates a debug exception (#DB) after each instruction. This allows the execution state of a program to be inspected after each instruction.</p>
+<p>However, things are changed under a special condition as indicated below. When BTF (single-step on branches) flag in IA32_DEBUGCTL MSR is set, the processor treats the TF flag in the EFLAGS register as a “single-step on branches” flag rather than a “single-step on instructions” flag. This mechanism allows single-stepping the processor on taken branches. Note that the exception is a trap-class exception, which means the exception is generated after the branch instruction (call/ret/jmp) is executed.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/control-flow2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/control-flow2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>So now we can make processor generate an exception (#DB) on (^after^, actually) every call/jmp/ret instruction. </p>
+<h3 id="Potential-Usages"><a href="#Potential-Usages" class="headerlink" title="Potential Usages"></a><strong>Potential Usages</strong></h3><p>We might have some usages with this capability, for example:</p>
+<ol>
+<li>Build dynamical CFG (Control Flow Graph) without changes to software binary or source code.</li>
+<li>Detect unknown control-flow hijacking vulnerabilities by using dynamic taint analysis, e.g. when a tainted value loaded into the program counter (EIP) has been influenced by data from the untrusted inputs.</li>
+<li>Perform software-invisible hooks for function calling (target of “call” instruction).<br><br></li>
+</ol>
+<p>However, there are some <strong><em>limitations</em></strong>:</p>
+<ol>
+<li>Performance overhead !!! (unless we use it under some environment where performance is not a big concern).</li>
+<li>It cannot control jmp/ret/call individually, for example, trigger exceptions only on CALL instructions, or RET instructions, or even only on “indirect” jmp/call instructions (because normally code with direct-jmp/call is trusted due to W^X on code section). </li>
+<li>It also has no CPL (user or kernel) controls, but we can control it through EFLAGS.TF bit crossing system call/ret. </li>
+<li>Because this #DB is controlled by EFLAGS bit, it can be easy to be disabled by using a “popf” instruction if the stack is controlled by an attacker:( . </li>
+<li>It obviously requires OS kernel changes (Does OS provide legitimate #DB handler registration?) </li>
+</ol>
+<p>Please let me know if you have any comments.</p>
+<hr>
+<p><strong><em>References:</em></strong><br>Intel IA32 architecture software development manual:<br><a href="http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html" target="_blank" rel="external">http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html</a> </p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">9</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/CFI/">CFI</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-cfi-development"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -379,66 +456,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-nmi-virtual"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/nmi-virtual/">虚拟化技术的NMI窗口退出</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/nmi-virtual/" class="article-date">
-	  <time datetime="2017-05-04T10:41:33.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2015/04/what-how-and-why-on-interrupt-window-or.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2015/04/what-how-and-why-on-interrupt-window-or.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>More recently, one of my colleagues asked me <strong><em>why</em></strong>  there is a feature called “<strong><em>Interrupt Window exiting</em></strong> “ in virtualization technology, and <strong><em>how</em></strong> it can be used by VMM? This blog is going to briefly describe its “what, how and why” .</p>
-<h3 id="WHAT-and-HOW"><a href="#WHAT-and-HOW" class="headerlink" title="WHAT, and HOW"></a><strong>WHAT, and HOW</strong></h3><p>“Interrupt Window Exiting” is one of VM exit reasons (#7 in Intel Technology). If “interrupt-window exiting” VM-execution control is set, this VM exit happens right after a VM entry and at the beginning of an any instruction:</p>
-<ul>
-<li>at which RFLAGS.IF = 1 (external interrupt is unmaksed) and,</li>
-<li>on which the interruptibility state of the guest would allow delivery of an interrupt (for example, not being blocked by STI or by MOV SS).<br><br><br></li>
-</ul>
-<h3 id="WHY"><a href="#WHY" class="headerlink" title="WHY"></a><strong>WHY</strong></h3><p>In a typical case, the VMM software wants to inject/deliver a (virtual) interrupt to its one of Guest VM at some point, but unfortunately the interruptibility state of its guest would NOT allow delivery of an interrupt at that moment (for example, since its guest RFLAGS.IF = 0). </p>
-<p>So, in order to deliver this interrupt, the VMM will need to poll and check the interruptibility state of the guest, once the interruptibility state of its guest allows delivery of an interrupt (A window is open), then VMM can deliver it at this moment. This is inefficient way to do so.</p>
-<p><strong><em>So, the problem is that – How does a VMM get to know when its guest becomes interruptible?</em></strong></p>
-<p>With this feature supported, a VMM is allowed to queue a virtual interrupt to its guest when the guest is not in an interruptible state. The VMM can just only set the “interrupt-window exiting” VM-execution control for that guest and depend on a VM exit to know when the guest becomes interruptible (and, therefore, when it can inject a virtual interrupt). The VMM can detect such VM exits by checking for the basic exit reason “interrupt-window”, if the value of exit reason is 7, then VMM knows it is right time to deliver a virtual interrupt to its specific guest.</p>
-<p><strong><em>Similarly, those also apply to “NMI window exiting” feature in Virtualization Technology.</em></strong></p>
-<hr>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟化原理/">虚拟化原理<span class="article-category-count">7</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -531,6 +548,18 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/cf-exception/">控制流分支指令上的控制流处理器异常(单步执行)</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -694,31 +723,19 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
+              <h6 style="margin: 0;"><a href="/20170504/cloud-osv/">Unikernels为云设计的库操作系统(OSv)</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
               <h6 style="margin: 0;"><a href="/20170504/securekernel-design/">这是Linux内核中一种好的安全设计吗- thread_info和内核栈的联系</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/secureos/">安全操作系统内核设计：一种阻止恶意软件覆盖关键系统内核数据结构的思想</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/rop-jop/">一种运行时无感的方法防御ROP和JOP攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -734,7 +751,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">8</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">10</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">10</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -744,7 +761,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.43px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.14px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.71px;">Binary</a> <a href="/tags/CFI/" style="font-size: 10.71px;">CFI</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.14px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 12.86px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 17.86px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.14px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 14.29px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.71px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.71px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.57px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.43px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.14px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 12.86px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 12.86px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.71px;">Malware</a> <a href="/tags/Memory/" style="font-size: 12.86px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.43px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 12.14px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.71px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.43px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.71px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.14px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.71px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.43px;">Rootkit</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.71px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.71px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.57px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.43px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.29px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 12.14px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 12.86px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.43px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.14px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.71px;">Binary</a> <a href="/tags/CFI/" style="font-size: 11.43px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.14px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 12.86px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 17.14px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.14px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 14.29px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.71px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.71px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.57px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.43px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.86px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 12.86px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 12.86px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.71px;">Malware</a> <a href="/tags/Memory/" style="font-size: 12.86px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.43px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 12.14px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.71px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.43px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.71px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.14px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.71px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.43px;">Rootkit</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.71px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.71px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.57px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.43px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.29px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 12.14px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 12.86px;">XEN</a>
     </div>
   </div>
 

@@ -106,6 +106,214 @@
         
           <section id="main">
   
+    <article id="post-compile-link"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170301/compile-link/">理清编译链接的那些事儿</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170301/compile-link/" class="article-date">
+	  <time datetime="2017-03-01T05:26:03.000Z" itemprop="datePublished">三月 1, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本文来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/05/25/lib-compile-link/" target="_blank" rel="external">个人博客</a>，主要介绍了Linux内核中一系列的内存分配函数及其原理<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170301/compile-link/" target="_blank" rel="external">理清编译链接的那些事儿</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<p>当你在linux下写C/C++代码的时候，是不是会遇到许多编译链接的问题？ 时不时报个glibc,gcc，g++等相关的错误？ 很多时候都无从下手，而且比较混乱。 这也是编译链接过程中经常出现的问题。</p>
+<p>这篇文章不是去介绍如何编译链接，而是理清编译链接过程中碰到的一些概念和出现的问题。尤其是，libc,,glib,glibc,eglibc，libc++，libstdc++，gcc,g++。 </p>
+<p>从libc说起。<br>libc是Linux下原来的标准C库，也就是当初写hello world时包含的头文件#include &lt; stdio.h> 定义的地方。 </p>
+<p>后来逐渐被glibc取代，也就是传说中的GNU C Library,在此之前除了有libc，还有klibc,uclibc。现在只要知道用的最多的是glibc就行了，主流的一些linux操作系统如 Debian, Ubuntu，Redhat等用的都是glibc（或者其变种，下面会说到).</p>
+<p>那glibc都做了些什么呢？ glibc是Linux系统中最底层的API，几乎其它任何的运行库都要依赖glibc。 glibc最主要的功能就是对系统调用的封装，你想想看，你怎么能在C代码中直接用fopen函数就能打开文件？ 打开文件最终还是要触发系统中的sys_open系统调用，而这中间的处理过程都是glibc来完成的。<a href="http://www.chongh.wiki/blog/2016/04/08/linux-syscalls/" target="_blank" rel="external">这篇文章</a>详细介绍了glibc是如何与上层应用程序和系统调用交互的。除了封装系统调用，glibc自身也提供了一些上层应用函数必要的功能,如string,malloc,stdlib,linuxthreads,locale,signal等等。</p>
+<p>好了，那eglibc又是什么？ 这里的e是Embedded的意思，也就是前面说到的变种glibc。eglibc的主要特性是为了更好的支持嵌入式架构，可以支持不同的shell(包括嵌入式)，但它是二进制兼容glibc的，就是说如果你的代码之前依赖eglibc库，那么换成glibc后也不需要重新编译。ubuntu系统用的就是eglibc（而不是glibc）,不信，你执行 ldd –version 或者 /lib/i386-linux-gnu/libc.so.6<br>(64位系统运行/lib/x86_64-linux-gnu）看看，便会显示你系统中eglibc/glibc的版本信息。  这里提到了libc.so.6,这个文件就是eglibc/glibc编译后的生成库文件。</p>
+<p>好了，还有一个glib看起来也很相似，那它又是什么呢？glib也是个c程序库，不过比较轻量级，glib将C语言中的数据类型统一封装成自己的数据类型，提供了C语言常用的数据结构的定义以及处理函数，有趣的宏以及可移植的封装等(注：glib是可移植的，说明你可以在linux下，也可以在windows下使用它）。那它跟glibc有什么关系吗？其实并没有，除非你的程序代码会用到glib库中的数据结构或者函数，glib库在ubuntu系统中并不会默认安装(可以通过apt-get install libglib2.0-dev手动安装)，著名的GTK+和Gnome底层用的都是glib库。想更详细了解glib？ 可以参考 <a href="https://developer.gnome.org/glib/" target="_blank" rel="external">这里</a></p>
+<p>看到这里，你应该知道这些库有多重要了吧？ 你写的C代码在编译的过程中有可能出现明明是这些库里面定义的变,却量还会出现’Undefined’, ‘Unreference’等错误，这时候你可能会怀疑是不是这些库出问题了？ 是不是该动手换个gilbc/eglibc了？ 这里强调一点，在你准备更换/升级这些库之前，你应该好好思考一下，你真的要更换/升级吗？你要知道你自己在做什么！你要时刻知道glibc/eglibc的影响有多大，不管你之前部署的什么程序，linux系统的ls,cd,mv,ps等等全都得依赖它，很多人在更换/升级都有过惨痛的教训，甚至让整个系统奔溃无法启动。所以，强烈不建议更换/升级这些库！</p>
+<p>当然如果你写的是C++代码，还有两个库也要非常重视了，libc++/libstdc++,这两个库有关系吗？有。两个都是C++标准库。libc++是针对clang编译器特别重写的C++标准库，那libstdc++自然就是gcc的事儿了。libstdc++与gcc的关系就像clang与libc++. 其中的区别这里不作详细介绍了。</p>
+<p>再说说libstdc++，glibc的关系。 libstdc++与gcc是捆绑在一起的，也就是说安装gcc的时候会把libstdc++装上。 那为什么glibc和gcc没有捆绑在一起呢？<br>相比glibc，libstdc++虽然提供了c++程序的标准库，但它并不与内核打交道。对于系统级别的事件，libstdc++首先是会与glibc交互，才能和内核通信。相比glibc来说，libstdc++就显得没那么基础了。</p>
+<p>说完了这些库，这些库最终都是拿来干嘛的？当然是要将它们与你的程序链接在一起！ 这时候就不得不说说gcc了(当然还有前文提到的clang以及llvm等编译器，本文就不细说它们的区别了)。</p>
+<p>你写的C代码.c文件通过gcc首先转化为汇编.S文件，之后汇编器as将.S文件转化为机器代码.o文件，生成的.o文件再与其它.o文件，或者之前提到的libc.so.6库文件通过ld链接器链接在一块生成可执行文件。当然，在你编译代码使用gcc的时候，gcc命令已经帮你把这些细节全部做好了。</p>
+<p>那g++是做什么的? 慢慢说来，不要以为gcc只能编译C代码，g++只能编译c++代码。 后缀为.c的，gcc把它当作是C程序，而g++当作是c++程序；后缀为.cpp的，两者都会认为是c++程序，注意，虽然c++是c的超集，但是两者对语法的要求是有区别的。在编译阶段，g++会调用gcc,对于c++代码，两者是等价的，但是因为gcc命令不能自动和C++程序使用的库联接，需要这样，gcc -lstdc++, 所以如果你的Makefile文件并没有手动加上libstdc++库，一般就会提示错误，要求你安装g++编译器了。</p>
+<p>好了，就说到这，理清这些库与编译器之间的关系，相信会对你解决编译链接过程中遇到的错误起到一点帮助。</p>
+<p>如果你的编译器不支持一些新的C/C++特性，想升级gcc/g++, 这里也给出一个基于ubuntu系统的参考方法。</p>
+<p>添加ppa</p>
+<pre><code>sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+sudo apt-get update
+</code></pre><p>添加ppa，是因为你所用的ubuntu版本的更新源中可能并没有你想要的gcc/g++版本。</p>
+<p>安装新版gcc/g++</p>
+<pre><code>sudo apt-get install gcc-4.8
+sudo apt-get install g++-4.8
+</code></pre><p>可以到/usr/bin/gcc查看新安装的gcc,g++</p>
+<p>配置系统gcc/g++</p>
+<p>使用update-alternatives,统一更新gcc/g++</p>
+<pre><code>sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.6 60 --slave /usr/bin/g++ g++ /usr/bin/g++-4.6
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8 80 --slave /usr/bin/g++ g++ /usr/bin/g++-4.8
+sudo update-alternatives --config gcc
+</code></pre><p>数字优先级(如60，80)高的会被系统选择为默认的编译器,也可以执行第三条命令就是来手动配置系统的gcc,此处按照提示,选择4.8版本的即可。</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170301/compile-link/" target="_blank" rel="external">理清编译链接的那些事儿</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统内核/">系统内核<span class="article-category-count">11</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Compiler/">Compiler</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-kernel-malloc"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170301/kernel-malloc/">深入理解Linux内存分配</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170301/kernel-malloc/" class="article-date">
+	  <time datetime="2017-03-01T05:22:46.000Z" itemprop="datePublished">三月 1, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        
+
+          
+            <div class="entry-summary" style="margin-left:0;">
+            作者：Diting0x
+
+CSysSec注： 本文来自Diting0x的个人博客，主要介绍了Linux内核中一系列的内存分配函数及其原理转载本文请务必注明，文章出处：《深入理解Linux内核分配》与作者信息：Diting0x
+
+为了写一个用户层程序，你也许会声明一个全局变量，这个全局变量可能是一个int类型也可能是一个数组，而声明之后你有可能会先初始化它，也有可能放在之后用到它的时候再初始化。除此之外，你有可能会选择在函数内部去声明局部变量，又或者为变量动态申请内存。
+
+不管你在用户程序中采取哪种方式申请内存，这些都对应着不同的内存分配方式以及不同的数据段，如果再加上代码段，就构成了一个完整的进程。由此可见，一个完整的进程在内存空间中对应着不同的数据区，具体来说，对应着五种不同的数据区...
+          
+
+        
+          <p class="article-more-link">
+            <a href="/20170301/kernel-malloc/#more">阅读全文</a>
+          </p>
+        </div>
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统内核/">系统内核<span class="article-category-count">11</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-pvops"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170301/pvops/">Hook内核之PVOPS</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170301/pvops/" class="article-date">
+	  <time datetime="2017-03-01T05:19:20.000Z" itemprop="datePublished">三月 1, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本文来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/05/03/pvops/" target="_blank" rel="external">个人博客</a>，讲述在虚拟化平台下如何利用PVOPS框架来hook内核<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170301/pvops/" target="_blank" rel="external">Hook内核之PVOPS</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<p>pvops是做什么的？ 简单地说，hook kernel.<br>利用pvops你可以自定义自己的write_cr3函数，你可以修改页表，追踪页表更新的信息，而这些听起来非常底层的操作，利用pvops都变得简单起来。</p>
+<p>pvops接口来源于Xen项目，初衷是建立一个类虚拟化(para-virtualized）内核来适应于不同的hypervisor，当然也包括适应于非虚拟化平台。</p>
+<p>pvops将类虚拟化操作分成一系列结构：pv_time_ops,pv_cpu_ops,pv_mmu_ops,pv_lock_ops和pv_irq_ops。</p>
+<p>举个例子，x86系统中利用’MOV CR3’指令来加载页表。pvops将其替换为一个间接跳转到pv_mmu_ops -&gt; write_cr3函数。 每种虚拟化系统，包括本地x86平台，对这些函数都有自己的实现。 对于x86平台，这些函数的实现只是简单地对原始函数指令的封装。比如对于pv_mmu_ops -&gt; write_cr3函数，x86平台的具体实现为native_write_cr3函数：</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"></div><div class="line">static inline void native_write_cr3(unsigned long val)</div><div class="line">&#123;</div><div class="line">        asm volatile("mov %0,%%cr3": : "r" (val), "m" (__force_order));</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>pvops将本地底层的硬件指令通过pv_xxx_ops结构体替换为间接跳转函数。下面以pv_mmu_ops为例，详细分析其内部结构，pv_mmu_ops的定义为：(文中列出主要部分，完整定义，可参看<a href="http://lxr.free-electrons.com/source/arch/x86/kernel/paravirt.c#L395" target="_blank" rel="external">pv_mmu_ops结构定义</a>）</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div></pre></td><td class="code"><pre><div class="line"></div><div class="line"><span class="keyword">struct</span> pv_mmu_ops &#123;</div><div class="line">         <span class="function"><span class="keyword">unsigned</span> <span class="title">long</span> <span class="params">(*read_cr2)</span><span class="params">(<span class="keyword">void</span>)</span></span>;</div><div class="line">         <span class="keyword">void</span> (*write_cr2)(<span class="keyword">unsigned</span> <span class="keyword">long</span>);</div><div class="line"> </div><div class="line">         <span class="function"><span class="keyword">unsigned</span> <span class="title">long</span> <span class="params">(*read_cr3)</span><span class="params">(<span class="keyword">void</span>)</span></span>;</div><div class="line">         <span class="keyword">void</span> (*write_cr3)(<span class="keyword">unsigned</span> <span class="keyword">long</span>);</div><div class="line"> </div><div class="line">         <span class="comment">/*</span></div><div class="line">          * Hooks for intercepting the creation/use/destruction of an</div><div class="line">          * mm_struct.</div><div class="line">          */</div><div class="line">         <span class="keyword">void</span> (*activate_mm)(<span class="keyword">struct</span> mm_struct *prev,</div><div class="line">                             <span class="keyword">struct</span> mm_struct *next);</div><div class="line">         <span class="keyword">void</span> (*dup_mmap)(<span class="keyword">struct</span> mm_struct *oldmm,</div><div class="line">                          <span class="keyword">struct</span> mm_struct *mm);</div><div class="line">         <span class="keyword">void</span> (*exit_mmap)(<span class="keyword">struct</span> mm_struct *mm);</div><div class="line"> </div><div class="line"> </div><div class="line">         <span class="comment">/* TLB operations */</span></div><div class="line">         <span class="keyword">void</span> (*flush_tlb_user)(<span class="keyword">void</span>);</div><div class="line">         <span class="keyword">void</span> (*flush_tlb_kernel)(<span class="keyword">void</span>);</div><div class="line">         <span class="keyword">void</span> (*flush_tlb_single)(<span class="keyword">unsigned</span> <span class="keyword">long</span> addr);</div><div class="line">         <span class="keyword">void</span> (*flush_tlb_others)(<span class="keyword">const</span> <span class="keyword">struct</span> cpumask *cpus,</div><div class="line">                                  <span class="keyword">struct</span> mm_struct *mm,</div><div class="line">                                  <span class="keyword">unsigned</span> <span class="keyword">long</span> start,</div><div class="line">                                  <span class="keyword">unsigned</span> <span class="keyword">long</span> end);</div><div class="line"> </div><div class="line">         <span class="comment">/* Hooks for allocating and freeing a pagetable top-level */</span></div><div class="line">         <span class="keyword">int</span>  (*pgd_alloc)(<span class="keyword">struct</span> mm_struct *mm);</div><div class="line">         <span class="keyword">void</span> (*pgd_free)(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">pgd_t</span> *pgd);</div><div class="line"> </div><div class="line">         <span class="comment">/*</span></div><div class="line">          * Hooks for allocating/releasing pagetable pages when they're</div><div class="line">          * attached to a pagetable</div><div class="line">          */</div><div class="line">         <span class="keyword">void</span> (*alloc_pte)(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">unsigned</span> <span class="keyword">long</span> pfn);</div><div class="line">         <span class="keyword">void</span> (*alloc_pmd)(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">unsigned</span> <span class="keyword">long</span> pfn);</div><div class="line">         <span class="keyword">void</span> (*alloc_pud)(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">unsigned</span> <span class="keyword">long</span> pfn);</div><div class="line">         <span class="keyword">void</span> (*release_pte)(<span class="keyword">unsigned</span> <span class="keyword">long</span> pfn);</div><div class="line">         <span class="keyword">void</span> (*release_pmd)(<span class="keyword">unsigned</span> <span class="keyword">long</span> pfn);</div><div class="line">         <span class="keyword">void</span> (*release_pud)(<span class="keyword">unsigned</span> <span class="keyword">long</span> pfn);</div><div class="line"> </div><div class="line">         <span class="comment">/* Pagetable manipulation functions */</span></div><div class="line">         <span class="keyword">void</span> (*set_pte)(<span class="keyword">pte_t</span> *ptep, <span class="keyword">pte_t</span> pteval);</div><div class="line">         <span class="keyword">void</span> (*set_pte_at)(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">unsigned</span> <span class="keyword">long</span> addr,</div><div class="line">                            <span class="keyword">pte_t</span> *ptep, <span class="keyword">pte_t</span> pteval);</div><div class="line">         <span class="keyword">void</span> (*set_pmd)(<span class="keyword">pmd_t</span> *pmdp, <span class="keyword">pmd_t</span> pmdval);</div><div class="line">         <span class="keyword">void</span> (*set_pmd_at)(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">unsigned</span> <span class="keyword">long</span> addr,</div><div class="line">                            <span class="keyword">pmd_t</span> *pmdp, <span class="keyword">pmd_t</span> pmdval);</div><div class="line">         <span class="keyword">void</span> (*pte_update)(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">unsigned</span> <span class="keyword">long</span> addr,</div><div class="line">                            <span class="keyword">pte_t</span> *ptep);</div><div class="line"> </div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>比如说你要在分配页表项的时候hook (<em>write_cr3)函数, 可以将(</em>write_cr3)函数赋值为自己的自定义函数。 默认情况下，内核中pvops框架中提供的自定义函数如下： (完整可参看 <a href="http://lxr.free-electrons.com/source/arch/x86/kernel/paravirt.c#L395" target="_blank" rel="external">pv_mmu_ops函数定义</a>)</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">struct</span> pv_mmu_ops pv_mmu_ops &#123;</div><div class="line"></div><div class="line">.read_cr2 = native_read_cr2,</div><div class="line">.write_cr2 = native_write_cr2,</div><div class="line">.read_cr3 = native_read_cr3,</div><div class="line">.write_cr3 = native_write_cr3,</div><div class="line"> .alloc_pte = paravirt_nop,</div><div class="line">.alloc_pmd = paravirt_nop,</div><div class="line">.alloc_pud = paravirt_nop,</div><div class="line">.release_pte = paravirt_nop,</div><div class="line">.release_pmd = paravirt_nop,</div><div class="line">.release_pud = paravirt_nop,</div><div class="line"></div><div class="line">.set_pte = native_set_pte,</div><div class="line">.set_pte_at = native_set_pte_at,</div><div class="line">.set_pmd = native_set_pmd,</div><div class="line">.set_pmd_at = native_set_pmd_at,</div><div class="line">.pte_update = paravirt_nop,</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>接着定义的函数会被传入到这里：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"></div><div class="line"> <span class="function"><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keyword">void</span> <span class="title">write_cr3</span><span class="params">(<span class="keyword">struct</span> mm_struct *mm, <span class="keyword">unsigned</span> <span class="keyword">long</span> pfn)</span></span></div><div class="line"> &#123;</div><div class="line">         PVOP_VCALL2(pv_mmu_ops.write_cr3, mm, pfn);</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>至于PVOP_VCALL2具体做了什么，可以不必去关心。</p>
+<p>完</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170301/pvops/" target="_blank" rel="external">Hook内核之PVOPS</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统内核/">系统内核<span class="article-category-count">11</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-course-fengweizhang1"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -555,234 +763,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-migration-papers"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170225/migration-papers/">虚拟机迁移论文推荐</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170225/migration-papers/" class="article-date">
-	  <time datetime="2017-02-25T08:32:16.000Z" itemprop="datePublished">二月 25, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <hr>
-<p><strong>CSysSec注</strong>： 本系列文章旨在收集相关领域经典论文阅读列表，持续更新中。<br><strong>转载请注明：</strong> <a href="http://www.csyssec.org/20170225/migration-papers/" target="_blank" rel="external">《虚拟机迁移技术阅读列表》</a></p>
-<hr>
-<h3 id="Virtual-Machine-Migration-Reading-List"><a href="#Virtual-Machine-Migration-Reading-List" class="headerlink" title="Virtual Machine Migration Reading List"></a>Virtual Machine Migration Reading List</h3><ul>
-<li>Abe,Y.,Geambasu,R., Joshi, K., Satyanarayanan,M:Urgent virtual machine evictionwith enlightened post-copy. In: Proceedings of the 12th ACM SIGPLAN/SIGOPS International Conference on Virtual Execution Environments, pp. 51–64, Atlanta, GA, USA (2016)</li>
-<li>Nathan, S., Bellur, U.,Kulkarni, P.:.On selecting the right optimizations for virtual machinemigration. In: Proceedings of the12th ACM SIGPLAN/SIGOPS International Conference on Virtual Execution Environments, pp. 37–49, Atlanta, GA, USA (2016)</li>
-<li>Jo, C., Gustafsson, E., Son, J., Egger, B.: Efficient livemigration of virtual machines using shared stor- age. In:Proceedings of the 9thACMSIGPLAN/SIGOPSInternationalConference onVirtualExecution Environments, pp. 41–50, Houston, Texas, USA (2013)</li>
-<li>Song, X., Shi, J ., Liu, R., Yang, J., Chen, H.: Parallelizing live migration of virtual machines. In: Proceedings of the 9thACMSIGPLAN/SIGOPS International Conference onVirtual Execution Envi- ronments, pp. 85–96, Houston, Texas, USA (2013)</li>
-<li>Chiang, J.-H., Li, H. -L., Chiueh, T-C.: Introspection-based memory de-duplication and migration. In: Proceedings of the 9th ACM SIGPLAN/SIGOPS International Conference on Virtual Execution Environments, pp. 51-62, Houston, Texas, USA (2013)</li>
-<li>Svard,P.,Hudzia, B.,Tordsson, J.,Elmroth,E.:Evaluation of delta compression techniques for efficient live migration of large virtual machines. In: Proceedings of the 7th ACMSIG- PLAN/SIGOPS Inter- national Conference on Virtual Execution Environments, pp. 111–120, New York, NY, USA (2011)</li>
-<li>Zhang, X., Huo, Z.,Ma, J.,Meng, D.: Exploiting data de-duplication to accelerate live virtualmachine migration. In: Proceedings of IEEE International Conference on Cluster Computing, pp. 88–96 (2010)</li>
-<li>Liu, H., Jin, H., Liao, X., Hu, L., Yu, C.: Live migration of virtual machine based on full system trace and replay. In: Proceedings of the 18th ACM International Symposium on High Performance Distributed Computing, pp. 101–110, New York, NY, USA (2009)</li>
-<li>Jin, H., Deng, L., Wu, S., Shi, X., Pan X.: Live virtual machine migration with adaptive, memory compression. In: Proceedings of IEEE InternationalConference on Cluster Computing, pp. 1–10, New Orleans, LA, USA (2009)</li>
-<li>Hines, M.,Gopalan, K.: Post-copy based live virtualmachinemigration using adaptive pre-paging and dynamic self- ballooning. In: Proceedings of the 5th ACM SIGPLAN/SIGOPS International Confer- ence on Virtual execution environments, pp. 51–60, New York, NY, USA (2009)</li>
-<li>Clark, C., Fraser, K., Hand, S., Hansen, J., Jul, E., Limpach, C., Pratt, I.,Warfield, A.: Live migration of virtual machines. In: Proceedings of the 2nd Usenix Conference on Symposium on Networked Systems Design &amp; Implementation, pp. 273–286, Berkeley, CA, USA (2005)</li>
-</ul>
-<hr>
-<p><strong>转载请注明：</strong> <a href="http://www.csyssec.org/20170225/migration-papers/" target="_blank" rel="external">《虚拟机迁移技术阅读列表》</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机迁移/">虚拟机迁移<span class="article-category-count">3</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Migration/">Migration</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-byoungyounglee"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170224/byoungyounglee/">Purdue大学助理教授Byoungyoung Lee</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170224/byoungyounglee/" class="article-date">
-	  <time datetime="2017-02-24T06:21:39.000Z" itemprop="datePublished">二月 24, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <hr>
-<p><strong>CSysSec注</strong>： 本系列文章旨在介绍计算机系统与安全领域著名教授与学者</p>
-<p><strong>转载请注明</strong>： 文章出处：《<a href="http://www.csyssec.org/20170224/byoungyounglee/" target="_blank" rel="external">Purdue大学助理教授Byoungyoung Lee</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<h3 id="个人简介"><a href="#个人简介" class="headerlink" title="个人简介"></a>个人简介</h3><p>Byoungyoung Lee，11-16年在佐治亚理工大学获得博士学位，师从<a href="">Prof. Wenke Lee</a>和<a href="">Prof. Taesoo Kim</a>. 16年以助理教授身份加入Purdue大学计算机系.</p>
-<h3 id="研究兴趣"><a href="#研究兴趣" class="headerlink" title="研究兴趣"></a>研究兴趣</h3><p>集中关注系统安全：在操作系统、编译器以及应用程序中设计与实现安全的系统。在NDSS,Security,CCS,ATC发表多篇论文，曾获CSAW, DEFCON, Facebook, Usenix等多项大奖</p>
-<h3 id="论文标签"><a href="#论文标签" class="headerlink" title="论文标签"></a>论文标签</h3><p>[ASLR],[SGX],[Code reuse attack], [Use-after-free],[Data Flow Integrity]</p>
-<h3 id="个人主页"><a href="#个人主页" class="headerlink" title="个人主页"></a>个人主页</h3><p><a href="https://lifeasageek.github.io/" target="_blank" rel="external">Byoungyoung Lee</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/学术专家/">学术专家<span class="article-category-count">1</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Professor/">Professor</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-migration"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170224/migration/">云平台高可用之虚拟机迁移</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170224/migration/" class="article-date">
-	  <time datetime="2017-02-24T06:04:17.000Z" itemprop="datePublished">二月 24, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
-<p><strong>CSysSec注</strong>： 本文来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/01/03/highavailability-migration/" target="_blank" rel="external">个人博客</a>，主要介绍虚拟机迁移技术，包括虚拟机迁移主要算法以及在KVM/QEMU平台上的迁移细节。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170224/migration/" target="_blank" rel="external">云平台高可用之虚拟机迁移</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
-<blockquote>
-<ul>
-<li>什么是云平台高可用</li>
-<li>虚拟机迁移主要算法</li>
-<li>实现 Pre-copy</li>
-<li>思考</li>
-</ul>
-</blockquote>
-<h2 id="什么是云平台高可用"><a href="#什么是云平台高可用" class="headerlink" title="什么是云平台高可用"></a>什么是云平台高可用</h2><p>云，一个再熟悉不过的词了。大家都看到了云计算的商业价值，于是乎各大IT公司都纷纷提出自己的云计算服务，有Amozon的EC2，微软的Azure,谷歌的Google AppEngine,腾讯云，百度云，阿里云等。说到Google AppEngine，相信许多用goagent翻墙党都用过这个东西，但估计大家都只忙着使用goagent，却忽略了AppEngine其中提供的云服务。如今，云无处不在，从当今主流产品看，云平台需要满足以下几个需求：</p>
-<ul>
-<li>第一，满足多用户的大规模并发访问，想想2015年的双十一，官方数据表明Taobao每秒钟要处理14万订单交易，平均每天也有七八千万访客（具体数据待我问阿里朋友）</li>
-<li>第二，处理海量数据，14年，google平均每天要处理57.4亿次查询，处理的数据高达100PB；阿里云的大数据产品ODPS在6个小时内就能处理100PB的数据</li>
-<li>第三，提供可持续的服务，如今云平台的用户如此之大，分秒级的停机时间将影响数百万用户，导致数十万美元损失，不管从用户角度还是公司本身角度来看，停机时间过长都是不可容忍的</li>
-</ul>
-<p>针对需求一和需求二，当前云平台的解决方案大多是通过分布式协议及系统来组织管理大量的廉价设备，以提供良好的可扩展性，从而满足大量用户的高并发访问需求以及对海量数据的处理能力，这不在本文考虑范围之内，不多叙说。本文只针对第三个需求，提供可持续的服务，也就是云计算平台中常说的高可用性（high availability)。可用性的准确定义是，在需要的外部资源得到保证的前提下，系统在规定的条件和时间内处于可执行功能状态的能力，高可用则定义为用来保障系统可用性达到某一预定水平的系统设计和技术手段。目前，许多云服务提供商都声称自己的云平台能保证较高的可用性，但实际上，近年来云平台的失效事件频繁发生。具体事件，可搜索了解一下。</p>
-<p>虚拟化技术是云计算平台的核心支撑技术，虚拟机的强隔离性有效解决了资源的共享使用问题，大大支撑了云计算平台的资源聚合、负载均衡、节能、可扩展等特性。为保证云平台的高可用性，基于虚拟机备份思想的技术应运而生，也是当前云平台为保证高可用性的最主要途径。虚拟机备份思想，主要包括三个方面：</p>
-<ul>
-<li>第一，快照回滚（snapshot&amp;rollback)，将虚拟机备份状态保存在持久化存储系统中, 在虚拟机因上层软件或底层硬件故障失效后,可以加载备份状态并恢复到之前的运行 状态继续运行</li>
-<li>第二，热备技术（hot-standby)，将虚拟机执行状态实时传输到目的端计算节点,在检测到源计算节点失效后,目的端的虚拟机状态可立刻恢复并持续提供任务</li>
-<li>第三，虚拟机迁移（migration)，将虚拟机运行时状态从一台计算节点传输到另一台计算节点,保证虚拟机在源计算节点因失效或维护而停机时可以在目的端继续执行</li>
-</ul>
-<p>本文旨在讲解虚拟机迁移技术</p>
-<h2 id="虚拟机迁移主要算法"><a href="#虚拟机迁移主要算法" class="headerlink" title="虚拟机迁移主要算法"></a>虚拟机迁移主要算法</h2><p>目前运用最广泛最原始的算法是预拷贝（pre-copy)算法和后拷贝（post-copy)算法，Pre-copy算法也被集成在主流虚拟机平台中如Xen,KVM,VMWare的官方源码中, Post-copy虽还没被各主流虚拟机平台集成，但个人实现起来也不是什么难事。 下面主要介绍这两种算法：</p>
-<p>Pre-copy, 先引用顶会 <a href="https://www.usenix.org/legacy/event/nsdi05/tech/full_papers/clark/clark.pdf" target="_blank" rel="external">NSDI’05 Live Migration of Virtual Machines</a> 论文中的一张图，描述了pre-copy算法的时间线</p>
-<p><img src="http://7xppf1.com1.z0.glb.clouddn.com/precopy-step.png" alt="pre-copy steps"><br>简而言之，大致思想就是先迭代的迁移整个内存的所有页面，迭代过程中，如果页面有更新，则再迁移更新过的页面，直到满足一个条件让迭代过程收敛（这个条件可以自己根据不同情况合理设置），最后再迁移剩余的页面、cpu、寄存器等状态以及外部设备。<br>贴一个基于Qemu/kvm 1.1.2的pre-copy算法主要代码：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div><div class="line">73</div><div class="line">74</div><div class="line">75</div><div class="line">76</div><div class="line">77</div><div class="line">78</div><div class="line">79</div><div class="line">80</div><div class="line">81</div><div class="line">82</div><div class="line">83</div><div class="line">84</div><div class="line">85</div><div class="line">86</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">ram_save_live</span><span class="params">(QEMUFile *f, <span class="keyword">int</span> stage, <span class="keyword">void</span> *opaque)</span></span></div><div class="line">&#123;</div><div class="line">    <span class="keyword">ram_addr_t</span> addr;</div><div class="line">    <span class="keyword">uint64_t</span> bytes_transferred_last;</div><div class="line">    <span class="keyword">double</span> bwidth = <span class="number">0</span>;</div><div class="line">    <span class="keyword">uint64_t</span> expected_time = <span class="number">0</span>;</div><div class="line">    <span class="keyword">int</span> ret;</div><div class="line"></div><div class="line">    <span class="keyword">if</span> (stage &lt; <span class="number">0</span>) &#123;</div><div class="line">        memory_global_dirty_log_stop();</div><div class="line">        <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">    &#125;</div><div class="line"></div><div class="line">    memory_global_sync_dirty_bitmap(get_system_memory());</div><div class="line"></div><div class="line">    <span class="keyword">if</span> (stage == <span class="number">1</span>) &#123;</div><div class="line">        RAMBlock *block;</div><div class="line">        bytes_transferred = <span class="number">0</span>;</div><div class="line">        last_block = <span class="literal">NULL</span>;</div><div class="line">        last_offset = <span class="number">0</span>;</div><div class="line">        sort_ram_list();</div><div class="line"></div><div class="line">        <span class="comment">/* Make sure all dirty bits are set */</span></div><div class="line">        QLIST_FOREACH(block, &amp;ram_list.blocks, next) &#123;</div><div class="line">            <span class="keyword">for</span> (addr = <span class="number">0</span>; addr &lt; block-&gt;length; addr += TARGET_PAGE_SIZE) &#123;</div><div class="line">                <span class="keyword">if</span> (!memory_region_get_dirty(block-&gt;mr, addr, TARGET_PAGE_SIZE,</div><div class="line">                                             DIRTY_MEMORY_MIGRATION)) &#123;</div><div class="line">                    memory_region_set_dirty(block-&gt;mr, addr, TARGET_PAGE_SIZE);</div><div class="line">                &#125;</div><div class="line">            &#125;</div><div class="line">        &#125;</div><div class="line"></div><div class="line">        memory_global_dirty_log_start();</div><div class="line"></div><div class="line">        qemu_put_be64(f, ram_bytes_total() | RAM_SAVE_FLAG_MEM_SIZE);</div><div class="line"></div><div class="line">        QLIST_FOREACH(block, &amp;ram_list.blocks, next) &#123;</div><div class="line">            qemu_put_byte(f, <span class="built_in">strlen</span>(block-&gt;idstr));</div><div class="line">            qemu_put_buffer(f, (<span class="keyword">uint8_t</span> *)block-&gt;idstr, <span class="built_in">strlen</span>(block-&gt;idstr));</div><div class="line">            qemu_put_be64(f, block-&gt;length);</div><div class="line">        &#125;</div><div class="line">    &#125;</div><div class="line"></div><div class="line">    bytes_transferred_last = bytes_transferred;</div><div class="line">    bwidth = qemu_get_clock_ns(rt_clock);</div><div class="line"></div><div class="line">    <span class="keyword">while</span> ((ret = qemu_file_rate_limit(f)) == <span class="number">0</span>) &#123;</div><div class="line">        <span class="keyword">int</span> bytes_sent;</div><div class="line"></div><div class="line">        bytes_sent = ram_save_block(f);</div><div class="line">        bytes_transferred += bytes_sent;</div><div class="line">        <span class="keyword">if</span> (bytes_sent == <span class="number">0</span>) &#123; <span class="comment">/* no more blocks */</span></div><div class="line">            <span class="keyword">break</span>;</div><div class="line">        &#125;</div><div class="line">    &#125;</div><div class="line"></div><div class="line">    <span class="keyword">if</span> (ret &lt; <span class="number">0</span>) &#123;</div><div class="line">        <span class="keyword">return</span> ret;</div><div class="line">    &#125;</div><div class="line"></div><div class="line">    bwidth = qemu_get_clock_ns(rt_clock) - bwidth;</div><div class="line">    bwidth = (bytes_transferred - bytes_transferred_last) / bwidth;</div><div class="line"></div><div class="line">    <span class="comment">/* if we haven't transferred anything this round, force expected_time to a</span></div><div class="line">     * a very high value, but without crashing */</div><div class="line">    <span class="keyword">if</span> (bwidth == <span class="number">0</span>) &#123;</div><div class="line">        bwidth = <span class="number">0.000001</span>;</div><div class="line">    &#125;</div><div class="line"></div><div class="line">    <span class="comment">/* try transferring iterative blocks of memory */</span></div><div class="line">    <span class="keyword">if</span> (stage == <span class="number">3</span>) &#123;</div><div class="line">        <span class="keyword">int</span> bytes_sent;</div><div class="line"></div><div class="line">        <span class="comment">/* flush all remaining blocks regardless of rate limiting */</span></div><div class="line">        <span class="keyword">while</span> ((bytes_sent = ram_save_block(f)) != <span class="number">0</span>) &#123;</div><div class="line">            bytes_transferred += bytes_sent;</div><div class="line">        &#125;</div><div class="line">        memory_global_dirty_log_stop();</div><div class="line">    &#125;</div><div class="line"></div><div class="line">    qemu_put_be64(f, RAM_SAVE_FLAG_EOS);</div><div class="line"></div><div class="line">    expected_time = ram_save_remaining() * TARGET_PAGE_SIZE / bwidth;</div><div class="line"></div><div class="line">    <span class="keyword">return</span> (stage == <span class="number">2</span>) &amp;&amp; (expected_time &lt;= migrate_max_downtime());</div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<ul>
-<li>第一阶段，（14-42），代码所有的内存被标记为脏页并初始化页面更新追踪机制</li>
-<li>第二阶段，（47-55），如果页面被标记为脏页，则传输这些页面，页面脏位被重置，如果有程序修改页面，页面的脏位又可设置。一般来说，第二阶段是迭代过程最长的</li>
-<li>第三阶段，（71-79），那些修改过的却还没有来得及被传输到目的端的页面可以用来计算停机时间，设置一个目标停机时间，当达到这个值的时候，停止第二阶段的迭代过程，进入第三阶段，这时源虚拟机被暂停，将剩余的页面、CPU等状态一同传输到目的端，目的端再重新恢复虚拟机。</li>
-</ul>
-<p>pre-copy总体来说能带来很小的停机时间，但不太适合写密集型的负载，写密集型负载会大量更新页面，使得迭代过程结束后的剩余页面增多，延长停机时间。</p>
-<p>下面再来看看post-copy算法</p>
-<p>Post-copy算法的思想是先暂停源虚拟机，把能保证一次正常运行的最小运行集（所有的CPU状态）传输到目的端，目的端恢复虚拟机的执行，若需要内存页，则产生页错误，主动从源虚拟机中获取。Post-copy能保证尽可能的做到个内存也最多只传输一次，避免pre-copy算法迭代过程中的重复传输；由于不断地从源端获取丢失页，不可避免地带来性能损失。<a href="http://www.cs.binghamton.edu/~mhines/papers/vee2009.pdf" target="_blank" rel="external">VEE’09 Post-Copy Based Live Virtual Machine Migration Using Adaptive Pre-Paging and Dynamic Self-Ballooning</a> 利用了一种称之为<code>adaptive pre-paging</code>的方法来减少页错误，<code>adaptive pre-paging</code>能尽可能的预测出目的端下一个需要的页面，从而减少页面传输的次数。</p>
-<h2 id="实现-Pre-copy"><a href="#实现-Pre-copy" class="headerlink" title="实现 Pre-copy"></a>实现 Pre-copy</h2><p>这一章节主要讲述KVM/Qemu关于Pre-copy迁移算法的实现，基于qemu-kvm-1.1.2版本。首先看一下源码中的hmp-commands.hx文件内容：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div></pre></td><td class="code"><pre><div class="line">    &#123;</div><div class="line">        .name       = &quot;migrate&quot;,</div><div class="line">        .args_type  = &quot;detach:-d,blk:-b,inc:-i,uri:s&quot;,</div><div class="line">        .params     = &quot;[-d] [-b] [-i] uri&quot;,</div><div class="line">        .help       = &quot;migrate to URI (using -d to not wait for completion)&quot;</div><div class="line">		      &quot;\n\t\t\t -b for migration without shared storage with&quot;</div><div class="line">		      &quot; full copy of disk\n\t\t\t -i for migration without &quot;</div><div class="line">		      &quot;shared storage with incremental copy of disk &quot;</div><div class="line">		      &quot;(base image shared between src and destination)&quot;,</div><div class="line">        .mhandler.cmd = hmp_migrate,</div><div class="line">    &#125;,</div><div class="line"></div><div class="line"></div><div class="line">STEXI</div><div class="line">@item migrate [-d] [-b] [-i] @var&#123;uri&#125;</div><div class="line">@findex migrate</div><div class="line">Migrate to @var&#123;uri&#125; (using -d to not wait for completion).</div><div class="line">	-b for migration with full copy of disk</div><div class="line">	-i for migration with incremental copy of disk (base image is shared)</div><div class="line">ETEXI</div></pre></td></tr></table></figure>
-<p>每一个Qemu相关命令都需要在此文件中注册，如savevm,snapshot,migrate等，如果想自定义命令，亦是如此，关于如何修改KVM/Qemu源码，可以结合我的 <a href="http://www.chongh.wiki/blog/2016/01/01/kvm-qemu-bytalk/" target="_blank" rel="external">上一篇</a> 文章.</p>
-<p>Qemu-kvm利用<code>hmp-commands.hx</code>这个文件保存相应的命令行参数以及常量，然后使用<code>hxtool</code>工具产生对应的头文件<code>hmp-commands.h</code>到<code>./x86_64-softmmu</code>文件夹中，这个过程自动进行。注，STEXI与ETEXI之间的内容属于注释内容。从代码中可看到，与迁移命令migrate相对应的处理函数是<code>hmp_migrate</code>,从<code>hmp_migrate</code>函数开始，会依次调用<code>qmp_migrate</code>,<code>tcp_start_outgoing_migration</code>,<code>migrate_fd_connect</code>, <code>migrate_fd_put_ready</code>,具体可看源码，不一一详细介绍。</p>
-<p>重点说一下<code>migrate_fd_connect</code>函数与<code>migrate_fd_put_ready</code>函数，<br><code>migrate_fd_connect</code>函数主要调用了<code>qemu_savevm_state_begin</code>函数进行迁移工作的初始化工作（对应于前文说的迁移过程的第一阶段），而<code>migrate_fd_connect</code>函数主要调用了<code>qemu_savevm_state_iterate</code>函数（对应第二阶段）与<code>qemu_savevm_state_complete</code>函数（对应第三阶段），这里注意，此三个函数（<code>qemu_savevm_state_beging</code>,<code>qemu_savevm_state_iterate</code>,<code>qemu_savevm_state_complete</code>)里面代码结构非同类似，必有蹊跷，这里贴出其中的<code>qemu_savevm_state_iterate</code>函数：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">qemu_savevm_state_iterate</span><span class="params">(QEMUFile *f)</span></span></div><div class="line">&#123;</div><div class="line">    SaveStateEntry *se;</div><div class="line">    <span class="keyword">int</span> ret = <span class="number">1</span>;</div><div class="line"></div><div class="line">    QTAILQ_FOREACH(se, &amp;savevm_handlers, entry) &#123;</div><div class="line">        <span class="keyword">if</span> (se-&gt;save_live_state == <span class="literal">NULL</span>)</div><div class="line">            <span class="keyword">continue</span>;</div><div class="line"></div><div class="line">        <span class="comment">/* Section type */</span></div><div class="line">        qemu_put_byte(f, QEMU_VM_SECTION_PART);</div><div class="line">        qemu_put_be32(f, se-&gt;section_id);</div><div class="line"></div><div class="line">        ret = se-&gt;save_live_state(f, QEMU_VM_SECTION_PART, se-&gt;opaque);</div><div class="line">        <span class="keyword">if</span> (ret &lt;= <span class="number">0</span>) &#123;</div><div class="line">            <span class="comment">/* Do not proceed to the next vmstate before this one reported</span></div><div class="line">               completion of the current stage. This serializes the migration</div><div class="line">               and reduces the probability that a faster changing state is</div><div class="line">               synchronized over and over again. */</div><div class="line">            <span class="keyword">break</span>;</div><div class="line">        &#125;</div><div class="line">    &#125;</div><div class="line">    <span class="keyword">if</span> (ret != <span class="number">0</span>) &#123;</div><div class="line">        <span class="keyword">return</span> ret;</div><div class="line">    &#125;</div><div class="line">    ret = qemu_file_get_error(f);</div><div class="line">    <span class="keyword">if</span> (ret != <span class="number">0</span>) &#123;</div><div class="line">        qemu_savevm_state_cancel(f);</div><div class="line">    &#125;</div><div class="line">    <span class="keyword">return</span> ret;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<p>三个函数都会有一句代码</p>
-<pre><code>ret = se-&gt;save_live_state(f, QEMU_VM_SECTION_PART, se-&gt;opaque); 
-</code></pre><p>只是其中参数不同。</p>
-<p>这个save_live_state是什么？</p>
-<p>注意，非常重要，存在于虚拟机迁移的核心结构体SaveStateEntry中：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">typedef</span> <span class="keyword">struct</span> SaveStateEntry &#123;</div><div class="line">    QTAILQ_ENTRY(SaveStateEntry) entry;</div><div class="line">    <span class="keyword">char</span> idstr[<span class="number">256</span>];</div><div class="line">    <span class="keyword">int</span> instance_id;</div><div class="line">    <span class="keyword">int</span> alias_id;</div><div class="line">    <span class="keyword">int</span> version_id;</div><div class="line">    <span class="keyword">int</span> section_id;</div><div class="line">    SaveSetParamsHandler *set_params;</div><div class="line">    SaveLiveStateHandler *save_live_state;</div><div class="line">    SaveStateHandler *save_state;</div><div class="line">    LoadStateHandler *load_state;</div><div class="line">    <span class="keyword">const</span> VMStateDescription *vmsd;</div><div class="line">    <span class="keyword">void</span> *opaque;</div><div class="line">    CompatEntry *compat;</div><div class="line">    <span class="keyword">int</span> no_migrate;</div><div class="line">    <span class="keyword">int</span> is_ram;</div><div class="line">&#125; SaveStateEntry;</div></pre></td></tr></table></figure>
-<p>此结构体存储了虚拟机迁移的用到的所有数据结构，主要包括被传输设备的存储格式以及被调用的具体设备的迁移功能函数. 那指针 <code>*save_live_state</code> 到底做了什么，一一追踪可发现，在<code>vl.c</code>文件中的main函数中（整个qemu程序的开始),针对ram设备，可发现如下一段代码：</p>
-<pre><code>register_savevm_live(NULL, &quot;ram&quot;, 0, 4, NULL, ram_save_live, NULL, ram_load, NULL);
-</code></pre><p>正是<code>register_savem_live</code>函数将<code>ram_save_live</code>指针传递给了<code>save_live_state</code>，前文说了，<code>ram_save_live</code>便是真正执行迁移工作的函数，这里如果需要自定义迁移工作，修改<code>ram_save_live</code>注册到<code>register_savevm_live</code>函数中就行了。了解清楚这一连串的函数调用关系，便能彻底明白迁移的每一步工作。</p>
-<h2 id="思考"><a href="#思考" class="headerlink" title="思考"></a>思考</h2><p>本文重点介绍了pre-copy迁移算法的详细过程，并简单介绍了post-copy算法，两个算法各有优缺点，也都各有改进之处。虚拟机迁移的初衷是保证云平台的高可用性，高可用性要尽量减少提供服务的云主机的宕机时间即停机时间，在此同时，也应尽量减少迁移过程中带来的性能开销，就像post-copy若不断的缺页，虽保证了极短的宕机时间，但如果性能损失太大也是无法接受的。目前多数优化迁移算法的工作主要是采取减少传输的内存数据量来实现，而为了减少内存数据量，又有：</p>
-<ul>
-<li>压缩内存</li>
-<li>基于hash指纹找出相同或类似页面去重</li>
-<li>尽可能传输不必要的页面如free页面等</li>
-</ul>
-<p>除此之外，也有工作不传输整个内存页面，而是传输内存页面到外部设备的映射关系，目的端则靠此映射关系从外设获取数据。这里不一一列出相关论文，若有兴趣深入者，可自行查阅。笔者也有一部分工作提出了相应的思路与实现，之后会有专门文章作详细介绍。</p>
-<p>如果你对迁移算法的优化有什么看法或什么建议，可留言，也可直接与我邮件联系。</p>
-<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p>崔磊先生的博士论文</p>
-<p><a href="https://www.usenix.org/legacy/event/nsdi05/tech/full_papers/clark/clark.pdf" target="_blank" rel="external">NSDI’05 Live Migration of Virtual Machines</a></p>
-<p><a href="http://www.cs.binghamton.edu/~mhines/papers/vee2009.pdf" target="_blank" rel="external">VEE’09 Post-Copy Based Live Virtual Machine Migration Using Adaptive Pre-Paging and Dynamic Self-Ballooning</a> </p>
-<hr>
-<p><strong>CSysSec注</strong>： 本文来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/01/03/highavailability-migration/" target="_blank" rel="external">个人博客</a>，主要介绍虚拟机迁移技术，包括虚拟机迁移主要算法以及在KVM/QEMU平台上的迁移细节。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170224/migration/" target="_blank" rel="external">云平台高可用之虚拟机迁移</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机迁移/">虚拟机迁移<span class="article-category-count">3</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Migration/">Migration</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/QEMU/">QEMU</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -875,6 +855,18 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/cf-exception/">控制流分支指令上的控制流处理器异常(单步执行)</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -1038,31 +1030,19 @@
               <div class="widget-entry-summary" style="margin: 0;">
             
 
+              <h6 style="margin: 0;"><a href="/20170504/cloud-osv/">Unikernels为云设计的库操作系统(OSv)</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
               <h6 style="margin: 0;"><a href="/20170504/securekernel-design/">这是Linux内核中一种好的安全设计吗- thread_info和内核栈的联系</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/secureos/">安全操作系统内核设计：一种阻止恶意软件覆盖关键系统内核数据结构的思想</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/rop-jop/">一种运行时无感的方法防御ROP和JOP攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
@@ -1078,7 +1058,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">8</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">10</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">10</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -1088,7 +1068,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.43px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.14px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.71px;">Binary</a> <a href="/tags/CFI/" style="font-size: 10.71px;">CFI</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.14px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 12.86px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 17.86px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.14px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 14.29px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.71px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.71px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.57px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.43px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.14px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 12.86px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 12.86px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.71px;">Malware</a> <a href="/tags/Memory/" style="font-size: 12.86px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.43px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 12.14px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.71px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.43px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.71px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.14px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.71px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.43px;">Rootkit</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.71px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.71px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.57px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.43px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.29px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 12.14px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 12.86px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.43px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.14px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.71px;">Binary</a> <a href="/tags/CFI/" style="font-size: 11.43px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.14px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 12.86px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 17.14px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.14px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 14.29px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.71px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.71px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.57px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.43px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.86px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 12.86px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 12.86px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.71px;">Malware</a> <a href="/tags/Memory/" style="font-size: 12.86px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.43px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 12.14px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.71px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.43px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.71px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.14px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.71px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.43px;">Rootkit</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.71px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.71px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.57px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.43px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.29px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 12.14px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 12.86px;">XEN</a>
     </div>
   </div>
 
