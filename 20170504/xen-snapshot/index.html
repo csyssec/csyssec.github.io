@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>xen快照机制 | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="作者:Mr_buffoon转载请注明：原作者信息以及CSysSec
+
+虚拟机快照技术是指，在虚拟机运行过程中将虚拟机的完整运行状态，包括内存、磁盘、 CPU、网络等，保存到持久化的外部设备中，从而当虚拟机发生故障时可以通过备份的数据恢复虚拟机的运行。快照里面内存的快照又是非常重要非常关键的一部分。内存快照主要实现机制主要有三种：停机拷贝机制（stop-and-copy），预拷贝机制（pre-cop">
+<meta property="og:type" content="article">
+<meta property="og:title" content="XEN快照机制">
+<meta property="og:url" content="http://yoursite.com/20170504/xen-snapshot/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="作者:Mr_buffoon转载请注明：原作者信息以及CSysSec
+
+虚拟机快照技术是指，在虚拟机运行过程中将虚拟机的完整运行状态，包括内存、磁盘、 CPU、网络等，保存到持久化的外部设备中，从而当虚拟机发生故障时可以通过备份的数据恢复虚拟机的运行。快照里面内存的快照又是非常重要非常关键的一部分。内存快照主要实现机制主要有三种：停机拷贝机制（stop-and-copy），预拷贝机制（pre-cop">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/1-1.png">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/1-2.png">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/1-3.png">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/1-4.png">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/1-5.png">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/1-6.png">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/1-7.png">
+<meta property="og:updated_time" content="2017-05-04T07:15:43.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="XEN快照机制">
+<meta name="twitter:description" content="作者:Mr_buffoon转载请注明：原作者信息以及CSysSec
+
+虚拟机快照技术是指，在虚拟机运行过程中将虚拟机的完整运行状态，包括内存、磁盘、 CPU、网络等，保存到持久化的外部设备中，从而当虚拟机发生故障时可以通过备份的数据恢复虚拟机的运行。快照里面内存的快照又是非常重要非常关键的一部分。内存快照主要实现机制主要有三种：停机拷贝机制（stop-and-copy），预拷贝机制（pre-cop">
+<meta name="twitter:image" content="http://oij0laovn.bkt.clouddn.com/1-1.png">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">FROM 0 TO 1</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">系统结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/courses">名人课堂</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-xen-snapshot" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      XEN快照机制
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/xen-snapshot/" class="article-date">
+	  <time datetime="2017-05-04T07:13:37.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者:<a href="http://blog.csdn.net/mrbuffoon" target="_blank" rel="external">Mr_buffoon</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>虚拟机快照技术是指，在虚拟机运行过程中将虚拟机的完整运行状态，包括内存、磁盘、 CPU、网络等，保存到持久化的外部设备中，从而当虚拟机发生故障时可以通过备份的数据恢复虚拟机的运行。快照里面内存的快照又是非常重要非常关键的一部分。<br>内存快照主要实现机制主要有三种：停机拷贝机制（stop-and-copy），预拷贝机制（pre-copy），后拷贝机制（post-copy）。</p>
+<p><strong>停机拷贝机制（stop-and-copy）</strong><br>    在进行虚拟机快照的时刻要先将虚拟机挂起，然后在保存完虚拟机的完整状态后再恢复虚拟机的运行。<br>    这种方式简单，但使得整个快照过程的虚拟机停机时间完全取决于虚拟机的内存大小，而且该时间可以达到几十秒，严重影响虚拟机的性能。<br>    主流kvm、xen、vmware等都是基于停机拷贝方式实现快照功能。</p>
+<p><strong>预拷贝机制（pre-copy）</strong><br>    通过多轮迭代的方式对内存页面进行保存。每一轮保存自上一轮以来变脏的内存页面，当需要保存的内 存页面数量收敛到可以在一个较短的停机时间内完成保存的时刻，虚拟机停机。<br>    写密集时，收敛时间较长，多轮拷贝影响性能。“状态漂移”现象。<br>    Vnsnap等基于预拷贝机制实现快照。</p>
+<p><strong>后拷贝机制（post-copy）</strong><br>    首先停机，将cpu、设备等状态信息以及少量内存页面保存，然后开机，并在发生缺页中断时将相应内存页面保存。<br>    个人认为在分布式快照时优势比较明显。</p>
+<p>研究了一下xen快照部分的代码，其实xen-4.1.2的内存快照实现函数是跟迁移共用的，迁移已经是采用预拷贝机制来实现内存的迁移，所以说内存快照部分的代码其实是实现了预拷贝快照的。只是有一个参数live进行控制，live为1那么就是预拷贝，live为0就是停机拷贝。<br>快照部分函数入口及调用关系如下：</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-1.png" width="450"></a><br>    <figcaption></figcaption><br></figure><br> 注意，xen-4.4.1版本及以上使用xl命令，不再是之前版本的xm命令，也就是不再用xend，而是成了toolstack，所以上层入口有所变化，但是最底层的xc_domain_save()函数是不变的。<br><br><strong>预拷贝过程中关键数据:</strong><br><br><figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p><strong>预拷贝主流程：</strong></p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-3.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p><strong>页判定代码：</strong></p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-4.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-4.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p><strong>代码分析</strong><br>    页判定主要是判定该轮迭代要传送哪些页面。<br>    last_iter=1表示最后一轮迭代，置1后下一轮就进行停机拷贝。<br>    superpages=1表示全虚拟化，iter=1表示第一轮迭代，test_bit(n,xx)表示xx位图第n位的值，为1或0。<br><strong>判定规则</strong><br>    (1)to_send为1且to_skip为0的页<br>    (2)全虚拟化形式下第一轮迭代to_send为1的页面<br>    (3)最后一轮迭代to_send为1的页面<br>    (4)最后一轮迭代to_fix为1的页面<br>以上四种页面是本轮迭代需要传送的页面。</p>
+<p><strong>to_send、to_skip、to_fix置位时机</strong></p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-5.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-5.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>  to_fix是每一轮迭代页判断，当该页还没有被映射时就置为1。</p>
+<p><strong>页判定规则原理</strong><br>    to_send在第i-1轮迭代结束时候获取，收集的是第i-1轮迭代过程中变脏的页面，即第i轮可能拷贝页面的全集。    to_skip是第i轮迭代开始时获取，收集的是第i-1轮迭代结束到第i轮迭代开始这一短暂时间间隔内再次变脏的页面。    当to_skip为1表示这很短时间内某页面又再次被修改，也就可以认为该页频繁访问，为避免该页被重复拷贝，可以暂缓拷贝。<br>    第一轮迭代时候，to_send被初始化为全1，to_skip实际上是没有获取的，所以可以不必考虑to_skip。<br>    最后一轮迭代时候，to_fix、to_skip都需要一并拷贝，以保证内存拷贝的完整。</p>
+<p><strong>后处理代码：</strong></p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-6.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-6.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p><strong>代码分析</strong><br>    后处理主要是判定是否进行最后一轮迭代，如果是最后一轮置标记并申请停机。<br>    判定规则：<br>    如果     迭代次数iter大于等于预设最大迭代次数max_iters<br>    或者     本轮拷贝页面数与跳过页面数之和小于50<br>    或者      整个迭代过程拷贝总页面数大于迭代因子倍的P2M表对应页面数量<br>    则          进入停机拷贝。</p>
+<p>设备状态的拷贝是在XendCheckpoint.py中的save()函数中实现的。</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-7.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-7.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<hr>
+<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟机快照/">虚拟机快照<span class="article-category-count">1</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Snapshot/">Snapshot</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/XEN/">XEN</a></li></ul>
+
+      
+        
+	<div id="comment">
+	
+	<!-- 多说评论框 start -->
+	 <div class="ds-thread" data-thread-key="/20170504/xen-snapshot/" data-title="XEN快照机制" data-url="http://yoursite.com/20170504/xen-snapshot/"></div>
+	<!-- 多说评论框 end -->
+	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+	<script type="text/javascript">
+	var duoshuoQuery = {short_name:"csyssec"};
+	  (function() {
+	    var ds = document.createElement('script');
+	    ds.type = 'text/javascript';ds.async = true;
+	    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+	    ds.charset = 'UTF-8';
+	    (document.getElementsByTagName('head')[0] 
+	     || document.getElementsByTagName('body')[0]).appendChild(ds);
+	  })();
+	  </script>
+	<!-- 多说公共JS代码 end -->
+	
+	</div>
+	<link rel="stylesheet" href="/css/comment.css">
+
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+  
+    <a href="/20170504/xen-event/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">XEN事件通道机制及其实例</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+    <ol class="toc">无</ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+       <!--  自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a> --> 
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/courses" class="mobile-nav-link">Courses</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>

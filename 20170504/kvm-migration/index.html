@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>kvm迁移中脏页位图机制源码分析 | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="作者:Mr_buffoon转载请注明：原作者信息以及CSysSec
+
+我们都知道KVM支持在线迁移，而其在线迁移是通过内存预拷贝（迭代拷贝）机制来实现的。预拷贝的一个思想就是不断记录脏页并每一轮迭代拷贝脏页面，直至达到一定的条件就退出迭代，进行最后的停机拷贝。关于预拷贝的原理我之前有博客进行了简单分析，在这里就不重复说明了。那这篇文章主要是就其中的脏页记录机制从源码层面进行分析。
+这里分析的代码版">
+<meta property="og:type" content="article">
+<meta property="og:title" content="KVM迁移中脏页位图机制源码分析">
+<meta property="og:url" content="http://yoursite.com/20170504/kvm-migration/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="作者:Mr_buffoon转载请注明：原作者信息以及CSysSec
+
+我们都知道KVM支持在线迁移，而其在线迁移是通过内存预拷贝（迭代拷贝）机制来实现的。预拷贝的一个思想就是不断记录脏页并每一轮迭代拷贝脏页面，直至达到一定的条件就退出迭代，进行最后的停机拷贝。关于预拷贝的原理我之前有博客进行了简单分析，在这里就不重复说明了。那这篇文章主要是就其中的脏页记录机制从源码层面进行分析。
+这里分析的代码版">
+<meta property="og:updated_time" content="2017-05-04T07:15:55.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="KVM迁移中脏页位图机制源码分析">
+<meta name="twitter:description" content="作者:Mr_buffoon转载请注明：原作者信息以及CSysSec
+
+我们都知道KVM支持在线迁移，而其在线迁移是通过内存预拷贝（迭代拷贝）机制来实现的。预拷贝的一个思想就是不断记录脏页并每一轮迭代拷贝脏页面，直至达到一定的条件就退出迭代，进行最后的停机拷贝。关于预拷贝的原理我之前有博客进行了简单分析，在这里就不重复说明了。那这篇文章主要是就其中的脏页记录机制从源码层面进行分析。
+这里分析的代码版">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">FROM 0 TO 1</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">系统结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/courses">名人课堂</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-kvm-migration" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      KVM迁移中脏页位图机制源码分析
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/kvm-migration/" class="article-date">
+	  <time datetime="2017-05-04T07:09:30.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者:<a href="http://blog.csdn.net/mrbuffoon" target="_blank" rel="external">Mr_buffoon</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>我们都知道KVM支持在线迁移，而其在线迁移是通过内存预拷贝（迭代拷贝）机制来实现的。预拷贝的一个思想就是不断记录脏页并每一轮迭代拷贝脏页面，直至达到一定的条件就退出迭代，进行最后的停机拷贝。关于预拷贝的原理我之前有博客进行了简单分析，在这里就不重复说明了。那这篇文章主要是就其中的脏页记录机制从源码层面进行分析。</p>
+<p>这里分析的代码版本是kvm3.10.1和qemu 1.5.3。我们直接进入到迁移（migration）的线程函数Migration.c—&gt;migration_thread()，直接看代码：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">void</span> *<span class="title">migration_thread</span><span class="params">(<span class="keyword">void</span> *opaque)</span>  </span></div><div class="line">&#123;  </div><div class="line">    <span class="comment">//.........//省略部分代码  </span></div><div class="line">    qemu_savevm_state_begin(s-&gt;file, &amp;s-&gt;params);  </div><div class="line">  </div><div class="line">    <span class="keyword">while</span> (s-&gt;state == MIG_STATE_ACTIVE) &#123;  </div><div class="line">        <span class="keyword">int64_t</span> current_time;  </div><div class="line">        <span class="keyword">uint64_t</span> pending_size;  </div><div class="line">  </div><div class="line">        <span class="keyword">if</span> (!qemu_file_rate_limit(s-&gt;file)) &#123;  </div><div class="line">            DPRINTF(<span class="string">"iterate\n"</span>);  </div><div class="line">            pending_size = qemu_savevm_state_pending(s-&gt;file, max_size);  </div><div class="line">            DPRINTF(<span class="string">"pending size %lu max %lu\n"</span>, pending_size, max_size);  </div><div class="line">            <span class="keyword">if</span> (pending_size &amp;&amp; pending_size &gt;= max_size) &#123;  </div><div class="line">                qemu_savevm_state_iterate(s-&gt;file);  </div><div class="line">            &#125; <span class="keyword">else</span> &#123;  </div><div class="line">                <span class="comment">//..........//省略部分代码  </span></div><div class="line">                qemu_savevm_state_complete(s-&gt;file);  </div><div class="line">                <span class="comment">//..........//省略部分代码  </span></div><div class="line">            &#125;  </div><div class="line">        &#125;  </div><div class="line">  </div><div class="line">        <span class="comment">//..........//省略部分代码  </span></div><div class="line">          </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">    <span class="comment">//..........//省略部分代码  </span></div><div class="line">  </div><div class="line">    <span class="keyword">return</span> <span class="literal">NULL</span>;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p> 这个函数主要是完成迁移的初始化以及内存拷贝过程，这里先看一下里面qemu_savevm_state_begin()这个函数，他里面调用了save_live_setup这个函数指针，这个函数指针在之前被注册，指向了ram_save_setup()这个函数，具体的注册过程这里不进行分析，根据代码追一下可以追到的。ram_save_setup()主要是进行一些初始化的工作，下面看ram_save_setup()这个函数：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">int</span> <span class="title">ram_save_setup</span><span class="params">(QEMUFile *f, <span class="keyword">void</span> *opaque)</span>  </span></div><div class="line">&#123;  </div><div class="line">    ........  </div><div class="line">  </div><div class="line">    migration_bitmap = bitmap_new(ram_pages);  </div><div class="line">    bitmap_set(migration_bitmap, <span class="number">0</span>, ram_pages);  </div><div class="line">    migration_dirty_pages = ram_pages;  </div><div class="line">  </div><div class="line">    ........  </div><div class="line">  </div><div class="line">    memory_global_dirty_log_start();  </div><div class="line">    migration_bitmap_sync();  </div><div class="line">    ........  </div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>我们看这个函数，里面有一个migration_bitmap，没错，这就是迁移过程中用到的脏页位图，看其定义可以发现这是一个unsigned long *类型的全局变量，这个函数代码中首先给位图分配了内存空间，然后初始化为全0。memory_global_dirty_log_start()这个函数是开启脏页记录，实际上就是对内存页面进行写保护，这里略过不谈。migration_bitmap_sync()函数是同步脏页位图。那为什么要同步脏页位图呢？到底有多少脏页位图？我们下面来思考一下。</p>
+<p>我们知道脏页就是修改了内存页面，kvm可以认为是qemu和kvm内核两个层次，I/O主要是在qemu层次进行的，那qemu层可能会有大量的内存的修改。那kvm内核有没有页面的修改呢？实际上，kvm内核也可能发生少量的内存的修改。这样，kvm就需要在两个层次都要维持各自的脏页位图，并且要将这两层的位图进行同步。通过分析代码，kvm两个层次我们可以认为维护了三套位图：一是kvm内核维护的脏页位图memslot-&gt;dirty_bitmap，这个位图记录kvm内核中的脏页，kvm内核中所有的对内存页面的修改都会对应着修改这个位图的位；二是qemu层次维护的一个脏页位图ram_list_phys_dirty[]，qemu层次对内存页面的修改都会相应的修改这个位图的位，并且它还会通过系统调用获取内核中的位图，并进行同步修改；三是迁移时具体使用的位图migration_btimap，这也是在qemu层的，但是它是复制ram_list_phys_dirty[]的相应位。</p>
+<p><br><br>我们一项一项分析，先看看migration_bitmap是如何复制ram_list_phys_dirty[]的。这个复制的过程是在migration_bitmap_sync()函数实现的，先看代码：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">void</span> <span class="title">migration_bitmap_sync</span><span class="params">(<span class="keyword">void</span>)</span>  </span></div><div class="line">&#123;  </div><div class="line">    ........  </div><div class="line">    trace_migration_bitmap_sync_start();  </div><div class="line">    memory_global_sync_dirty_bitmap(get_system_memory());  </div><div class="line">  </div><div class="line">    QTAILQ_FOREACH(block, &amp;ram_list.blocks, next) &#123;  </div><div class="line">        <span class="keyword">for</span> (addr = <span class="number">0</span>; addr &lt; block-&gt;length; addr += TARGET_PAGE_SIZE) &#123;  </div><div class="line">            <span class="keyword">if</span> (memory_region_test_and_clear_dirty(block-&gt;mr,  </div><div class="line">                                                   addr, TARGET_PAGE_SIZE,  </div><div class="line">                                                   DIRTY_MEMORY_MIGRATION)) &#123;  </div><div class="line">                migration_bitmap_set_dirty(block-&gt;mr, addr);  </div><div class="line">            &#125;  </div><div class="line">        &#125;  </div><div class="line">    &#125;  </div><div class="line">    trace_migration_bitmap_sync_end(migration_dirty_pages  </div><div class="line">                                    - num_dirty_pages_init);  </div><div class="line">    ........  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>我们分析这个函数，里面memory_global_sync_dirty_bitmap()就是将kvm内核中的位图同步到ram_list_phys_dirty[]中，这样就保证了现在ram_list_phys_dirty[]是完整的位图。memory_region_test_and_clear_dirty()是判断ram_list_phys_dirty[]该位是否置位，如果置位则清位，migration_bitmap_set_dirty()这个函数则是将migration_bitmap置位，这两个函数结合，就将ram_list_phys_dirty[]中为1的位复制到了migration_bitmap中。这里引申一点做个说明，迁移时，如果migration_bitmap相应位为1，就将页面保存，并将migration_bitmap位图相应位清位（migration_bitmap_find_and_reset_dirty()函数来实现的），这样就能保证migration_bitmap的准确性和实时性。</p>
+<p>我们再分析一下前面提到的几个函数。memory_global_sync_dirty_bitmap()这里先不分析，后面在分析内核与qemu位图同步时候再分析。先看memory_region_test_and_clear_dirty()这个函数：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">bool</span> <span class="title">memory_region_test_and_clear_dirty</span><span class="params">(MemoryRegion *mr, hwaddr addr,  </span></span></div><div class="line">                                        hwaddr size, <span class="keyword">unsigned</span> client)  </div><div class="line">&#123;  </div><div class="line">    <span class="keyword">bool</span> ret;  </div><div class="line">    assert(mr-&gt;terminates);  </div><div class="line">    ret = cpu_physical_memory_get_dirty(mr-&gt;ram_addr + addr, size,  </div><div class="line">                                        <span class="number">1</span> &lt;&lt; client);  </div><div class="line">    <span class="keyword">if</span> (ret) &#123;  </div><div class="line">        cpu_physical_memory_reset_dirty(mr-&gt;ram_addr + addr,  </div><div class="line">                                        mr-&gt;ram_addr + addr + size,  </div><div class="line">                                        <span class="number">1</span> &lt;&lt; client);  </div><div class="line">    &#125;  </div><div class="line">    <span class="keyword">return</span> ret;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p> cpu_physical_memory_get_dirty()  —&gt;  cpu_physical_memory_get_dirty_flag()  –&gt;  return ram_list.phys_dirty[addr &gt;&gt; TARGET_PAGE_BITS]  这就获得了ram_list.phys_dirty[]相应位的数值，然后判断如果是1，执行cpu_physical_memory_reset_dirty()  –&gt;  cpu_physical_memory_mask_dirty_range()  –&gt;  cpu_physical_memory_clear_dirty_flags()  –&gt;  ram_list.phys_dirty[addr &gt;&gt; TARGET_PAGE_BITS] &amp;= mask  ，这就清了相应位。</p>
+<p>再看 migration_bitmap_set_dirty()这个函数：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keyword">bool</span> <span class="title">migration_bitmap_set_dirty</span><span class="params">(MemoryRegion *mr,  </span></span></div><div class="line">                                              <span class="keyword">ram_addr_t</span> offset)  </div><div class="line">&#123;  </div><div class="line">    <span class="keyword">bool</span> ret;  </div><div class="line">    <span class="keyword">int</span> nr = (mr-&gt;ram_addr + offset) &gt;&gt; TARGET_PAGE_BITS;  </div><div class="line">  </div><div class="line">    ret = test_and_set_bit(nr, migration_bitmap);  </div><div class="line">  </div><div class="line">    <span class="keyword">if</span> (!ret) &#123;  </div><div class="line">        migration_dirty_pages++;  </div><div class="line">    &#125;  </div><div class="line">    <span class="keyword">return</span> ret;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p> 里面test_and_set_bit(nr, migration_bitmap)，这个函数将migration_bitmap置位。</p>
+<p><br><br>分析完migration_bitmap是如何复制ram_list_phys_dirty[]的，我们再分析ram_list_phys_dirty[]是如何维护的。跟内核的同步这一部分前面也提到过，具体的后面讲解。这里就分析qemu中如何随时修改的这个位图。实际上修改这个位图的函数是cpu_physical_memory_set_dirty_flags()，qemu中大概有几十处直接或间接调用这个函数，在这里就不再一一讲解。</p>
+<p>最后我们分析内核与qemu位图的同步以及内核中位图的维护。内核中的位图是memslot-&gt;dirty_bitmap，它的修改是通过mark_page_dirty_in_slot()这个函数，而mark_page_dirty_in_slot()这个函数又被kvm_write_guest_cached()和mark_page_dirty()这两个函数调用，kvm中大概有十几处调用了这两个函数，这里也不一一讲解了。</p>
+<p>关于内核与qemu位图的同步我们前面提到过memory_global_sync_dirty_bitmap()这个函数，这个过程实际上是qemu主动发起的系统调用，具体分析其代码：<br>memory_global_sync_dirty_bitmap()  –&gt;  log_sync  –&gt;  kvm_log_sync() –&gt;  kvm_physical_sync_dirty_bitmap()，分析kvm_physical_sync_dirty_bitmap()这个函数，里面有几行代码如下：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line"><span class="built_in">memset</span>(d.dirty_bitmap, <span class="number">0</span>, allocated_size);  </div><div class="line">  </div><div class="line">d.slot = mem-&gt;slot;  </div><div class="line">  </div><div class="line"><span class="keyword">if</span> (kvm_vm_ioctl(s, KVM_GET_DIRTY_LOG, &amp;d) == <span class="number">-1</span>) &#123;  </div><div class="line">    DPRINTF(<span class="string">"ioctl failed %d\n"</span>, errno);  </div><div class="line">    ret = <span class="number">-1</span>;  </div><div class="line">    <span class="keyword">break</span>;  </div><div class="line">&#125;  </div><div class="line">  </div><div class="line">kvm_get_dirty_pages_log_range(section, d.dirty_bitmap);</div></pre></td></tr></table></figure></p>
+<p>  我们可以看到，这就是ioctl系统调用，命令参数是KVM_GET_DIRTY_LOG，将内核中的位图复制到了d.dirty_bitmap中，后面又利用d来修改了ram_list_phys_dirty[]。既然是系统调用，那我们追踪到kvm内核中来看，找到kvm_vm_ioctl()函数，其中一段代码：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">case</span> KVM_GET_DIRTY_LOG: &#123;  </div><div class="line">    <span class="keyword">struct</span> kvm_dirty_log <span class="built_in">log</span>;  </div><div class="line">  </div><div class="line">    r = -EFAULT;  </div><div class="line">    <span class="keyword">if</span> (copy_from_user(&amp;<span class="built_in">log</span>, argp, <span class="keyword">sizeof</span> <span class="built_in">log</span>))  </div><div class="line">        <span class="keyword">goto</span> out;  </div><div class="line">    r = kvm_vm_ioctl_get_dirty_log(kvm, &amp;<span class="built_in">log</span>);  </div><div class="line">    <span class="keyword">break</span>;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>这一段代码里看一下kvm_vm_ioctl_get_dirty_log()函数：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">kvm_vm_ioctl_get_dirty_log</span><span class="params">(<span class="keyword">struct</span> kvm *kvm, <span class="keyword">struct</span> kvm_dirty_log *<span class="built_in">log</span>)</span>  </span></div><div class="line">&#123;  </div><div class="line">    ......  </div><div class="line">  </div><div class="line">    dirty_bitmap = memslot-&gt;dirty_bitmap;  </div><div class="line">    r = -ENOENT;  </div><div class="line">    <span class="keyword">if</span> (!dirty_bitmap)  </div><div class="line">        <span class="keyword">goto</span> out;  </div><div class="line">  </div><div class="line">    n = kvm_dirty_bitmap_bytes(memslot);  </div><div class="line">  </div><div class="line">    dirty_bitmap_buffer = dirty_bitmap + n / <span class="keyword">sizeof</span>(<span class="keyword">long</span>);  </div><div class="line">    <span class="built_in">memset</span>(dirty_bitmap_buffer, <span class="number">0</span>, n);  </div><div class="line">  </div><div class="line">    spin_lock(&amp;kvm-&gt;mmu_lock);  </div><div class="line">  </div><div class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; n / <span class="keyword">sizeof</span>(<span class="keyword">long</span>); i++) &#123;  </div><div class="line">        <span class="keyword">unsigned</span> <span class="keyword">long</span> mask;  </div><div class="line">        <span class="keyword">gfn_t</span> offset;  </div><div class="line">  </div><div class="line">        <span class="keyword">if</span> (!dirty_bitmap[i])  </div><div class="line">            <span class="keyword">continue</span>;  </div><div class="line">  </div><div class="line">        is_dirty = <span class="literal">true</span>;  </div><div class="line">  </div><div class="line">        mask = xchg(&amp;dirty_bitmap[i], <span class="number">0</span>);  </div><div class="line">        dirty_bitmap_buffer[i] = mask;  </div><div class="line">  </div><div class="line">        offset = i * BITS_PER_LONG;  </div><div class="line">        kvm_mmu_write_protect_pt_masked(kvm, memslot, offset, mask);  </div><div class="line">    &#125;  </div><div class="line">    <span class="keyword">if</span> (is_dirty)  </div><div class="line">        kvm_flush_remote_tlbs(kvm);  </div><div class="line">  </div><div class="line">    spin_unlock(&amp;kvm-&gt;mmu_lock);  </div><div class="line">  </div><div class="line">    r = -EFAULT;  </div><div class="line">    <span class="keyword">if</span> (copy_to_user(<span class="built_in">log</span>-&gt;dirty_bitmap, dirty_bitmap_buffer, n))  </div><div class="line">        <span class="keyword">goto</span> out;  </div><div class="line">  </div><div class="line">    r = <span class="number">0</span>;  </div><div class="line">out:  </div><div class="line">    mutex_unlock(&amp;kvm-&gt;slots_lock);  </div><div class="line">    <span class="keyword">return</span> r;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>这个函数实际上是将memslot-&gt;dirty_bitmap最终通过copy_to_user()函数复制到了qemu层。这就实现了两个层次的位图同步。</p>
+<hr>
+<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟机迁移/">虚拟机迁移<span class="article-category-count">3</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Migration/">Migration</a></li></ul>
+
+      
+        
+	<div id="comment">
+	
+	<!-- 多说评论框 start -->
+	 <div class="ds-thread" data-thread-key="/20170504/kvm-migration/" data-title="KVM迁移中脏页位图机制源码分析" data-url="http://yoursite.com/20170504/kvm-migration/"></div>
+	<!-- 多说评论框 end -->
+	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+	<script type="text/javascript">
+	var duoshuoQuery = {short_name:"csyssec"};
+	  (function() {
+	    var ds = document.createElement('script');
+	    ds.type = 'text/javascript';ds.async = true;
+	    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+	    ds.charset = 'UTF-8';
+	    (document.getElementsByTagName('head')[0] 
+	     || document.getElementsByTagName('body')[0]).appendChild(ds);
+	  })();
+	  </script>
+	<!-- 多说公共JS代码 end -->
+	
+	</div>
+	<link rel="stylesheet" href="/css/comment.css">
+
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/20170504/xen-event/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">上一篇</strong>
+      <div class="article-nav-title">
+        
+          XEN事件通道机制及其实例
+        
+      </div>
+    </a>
+  
+  
+    <a href="/20170504/kvm-exception/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">KVM异常处理流程源码简要分析</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+    <ol class="toc">无</ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+       <!--  自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a> --> 
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/courses" class="mobile-nav-link">Courses</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>
