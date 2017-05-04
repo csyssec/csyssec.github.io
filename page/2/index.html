@@ -106,123 +106,6 @@
         
           <section id="main">
   
-    <article id="post-unmasking"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170401/unmasking/">揭开内核漏洞利用的神秘面纱</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170401/unmasking/" class="article-date">
-	  <time datetime="2017-04-01T01:27:11.000Z" itemprop="datePublished">四月 1, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Source: <a href="https://www.lastline.com/labsblog/unmasking-kernel-exploits/" target="_blank" rel="external">https://www.lastline.com/labsblog/unmasking-kernel-exploits/</a></p>
-<p>Author: <a href="https://www.lastline.com/author/roman/" target="_blank" rel="external">Roman Vasilenko</a></p>
-<pre><code>Roman Vasilenko started his career as a Virus Analyst     in 2007 at Dr. Web Ltd. From December 2008 to     November 2012 he worked in the Anti-Malware Research Department of Kaspersky Labs as a Research Developer/Senior Research Developer. Roman is the author of two patents: “System and Method of Files Comparison Based on Functionality Patterns” (Russia) and “System and Method for Detecting Unknown Malware” (Russia/USA). He was also a Senior Lecturer in the Department of Mathematics &amp; Mechanics, Saint Petersburg State University, Russia, where he taught a special course titled “Introduction to Malware Research” in 2011/2012. In November 2012, Roman moved to California to join Lastline, Inc. as an Internet Security Analyst. Since 2013 he has held a System Engineer position. His specialties are design and development of the LLAMA engine (Lastline Automated Malware Analysis), in-depth analysis of malicious techniques and malware families, targeted attack analysis, and development of new advanced algorithms of malware detection.
-</code></pre><hr>
-<p>A large set of publicly disclosed Advanced Persistent Threat (APT) and nation state attacks use sophisticated malware (e.g Turla, Duqu, Equation Group, Duqu2, etc.) that make use of at least one component running hidden inside the kernel of the Microsoft Windows operating system (OS). There, malware remains hidden from security solutions, and can abuse the highest privileges available on a computer system to achieve the attacker’s evil objectives.</p>
-<p>With the ability to run in the OS kernel, malicious code has started to evade automated malware analysis solutions (sandboxes) that have limited visibility into actions executed by malware in the context of the kernel. This new wave of kernel-malware makes the ability to provide in-depth kernel-mode analysis a key requirement for effective advanced malware analysis solutions.</p>
-<p>In two recent posts <a href="https://www.lastline.com/labsblog/high-resolution-dynamic-analysis-of-windows-kernel-rootkits/" target="_blank" rel="external">1</a>, <a href="https://www.lastline.com/labsblog/dissecting-turla-rootkit-malware-using-dynamic-analysis/" target="_blank" rel="external">2</a> we have looked at how we can analyze and detect these advanced threats, but we have not yet described how attackers manage to inject their code into the Windows kernel. In this post, we highlight some of the difficulties attackers face, and how security researchers and professionals can use <a href="http://lastline.wpengine.com/labsblog/dyre-malware-does-it-play-nice-in-your-sandbox" target="_blank" rel="external">full-system emulation</a> to analyze, dissect, and detect zero-day kernel exploitation techniques in an automated way.</p>
-<h2 id="Exploiting-Microsoft-Windows-Kernels"><a href="#Exploiting-Microsoft-Windows-Kernels" class="headerlink" title="Exploiting Microsoft Windows Kernels"></a>Exploiting Microsoft Windows Kernels</h2><p>All modern versions of Microsoft Windows enable <a href="https://support.microsoft.com/zh-cn/products/windows" target="_blank" rel="external">User Account Control (UAC)</a> by default, which grants limited privileges to user mode processes, restricting them in the actions they can perform on a host. For example, by default a program cannot access critical system components, modify the system registry, or load new drivers into the kernel, even if the driver is signed by a trusted entity.</p>
-<p>To regain the privileges attackers need to achieve their goals, kernel exploits have become one of the major components in modern attacks. Since we first highlighted malware running in the kernel as a rising threat and announced our own new <a href="https://www.lastline.com/press/deep-kernel-malware-analysis-launch-industry-first/" target="_blank" rel="external">deep kernel malware analysis</a> capabilities at SXSW Interactive in March, several kernel mode exploits have made headlines including:</p>
-<ul>
-<li>As revealed by <a href="https://securelist.com/blog/research/70504/the-mystery-of-duqu-2-0-a-sophisticated-cyberespionage-actor-returns/" target="_blank" rel="external">Kaspersky Lab</a> this month, Duqu2 uses a <a href="http://blog.trendmicro.com/trendlabs-security-intelligence/analysis-of-cve-2015-2360-duqu-2-0-zero-day-vulnerability/" target="_blank" rel="external">kernel mode exploit</a> for CVE-2015-2360 to load its kernel mode component.</li>
-<li>One of the most recent targeted attacks against NATO members and the White House, termed <a href="http://blog.trendmicro.com/trendlabs-security-intelligence/operation-pawn-storm-ramps-up-its-activities-targets-nato-white-house/" target="_blank" rel="external">Operation Pawn Storm</a>, attracted massive media attention in April. The malware used in this campaign was equipped with a <a href="(http://www.securityweek.com/russian-hackers-exploited-windows-zero-day-spy-nato-eu-other-high-profile-targets">kernel exploit for CVE-2015-1701</a>).</li>
-<li>Also reported in April, <a href="http://lastline.wpengine.com/labsblog/dissecting-turla-rootkit-malware-using-dynamic-analysis" target="_blank" rel="external">Turla</a> uses <a href="http://blog.talosintelligence.com/2014/04/snake-campaign-few-words-about-uroburos.html" target="_blank" rel="external">two exploits</a> for [CVE-2009-1123 and CVE-2010-0232].<br>And previously in February the well known, possibly government-sponsored, Equation Group APT was reported to have used malware using up to 10 exploits, <a href="https://securelist.com/blog/research/68750/equation-the-death-star-of-malware-galaxy/" target="_blank" rel="external">3 of them confirmed</a> for CVE-2009-1124, CVE-2011-3402, and CVE-2013-3879.</li>
-</ul>
-<p>But well-funded, government-sponsored attacks aren’t the only ones that leverage kernel exploits. Attacking the kernel has become increasingly common, as can be seen by looking at prominent malware families making use of kernel exploits:</p>
-<ul>
-<li><a href="http://www.malwaredigger.com/2015/05/rovnix-dropper-analysis.html" target="_blank" rel="external">Cidox/Rovnix Bootkit</a> uses exploits for CVE-2013-3660 and CVE-2014-4113.</li>
-<li><a href="http://blog.trendmicro.com/trendlabs-security-intelligence/an-analysis-of-a-windows-kernel-mode-vulnerability-cve-2014-4113/" target="_blank" rel="external">Sandworm</a> uses exploits for CVE-2014-4148 and CVE-2014-4113.</li>
-<li><a href="https://www.welivesecurity.com/2013/08/27/the-powerloader-64-bit-update-based-on-leaked-exploits/" target="_blank" rel="external">PowerLoader</a> uses exploits for CVE-2013-3660, CVE-2012-1864, and CVE-2012-0217.<br>… just to name a few.</li>
-</ul>
-<p>As one can see, the ability to analyze and identify compromises of the operating system kernel has become crucial in detecting modern threats – not only, but especially with advanced, targeted attacks.</p>
-<h2 id="Anatomy-of-Kernel-Exploits"><a href="#Anatomy-of-Kernel-Exploits" class="headerlink" title="Anatomy of Kernel Exploits"></a>Anatomy of Kernel Exploits</h2><p>Before we focus on how we detect kernel exploitation, let’s first dive into how a typical kernel exploit works. Usually, exploitation happens in four stages: host preparation, exploit-code setup, kernel vulnerability exploitation, and payload execution.</p>
-<p><strong>Host Preparation:</strong> In the first phase, the host preparation phase, the attacker tricks the user into executing a piece of user-mode code. This can happen through a conventional exploit, such as a drive-by-download exploit, or by executing the attack as part of user-mode malware already running on a target machine. Increasingly, this user-mode malware is tailor-made to evade traditional sandboxes through a number of techniques <a href="http://lastline.wpengine.com/labsblog/evasive-malware-gone-mainstream" target="_blank" rel="external">we’ve covered before</a>.</p>
-<p><strong>Exploit-code Setup:</strong> Next, in the exploit-code setup phase, the attacker prepares the shellcode that is later invoked using the kernel exploit. To perform any actions in the context of the kernel, the exploit needs to know information about the kernel internals, such as:</p>
-<ul>
-<li>the location or offsets of critical structures in kernel memory, or</li>
-<li>the addresses of kernel API functions.</li>
-</ul>
-<p>Windows kernel modules may vary between different versions of the operating system, between different service pack levels, and even when different system updates have been installed. Thus, an exploit must adapt to these changes. To do this, the user-mode setup code typically opens a kernel image from disk to analyze and find the necessary data.</p>
-<p>At the same time, the setup code can find custom OEM drivers available on the system, which can provide additional vulnerabilities to exploit. To this end, the attacker can search for the presence of drivers and probe for devices available on the system.</p>
-<p><strong>Vulnerability Exploitation:</strong> Once the attacker has gathered all necessary information to make an exploit possible, the kernel vulnerability is exploited. There are two types of exploits that we have to address, depending on the location of the shellcode that is executed: execution of user-space shellcode with kernel privileges (i.e., CPL/Current Privilege Level = 0) versus execution of kernel-space shellcode.</p>
-<p>User-space shellcode is easier to implement, because it only requires overwriting a small amount of data in kernel memory. In many cases, this memory is a function or function-pointer causing the next kernel thread executing this function to jump to the user-space memory prepared with the shellcode.</p>
-<p>The advantage of this type of shellcode is that there is no limitation on the size of the shellcode (because it doesn’t need to be copied to kernel memory). However, this type of exploit does not work in Windows 8 or later, because of a new security feature known as <a href="http://blog.ptsecurity.com/2012/09/intel-smep-overview-and-partial-bypass.html" target="_blank" rel="external">Supervisor Mode Execution Prevention (SMEP)</a>, which prevents execution of code located in user-mode pages with CPL of 0.</p>
-<p>Kernel-space shellcode bypasses SMEP but it is more complicated: it requires copying shellcode to kernel memory, but only very few (known) vulnerabilities allow overwriting large amounts of data in the kernel.</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/unmasking1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/unmasking1.png" width="450"></a><br>    <figcaption>Shellcode type overview</figcaption><br></figure>
-
-
-<p>Because of this, attackers sometimes use a hybrid approach combining both shellcode types: in a first step, using a small shellcode, the attacker disables SMEP, followed by executing a second, larger shellcode in user memory with CPL of 0.</p>
-<p><strong>Payload Execution:</strong> Once the shellcode has successfully been executed, the attacker is able to run any payload in the context of the kernel, that is, without any restrictions imposed by the operating system.</p>
-<p>In exploits against Microsoft Windows kernels, we typically find two types of payloads: In the first type, the attacker tries to elevate privileges of the user-mode process. The idea is to run an entire process, not just a small piece of shellcode, with elevated privileges, which greatly simplifies writing complex payloads.</p>
-<p>To elevate privileges, the payload can copy the access token of the System process and overwrite the current process’ access token. This gives the process the same level of permissions as those granted by the original process’ token. To do this, the payload needs to:</p>
-<ul>
-<li>enumerate <a href="https://msdn.microsoft.com/en-us/library/windows/hardware/ff544273(v=vs.85" target="_blank" rel="external">EPROCESS</a>.aspx) structures in kernel memory,</li>
-<li>find the System process, and</li>
-<li>copy the pointer to the token structure inside the EPROCESS structure of the System process to the current process’ EPROCESS structure.</li>
-</ul>
-<p>By stealing a pointer to the System process token structure, the process receives all <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/aa379571(v=vs.85" target="_blank" rel="external">Security Identifiers</a>.aspx) (SIDs) of that process, including the SID…</p>
-<p>SID: <strong>S-1-5-18</strong><br>Name: Local System<br>Description: A service account that is used by the operating system.</p>
-<p>…which allows performing any actions with system process privileges.</p>
-<p>The second type of payload we frequently find is more sophisticated: instead of elevating privileges of the user-mode process, the payload contains code for loading a malicious driver directly into kernel memory without the use of system APIs.</p>
-<h2 id="Analysis-of-Kernel-Exploit"><a href="#Analysis-of-Kernel-Exploit" class="headerlink" title="Analysis of Kernel Exploit"></a>Analysis of Kernel Exploit</h2><p>An interesting finding that emerged from our research is that some of the attacks are not using their own version of the setup/shellcode/payload functionality. Instead, the attackers use proof-of-concept implementations available on the Internet (sometimes provided for free by researchers, other times sold by specialized exploit groups). Here, the payload invokes a malware process after elevating privileges, providing the attacker with a simple and reliable way to bypass the kernel’s security restrictions.</p>
-<p>This allows traditional security solution to claim “kernel exploit detection” capabilities, because the proof-of-concept implementations can be trivially detected using signature-based approaches. Clearly, sophisticated and well-funded attack groups can leverage zero-day exploits – that is, exploits that have not been publicly documented – as part of their attack, and <a href="http://lastline.wpengine.com/labsblog/malware-in-the-wild-evolving-to-evade-detection" target="_blank" rel="external">use evasive code</a> to identify or bypass traditional analysis systems before launching the kernel exploit.</p>
-<p>As a consequence, the analysis system must not only be able to handle evasive code, but also to inspect code run as part of the operating system kernel. Only then can it correctly identify the malicious behavior and thwart the attack.</p>
-<h2 id="Unmasking-the-Cidox-Rovnix-Bootkit"><a href="#Unmasking-the-Cidox-Rovnix-Bootkit" class="headerlink" title="Unmasking the Cidox/Rovnix Bootkit"></a>Unmasking the Cidox/Rovnix Bootkit</h2><p>Our system performs in-depth analysis of all stages of kernel exploits, as one can see by looking at the following example (found in the wild) of the Cidox/Rovnix Bootkit</p>
-<p>MD5: d3d013aaa07c6217fda7a8a139c42b60<br>SHA1: c2255e187fc08109ee3da450bba1e176b7583384</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/unmasking2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/unmasking2.png" width="450"></a><br>    <figcaption>Analysis overview for Cidox/Rovnix bootkit</figcaption><br></figure>
-
-<p>As we can see, every stage of the kernel exploit discussed above is already highlighted in the analysis overview.</p>
-<p>But the analysis capabilities of our system go well beyond that! As we already covered in <a href="https://www.lastline.com/labsblog/dissecting-payload-injection-using-llama-process-snapshots/" target="_blank" rel="external">previous blog posts</a>, the Lastline analysis system automatically extracts full-process snapshots containing points of interest for subsequent analysis by a security analyst or researcher.</p>
-<p>Our solution tracks the execution of untrusted memory in user- as well as kernel-mode. As a result, the system sees all code fragments associated with the malicious behavior executed as part of the exploit, which can be downloaded as part of the analysis result, and be imported into off-the-shelf tools, such as IDA Pro.</p>
-<p>For example, the process-snapshot extracted as part of the Cidox/Rovnix Bootkit exploit analysis shows the malicious payload executed in the context of the kernel:</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/unmasking3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/unmasking3.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-
-<p>ere, the code searches for the EPROCESS structure of the System process (using its process-ID 4) as well as for the entry of the malicious process using <a href="https://msdn.microsoft.com/en-us/library/windows/hardware/ff551920(v=vs.85" target="_blank" rel="external">PsLookupProcessByProcessId</a>.aspx). Once found, it duplicates the EPROCESS::Token from System to the malicious process, giving it Local System privileges.</p>
-<p>The extracted process-snapshot not only contains all the relevant code-sections (and is stripped from unrelated, benign code cluttering the snapshot), but the system also highlights code areas of interest to guide the analyst in where to look.</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/unmasking4.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/unmasking4.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-<h2 id="Summary"><a href="#Summary" class="headerlink" title="Summary"></a>Summary</h2><p>Kernel exploits are not only part of advanced and sophisticated attacks, but are now also used in many mainstream malware families. As a result, security solutions and analysis sandboxes must be able to provide deep insights into the execution of kernel code to identify and address these types of threats.</p>
-<p>Lastline’s high-resolution sandbox uses a full-system emulation approach that is able to track malicious code running in user- as well as kernel-mode. This provides the analysis system with a complete picture of the malicious behavior exhibited by malware, to catch even the latest zero-day attacks, and provide valuable insights for security professionals and researchers alike.</p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">9</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
     <article id="post-raid"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -1301,11 +1184,79 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
 <!-- Table of Contents -->
 
   
+    <article id="post-phd-expectations-realities"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170312/phd-expectations-realities/">PhD expectations and reality</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170312/phd-expectations-realities/" class="article-date">
+	  <time datetime="2017-03-12T11:42:48.000Z" itemprop="datePublished">三月 12, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>来源： <a href="http://nebelwelt.net/blog/20120921-phd-expectations-and-reality.html" target="_blank" rel="external">http://nebelwelt.net/blog/20120921-phd-expectations-and-reality.html</a><br>作者：<a href="http://nebelwelt.net/" target="_blank" rel="external">Mathias Payer</a></p>
+<hr>
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>Deciding to do a PhD is a huge commitment as you are just dedicating a couple of years of your life to a single cause. When I decided to do a PhD in 2006 I was not completely sure what would expect me. I just finished my master of science (MSc) at ETH Zurich and I knew that I really liked working on the research project that I chose. On the other hand I worked in programming and web development for the last couple of years to finance my studies and I discovered that only doing project/programming work is too boring for me. I had no clear picture how the PhD would be like, but I assumed that it would be a combination of a continuation of the research I did during my master thesis, writing papers, going to conferences to present your research, and in the end writing a thesis that proofs your thesis statement.</p>
+<p>Many others before me have already blogged or written books about the life as a PhD student, how to carry out a PhD, defined what research, yet I think that I can add my two cents to the existing stories. My experiences are still fresh (I started my PhD in 2006, defended beginning of May 2012, and started my PostDoc here at UC Berkeley in September 2012) and I hope that I can give a good description about the qualitative aspects of a PhD.</p>
+<h2 id="The-three-phases-of-a-research-PhD"><a href="#The-three-phases-of-a-research-PhD" class="headerlink" title="The three phases of a research PhD"></a>The three phases of a research PhD</h2><p>In my time as a PhD student at ETH Zurich I had uncounted discussions with peers, assistant professors, professors, researchers, and people related to academia. During these discussions we discovered that a PhD can be segmented into three basic phases: the first phase identifies the research topic and bootstraps the student; the second phase is the productive phase where the research bears fruits and is turned into papers (or at least communicated to other people); and the last phase consists in wrapping up, writing the thesis, and finally the defense. Every successful PhD student goes through three phases during his PhD. Each phase has different requirements and relies on different personality aspects. The phases follow after each other but there is no clear transition from one phase to the other yet one knows if the transition completed.</p>
+<p>The search for the holy grail: ramping up and finding your topic</p>
+<p>The first phase of a PhD is like the ‘get to know each other’ phase at the beginning of a relationship. You don’t really know what to expect but you are interested and you want to explore. Yes, there are some peculiarities but you are not too concerned about that right now. In this first phase you dig into the field that is interesting to you and you start reading up about prior research approaches about the problem you want to tackle. Some ideas start to form in your head and you decide on a topic for your thesis. In more practical research areas you start building prototypes and you execute small tests; in more theoretical areas you try to come up with some theorems and you have a rough idea about the general topic.</p>
+<p>Depending on your adviser he or she will restrict your search in one way or another. The most restrictive adviser tells you exactly what you should do (sometimes they have a grant proposal for a specific project and/or only need a code monkey to implement their grand idea) other advisers let you run free and let you come up with your own idea in a (sub-)field. Both extremes have their advantages and the kind of adviser that is best for you is basically an optimization problem that you need to solve for yourself.</p>
+<p>On one end of the scale you are given a topic by your adviser. This approach ensures that your adviser cares/should care deeply about your project and it gives you a head start, on the other hand you’ll have to make up for this pre-selection and you’ll have a harder time to bring in your own (research) ideas into the already existing project. On the other end you can choose your topic in an open void. It is up to you to make your adviser care about the project and you need to come up with the core idea. This great opportunity usually results in additional time needed to complete this phase. In the real world your adviser will usually set the limits anywhere between these two extremes.</p>
+<p>From my experience I would say that the average student stays in this phase from one to three years. I was lucky enough to have an adviser that allowed me to choose freely in any field that he was comfortable with. During my first three years I discussed a huge set of possible research ideas with him and even after we had settled on a specific topic the details kept changing as I passed through the later phases. Two key aspects in this phase are: (i) creativity, you need to come up with a good research idea and research plan. Nobody will tell you what to do, there is neither a customer who demands a specific feature, nor is there a pre-set plan like in a play. You need to be focused and keep yourself together to pass through this phase. (ii) Due to the fact that you need an idea and you are responsible for the schedule you build up a huge amount of psychological pressure. Most people that drop out during this phase fail due to either a lack of ideas (and creativity) or because they are unable to self-organize themselves in an unstructured work environment.</p>
+<h2 id="The-paper-mill"><a href="#The-paper-mill" class="headerlink" title="The paper mill"></a>The paper mill</h2><p>After you have decided on the (main) topic of your thesis and built the first prototype (or come up with the first layout of the system) you gradually transition from the first phase to the second phase. You are now trapped in the paper mill. This is the most productive phase as you try to publish your work in as many (good) conferences as possible. The quality of your work is (somewhat) measured in the number of papers that you publish at top tier conferences. You are evaluated based on the quality of your work combined with the human factor how you present yourself.</p>
+<p>In this phase you start to become an expert in your field: you have claimed a little spot in a bigger field that you extend with your research. Your adviser will try to keep you in this phase as long as you are able to produce more good papers (given that your adviser has enough funding and that you do not run into any hard time limits given by your university).</p>
+<p>The core qualifications for this phase are that you can (i) work hard and (ii) present yourself at conferences. You have to write all these papers and at the same time you should refill your pipeline of ideas to get the next publications in order. In addition you have to express all these ideas to others and you have to play the social game at conferences. Building your social network during conferences is actually hard work and you need to try to make friends with some of the bigger shots in your field as this can be helpful for future collaborations, additional papers, or even reviews. If other people understand your ideas from beginning to end and you can convince them (in person) that the ideas are great then they are more likely to accept your paper that they’ll review later on. This (productive) phase usually lasts about two years and is your opportunity to build your social network for possible future positions. A side quest during this time is to select your thesis committee. You already know in what area you will write your thesis about, you should have an idea about your thesis statement, and you should know who the experts are in this area. Hint: conferences are a good place to chat up possible committee members!</p>
+<h2 id="The-exit-strategy-wrapping-up-and-writing-your-thesis"><a href="#The-exit-strategy-wrapping-up-and-writing-your-thesis" class="headerlink" title="The exit strategy: wrapping up and writing your thesis"></a>The exit strategy: wrapping up and writing your thesis</h2><p>After you churned out a bunch of papers during your time on the paper mill you are finally ready to graduate. At one point in time you start to feel ready, you have published a couple of papers (or at least written a couple of technical reports if you weren’t able to publish the papers) and you developed a good understanding of what research in your area is about. In your (regular or not so regular) meetings with your adviser you should also get a feeling if he or she thinks that you are ready.</p>
+<p>At ETH you write your thesis from scratch. I started with reading (or at least skimming) my prior papers before I wrote my thesis. After that I came up with the basic outline and the vision that my thesis should get across. The goal of the thesis is to write down your thesis statement and to prove said statement. It is important that your thesis is a self-contained and self-consistent document.</p>
+<p>In this phase you should have settled on your thesis committee. Your committee consists of a couple of professors (or people with a PhD depending on your university) that are experts in your area of research. These experts will read your thesis and grill you during your defense. Some people quit at this late stage of the PhD due to timing constraints or due to burn out. After a couple of years they are worn out and run into deadlines imposed by their adviser or by the university. It makes me sad when I see colleagues that come up to this point in their career and then quit so close to the finish line.</p>
+<p>The defense is the end of this last phase and after you have passed this final test you have almost completed your PhD. At most universities there are some bureaucratic hurdles that are left for you to take and there might be some minor (or major) revisions to your written thesis that you have to carry out. Other than that you are done and at some delta t after the defense you are allowed to call yourself PhD (or Dr. Sc in my case).</p>
+<h2 id="The-teaching-aspect-in-a-PhD"><a href="#The-teaching-aspect-in-a-PhD" class="headerlink" title="The teaching aspect in a PhD"></a>The teaching aspect in a PhD</h2><p>Teaching is an orthogonal experience to the research experience. At ETH you are supposed to be the teaching assistant (TA) for one lecture per semester. At the beginning you will start off as a regular TA but as you progress in your PhD you will be trusted with more and more responsibilities, e.g. you will teach lectures if the professor is sick, or you will be head TA for a complete lecture. Head TAs are responsible to coordinate the lecture, to supervise the other TAs, and to organize the individual exercises.</p>
+<p>I really enjoyed teaching during my almost 5 1/2 years at ETH and I think that it is a great experience that every PhD should have. During the exercise hours that you have to supervise you learn how to speak in front of a group (a skill that is not that common in Switzerland and that is not part of the regular curriculum at high school or college), you learn how to prepare the material so that you can present it to a group of students, and most importantly you learn how to interact with all kinds of students that have different problems with the material, the course, or a specific exercise. All in all you learn a new skill: how to teach some specific material to students. If you plan an academic career then this might come in handy at one point in time.</p>
+<h2 id="The-PhD-grind"><a href="#The-PhD-grind" class="headerlink" title="The PhD grind"></a>The PhD grind</h2><p>Right when I was finishing my thesis Philip Guo published his memoirs about his own PhD experience in an e-book called <a href="http://pgbovine.net/PhD-memoir/pguo-PhD-grind.pdf" target="_blank" rel="external">“The PhD Grind”</a>. In the book Philip tells us about his PhD experience year for year in chronological order. Each year of his PhD is covered in a chapter and he writes about all the ups and downs during that time. The book is a great read and I warmly recommend that you read it too if you are interested in research and academia.</p>
+<p>I agree with many of his observations, e.g., that it is important that you focus on conferences that your adviser already has published in recent years. Your adviser will know the right lingo and the right buzzwords for the conference and the members of the committee will know your adviser which in turn will help as well.</p>
+<p>On the other hand there are a couple of things where I don’t agree with Philip. Most importantly Philip mentioned that being a TA only delays the PhD (page 70, of the e-book). As I explained above I really valued the teaching experience - from a personal as well as from a professional point of view. During the discussions with the students I learned several new and interesting details in areas that I actually assumed to know in depth. Another area I don’t agree with Philip is about how to select your thesis committee. Philip tells us that usually the adviser selects the thesis committee (page 56, of the e-book), I on the other side had the pleasure to select my own committee. I discussed possible members of the committee with my adviser and then approached each member myself. For me this was an interesting experience - first coming up with possible and plausible fits and then approaching these professors myself.</p>
+<h2 id="Conclusion"><a href="#Conclusion" class="headerlink" title="Conclusion"></a>Conclusion</h2><p>A PhD is certainly not the right career path for everyone. Doing a PhD is challenging, requires a lot of self-control and self-organization. The PhD is not (pre-)structured and you will need a lot of creativity. In addition you get less pay than an industry position with a comparable education. On the other hand you learn a huge amount of new skills during your PhD. This is your opportunity to do academic research, you can publish at conferences, you’ll meet a huge amount of new people, and you learn to network. I enjoyed my time and I recommend doing a PhD to all the curious and interested people out there that are interested in academia and who want to go that extra mile.</p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/博士之路/">博士之路<span class="article-category-count">2</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Ph-D/">Ph.D</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
 
 
   <nav id="page-nav">
     
-    <a class="extend prev" rel="prev" href="/">上一页</a><a class="page-number" href="/">1</a><span class="page-number current">2</span><a class="page-number" href="/page/3/">3</a><a class="page-number" href="/page/4/">4</a><span class="space">&hellip;</span><a class="page-number" href="/page/14/">14</a><a class="extend next" rel="next" href="/page/3/">下一页</a>
+    <a class="extend prev" rel="prev" href="/">上一页</a><a class="page-number" href="/">1</a><span class="page-number current">2</span><a class="page-number" href="/page/3/">3</a><a class="page-number" href="/page/4/">4</a><span class="space">&hellip;</span><a class="page-number" href="/page/13/">13</a><a class="extend next" rel="next" href="/page/3/">下一页</a>
   </nav>
 
 </section>
@@ -1393,18 +1344,6 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
     </ul>
     <div class="widget">
       <ul>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170427/vitae/">写在最前</a></h6>
-          <!--  <span>四月 27, 2017</span> -->
-            </div>
-
-          </li>
         
           <li class="clearfix">
 
@@ -1581,6 +1520,18 @@ Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系
             
 
               <h6 style="margin: 0;"><a href="/20170307/introspection-papers/">虚拟机监控论文推荐</a></h6>
+          <!--  <span>三月 7, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170307/course-zhiqianglin2/">名人课堂-系统安全与二进制代码分析(上)</a></h6>
           <!--  <span>三月 7, 2017</span> -->
             </div>
 
