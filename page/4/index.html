@@ -106,6 +106,105 @@
         
           <section id="main">
   
+    <article id="post-winkernelmal"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170401/winkernelmal/">深入探索windows内核rootkit动态分析</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170401/winkernelmal/" class="article-date">
+	  <time datetime="2017-04-01T02:48:38.000Z" itemprop="datePublished">四月 1, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Source: <a href="https://www.lastline.com/labsblog/high-resolution-dynamic-analysis-of-windows-kernel-rootkits/" target="_blank" rel="external">https://www.lastline.com/labsblog/high-resolution-dynamic-analysis-of-windows-kernel-rootkits/</a></p>
+<p>Author: <a href="https://www.lastline.com/author/clemens/" target="_blank" rel="external">Clemens Kolbitsch</a></p>
+<pre><code>Clemens is a Security Researcher and engine developer at Lastline. As a lead-developer of Anubis, he has gained profound expertise in analyzing current, malicious code found in the wild. He has observed various trends in the malware community and successfully published peer-reviewed research papers. In the past, he also investigated offensive technologies presenting results at conferences such as BlackHat.
+</code></pre><hr>
+<p>Many recently-discovered sophisticated attacks against Windows users have been found to use at least one component executing in the kernel of the operating system. Examples for such APT attacks are Equation, Regin, Dark Hotel, or Turla/Uroburos, and they have received a lot of scrutiny from the security and research community.</p>
+<p>These threats are particularly pernicious because their kernel components are running with the highest level of permissions available on a computer system. As such, it is very difficult for traditional antivirus systems to detect (or protect) a computer system from these attacks, because the attacker is running with the same (or higher!) permissions as the AV solution.</p>
+<p>At the same time, it is far from trivial to analyze such kernel-based APTs inside a traditional sandboxing system, as kernel behavior often lies outside the scope of what can be monitored using traditional hooking mechanisms.</p>
+<p>In this post, we will show how the latest release of the Lastline Breach Detection Platform using a full-system emulation approach defeats even the latest version of kernel-based attacks. In a series of follow-up posts, we will focus on individual APT families and techniques, and detail how our sandbox can be used to analyze and detect these threats.</p>
+<h2 id="Analysis-of-Malicious-Code-in-the-Kernel"><a href="#Analysis-of-Malicious-Code-in-the-Kernel" class="headerlink" title="Analysis of Malicious Code in the Kernel"></a>Analysis of Malicious Code in the Kernel</h2><p>Most traditional sandboxes available today are based on intercepting API function invocations by placing hooks into the user-mode libraries loaded by a program under analysis. The idea is to intercept – and sometimes even tamper with – any parameters passed to functions that can be used to perform security-relevant behavior on a system.</p>
+<p>Some slightly more advanced sandboxes are also able to intercept system calls invoked by the analyzed program, to address the case in which evasive malware bypasses user-mode functions and interacts with the operating system kernel directly. In both systems, the core idea is to interrupt the execution of malicious code at certain points of interest in order to extract and log the functions (and their arguments) that represent the actions performed by the program under analysis.</p>
+<p>When malware manages to load one of its components into the kernel (for example via an exploit, as we will cover in a follow-up post), this malicious component is loaded indistinguishably from trusted, operating-system code. At this point, it is no longer feasible to monitor actions triggered by malware code using traditional hooking mechanisms, as the malware behaviors do not rely on invocations of user-mode APIs or system calls any longer.<br>With the rise and prevalence of kernel-mode APTs, it is crucial to overcome this problem in order to defend against these recent attacks.</p>
+<p>Lastline’s high-resolution sandbox uses a full-system emulation approach, which allows the sandbox to see every instruction executed inside the analysis environment. This allows our engine to interrupt the execution of an interesting piece of code at any time (and not only when an API function or system call is invoked) to extract behavior, regardless of whether the malicious code is running in the context of a user-application or the operating system’s kernel. At the same time, our approach allows us to track which code has been loaded or modified from the context of untrusted operations (such as newly-loaded drivers) and thus track which code belongs to the original, trusted kernel, and what code is part of the malware threat and, therefore, requires special attention.</p>
+<h2 id="Anatomy-of-Traditional-Kernel-Rootkits"><a href="#Anatomy-of-Traditional-Kernel-Rootkits" class="headerlink" title="Anatomy of Traditional Kernel-Rootkits"></a>Anatomy of Traditional Kernel-Rootkits</h2><p>To start off, let us take a brief look at how kernel-based attacks have worked in the past. While some of the attacks described below are rather well-understood, they nevertheless highlight a few key concepts a next-generation analysis sandbox has to fulfill to allow for the analysis of kernel-based malicious code.</p>
+<p>Most traditional rootkits have the ability to hide the user-mode components of a malicious program. This is typically used to hide these components from AV software or analysts looking for signs of an infection. This can be achieved by hooking or modifying critical system tables, such as SSDT or IDT, or by modifying other kernel memory regions, such as code or data sections of system modules.</p>
+<p>For such rootkits, the infection typically works as follows: First, an attacker exploits a user system (for example, the attacker tricks the user to visit a URL serving a drive-by download exploit attacking the user’s browser), loading a piece of malicious code into the kernel. This code then intercepts any system call invoked by user-mode applications, and filters any data returned to a program that would reveal the infection. For example, if a security product is looking for newly-generated files in a directory, this filter function would simply remove any malicious files before returning a directory listing to the requesting program. In a similar way, these hooks can filter and hide the presence of registry modifications, running processes, or any other event generated by the attacker.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>As one might have guessed, the presence of such filtering code loaded into the kernel is very indicative of malicious activity. Therefore, the Lastline analysis engine is able to analyze any code that is newly loaded into the kernel of the operating system under analysis.</p>
+<p>Additionally, whenever a critical function or memory location is hooked or modified, the analysis system uses this information to classify the origin of this code as malicious. At the same time, the analysis report exposes all this information with details on the type of function that was hooked or modified, providing analysts with highly-valuable information about the attack:</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal2.png" width="450"></a><br>    <figcaption>Analysis report showing kernel modification </figcaption><br></figure>
+
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal3.png" width="450"></a><br>    <figcaption>Analysis report showing SSDT hooks modification</figcaption><br></figure>
+
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal4.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal4.png" width="450"></a><br>    <figcaption>Analysis report showing critical kernel memory region modification</figcaption><br></figure>
+
+<p>Anatomy of Kernel-Based APTs<br>Recent waves of APT-attacks, such as Regin, Dark Hotel, or Turla/Uroburos, have shown that malware authors are using these rootkit techniques not only to hide the presence of other user-mode components, but also to leverage the privileges of kernel-code and integrate much more sophisticated behavior directly into the kernel-components. Examples of such added functionality are the ability to inject arbitrary code into running processes, or code to download and install further code, directly from the context of the kernel.</p>
+<p>At the same time, these APTs have also become more evasive against traditional, signature-based detection systems. Very often, they use encryption and loading in multiple stages to hinder analysis. Often they use hidden and encrypted files in unpartitioned sections of the file-system to hide their presence, even when the system is booted using a trusted, uncompromised kernel to analyze an infected host.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal5.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal5.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p>With full visibility into any malicious code running in user or kernel context, the Lastline sandbox is able to perform comprehensive analysis of any such components. Whenever the engine sees that untrusted code tampers with or injects code into another user-mode process, the system includes any behavior exhibited by the modified user-process in the analysis.</p>
+<p>This way, our analysis results reflect the full chain of infection, from the initial exploit modifying the kernel, all the way to kernel code spreading to other user-mode processes.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal6.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal6.png" width="450"></a><br>    <figcaption>Analysis report showing kernel-memory hooking and user-mode injections</figcaption><br></figure>
+
+<h2 id="Understanding-Kernel-Modifications-Necrus"><a href="#Understanding-Kernel-Modifications-Necrus" class="headerlink" title="Understanding Kernel Modifications: Necrus"></a>Understanding Kernel Modifications: Necrus</h2><p>As we have described in a <a href="http://lastline.wpengine.com/labsblog/exploit-analysis-via-process-snapshotting" target="_blank" rel="external">previous post on process snapshotting</a>, the Lastline analysis engine allows a security analyst to expose memory dumps from various stages of the malware execution in addition to the detailed description of the behavior observed during analysis.</p>
+<p>This is no different for kernel-based malicious code, so let us use a variant of the Necrus Rootkit to take a deeper look at how this malware behaves as part of the kernel.</p>
+<p>As any analyst who has worked on Necrus (or really any kernel rootkit) knows, it is very tedious to analyze and understand the various decryption loops obfuscating the interesting payload of a kernel driver.</p>
+<p>The following snippet of code shows just one such decryption loop present in Necrus:</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal7.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal7.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>In addition to using various obfuscation/decryption loops, Necrus also contains fake entries in the import table that are not related to any payload functionality:</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal8.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal8.png" width="450"></a><br>    <figcaption>Function Exports in IDA</figcaption><br></figure>
+
+<p>Luckily for this analysis, we can skip the description of how to set up a kernel debugger to intercept execution when the kernel component has decrypted itself. The Lastline analysis engine does all of this automatically and provides us with a decrypted, de-obfuscated, repackaged executable snapshot that can be loaded via IDA Pro.</p>
+<p>Once opened in IDA, the snapshot reveals all information about the decrypted payload. For example, the Rebuilt APIs section contains information about imports pointing to decrypted payload functionality:</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal9.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal9.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>Starting from this table, it is trivial to find a particular hook the analyst is interested in. For example, we can follow KeServiceDescriptorTable, which reveals that the sample patches the SSDT, and sets hooks at NtOpenProcess and NtOpenThread to the code seen below:</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/winkernelmal10.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/winkernelmal10.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>The routine first maps the Service Descriptor Table in memory to find the function addresses of NtOpenProcess and NtOpenThread. These pointers are then overwritten with addresses of the corresponding hook functions. Subsequently, calls to NtOpenProcess or NtOpenThread from any user-mode application execute the hijacked functions of the rootkit.</p>
+<p>Summary<br>Kernel-based malicious code has become part of the most advanced and sophisticated attacks seen in recent months. As a result, security solutions and analysis sandboxes need to adapt and provide the ability for analyzing and understanding kernel code to protect users from these threats.</p>
+<p>Lastline’s high-resolution sandbox uses a full-system emulation approach and is able to perform effective analysis of code running in both kernel and user spaces. This allows us to obtain a complete picture of the malicious behavior to detect and mitigate these advanced threats.</p>
+<p>To learn more about Lastline’s rootkit analysis capabilities, <a href="https://www.lastline.com/press/deep-kernel-malware-analysis-launch-industry-first/" target="_blank" rel="external">read the announcement</a> that we made today in a press release.</p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">9</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-buildsandbox"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -1038,78 +1137,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-kernelmalware"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170330/kernelmalware/">内核层恶意代码分析</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170330/kernelmalware/" class="article-date">
-	  <time datetime="2017-03-30T06:13:41.000Z" itemprop="datePublished">三月 30, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <hr>
-<p>作者：<a href="http://weibo.com/diting0x/profile?rightmod=1&amp;wvr=6&amp;mod=personinfo&amp;is_all=1" target="_blank" rel="external">Diting0x</a></p>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170330/kernelmalware" target="_blank" rel="external">内核层恶意代码分析</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-<hr>
-<p>本文旨在收集Linux下内核层恶意代码并进行分析，持续更新。</p>
-<ul>
-<li>来源于论文<a href="https://www.cerias.purdue.edu/assets/pdf/bibtex_archive/2010-02.pdf" target="_blank" rel="external">LiveDM: Temporal Mapping of Dynamic Kernel Memory for Dynamic Kernel Malware Analysis and Debugging, </a>rootkit操纵内核动态对象的分析结果：</li>
-</ul>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/livedm1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/livedm1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<ul>
-<li>来源于论文<a href="http://friends.cs.purdue.edu/pubs/eurosys09.pdf" target="_blank" rel="external">Multi-Aspect Profiling of Kernel Rootkit Behavior, EuroSys’09</a>中PoKeR系统对rootkit行为的分析结果：</li>
-</ul>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/pokerresult.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/pokerresult.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<ul>
-<li>来源于论文<a href="http://www.cs.umd.edu/~mwh/papers/sbcfi.pdf" target="_blank" rel="external">Automated Detection of Persistent Kernel<br>Control-Flow Attacks,CCS’07</a>对内核层恶意代码的行为以及利用的机制分析结果：</li>
-</ul>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/sbcfi.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/sbcfi.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-<ul>
-<li>部分用于研究目的的内核层恶意代码源码分享，可以参考<a href="https://github.com/chonghw/research-malware" target="_blank" rel="external">这里</a></li>
-</ul>
-<hr>
-<p>作者：<a href="http://weibo.com/diting0x/profile?rightmod=1&amp;wvr=6&amp;mod=personinfo&amp;is_all=1" target="_blank" rel="external">Diting0x</a></p>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170330/kernelmalware" target="_blank" rel="external">内核层恶意代码分析</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">9</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Rootkit/">Rootkit</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -1202,6 +1229,18 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/monitoring-int80/">X86/Intel虚拟化技术监控/陷入软件中断INT80H系统调用</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -1383,18 +1422,6 @@
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170401/buildsandbox/">如何构建一个有效地恶意代码分析沙盒</a></h6>
-          <!--  <span>四月 1, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -1405,7 +1432,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">10</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -1415,7 +1442,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.73px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 18.18px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.73px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 11.82px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.91px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 17.27px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 16.36px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.45px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.82px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 11.82px;">Monitoring</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.91px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.91px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 16.36px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.82px;">Rootkit</a> <a href="/tags/Sandbox/" style="font-size: 10.91px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.09px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 11.82px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 11.82px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.82px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.91px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.73px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.64px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 18.18px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.73px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 11.82px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.91px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.91px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.55px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 17.27px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 16.36px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.64px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.64px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.45px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.64px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.82px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 12.73px;">Monitoring</a> <a href="/tags/Overflow/" style="font-size: 10.91px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.91px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.91px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.73px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 16.36px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.82px;">Rootkit</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.91px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.91px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 19.09px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.82px;">Systemcall</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.09px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 12.73px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 11.82px;">XEN</a>
     </div>
   </div>
 
