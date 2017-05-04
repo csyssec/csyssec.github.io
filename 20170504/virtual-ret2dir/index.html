@@ -11,29 +11,23 @@
   
   
   
-  <meta name="description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/11/defending-against-ret2dir-attacks.html
-转载请注明：原作者信息以及CSysSec
+  <meta name="description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/11/defending-against-ret2dir-attacks.html转载请注明：原作者信息以及CSysSec
 
-I was so excited when recently reading the paper (ret2dir: Rethinking Kernel">
+I was so excited when recently reading the paper (ret2dir: Rethinking Kernel Iso">
 <meta property="og:type" content="article">
 <meta property="og:title" content="利用虚拟化技术防御ret2dir攻击">
 <meta property="og:url" content="http://yoursite.com/20170504/virtual-ret2dir/index.html">
 <meta property="og:site_name" content="Index of Computer System and Security">
-<meta property="og:description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/11/defending-against-ret2dir-attacks.html
-转载请注明：原作者信息以及CSysSec
+<meta property="og:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/11/defending-against-ret2dir-attacks.html转载请注明：原作者信息以及CSysSec
 
-I was so excited when recently reading the paper (ret2dir: Rethinking Kernel">
+I was so excited when recently reading the paper (ret2dir: Rethinking Kernel Iso">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/ret2dir.png">
-<meta property="og:updated_time" content="2017-05-04T10:35:35.000Z">
+<meta property="og:updated_time" content="2017-05-04T10:53:37.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="利用虚拟化技术防御ret2dir攻击">
-<meta name="twitter:description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/11/defending-against-ret2dir-attacks.html
-转载请注明：原作者信息以及CSysSec
+<meta name="twitter:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/11/defending-against-ret2dir-attacks.html转载请注明：原作者信息以及CSysSec
 
-I was so excited when recently reading the paper (ret2dir: Rethinking Kernel">
+I was so excited when recently reading the paper (ret2dir: Rethinking Kernel Iso">
 <meta name="twitter:image" content="http://oij0laovn.bkt.clouddn.com/ret2dir.png">
   
     <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
@@ -142,9 +136,7 @@ I was so excited when recently reading the paper (ret2dir: Rethinking Kernel">
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
-<p>Source：<a href="http://hypervsir.blogspot.com/2014/11/defending-against-ret2dir-attacks.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/defending-against-ret2dir-attacks.html</a></p>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/11/defending-against-ret2dir-attacks.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/defending-against-ret2dir-attacks.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
 <p>I was so excited when recently reading the paper (<strong><a href="http://www.cs.columbia.edu/~vpk/papers/ret2dir.sec14.pdf" target="_blank" rel="external">ret2dir: Rethinking Kernel Isolation</a></strong> from <strong><a href="http://www.cs.columbia.edu/~vpk/" target="_blank" rel="external">Vasileios P. Kemerlis</a></strong>. This post is basically going to introduce the idea of ret2dir attack, and how to prevent such an attack with hardware virtualization technology, actually partially. </p>
 <p>ret2dir (Return-to-Direct-Mapped-Memory) attack abuses <strong><em>physmap</em></strong> design in kernel virtual memory management system of many Linux/Unix OSs, it can bypass the SMEP/SMAP, PXN, KERNEXEC/UDEREF. </p>

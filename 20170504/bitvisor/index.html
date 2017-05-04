@@ -11,31 +11,25 @@
   
   
   
-  <meta name="description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/11/paper-read-bitvisor-thin-hypervisor-for.html
-转载请注明：原作者信息以及CSysSec
+  <meta name="description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/11/paper-read-bitvisor-thin-hypervisor-for.html转载请注明：原作者信息以及CSysSec
 
-This post is wrote to share an idea of the paper (BitVisor: A Thin Hype">
+This post is wrote to share an idea of the paper (BitVisor: A Thin Hypervi">
 <meta property="og:type" content="article">
 <meta property="og:title" content="BitVisor- 一种实施I/O设备安全的轻量级Hypervisor">
 <meta property="og:url" content="http://yoursite.com/20170504/bitvisor/index.html">
 <meta property="og:site_name" content="Index of Computer System and Security">
-<meta property="og:description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/11/paper-read-bitvisor-thin-hypervisor-for.html
-转载请注明：原作者信息以及CSysSec
+<meta property="og:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/11/paper-read-bitvisor-thin-hypervisor-for.html转载请注明：原作者信息以及CSysSec
 
-This post is wrote to share an idea of the paper (BitVisor: A Thin Hype">
+This post is wrote to share an idea of the paper (BitVisor: A Thin Hypervi">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/MMU_and_IOMMU.png">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/BitVisor.png">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/BitVisor-layer.png">
-<meta property="og:updated_time" content="2017-05-04T10:26:23.000Z">
+<meta property="og:updated_time" content="2017-05-04T10:54:46.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="BitVisor- 一种实施I/O设备安全的轻量级Hypervisor">
-<meta name="twitter:description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/11/paper-read-bitvisor-thin-hypervisor-for.html
-转载请注明：原作者信息以及CSysSec
+<meta name="twitter:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/11/paper-read-bitvisor-thin-hypervisor-for.html转载请注明：原作者信息以及CSysSec
 
-This post is wrote to share an idea of the paper (BitVisor: A Thin Hype">
+This post is wrote to share an idea of the paper (BitVisor: A Thin Hypervi">
 <meta name="twitter:image" content="http://oij0laovn.bkt.clouddn.com/MMU_and_IOMMU.png">
   
     <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
@@ -144,9 +138,7 @@ This post is wrote to share an idea of the paper (BitVisor: A Thin Hype">
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
-<p>Source：<a href="http://hypervsir.blogspot.com/2014/11/paper-read-bitvisor-thin-hypervisor-for.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/paper-read-bitvisor-thin-hypervisor-for.html</a></p>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/11/paper-read-bitvisor-thin-hypervisor-for.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/paper-read-bitvisor-thin-hypervisor-for.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
 <p>This post is wrote to share an idea of the paper (<a href="http://dl.acm.org/citation.cfm?id=1508311" target="_blank" rel="external">BitVisor: A Thin Hypervisor for Enforcing I/O Device Security</a>) that I read recently. It innovates a <strong>hypervisor-based solution for enforcing storage/disk encryption of ATA devices</strong>.<br>As we know that Direct memory access (DMA) is a feature in computer system that allows certain hardware subsystems to directly access main system memory independently of the CPU/processor. </p>
 <p>As shown in picture below (from <a href="http://en.wikipedia.org/wiki/IOMMU" target="_blank" rel="external">wikipedia</a>), processor MMU (if present) cannot directly intercept data movement between external DMA-capable devices and the main memory. Even in a virtualization environment, extended page table (EPT or NPT) MMU configured by Hypervisor cannot protect the main memory resource, this is one of reasons of why the technology IOMMU like VT-d (<a href="https://software.intel.com/en-us/articles/intel-virtualization-technology-for-directed-io-vt-d-enhancing-intel-platforms-for-efficient-virtualization-of-io-devices" target="_blank" rel="external">Intel Virtualization Technology for Directed I/O</a>) is introduced to prevent malicious device drivers from attacking against the main memory even hypervisor owned memory space. </p>

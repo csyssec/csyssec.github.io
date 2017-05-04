@@ -11,28 +11,22 @@
   
   
   
-  <meta name="description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/10/security-os-design-idea-to-prevent.html
-转载请注明：原作者信息以及CSysSec
+  <meta name="description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/10/security-os-design-idea-to-prevent.html转载请注明：原作者信息以及CSysSec
 
-Recently, when reading this paper “HyperSafe - A Lightweight Approach to Pro">
+Recently, when reading this paper “HyperSafe - A Lightweight Approach to Provid">
 <meta property="og:type" content="article">
 <meta property="og:title" content="安全操作系统内核设计：一种阻止恶意软件覆盖关键系统内核数据结构的思想">
 <meta property="og:url" content="http://yoursite.com/20170504/secureos/index.html">
 <meta property="og:site_name" content="Index of Computer System and Security">
-<meta property="og:description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/10/security-os-design-idea-to-prevent.html
-转载请注明：原作者信息以及CSysSec
+<meta property="og:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/10/security-os-design-idea-to-prevent.html转载请注明：原作者信息以及CSysSec
 
-Recently, when reading this paper “HyperSafe - A Lightweight Approach to Pro">
-<meta property="og:updated_time" content="2017-05-04T10:17:10.000Z">
+Recently, when reading this paper “HyperSafe - A Lightweight Approach to Provid">
+<meta property="og:updated_time" content="2017-05-04T10:56:12.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="安全操作系统内核设计：一种阻止恶意软件覆盖关键系统内核数据结构的思想">
-<meta name="twitter:description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/10/security-os-design-idea-to-prevent.html
-转载请注明：原作者信息以及CSysSec
+<meta name="twitter:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/10/security-os-design-idea-to-prevent.html转载请注明：原作者信息以及CSysSec
 
-Recently, when reading this paper “HyperSafe - A Lightweight Approach to Pro">
+Recently, when reading this paper “HyperSafe - A Lightweight Approach to Provid">
   
     <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
   
@@ -140,9 +134,7 @@ Recently, when reading this paper “HyperSafe - A Lightweight Approach to Pro">
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
-<p>Source：<a href="http://hypervsir.blogspot.com/2014/10/security-os-design-idea-to-prevent.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/security-os-design-idea-to-prevent.html</a></p>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/security-os-design-idea-to-prevent.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/security-os-design-idea-to-prevent.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
 <p>Recently, when reading this paper “<strong><a href="http://www.csc.ncsu.edu/faculty/jiang/pubs/OAKLAND10.pdf" target="_blank" rel="external">HyperSafe - A Lightweight Approach to Provide Lifetime Hypervisor Control-Flow Integrity</a></strong>“, an idea just comes out from my mind: using write protection (CR0.WP) and read-only (RO) page attribute to prevent the critical kernel data structures being overwritten by malicious software through buffer (stack, heap) overflow in an exploitable kernel module.</p>
 <p>In a virtual memory management system, OS kernel can configure a Read-Only (RO) virtual page by clearing R/W bit in corresponding page table entry (PTE) so that a virtual page cannot be modified by OS kernel and/or application.</p>

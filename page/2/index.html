@@ -129,9 +129,7 @@
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
-<p>Source：<a href="http://hypervsir.blogspot.com/2014/12/using-lbr-last-branch-record-feature-to.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/12/using-lbr-last-branch-record-feature-to.html</a></p>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/12/using-lbr-last-branch-record-feature-to.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/12/using-lbr-last-branch-record-feature-to.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
 <p>SMEP (Supervisor Mode Execution Prevention) is a mitigation that aims to prevent the CPU from running code from user-mode while in kernel-mode, however this post (<strong><a href="https://labs.mwrinfosecurity.com/blog/2014/08/15/windows-8-kernel-memory-protections-bypass/" target="_blank" rel="external">Windows 8 Kernel Memory Protections Bypass</a></strong>) presents a generic technique for exploiting kernel vulnerabilities with bypassing SMEP. Unlike my previous post (<strong><a href="http://hypervsir.blogspot.com/2014/11/page-structure-table-corruption-attacks.html" target="_blank" rel="external">Page Table Structure Corruption Attacks - How to Mitigate it?</a></strong>) that presented a mitigation to that attack, this post will present a solution to detect such a ret2usr attack due to MMU paging structure corruption.</p>
 <p>In Intel/x86 recent processors, the LBR (last branch record) feature has some filtering capabilities like CPL (current privilege level) filtering and indirect jmp/call filterings. </p>
@@ -186,9 +184,7 @@
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
-<p>Source：<a href="http://hypervsir.blogspot.com/2014/11/defending-against-ret2dir-attacks.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/defending-against-ret2dir-attacks.html</a></p>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/11/defending-against-ret2dir-attacks.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/defending-against-ret2dir-attacks.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
 <p>I was so excited when recently reading the paper (<strong><a href="http://www.cs.columbia.edu/~vpk/papers/ret2dir.sec14.pdf" target="_blank" rel="external">ret2dir: Rethinking Kernel Isolation</a></strong> from <strong><a href="http://www.cs.columbia.edu/~vpk/" target="_blank" rel="external">Vasileios P. Kemerlis</a></strong>. This post is basically going to introduce the idea of ret2dir attack, and how to prevent such an attack with hardware virtualization technology, actually partially. </p>
 <p>ret2dir (Return-to-Direct-Mapped-Memory) attack abuses <strong><em>physmap</em></strong> design in kernel virtual memory management system of many Linux/Unix OSs, it can bypass the SMEP/SMAP, PXN, KERNEXEC/UDEREF. </p>
@@ -253,9 +249,7 @@
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
-<p>Source：<a href="http://hypervsir.blogspot.com/2014/11/implement-software-based-smep-with-non.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/implement-software-based-smep-with-non.html</a></p>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/11/implement-software-based-smep-with-non.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/implement-software-based-smep-with-non.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
 <p>In my <a href="http://hypervsir.blogspot.com/2014/11/how-to-implement-software-based.html" target="_blank" rel="external">previous post</a>, I talked about how to implement a software-based SMEP (Supervisor Mode Execution Protection) with virtualization/hypervisor for fun. In this post, I’m going to detail yet another solution to implement software-based SMEP without virtualization technology. </p>
 <p>In modern operating systems, like Linux and Windows, all the processes share the same kernel virtual address space, but have separate user virtual address space, see below for <a href="http://blogs.technet.com/b/askperf/archive/2007/09/28/memory-management-x86-virtual-address-space.aspx" target="_blank" rel="external">Windows 32bit OS</a>. The system can achieve this by configuring separate page structures pointed by a translation table base register (e.g. CR3 register on x86/Intel MMU architecture) for each process, and switch among them.</p>
@@ -334,9 +328,7 @@
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
-<p>Source：<a href="http://hypervsir.blogspot.com/2014/11/how-to-implement-software-based.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/how-to-implement-software-based.html</a></p>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/11/how-to-implement-software-based.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/how-to-implement-software-based.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
 <p>As <a href="http://hypervsir.blogspot.com/2014/10/introduction-on-hardware-security.html" target="_blank" rel="external">my previous post</a> indicated, SMEP is a powerful security feature, and easy to deploy in modern commodity OS. However this feature requires H/W processor’s support, for those processors that are not SMEP-capable, this post presents a software-based solution to emulate SMEP functionality with the help of Virtualization/Hypervisor technology. </p>
 <p>When x86 processor CR4.SMEP bit is set, the system software executing in kernel mode (CPL&lt;3) cannot fetch instructions from any linear address with a translation for which the U/S flag is 1 (User) in every paging-structure entries controlling the translation. In other words, If SMEP is enabled, software operating in supervisor mode cannot fetch instructions from linear addresses that are accessible in user mode. When such an instruction fetch occurs, a #PF exception will be generated by SMEP-capable processor.</p>
@@ -429,9 +421,7 @@
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
-<p>Source：<a href="http://hypervsir.blogspot.com/2014/11/what-does-transactional-synchronization.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/what-does-transactional-synchronization.html</a></p>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/11/what-does-transactional-synchronization.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/what-does-transactional-synchronization.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
 <p><a href="http://en.wikipedia.org/wiki/Transactional_Synchronization_Extensions" target="_blank" rel="external">Intel Transactional Synchronization Extensions</a> (TSX) was introduced since from Haswell processor with adding hardware <a href="http://en.wikipedia.org/wiki/Transactional_memory" target="_blank" rel="external">transactional memory</a> support. It was originally design to speed up execution of multi-threaded software through lock elision. Every new technology has both good side and evil side, then how about TSX extension? What can we use it to do for vulnerability exploits and its defenses?</p>
 <p><br><br>According to Intel SDM, TSX provides two software interfaces for programmers:</p>

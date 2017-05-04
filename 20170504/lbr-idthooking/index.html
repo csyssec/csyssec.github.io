@@ -11,29 +11,23 @@
   
   
   
-  <meta name="description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html
-转载请注明：原作者信息以及CSysSec
+  <meta name="description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html转载请注明：原作者信息以及CSysSec
 
-Thanks to Yushi who shared a presentation (ELI: Bare-Metal Performance">
+Thanks to Yushi who shared a presentation (ELI: Bare-Metal Performance for">
 <meta property="og:type" content="article">
 <meta property="og:title" content="使用LRB(最近分支记录)特性检测IDT Hooking">
 <meta property="og:url" content="http://yoursite.com/20170504/lbr-idthooking/index.html">
 <meta property="og:site_name" content="Index of Computer System and Security">
-<meta property="og:description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html
-转载请注明：原作者信息以及CSysSec
+<meta property="og:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html转载请注明：原作者信息以及CSysSec
 
-Thanks to Yushi who shared a presentation (ELI: Bare-Metal Performance">
+Thanks to Yushi who shared a presentation (ELI: Bare-Metal Performance for">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/VIDT.png">
-<meta property="og:updated_time" content="2017-05-04T10:28:36.000Z">
+<meta property="og:updated_time" content="2017-05-04T10:54:31.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="使用LRB(最近分支记录)特性检测IDT Hooking">
-<meta name="twitter:description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html
-转载请注明：原作者信息以及CSysSec
+<meta name="twitter:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html转载请注明：原作者信息以及CSysSec
 
-Thanks to Yushi who shared a presentation (ELI: Bare-Metal Performance">
+Thanks to Yushi who shared a presentation (ELI: Bare-Metal Performance for">
 <meta name="twitter:image" content="http://oij0laovn.bkt.clouddn.com/VIDT.png">
   
     <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
@@ -142,9 +136,7 @@ Thanks to Yushi who shared a presentation (ELI: Bare-Metal Performance">
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
-<p>Source：<a href="http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html</a></p>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
 <p>Thanks to <a href="https://twitter.com/ysmoo" target="_blank" rel="external">Yushi</a> who shared a presentation (<a href="http://www.iolanes.eu/_docs/eli_asplos12_slides.pdf" target="_blank" rel="external">ELI: Bare-Metal Performance for I/O Virtualization</a>) with me. In that hypervisor (ELI), it innovates an idea of gust IDT shadow (or IDT virtualization) design for some specific usage models. I’m going to talk a little bit about this idea.</p>
 <p>This post firstly gives an introduction about IDT shadow in that paper, then talks about guest IDT hooking with this technique, and finally explains how to detect such a hooking with processor LBR feature. </p>

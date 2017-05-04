@@ -129,9 +129,7 @@
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
-<p>Source：<a href="http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html</a></p>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
 <p>Thanks to <a href="https://twitter.com/ysmoo" target="_blank" rel="external">Yushi</a> who shared a presentation (<a href="http://www.iolanes.eu/_docs/eli_asplos12_slides.pdf" target="_blank" rel="external">ELI: Bare-Metal Performance for I/O Virtualization</a>) with me. In that hypervisor (ELI), it innovates an idea of gust IDT shadow (or IDT virtualization) design for some specific usage models. I’m going to talk a little bit about this idea.</p>
 <p>This post firstly gives an introduction about IDT shadow in that paper, then talks about guest IDT hooking with this technique, and finally explains how to detect such a hooking with processor LBR feature. </p>
@@ -208,9 +206,7 @@
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
-<p>Source：<a href="http://hypervsir.blogspot.com/2014/11/paper-read-bitvisor-thin-hypervisor-for.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/paper-read-bitvisor-thin-hypervisor-for.html</a></p>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/11/paper-read-bitvisor-thin-hypervisor-for.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/paper-read-bitvisor-thin-hypervisor-for.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
 <p>This post is wrote to share an idea of the paper (<a href="http://dl.acm.org/citation.cfm?id=1508311" target="_blank" rel="external">BitVisor: A Thin Hypervisor for Enforcing I/O Device Security</a>) that I read recently. It innovates a <strong>hypervisor-based solution for enforcing storage/disk encryption of ATA devices</strong>.<br>As we know that Direct memory access (DMA) is a feature in computer system that allows certain hardware subsystems to directly access main system memory independently of the CPU/processor. </p>
 <p>As shown in picture below (from <a href="http://en.wikipedia.org/wiki/IOMMU" target="_blank" rel="external">wikipedia</a>), processor MMU (if present) cannot directly intercept data movement between external DMA-capable devices and the main memory. Even in a virtualization environment, extended page table (EPT or NPT) MMU configured by Hypervisor cannot protect the main memory resource, this is one of reasons of why the technology IOMMU like VT-d (<a href="https://software.intel.com/en-us/articles/intel-virtualization-technology-for-directed-io-vt-d-enhancing-intel-platforms-for-efficient-virtualization-of-io-devices" target="_blank" rel="external">Intel Virtualization Technology for Directed I/O</a>) is introduced to prevent malicious device drivers from attacking against the main memory even hypervisor owned memory space. </p>
@@ -287,9 +283,7 @@
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author:<a href="http://www.brendangregg.com/index.html" target="_blank" rel="external">Brendan D. Gregg</a></p>
-<p>Source:<a href="http://www.brendangregg.com/blog/2014-05-07/what-color-is-your-xen.html" target="_blank" rel="external">http://www.brendangregg.com/blog/2014-05-07/what-color-is-your-xen.html</a></p>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author:<a href="http://www.brendangregg.com/index.html" target="_blank" rel="external">Brendan D. Gregg</a><br>Source:<a href="http://www.brendangregg.com/blog/2014-05-07/what-color-is-your-xen.html" target="_blank" rel="external">http://www.brendangregg.com/blog/2014-05-07/what-color-is-your-xen.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
 <p>What’s faster: <strong>PV</strong>, <strong>HVM</strong>, <strong>HVM with PV drivers</strong>, <strong>PVHVM</strong>, or <strong>PVH</strong>? Cloud computing providers using <a href="http://www.xenproject.org/" target="_blank" rel="external">Xen</a> can offer different virtualization “modes”, based on paravirtualization (PV), hardware virtual machine (HVM), or a hybrid of them. As a customer, you may be required to choose one of these. So, which one?</p>
 <p>Rackspace offers <a href="http://www.rackspace.com/knowledge_center/article/choosing-a-virtualization-mode-pv-versus-pvhvm" target="_blank" rel="external">PV or PVHVM</a>, and Amazon EC2 offers <a href="http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-types.html" target="_blank" rel="external">PV or HVM</a>. I’d summarize the choice today as:</p>
@@ -403,9 +397,7 @@
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
-<p>Source：<a href="http://hypervsir.blogspot.com/2014/10/in-linux-kernel-threadinfo-is-small-cpu.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/in-linux-kernel-threadinfo-is-small-cpu.html</a></p>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/in-linux-kernel-threadinfo-is-small-cpu.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/in-linux-kernel-threadinfo-is-small-cpu.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
 <p>In Linux kernel, <strong><em>thread_info</em></strong> is a small CPU-specific data structure that stores some low-level task data for corresponding process, it also has a pointer to <strong><em>task_struct</em></strong>, which is a processor-independent process control block data structure, e.g. scheduling, virtual memory structures.<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* x86 * 64 */</span></div><div class="line"><span class="keyword">struct</span> thread_info &#123;</div><div class="line"><span class="keyword">struct</span> task_struct   *task;        <span class="comment">/* main task structure */</span></div><div class="line"><span class="keyword">struct</span> exec_domain  *exec_domain; <span class="comment">/* execution domain */</span></div><div class="line">__u32               flags;        <span class="comment">/* low level flags */</span></div><div class="line">__u32               status;       <span class="comment">/* thread synchronous flags*/</span></div><div class="line">__u32                cpu;          <span class="comment">/* current CPU */</span></div><div class="line"><span class="keyword">int</span>                  saved_preempt_count;</div><div class="line"><span class="keyword">mm_segment_t</span>         addr_limit;</div><div class="line"><span class="keyword">struct</span> restart_block restart_block;</div><div class="line"><span class="keyword">void</span> __user          *sysenter_return;</div><div class="line"><span class="keyword">unsigned</span> <span class="keyword">int</span>         sig_on_uaccess_error:<span class="number">1</span>;</div><div class="line"><span class="keyword">unsigned</span> <span class="keyword">int</span>         uaccess_err:<span class="number">1</span>; <span class="comment">/* uaccess failed */</span></div><div class="line">&#125;;</div></pre></td></tr></table></figure></p>
 <p>Every user process has its unique two stacks, one is for code running in user mode, and the other is <strong><em>kernel stack</em></strong> for code execution running in kernel mode. </p>
@@ -481,9 +473,7 @@
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
-<p>Source：<a href="http://hypervsir.blogspot.com/2014/10/security-os-design-idea-to-prevent.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/security-os-design-idea-to-prevent.html</a></p>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/security-os-design-idea-to-prevent.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/security-os-design-idea-to-prevent.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
 <p>Recently, when reading this paper “<strong><a href="http://www.csc.ncsu.edu/faculty/jiang/pubs/OAKLAND10.pdf" target="_blank" rel="external">HyperSafe - A Lightweight Approach to Provide Lifetime Hypervisor Control-Flow Integrity</a></strong>“, an idea just comes out from my mind: using write protection (CR0.WP) and read-only (RO) page attribute to prevent the critical kernel data structures being overwritten by malicious software through buffer (stack, heap) overflow in an exploitable kernel module.</p>
 <p>In a virtual memory management system, OS kernel can configure a Read-Only (RO) virtual page by clearing R/W bit in corresponding page table entry (PTE) so that a virtual page cannot be modified by OS kernel and/or application.</p>

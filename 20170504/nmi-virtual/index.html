@@ -11,28 +11,22 @@
   
   
   
-  <meta name="description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2015/04/what-how-and-why-on-interrupt-window-or.html
-转载请注明：原作者信息以及CSysSec
+  <meta name="description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2015/04/what-how-and-why-on-interrupt-window-or.html转载请注明：原作者信息以及CSysSec
 
-More recently, one of my colleagues asked me why  there is a feature ca">
+More recently, one of my colleagues asked me why  there is a feature calle">
 <meta property="og:type" content="article">
 <meta property="og:title" content="虚拟化技术的NMI窗口退出">
 <meta property="og:url" content="http://yoursite.com/20170504/nmi-virtual/index.html">
 <meta property="og:site_name" content="Index of Computer System and Security">
-<meta property="og:description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2015/04/what-how-and-why-on-interrupt-window-or.html
-转载请注明：原作者信息以及CSysSec
+<meta property="og:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2015/04/what-how-and-why-on-interrupt-window-or.html转载请注明：原作者信息以及CSysSec
 
-More recently, one of my colleagues asked me why  there is a feature ca">
-<meta property="og:updated_time" content="2017-05-04T10:42:18.000Z">
+More recently, one of my colleagues asked me why  there is a feature calle">
+<meta property="og:updated_time" content="2017-05-04T10:53:01.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="虚拟化技术的NMI窗口退出">
-<meta name="twitter:description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2015/04/what-how-and-why-on-interrupt-window-or.html
-转载请注明：原作者信息以及CSysSec
+<meta name="twitter:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2015/04/what-how-and-why-on-interrupt-window-or.html转载请注明：原作者信息以及CSysSec
 
-More recently, one of my colleagues asked me why  there is a feature ca">
+More recently, one of my colleagues asked me why  there is a feature calle">
   
     <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
   
@@ -140,9 +134,7 @@ More recently, one of my colleagues asked me why  there is a feature ca">
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
-<p>Source：<a href="http://hypervsir.blogspot.com/2015/04/what-how-and-why-on-interrupt-window-or.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2015/04/what-how-and-why-on-interrupt-window-or.html</a></p>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2015/04/what-how-and-why-on-interrupt-window-or.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2015/04/what-how-and-why-on-interrupt-window-or.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
 <p>More recently, one of my colleagues asked me <strong><em>why</em></strong>  there is a feature called “<strong><em>Interrupt Window exiting</em></strong> “ in virtualization technology, and <strong><em>how</em></strong> it can be used by VMM? This blog is going to briefly describe its “what, how and why” .</p>
 <h3 id="WHAT-and-HOW"><a href="#WHAT-and-HOW" class="headerlink" title="WHAT, and HOW"></a><strong>WHAT, and HOW</strong></h3><p>“Interrupt Window Exiting” is one of VM exit reasons (#7 in Intel Technology). If “interrupt-window exiting” VM-execution control is set, this VM exit happens right after a VM entry and at the beginning of an any instruction:</p>

@@ -11,28 +11,22 @@
   
   
   
-  <meta name="description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/12/using-lbr-last-branch-record-feature-to.html
-转载请注明：原作者信息以及CSysSec
+  <meta name="description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/12/using-lbr-last-branch-record-feature-to.html转载请注明：原作者信息以及CSysSec
 
-SMEP (Supervisor Mode Execution Prevention) is a mitigation that aims t">
+SMEP (Supervisor Mode Execution Prevention) is a mitigation that aims to p">
 <meta property="og:type" content="article">
 <meta property="og:title" content="利用LBR特性检测ret2dir攻击">
 <meta property="og:url" content="http://yoursite.com/20170504/lbr-ret2dir/index.html">
 <meta property="og:site_name" content="Index of Computer System and Security">
-<meta property="og:description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/12/using-lbr-last-branch-record-feature-to.html
-转载请注明：原作者信息以及CSysSec
+<meta property="og:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/12/using-lbr-last-branch-record-feature-to.html转载请注明：原作者信息以及CSysSec
 
-SMEP (Supervisor Mode Execution Prevention) is a mitigation that aims t">
-<meta property="og:updated_time" content="2017-05-04T10:40:20.000Z">
+SMEP (Supervisor Mode Execution Prevention) is a mitigation that aims to p">
+<meta property="og:updated_time" content="2017-05-04T10:53:12.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="利用LBR特性检测ret2dir攻击">
-<meta name="twitter:description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/12/using-lbr-last-branch-record-feature-to.html
-转载请注明：原作者信息以及CSysSec
+<meta name="twitter:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/12/using-lbr-last-branch-record-feature-to.html转载请注明：原作者信息以及CSysSec
 
-SMEP (Supervisor Mode Execution Prevention) is a mitigation that aims t">
+SMEP (Supervisor Mode Execution Prevention) is a mitigation that aims to p">
   
     <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
   
@@ -140,9 +134,7 @@ SMEP (Supervisor Mode Execution Prevention) is a mitigation that aims t">
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
-<p>Source：<a href="http://hypervsir.blogspot.com/2014/12/using-lbr-last-branch-record-feature-to.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/12/using-lbr-last-branch-record-feature-to.html</a></p>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/12/using-lbr-last-branch-record-feature-to.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/12/using-lbr-last-branch-record-feature-to.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
 <p>SMEP (Supervisor Mode Execution Prevention) is a mitigation that aims to prevent the CPU from running code from user-mode while in kernel-mode, however this post (<strong><a href="https://labs.mwrinfosecurity.com/blog/2014/08/15/windows-8-kernel-memory-protections-bypass/" target="_blank" rel="external">Windows 8 Kernel Memory Protections Bypass</a></strong>) presents a generic technique for exploiting kernel vulnerabilities with bypassing SMEP. Unlike my previous post (<strong><a href="http://hypervsir.blogspot.com/2014/11/page-structure-table-corruption-attacks.html" target="_blank" rel="external">Page Table Structure Corruption Attacks - How to Mitigate it?</a></strong>) that presented a mitigation to that attack, this post will present a solution to detect such a ret2usr attack due to MMU paging structure corruption.</p>
 <p>In Intel/x86 recent processors, the LBR (last branch record) feature has some filtering capabilities like CPL (current privilege level) filtering and indirect jmp/call filterings. </p>

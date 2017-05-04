@@ -11,28 +11,22 @@
   
   
   
-  <meta name="description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/10/why-smaller-code-size-with-xen-on-arm.html
-转载请注明：原作者信息以及CSysSec
+  <meta name="description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/10/why-smaller-code-size-with-xen-on-arm.html转载请注明：原作者信息以及CSysSec
 
-This white paper (Xen ARM with Virtualization Extensions whitepaper) indi">
+This white paper (Xen ARM with Virtualization Extensions whitepaper) indicat">
 <meta property="og:type" content="article">
 <meta property="og:title" content="为什么ARM平台XEN的代码量更小">
 <meta property="og:url" content="http://yoursite.com/20170504/arm-xen/index.html">
 <meta property="og:site_name" content="Index of Computer System and Security">
-<meta property="og:description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/10/why-smaller-code-size-with-xen-on-arm.html
-转载请注明：原作者信息以及CSysSec
+<meta property="og:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/10/why-smaller-code-size-with-xen-on-arm.html转载请注明：原作者信息以及CSysSec
 
-This white paper (Xen ARM with Virtualization Extensions whitepaper) indi">
-<meta property="og:updated_time" content="2017-05-04T10:12:56.000Z">
+This white paper (Xen ARM with Virtualization Extensions whitepaper) indicat">
+<meta property="og:updated_time" content="2017-05-04T10:56:44.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="为什么ARM平台XEN的代码量更小">
-<meta name="twitter:description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/10/why-smaller-code-size-with-xen-on-arm.html
-转载请注明：原作者信息以及CSysSec
+<meta name="twitter:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/10/why-smaller-code-size-with-xen-on-arm.html转载请注明：原作者信息以及CSysSec
 
-This white paper (Xen ARM with Virtualization Extensions whitepaper) indi">
+This white paper (Xen ARM with Virtualization Extensions whitepaper) indicat">
   
     <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
   
@@ -140,9 +134,7 @@ This white paper (Xen ARM with Virtualization Extensions whitepaper) indi">
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
-<p>Source：<a href="http://hypervsir.blogspot.com/2014/10/why-smaller-code-size-with-xen-on-arm.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/why-smaller-code-size-with-xen-on-arm.html</a></p>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/why-smaller-code-size-with-xen-on-arm.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/why-smaller-code-size-with-xen-on-arm.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
 <p>This white paper (<a href="http://wiki.xenproject.org/wiki/Xen_ARM_with_Virtualization_Extensions_whitepaper" target="_blank" rel="external">Xen ARM with Virtualization Extensions whitepaper</a>) indicates that “Xen on ARM is 1/6 of the code size of x86_64 Xen, while still providing a similar level of features”. what does this mean? Does this mean that Xen/ARM is better than Xen/x86? We cannot simply just make this conclusion, but anyway smaller code size means smaller <a href="http://en.wikipedia.org/wiki/Trusted_computing_base" target="_blank" rel="external">TCB</a>, which can reduce security risks (e.g. security vulnerabilities). </p>
 <p>First of all, I don’t think that is the latest status on Xen 4.4+ version. see the latest one (in 2014, Xen on ARM summit, in the Reference link below). </p>

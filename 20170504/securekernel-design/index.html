@@ -11,30 +11,24 @@
   
   
   
-  <meta name="description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/10/in-linux-kernel-threadinfo-is-small-cpu.html
-转载请注明：原作者信息以及CSysSec
+  <meta name="description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/10/in-linux-kernel-threadinfo-is-small-cpu.html转载请注明：原作者信息以及CSysSec
 
-In Linux kernel, thread_info is a small CPU-specific data structure tha">
+In Linux kernel, thread_info is a small CPU-specific data structure that s">
 <meta property="og:type" content="article">
 <meta property="og:title" content="这是Linux内核中一种好的安全设计吗- thread_info和内核栈的联系">
 <meta property="og:url" content="http://yoursite.com/20170504/securekernel-design/index.html">
 <meta property="og:site_name" content="Index of Computer System and Security">
-<meta property="og:description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/10/in-linux-kernel-threadinfo-is-small-cpu.html
-转载请注明：原作者信息以及CSysSec
+<meta property="og:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/10/in-linux-kernel-threadinfo-is-small-cpu.html转载请注明：原作者信息以及CSysSec
 
-In Linux kernel, thread_info is a small CPU-specific data structure tha">
+In Linux kernel, thread_info is a small CPU-specific data structure that s">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/thread_info_stack%281%29.png">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/thread_info_stack%282%29.png">
-<meta property="og:updated_time" content="2017-05-04T10:20:18.000Z">
+<meta property="og:updated_time" content="2017-05-04T10:55:40.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="这是Linux内核中一种好的安全设计吗- thread_info和内核栈的联系">
-<meta name="twitter:description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/10/in-linux-kernel-threadinfo-is-small-cpu.html
-转载请注明：原作者信息以及CSysSec
+<meta name="twitter:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/10/in-linux-kernel-threadinfo-is-small-cpu.html转载请注明：原作者信息以及CSysSec
 
-In Linux kernel, thread_info is a small CPU-specific data structure tha">
+In Linux kernel, thread_info is a small CPU-specific data structure that s">
 <meta name="twitter:image" content="http://oij0laovn.bkt.clouddn.com/thread_info_stack%281%29.png">
   
     <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
@@ -143,9 +137,7 @@ In Linux kernel, thread_info is a small CPU-specific data structure tha">
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
-<p>Source：<a href="http://hypervsir.blogspot.com/2014/10/in-linux-kernel-threadinfo-is-small-cpu.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/in-linux-kernel-threadinfo-is-small-cpu.html</a></p>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/in-linux-kernel-threadinfo-is-small-cpu.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/in-linux-kernel-threadinfo-is-small-cpu.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
 <p>In Linux kernel, <strong><em>thread_info</em></strong> is a small CPU-specific data structure that stores some low-level task data for corresponding process, it also has a pointer to <strong><em>task_struct</em></strong>, which is a processor-independent process control block data structure, e.g. scheduling, virtual memory structures.<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* x86 * 64 */</span></div><div class="line"><span class="keyword">struct</span> thread_info &#123;</div><div class="line"><span class="keyword">struct</span> task_struct   *task;        <span class="comment">/* main task structure */</span></div><div class="line"><span class="keyword">struct</span> exec_domain  *exec_domain; <span class="comment">/* execution domain */</span></div><div class="line">__u32               flags;        <span class="comment">/* low level flags */</span></div><div class="line">__u32               status;       <span class="comment">/* thread synchronous flags*/</span></div><div class="line">__u32                cpu;          <span class="comment">/* current CPU */</span></div><div class="line"><span class="keyword">int</span>                  saved_preempt_count;</div><div class="line"><span class="keyword">mm_segment_t</span>         addr_limit;</div><div class="line"><span class="keyword">struct</span> restart_block restart_block;</div><div class="line"><span class="keyword">void</span> __user          *sysenter_return;</div><div class="line"><span class="keyword">unsigned</span> <span class="keyword">int</span>         sig_on_uaccess_error:<span class="number">1</span>;</div><div class="line"><span class="keyword">unsigned</span> <span class="keyword">int</span>         uaccess_err:<span class="number">1</span>; <span class="comment">/* uaccess failed */</span></div><div class="line">&#125;;</div></pre></td></tr></table></figure></p>
 <p>Every user process has its unique two stacks, one is for code running in user mode, and the other is <strong><em>kernel stack</em></strong> for code execution running in kernel mode. </p>

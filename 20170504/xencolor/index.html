@@ -11,31 +11,25 @@
   
   
   
-  <meta name="description" content="Author:Brendan D. Gregg
-Source:http://www.brendangregg.com/blog/2014-05-07/what-color-is-your-xen.html
-转载请注明：原作者信息以及CSysSec
+  <meta name="description" content="Author:Brendan D. GreggSource:http://www.brendangregg.com/blog/2014-05-07/what-color-is-your-xen.html转载请注明：原作者信息以及CSysSec
 
-What’s faster: PV, HVM, HVM with PV drivers, PVHVM, or PVH? Cloud computing">
+What’s faster: PV, HVM, HVM with PV drivers, PVHVM, or PVH? Cloud computing p">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Xen模式：你的XEN是什么颜色？">
 <meta property="og:url" content="http://yoursite.com/20170504/xencolor/index.html">
 <meta property="og:site_name" content="Index of Computer System and Security">
-<meta property="og:description" content="Author:Brendan D. Gregg
-Source:http://www.brendangregg.com/blog/2014-05-07/what-color-is-your-xen.html
-转载请注明：原作者信息以及CSysSec
+<meta property="og:description" content="Author:Brendan D. GreggSource:http://www.brendangregg.com/blog/2014-05-07/what-color-is-your-xen.html转载请注明：原作者信息以及CSysSec
 
-What’s faster: PV, HVM, HVM with PV drivers, PVHVM, or PVH? Cloud computing">
+What’s faster: PV, HVM, HVM with PV drivers, PVHVM, or PVH? Cloud computing p">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/xen-virt-spectrum-crop-800.png">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/xen-mode-flow.png">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/xen-colors.png">
-<meta property="og:updated_time" content="2017-05-04T10:24:29.000Z">
+<meta property="og:updated_time" content="2017-05-04T10:55:04.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Xen模式：你的XEN是什么颜色？">
-<meta name="twitter:description" content="Author:Brendan D. Gregg
-Source:http://www.brendangregg.com/blog/2014-05-07/what-color-is-your-xen.html
-转载请注明：原作者信息以及CSysSec
+<meta name="twitter:description" content="Author:Brendan D. GreggSource:http://www.brendangregg.com/blog/2014-05-07/what-color-is-your-xen.html转载请注明：原作者信息以及CSysSec
 
-What’s faster: PV, HVM, HVM with PV drivers, PVHVM, or PVH? Cloud computing">
+What’s faster: PV, HVM, HVM with PV drivers, PVHVM, or PVH? Cloud computing p">
 <meta name="twitter:image" content="http://oij0laovn.bkt.clouddn.com/xen-virt-spectrum-crop-800.png">
   
     <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
@@ -144,9 +138,7 @@ What’s faster: PV, HVM, HVM with PV drivers, PVHVM, or PVH? Cloud computing">
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author:<a href="http://www.brendangregg.com/index.html" target="_blank" rel="external">Brendan D. Gregg</a></p>
-<p>Source:<a href="http://www.brendangregg.com/blog/2014-05-07/what-color-is-your-xen.html" target="_blank" rel="external">http://www.brendangregg.com/blog/2014-05-07/what-color-is-your-xen.html</a></p>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author:<a href="http://www.brendangregg.com/index.html" target="_blank" rel="external">Brendan D. Gregg</a><br>Source:<a href="http://www.brendangregg.com/blog/2014-05-07/what-color-is-your-xen.html" target="_blank" rel="external">http://www.brendangregg.com/blog/2014-05-07/what-color-is-your-xen.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
 <p>What’s faster: <strong>PV</strong>, <strong>HVM</strong>, <strong>HVM with PV drivers</strong>, <strong>PVHVM</strong>, or <strong>PVH</strong>? Cloud computing providers using <a href="http://www.xenproject.org/" target="_blank" rel="external">Xen</a> can offer different virtualization “modes”, based on paravirtualization (PV), hardware virtual machine (HVM), or a hybrid of them. As a customer, you may be required to choose one of these. So, which one?</p>
 <p>Rackspace offers <a href="http://www.rackspace.com/knowledge_center/article/choosing-a-virtualization-mode-pv-versus-pvhvm" target="_blank" rel="external">PV or PVHVM</a>, and Amazon EC2 offers <a href="http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-types.html" target="_blank" rel="external">PV or HVM</a>. I’d summarize the choice today as:</p>

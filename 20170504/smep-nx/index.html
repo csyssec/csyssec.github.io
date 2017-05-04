@@ -11,32 +11,26 @@
   
   
   
-  <meta name="description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/11/implement-software-based-smep-with-non.html
-转载请注明：原作者信息以及CSysSec
+  <meta name="description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/11/implement-software-based-smep-with-non.html转载请注明：原作者信息以及CSysSec
 
-In my previous post, I talked about how to implement a software-based SM">
+In my previous post, I talked about how to implement a software-based SMEP">
 <meta property="og:type" content="article">
 <meta property="og:title" content="利用NX位实现基于软件的SMEP">
 <meta property="og:url" content="http://yoursite.com/20170504/smep-nx/index.html">
 <meta property="og:site_name" content="Index of Computer System and Security">
-<meta property="og:description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/11/implement-software-based-smep-with-non.html
-转载请注明：原作者信息以及CSysSec
+<meta property="og:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/11/implement-software-based-smep-with-non.html转载请注明：原作者信息以及CSysSec
 
-In my previous post, I talked about how to implement a software-based SM">
+In my previous post, I talked about how to implement a software-based SMEP">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/SMEP1.png">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/SMEP2.png">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/SMEP4.png">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/SMEP3.png">
-<meta property="og:updated_time" content="2017-05-04T10:33:33.000Z">
+<meta property="og:updated_time" content="2017-05-04T10:53:50.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="利用NX位实现基于软件的SMEP">
-<meta name="twitter:description" content="Author：Bing Zhu 
-Source：http://hypervsir.blogspot.com/2014/11/implement-software-based-smep-with-non.html
-转载请注明：原作者信息以及CSysSec
+<meta name="twitter:description" content="Author：Bing ZhuSource：http://hypervsir.blogspot.com/2014/11/implement-software-based-smep-with-non.html转载请注明：原作者信息以及CSysSec
 
-In my previous post, I talked about how to implement a software-based SM">
+In my previous post, I talked about how to implement a software-based SMEP">
 <meta name="twitter:image" content="http://oij0laovn.bkt.clouddn.com/SMEP1.png">
   
     <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
@@ -145,9 +139,7 @@ In my previous post, I talked about how to implement a software-based SM">
     </div>
     <div class="article-entry" itemprop="articleBody">
       
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a> </p>
-<p>Source：<a href="http://hypervsir.blogspot.com/2014/11/implement-software-based-smep-with-non.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/implement-software-based-smep-with-non.html</a></p>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/11/implement-software-based-smep-with-non.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/implement-software-based-smep-with-non.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
 <hr>
 <p>In my <a href="http://hypervsir.blogspot.com/2014/11/how-to-implement-software-based.html" target="_blank" rel="external">previous post</a>, I talked about how to implement a software-based SMEP (Supervisor Mode Execution Protection) with virtualization/hypervisor for fun. In this post, I’m going to detail yet another solution to implement software-based SMEP without virtualization technology. </p>
 <p>In modern operating systems, like Linux and Windows, all the processes share the same kernel virtual address space, but have separate user virtual address space, see below for <a href="http://blogs.technet.com/b/askperf/archive/2007/09/28/memory-management-x86-virtual-address-space.aspx" target="_blank" rel="external">Windows 32bit OS</a>. The system can achieve this by configuring separate page structures pointed by a translation table base register (e.g. CR3 register on x86/Intel MMU architecture) for each process, and switch among them.</p>
