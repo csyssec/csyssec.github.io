@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>qemu-kvm虚拟机初始化及创建过程源码简要分析（一） | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="作者: Mr_buffoon
+转载请注明：原作者信息以及CSysSec
+
+ 我们知道，Qemu-KVM实际上包括Qemu和KVM两部分，那么在创建以及初始化虚拟机时，实际上也是在这两部分进行的。
+KVM实际上就是kvm内核模块，包括kvm.ko、kvm-intel.ko、kvm-amd.ko三部分，后两部分分别对应Intel体系的VMX技术以及AMD体系的SVM技术。
+首先，我们需要加载模块，当我">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Qemu-KVM虚拟机初始化及创建过程源码简要分析（一）">
+<meta property="og:url" content="http://yoursite.com/20170504/qemukvm-source1/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="作者: Mr_buffoon
+转载请注明：原作者信息以及CSysSec
+
+ 我们知道，Qemu-KVM实际上包括Qemu和KVM两部分，那么在创建以及初始化虚拟机时，实际上也是在这两部分进行的。
+KVM实际上就是kvm内核模块，包括kvm.ko、kvm-intel.ko、kvm-amd.ko三部分，后两部分分别对应Intel体系的VMX技术以及AMD体系的SVM技术。
+首先，我们需要加载模块，当我">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/2-1.png">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/2-2.png">
+<meta property="og:updated_time" content="2017-05-04T07:02:09.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Qemu-KVM虚拟机初始化及创建过程源码简要分析（一）">
+<meta name="twitter:description" content="作者: Mr_buffoon
+转载请注明：原作者信息以及CSysSec
+
+ 我们知道，Qemu-KVM实际上包括Qemu和KVM两部分，那么在创建以及初始化虚拟机时，实际上也是在这两部分进行的。
+KVM实际上就是kvm内核模块，包括kvm.ko、kvm-intel.ko、kvm-amd.ko三部分，后两部分分别对应Intel体系的VMX技术以及AMD体系的SVM技术。
+首先，我们需要加载模块，当我">
+<meta name="twitter:image" content="http://oij0laovn.bkt.clouddn.com/2-1.png">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">FROM 0 TO 1</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">系统结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/courses">名人课堂</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-qemukvm-source1" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      Qemu-KVM虚拟机初始化及创建过程源码简要分析（一）
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/qemukvm-source1/" class="article-date">
+	  <time datetime="2017-05-04T07:01:06.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p><strong>作者:</strong> <a href="http://blog.csdn.net/mrbuffoon" target="_blank" rel="external">Mr_buffoon</a></p>
+<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p> 我们知道，Qemu-KVM实际上包括Qemu和KVM两部分，那么在创建以及初始化虚拟机时，实际上也是在这两部分进行的。</p>
+<p>KVM实际上就是kvm内核模块，包括kvm.ko、kvm-intel.ko、kvm-amd.ko三部分，后两部分分别对应Intel体系的VMX技术以及AMD体系的SVM技术。</p>
+<p>首先，我们需要加载模块，当我们加载kvm-xxx.ko模块时，会调用对应的module_init()函数，然后调用vmx_init()或者svm_init()函数，最后进入到统一的kvm.ko模块中的kvm_init()函数，现在正式开始进行虚拟机的初始化工作。</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/2-1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/2-1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">module_init(vmx_init)    <span class="comment">//位于vmx.c文件</span></div></pre></td></tr></table></figure>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">static</span> <span class="keyword">int</span> __<span class="function">init <span class="title">vmx_init</span><span class="params">(<span class="keyword">void</span>)</span>    <span class="comment">//位于vmx.c文件  </span></span></div><div class="line">&#123;  </div><div class="line">       ..............<span class="comment">//省略部分代码  </span></div><div class="line">       r= kvm_init(&amp;vmx_x86_ops, <span class="keyword">sizeof</span>(<span class="keyword">struct</span> vcpu_vmx),  </div><div class="line">                   __alignof__(<span class="keyword">struct</span> vcpu_vmx),THIS_MODULE);  </div><div class="line">       ................<span class="comment">//省略部分代码  </span></div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">kvm_init</span><span class="params">(voidvoid *opaque, <span class="keyword">unsigned</span> vcpu_size,<span class="keyword">unsigned</span> vcpu_align,  </span></span></div><div class="line">                <span class="keyword">struct</span> <span class="keyword">module</span> *<span class="keyword">module</span>)    <span class="comment">//位于kvm_main.c文件  </span></div><div class="line">&#123;  </div><div class="line">       ......................<span class="comment">//省略部分代码  </span></div><div class="line">       r= kvm_arch_init(opaque);  </div><div class="line">       ........................<span class="comment">//省略部分代码  </span></div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p> 在进入到kvm_init()函数后，进行了很多初始化的相关工作，这里单独强调一下kvm_arch_init()函数。<br>    在vmx.c文件中声明并定义了一个结构体vmx_x86_ops，这是函数指针的集合，其实就是各种操作的一个集合。内部很多函数是后续的初始化工作需要具体调用到的，比如很多Qemu层的ioctl调用到内核层实际上就是执行这内部的一些函数。具体的内容如下：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div><div class="line">73</div><div class="line">74</div><div class="line">75</div><div class="line">76</div><div class="line">77</div><div class="line">78</div><div class="line">79</div><div class="line">80</div><div class="line">81</div><div class="line">82</div><div class="line">83</div><div class="line">84</div><div class="line">85</div><div class="line">86</div><div class="line">87</div><div class="line">88</div><div class="line">89</div><div class="line">90</div><div class="line">91</div><div class="line">92</div><div class="line">93</div><div class="line">94</div><div class="line">95</div><div class="line">96</div><div class="line">97</div><div class="line">98</div><div class="line">99</div><div class="line">100</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">static</span> <span class="keyword">struct</span> kvm_x86_ops vmx_x86_ops = &#123;  </div><div class="line">       .cpu_has_kvm_support= cpu_has_kvm_support,  </div><div class="line">       .disabled_by_bios= vmx_disabled_by_bios,  </div><div class="line">       .hardware_setup= hardware_setup,  </div><div class="line">       .hardware_unsetup= hardware_unsetup,  </div><div class="line">       .check_processor_compatibility= vmx_check_processor_compat,  </div><div class="line">       .hardware_enable= hardware_enable,  </div><div class="line">       .hardware_disable= hardware_disable,  </div><div class="line">       .cpu_has_accelerated_tpr= report_flexpriority,  </div><div class="line">   </div><div class="line">       .vcpu_create= vmx_create_vcpu,  </div><div class="line">       .vcpu_free= vmx_free_vcpu,  </div><div class="line">       .vcpu_reset= vmx_vcpu_reset,  </div><div class="line">   </div><div class="line">       .prepare_guest_switch= vmx_save_host_state,  </div><div class="line">       .vcpu_load= vmx_vcpu_load,  </div><div class="line">       .vcpu_put= vmx_vcpu_put,  </div><div class="line">   </div><div class="line">       .update_db_bp_intercept= update_exception_bitmap,  </div><div class="line">       .get_msr= vmx_get_msr,  </div><div class="line">       .set_msr= vmx_set_msr,  </div><div class="line">       .get_segment_base= vmx_get_segment_base,  </div><div class="line">       .get_segment= vmx_get_segment,  </div><div class="line">       .set_segment= vmx_set_segment,  </div><div class="line">       .get_cpl= vmx_get_cpl,  </div><div class="line">       .get_cs_db_l_bits= vmx_get_cs_db_l_bits,  </div><div class="line">       .decache_cr0_guest_bits= vmx_decache_cr0_guest_bits,  </div><div class="line">       .decache_cr3= vmx_decache_cr3,  </div><div class="line">       .decache_cr4_guest_bits= vmx_decache_cr4_guest_bits,  </div><div class="line">       .set_cr0= vmx_set_cr0,  </div><div class="line">       .set_cr3= vmx_set_cr3,  </div><div class="line">       .set_cr4= vmx_set_cr4,  </div><div class="line">       .set_efer= vmx_set_efer,  </div><div class="line">       .get_idt= vmx_get_idt,  </div><div class="line">       .set_idt= vmx_set_idt,  </div><div class="line">       .get_gdt= vmx_get_gdt,  </div><div class="line">       .set_gdt= vmx_set_gdt,  </div><div class="line">       .set_dr7= vmx_set_dr7,  </div><div class="line">       .cache_reg= vmx_cache_reg,  </div><div class="line">       .get_rflags= vmx_get_rflags,  </div><div class="line">       .set_rflags= vmx_set_rflags,  </div><div class="line">       .fpu_activate= vmx_fpu_activate,  </div><div class="line">       .fpu_deactivate= vmx_fpu_deactivate,  </div><div class="line">   </div><div class="line">       .tlb_flush= vmx_flush_tlb,  </div><div class="line">   </div><div class="line">       .run= vmx_vcpu_run,  </div><div class="line">       .handle_exit= vmx_handle_exit,  </div><div class="line">       .skip_emulated_instruction= skip_emulated_instruction,  </div><div class="line">       .set_interrupt_shadow= vmx_set_interrupt_shadow,  </div><div class="line">       .get_interrupt_shadow= vmx_get_interrupt_shadow,  </div><div class="line">       .patch_hypercall= vmx_patch_hypercall,  </div><div class="line">       .set_irq= vmx_inject_irq,  </div><div class="line">       .set_nmi= vmx_inject_nmi,  </div><div class="line">       .queue_exception= vmx_queue_exception,  </div><div class="line">       .cancel_injection= vmx_cancel_injection,  </div><div class="line">       .interrupt_allowed= vmx_interrupt_allowed,  </div><div class="line">       .nmi_allowed= vmx_nmi_allowed,  </div><div class="line">       .get_nmi_mask= vmx_get_nmi_mask,  </div><div class="line">       .set_nmi_mask= vmx_set_nmi_mask,  </div><div class="line">       .enable_nmi_window= enable_nmi_window,  </div><div class="line">       .enable_irq_window= enable_irq_window,  </div><div class="line">       .update_cr8_intercept= update_cr8_intercept,  </div><div class="line">       .set_virtual_x2apic_mode= vmx_set_virtual_x2apic_mode,  </div><div class="line">       .vm_has_apicv= vmx_vm_has_apicv,  </div><div class="line">       .load_eoi_exitmap= vmx_load_eoi_exitmap,  </div><div class="line">       .hwapic_irr_update= vmx_hwapic_irr_update,  </div><div class="line">       .hwapic_isr_update= vmx_hwapic_isr_update,  </div><div class="line">       .sync_pir_to_irr= vmx_sync_pir_to_irr,  </div><div class="line">       .deliver_posted_interrupt= vmx_deliver_posted_interrupt,  </div><div class="line">   </div><div class="line">       .set_tss_addr= vmx_set_tss_addr,  </div><div class="line">       .get_tdp_level= get_ept_level,  </div><div class="line">       .get_mt_mask= vmx_get_mt_mask,  </div><div class="line">   </div><div class="line">       .get_exit_info= vmx_get_exit_info,  </div><div class="line">   </div><div class="line">       .get_lpage_level= vmx_get_lpage_level,  </div><div class="line">   </div><div class="line">       .cpuid_update= vmx_cpuid_update,  </div><div class="line">   </div><div class="line">       .rdtscp_supported= vmx_rdtscp_supported,  </div><div class="line">       .invpcid_supported= vmx_invpcid_supported,  </div><div class="line">   </div><div class="line">       .set_supported_cpuid= vmx_set_supported_cpuid,  </div><div class="line">   </div><div class="line">       .has_wbinvd_exit= cpu_has_vmx_wbinvd_exit,  </div><div class="line">   </div><div class="line">       .set_tsc_khz= vmx_set_tsc_khz,  </div><div class="line">       .read_tsc_offset= vmx_read_tsc_offset,  </div><div class="line">       .write_tsc_offset= vmx_write_tsc_offset,  </div><div class="line">       .adjust_tsc_offset= vmx_adjust_tsc_offset,  </div><div class="line">       .compute_tsc_offset= vmx_compute_tsc_offset,  </div><div class="line">       .read_l1_tsc= vmx_read_l1_tsc,  </div><div class="line">   </div><div class="line">       .set_tdp_cr3= vmx_set_cr3,  </div><div class="line">   </div><div class="line">       .check_intercept= vmx_check_intercept,  </div><div class="line">       .handle_external_intr= vmx_handle_external_intr,  </div><div class="line">&#125;;</div></pre></td></tr></table></figure></p>
+<p>这个结构体作为参数传递到kvm_init()函数，再传递到kvm_arch_init()函数，再传递到全局变量kvm_x86_ops中，注册各种操作函数，后续可以调用。随后还进行了一些内部<strong>数据结构</strong>以及定时器、调试信息等的一些初始化工作。与此同时，qemu层也会进行大部分的初始化工作，这一部分后一篇再讲。</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/2-2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/2-2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<hr>
+<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟化基础/">虚拟化基础<span class="article-category-count">4</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/QEMU/">QEMU</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtulization/">Virtulization</a></li></ul>
+
+      
+        
+	<div id="comment">
+	
+	<!-- 多说评论框 start -->
+	 <div class="ds-thread" data-thread-key="/20170504/qemukvm-source1/" data-title="Qemu-KVM虚拟机初始化及创建过程源码简要分析（一）" data-url="http://yoursite.com/20170504/qemukvm-source1/"></div>
+	<!-- 多说评论框 end -->
+	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+	<script type="text/javascript">
+	var duoshuoQuery = {short_name:"csyssec"};
+	  (function() {
+	    var ds = document.createElement('script');
+	    ds.type = 'text/javascript';ds.async = true;
+	    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+	    ds.charset = 'UTF-8';
+	    (document.getElementsByTagName('head')[0] 
+	     || document.getElementsByTagName('body')[0]).appendChild(ds);
+	  })();
+	  </script>
+	<!-- 多说公共JS代码 end -->
+	
+	</div>
+	<link rel="stylesheet" href="/css/comment.css">
+
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/20170504/qemukvm-source2/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">上一篇</strong>
+      <div class="article-nav-title">
+        
+          Qemu-KVM虚拟机初始化及创建过程源码简要分析（二）
+        
+      </div>
+    </a>
+  
+  
+    <a href="/20170401/keylogger/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">Keylogger检测</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+    <ol class="toc">无</ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+       <!--  自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a> --> 
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/courses" class="mobile-nav-link">Courses</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>

@@ -106,6 +106,131 @@
         
           <section id="main">
   
+    <article id="post-qemukvm-source2"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/qemukvm-source2/">Qemu-KVM虚拟机初始化及创建过程源码简要分析（二）</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/qemukvm-source2/" class="article-date">
+	  <time datetime="2017-05-04T07:02:19.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者: <a href="http://blog.csdn.net/mrbuffoon" target="_blank" rel="external">Mr_buffoon</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p> 前面我们讲了KVM内核层创建及初始化虚拟机的一些工作过程，现在讲一下Qemu层的流程以及与KVM内核层的配合过程。<br>Qemu层是从vl.c中的main()函数开始的，这里通过在代码中添加一些注释的方式来进行讲解,中间省略了很多不重要或者我也没有搞清楚的代码。<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div><div class="line">73</div><div class="line">74</div><div class="line">75</div><div class="line">76</div><div class="line">77</div><div class="line">78</div><div class="line">79</div><div class="line">80</div><div class="line">81</div><div class="line">82</div><div class="line">83</div><div class="line">84</div><div class="line">85</div><div class="line">86</div><div class="line">87</div><div class="line">88</div><div class="line">89</div><div class="line">90</div><div class="line">91</div><div class="line">92</div><div class="line">93</div><div class="line">94</div><div class="line">95</div><div class="line">96</div><div class="line">97</div><div class="line">98</div><div class="line">99</div><div class="line">100</div><div class="line">101</div><div class="line">102</div><div class="line">103</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, charchar **argv, charchar **envp)</span>  </span></div><div class="line">&#123;  </div><div class="line">    ......  </div><div class="line">    atexit(qemu_run_exit_notifiers);<span class="comment">//注册了Qemu的退出函数  </span></div><div class="line">    ......  </div><div class="line">    module_call_init(MODULE_INIT_QOM);<span class="comment">//初始化Qemu的各个模块，具体见下面注释  </span></div><div class="line">      </div><div class="line"><span class="comment">/* </span></div><div class="line">    module_call_init实际上是设计了一个函数链表ModuleTypeList，参数作为一个Type，相关的函数注册到这个函数链表上， </div><div class="line">    然后内部通过调用e-&gt;init()函数完成所有Type相关的设备的初始化。关于e-&gt;init()的具体内容后面再细说。 </div><div class="line">    Type总计有这些类型： </div><div class="line">    typedef enum &#123; </div><div class="line">    MODULE_INIT_BLOCK, </div><div class="line">    MODULE_INIT_MACHINE, </div><div class="line">    MODULE_INIT_QAPI, </div><div class="line">    MODULE_INIT_QOM, </div><div class="line">    MODULE_INIT_MAX </div><div class="line">    &#125; module_init_type; </div><div class="line">*/   </div><div class="line">  </div><div class="line">    qemu_add_opts(&amp;qemu_drive_opts);<span class="comment">//将各种函数指针（也就是操作）集合添加到链表中   </span></div><div class="line">    qemu_add_opts(&amp;qemu_chardev_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_device_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_netdev_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_net_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_rtc_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_global_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_mon_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_trace_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_option_rom_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_machine_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_boot_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_sandbox_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_add_fd_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_object_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_tpmdev_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_realtime_opts);  </div><div class="line">     ......   </div><div class="line">    init_clocks();<span class="comment">//时钟初始化相关   </span></div><div class="line">    rtc_clock = host_clock;   </div><div class="line">    ......   </div><div class="line">    module_call_init(MODULE_INIT_MACHINE);   </div><div class="line">    machine = find_default_machine();  </div><div class="line">    ......   </div><div class="line">    ......   </div><div class="line">    cpudef_init();<span class="comment">//初始化CPU def相关  </span></div><div class="line">     ......   </div><div class="line">    <span class="keyword">if</span> (log_mask) &#123;<span class="comment">//日志相关的设置，KVM对外的日志在这里配置   </span></div><div class="line">        <span class="keyword">int</span> mask;   </div><div class="line">        <span class="keyword">if</span> (log_file) &#123;   </div><div class="line">            qemu_set_log_filename(log_file);   </div><div class="line">        &#125;  </div><div class="line">        mask = qemu_str_to_log_mask(log_mask);   </div><div class="line">        <span class="keyword">if</span> (!mask) &#123;   </div><div class="line">            qemu_print_log_usage(<span class="built_in">stdout</span>);   </div><div class="line">            <span class="built_in">exit</span>(<span class="number">1</span>);   </div><div class="line">        &#125;  </div><div class="line">        qemu_set_log(mask);  </div><div class="line">     &#125;   </div><div class="line">    ......   </div><div class="line">    configure_accelerator();<span class="comment">//进行虚拟机模拟器的配置，这里重点注意，它内部调用了accel_list[i].init()函数   </span></div><div class="line">  </div><div class="line"><span class="comment">/* </span></div><div class="line">    for (i = 0; i &lt; ARRAY_SIZE(accel_list); i++) &#123; </div><div class="line">        if (strcmp(accel_list[i].opt_name, buf) == 0) &#123; </div><div class="line">            if (!accel_list[i].available()) &#123; </div><div class="line">                printf("%s not supported for this target\n",accel_list[i].name); </div><div class="line">                continue; </div><div class="line">            &#125; </div><div class="line">            *(accel_list[i].allowed) = true; </div><div class="line">            ret = accel_list[i].init(); </div><div class="line">            if (ret &lt; 0) &#123; </div><div class="line">                init_failed = true; </div><div class="line">                fprintf(stderr, "failed to initialize %s: %s\n",accel_list[i].name,strerror(-ret)); </div><div class="line">               *(accel_list[i].allowed) = false;         </div><div class="line">            &#125; else &#123;             </div><div class="line">                accel_initialised = true;        </div><div class="line">            &#125;        </div><div class="line">            break;    </div><div class="line">         &#125; </div><div class="line">     &#125;  </div><div class="line">    //accel_list定义如下，实际上在kvm平台，我们就关注kvm_init即可。     </div><div class="line">    static struct &#123; </div><div class="line">        const char *opt_name;   </div><div class="line">        const char *name;   </div><div class="line">        int (*available)(void); </div><div class="line">        int (*init)(void); </div><div class="line">        bool *allowed;  </div><div class="line">    &#125; accel_list[] = &#123; </div><div class="line">       &#123; "tcg", "tcg", tcg_available, tcg_init, &amp;tcg_allowed &#125;, </div><div class="line">       &#123; "xen", "Xen", xen_available, xen_init, &amp;xen_allowed &#125;, </div><div class="line">       &#123; "kvm", "KVM", kvm_available, kvm_init, &amp;kvm_allowed &#125;, </div><div class="line">       &#123; "qtest", "QTest", qtest_available, qtest_init, &amp;qtest_allowed &#125;,  </div><div class="line">    &#125;;     </div><div class="line">    //kvm_init函数内首先打开用于用户层以及内核层交互的字符设备文件/dev/kvm，然后通过kvm_ioctl()与内核进行交互，比如     KVM_GET_API_VERSION，KVM_CREATE_VM等命令，其中KVM_CREATE_VM命令创建虚拟机并获得虚拟机句柄，后续kvm_arch_init()、 kvm_irqchip_create()等函数就可以通过kvm_vm_ioctl系统调用进行更进一步的一些配置。这些系统调用实际上是传递到内核层，由内核来完成相应的操作并返回到用户层，内核层的相关函数很多就是前一篇文章注册过的函数指针。 </div><div class="line">*/  </div><div class="line">    ......       </div><div class="line">    ......       </div><div class="line">    cpu_exec_init_all();<span class="comment">//记录CPU执行前的一些初始化工作     </span></div><div class="line">    ......      </div><div class="line">    ......       </div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>前面提到过e-&gt;init()函数，并没有展开细说，现在来说一下这个函数。实际上e-&gt;init()函数是在machine_init(pc_machine_init)函数注册时注册到ModuleTypeList的ModuleEntry上的，module_call_init()针对X86架构时调用amchine_init(),随即调用pc_machine_init()函数，代码如下：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">void</span> <span class="title">pc_machine_init</span><span class="params">(<span class="keyword">void</span>)</span>  </span></div><div class="line">&#123;  </div><div class="line">    qemu_register_machine(&amp;pc_i440fx_machine_v1_5);  </div><div class="line">    qemu_register_machine(&amp;pc_i440fx_machine_v1_4);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v1_3);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v1_2);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v1_1);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v1_0);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_15);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_14);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_13);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_12);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_11);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_10);  </div><div class="line">    qemu_register_machine(&amp;isapc_machine);  </div><div class="line"><span class="meta">#<span class="meta-keyword">ifdef</span> CONFIG_XEN  </span></div><div class="line">    qemu_register_machine(&amp;xenfv_machine);  </div><div class="line"><span class="meta">#<span class="meta-keyword">endif</span>  </span></div><div class="line">&#125;  </div><div class="line">  </div><div class="line">machine_init(pc_machine_init);</div></pre></td></tr></table></figure></p>
+<p>注意这里注册的第一个为pc_i440fx_machine_v1_5，这个结构体定义为下：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">static</span> QEMUMachine pc_i440fx_machine_v1_5 = &#123;  </div><div class="line">    .name = <span class="string">"pc-i440fx-1.5"</span>,  </div><div class="line">    .alias = <span class="string">"pc"</span>,  </div><div class="line">    .desc = <span class="string">"Standard PC (i440FX + PIIX, 1996)"</span>,  </div><div class="line">    .init = pc_init_pci,  </div><div class="line">    .hot_add_cpu = pc_hot_add_cpu,  </div><div class="line">    .max_cpus = <span class="number">255</span>,  </div><div class="line">    .is_default = <span class="number">1</span>,  </div><div class="line">    DEFAULT_MACHINE_OPTIONS,  </div><div class="line">&#125;;</div></pre></td></tr></table></figure></p>
+<p> .init=pc_init_pci, pc_init_pci()即为初始化时候调用的函数，一路跟下去，其实最终调到pc_init1()这个函数。再看pc_init1()这个函数，这里面进行了内存（pc_memory_init）、cpu（pc_cpus_init）、中断等等多种的初始化，这里不细说，重点看cpu的初始化。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">pc_cpus_init</span><span class="params">(<span class="keyword">const</span> charchar *cpu_model, DeviceState *icc_bridge)</span>  </span></div><div class="line">&#123;  </div><div class="line">    <span class="keyword">int</span> i;  </div><div class="line">    X86CPU *cpu = <span class="literal">NULL</span>;  </div><div class="line">    Error *error = <span class="literal">NULL</span>;  </div><div class="line">  </div><div class="line">    <span class="comment">/* init CPUs */</span>  </div><div class="line">    <span class="keyword">if</span> (cpu_model == <span class="literal">NULL</span>) &#123;  </div><div class="line"><span class="meta">#<span class="meta-keyword">ifdef</span> TARGET_X86_64  </span></div><div class="line">        cpu_model = <span class="string">"qemu64"</span>;  </div><div class="line"><span class="meta">#<span class="meta-keyword">else</span>  </span></div><div class="line">        cpu_model = <span class="string">"qemu32"</span>;  </div><div class="line"><span class="meta">#<span class="meta-keyword">endif</span>  </span></div><div class="line">    &#125;  </div><div class="line">    current_cpu_model = cpu_model;  </div><div class="line">  </div><div class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; smp_cpus; i++) &#123;  </div><div class="line">        cpu = pc_new_cpu(cpu_model, x86_cpu_apic_id_from_index(i),<span class="comment">//对每一个CPU进行初始化及创建  </span></div><div class="line">                         icc_bridge, &amp;error);  </div><div class="line">        <span class="keyword">if</span> (error) &#123;  </div><div class="line">            <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>, <span class="string">"%s\n"</span>, error_get_pretty(error));  </div><div class="line">            error_free(error);  </div><div class="line">            <span class="built_in">exit</span>(<span class="number">1</span>);  </div><div class="line">        &#125;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">    <span class="comment">/* map APIC MMIO area if CPU has APIC */</span>  </div><div class="line">    <span class="keyword">if</span> (cpu &amp;&amp; cpu-&gt;env.apic_state) &#123;  </div><div class="line">        <span class="comment">/* <span class="doctag">XXX:</span> what if the base changes? */</span>  </div><div class="line">        sysbus_mmio_map_overlap(SYS_BUS_DEVICE(icc_bridge), <span class="number">0</span>,  </div><div class="line">                                APIC_DEFAULT_ADDRESS, <span class="number">0x1000</span>);  </div><div class="line">    &#125;  </div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p> 该函数内调用pc_new_cpu()函数对每一个CPU进行初始化，其后依次调用关系为：</p>
+ <figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/3-1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/3-1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>下面来看kvm_init_vcpu()函数<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">kvm_init_vcpu</span><span class="params">(CPUState *cpu)</span>  </span></div><div class="line">&#123;  </div><div class="line">    KVMState *s = kvm_state;  </div><div class="line">    <span class="keyword">long</span> mmap_size;  </div><div class="line">    <span class="keyword">int</span> ret;  </div><div class="line">  </div><div class="line">    DPRINTF(<span class="string">"kvm_init_vcpu\n"</span>);  </div><div class="line">  </div><div class="line">    ret = kvm_vm_ioctl(s, KVM_CREATE_VCPU, (voidvoid *)kvm_arch_vcpu_id(cpu));<span class="comment">//通过ioctl调用向内核发起创建CPU请求，内核完成相关工作。  </span></div><div class="line">    <span class="keyword">if</span> (ret &lt; <span class="number">0</span>) &#123;  </div><div class="line">        DPRINTF(<span class="string">"kvm_create_vcpu failed\n"</span>);  </div><div class="line">        <span class="keyword">goto</span> err;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">    cpu-&gt;kvm_fd = ret;  </div><div class="line">    cpu-&gt;kvm_state = s;  </div><div class="line">    cpu-&gt;kvm_vcpu_dirty = <span class="literal">true</span>;  </div><div class="line">  </div><div class="line">    mmap_size = kvm_ioctl(s, KVM_GET_VCPU_MMAP_SIZE, <span class="number">0</span>);<span class="comment">//通过ioctl调用获取内核与用户层共享的内存大小，这部分内存以内存映射的方式进行共享。  </span></div><div class="line">    <span class="keyword">if</span> (mmap_size &lt; <span class="number">0</span>) &#123;  </div><div class="line">        ret = mmap_size;  </div><div class="line">        DPRINTF(<span class="string">"KVM_GET_VCPU_MMAP_SIZE failed\n"</span>);  </div><div class="line">        <span class="keyword">goto</span> err;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">    cpu-&gt;kvm_run = mmap(<span class="literal">NULL</span>, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,<span class="comment">//获取内存大小后，用户层进行共享内存映射。  </span></div><div class="line">                        cpu-&gt;kvm_fd, <span class="number">0</span>);  </div><div class="line">    <span class="keyword">if</span> (cpu-&gt;kvm_run == MAP_FAILED) &#123;  </div><div class="line">        ret = -errno;  </div><div class="line">        DPRINTF(<span class="string">"mmap'ing vcpu state failed\n"</span>);  </div><div class="line">        <span class="keyword">goto</span> err;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">    <span class="keyword">if</span> (s-&gt;coalesced_mmio &amp;&amp; !s-&gt;coalesced_mmio_ring) &#123;  <span class="comment">//mmio相关的一部分共享内存设置  </span></div><div class="line">        s-&gt;coalesced_mmio_ring =  </div><div class="line">            (voidvoid *)cpu-&gt;kvm_run + s-&gt;coalesced_mmio * PAGE_SIZE;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">    ret = kvm_arch_init_vcpu(cpu);<span class="comment">//相关初始化  </span></div><div class="line">    <span class="keyword">if</span> (ret == <span class="number">0</span>) &#123;  </div><div class="line">        qemu_register_reset(kvm_reset_vcpu, cpu);  </div><div class="line">        kvm_arch_reset_vcpu(cpu);  </div><div class="line">    &#125;  </div><div class="line">err:  </div><div class="line">    <span class="keyword">return</span> ret;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>回到上面一些列调用中的qemu_kvm_cpu_thread_fn()函数中，在调用了kvm_init_vcpu()函数完成cpu的初始化之后，又调用kvm_cpu_exec()函数运行cpu，也就是运行了整个虚拟机。<br>我们来看kvm_cpu_exec()这个函数<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">kvm_cpu_exec</span><span class="params">(CPUArchState *env)</span>  </span></div><div class="line">&#123;  </div><div class="line">    .......  </div><div class="line">    <span class="keyword">do</span>&#123;   </div><div class="line">        run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, <span class="number">0</span>);  </div><div class="line">  </div><div class="line">       .......  </div><div class="line">        trace_kvm_run_exit(cpu-&gt;cpu_index, run-&gt;exit_reason);  </div><div class="line">        <span class="keyword">switch</span> (run-&gt;exit_reason) &#123;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_IO:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_MMIO:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_IRQ_WINDOW_OPEN:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_SHUTDOWN:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_UNKNOWN:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_INTERNAL_ERROR:  </div><div class="line">           ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">default</span>:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        &#125;  </div><div class="line">    &#125; <span class="keyword">while</span> (ret == <span class="number">0</span>);  </div><div class="line">  </div><div class="line">    .......  </div><div class="line">    <span class="keyword">return</span> ret;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>首先一个kvm_vcpu_ioctl系统调用，向内核请求运行虚拟机，然后内核运行虚拟机，kvm_cpu_exec()内是有一个while循环，只要是没有错误就会不断运行不会终止，后面的switch语句实际上是接收内核传来的退出原因，因为I/O等是需要Qemu即用户层来完成的，这样虚拟机运行时内核层遇到I/O等就需要退出到Qemu层并记录退出原因，Qemu根据退出原因执行相关操作，完成后再次执行ioctl操作转到内核层继续运行虚拟机。关于异常退出的具体流程下篇文章再详细讲解。<br><br></p>
+<p>关于内存初始化相关工作，在之前提到过的kvm初始化主函数kvm_init()函数里，依次调用：<br>    memory_listener_register(&amp;kvm_memory_listener, &amp;address_space_memory);<br>    listener_add_address_space(listener, as);<br>    listener-&gt;region_add(listener, &amp;section);<br>    .region_add = kvm_region_add,<br>    kvm_set_phys_mem(section, true);<br>    err = kvm_set_user_memory_region(s, mem);<br>    return kvm_vm_ioctl(s, KVM_SET_USER_MEMORY_REGION, &amp;mem);<br>    这些函数依次调用，基本完成内存初始化过程，这里最后的ioctl调用是设置影子页表信息以及设置页面访问权限等。<br><br></p>
+<p>最终，在内核与用户层的配合下完成整个虚拟机的创建和初始化工作，并运行虚拟机。</p>
+<hr>
+<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟化基础/">虚拟化基础<span class="article-category-count">4</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/QEMU/">QEMU</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-qemukvm-source1"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/qemukvm-source1/">Qemu-KVM虚拟机初始化及创建过程源码简要分析（一）</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/qemukvm-source1/" class="article-date">
+	  <time datetime="2017-05-04T07:01:06.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p><strong>作者:</strong> <a href="http://blog.csdn.net/mrbuffoon" target="_blank" rel="external">Mr_buffoon</a></p>
+<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p> 我们知道，Qemu-KVM实际上包括Qemu和KVM两部分，那么在创建以及初始化虚拟机时，实际上也是在这两部分进行的。</p>
+<p>KVM实际上就是kvm内核模块，包括kvm.ko、kvm-intel.ko、kvm-amd.ko三部分，后两部分分别对应Intel体系的VMX技术以及AMD体系的SVM技术。</p>
+<p>首先，我们需要加载模块，当我们加载kvm-xxx.ko模块时，会调用对应的module_init()函数，然后调用vmx_init()或者svm_init()函数，最后进入到统一的kvm.ko模块中的kvm_init()函数，现在正式开始进行虚拟机的初始化工作。</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/2-1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/2-1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">module_init(vmx_init)    <span class="comment">//位于vmx.c文件</span></div></pre></td></tr></table></figure>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">static</span> <span class="keyword">int</span> __<span class="function">init <span class="title">vmx_init</span><span class="params">(<span class="keyword">void</span>)</span>    <span class="comment">//位于vmx.c文件  </span></span></div><div class="line">&#123;  </div><div class="line">       ..............<span class="comment">//省略部分代码  </span></div><div class="line">       r= kvm_init(&amp;vmx_x86_ops, <span class="keyword">sizeof</span>(<span class="keyword">struct</span> vcpu_vmx),  </div><div class="line">                   __alignof__(<span class="keyword">struct</span> vcpu_vmx),THIS_MODULE);  </div><div class="line">       ................<span class="comment">//省略部分代码  </span></div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">kvm_init</span><span class="params">(voidvoid *opaque, <span class="keyword">unsigned</span> vcpu_size,<span class="keyword">unsigned</span> vcpu_align,  </span></span></div><div class="line">                <span class="keyword">struct</span> <span class="keyword">module</span> *<span class="keyword">module</span>)    <span class="comment">//位于kvm_main.c文件  </span></div><div class="line">&#123;  </div><div class="line">       ......................<span class="comment">//省略部分代码  </span></div><div class="line">       r= kvm_arch_init(opaque);  </div><div class="line">       ........................<span class="comment">//省略部分代码  </span></div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p> 在进入到kvm_init()函数后，进行了很多初始化的相关工作，这里单独强调一下kvm_arch_init()函数。<br>    在vmx.c文件中声明并定义了一个结构体vmx_x86_ops，这是函数指针的集合，其实就是各种操作的一个集合。内部很多函数是后续的初始化工作需要具体调用到的，比如很多Qemu层的ioctl调用到内核层实际上就是执行这内部的一些函数。具体的内容如下：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div><div class="line">73</div><div class="line">74</div><div class="line">75</div><div class="line">76</div><div class="line">77</div><div class="line">78</div><div class="line">79</div><div class="line">80</div><div class="line">81</div><div class="line">82</div><div class="line">83</div><div class="line">84</div><div class="line">85</div><div class="line">86</div><div class="line">87</div><div class="line">88</div><div class="line">89</div><div class="line">90</div><div class="line">91</div><div class="line">92</div><div class="line">93</div><div class="line">94</div><div class="line">95</div><div class="line">96</div><div class="line">97</div><div class="line">98</div><div class="line">99</div><div class="line">100</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">static</span> <span class="keyword">struct</span> kvm_x86_ops vmx_x86_ops = &#123;  </div><div class="line">       .cpu_has_kvm_support= cpu_has_kvm_support,  </div><div class="line">       .disabled_by_bios= vmx_disabled_by_bios,  </div><div class="line">       .hardware_setup= hardware_setup,  </div><div class="line">       .hardware_unsetup= hardware_unsetup,  </div><div class="line">       .check_processor_compatibility= vmx_check_processor_compat,  </div><div class="line">       .hardware_enable= hardware_enable,  </div><div class="line">       .hardware_disable= hardware_disable,  </div><div class="line">       .cpu_has_accelerated_tpr= report_flexpriority,  </div><div class="line">   </div><div class="line">       .vcpu_create= vmx_create_vcpu,  </div><div class="line">       .vcpu_free= vmx_free_vcpu,  </div><div class="line">       .vcpu_reset= vmx_vcpu_reset,  </div><div class="line">   </div><div class="line">       .prepare_guest_switch= vmx_save_host_state,  </div><div class="line">       .vcpu_load= vmx_vcpu_load,  </div><div class="line">       .vcpu_put= vmx_vcpu_put,  </div><div class="line">   </div><div class="line">       .update_db_bp_intercept= update_exception_bitmap,  </div><div class="line">       .get_msr= vmx_get_msr,  </div><div class="line">       .set_msr= vmx_set_msr,  </div><div class="line">       .get_segment_base= vmx_get_segment_base,  </div><div class="line">       .get_segment= vmx_get_segment,  </div><div class="line">       .set_segment= vmx_set_segment,  </div><div class="line">       .get_cpl= vmx_get_cpl,  </div><div class="line">       .get_cs_db_l_bits= vmx_get_cs_db_l_bits,  </div><div class="line">       .decache_cr0_guest_bits= vmx_decache_cr0_guest_bits,  </div><div class="line">       .decache_cr3= vmx_decache_cr3,  </div><div class="line">       .decache_cr4_guest_bits= vmx_decache_cr4_guest_bits,  </div><div class="line">       .set_cr0= vmx_set_cr0,  </div><div class="line">       .set_cr3= vmx_set_cr3,  </div><div class="line">       .set_cr4= vmx_set_cr4,  </div><div class="line">       .set_efer= vmx_set_efer,  </div><div class="line">       .get_idt= vmx_get_idt,  </div><div class="line">       .set_idt= vmx_set_idt,  </div><div class="line">       .get_gdt= vmx_get_gdt,  </div><div class="line">       .set_gdt= vmx_set_gdt,  </div><div class="line">       .set_dr7= vmx_set_dr7,  </div><div class="line">       .cache_reg= vmx_cache_reg,  </div><div class="line">       .get_rflags= vmx_get_rflags,  </div><div class="line">       .set_rflags= vmx_set_rflags,  </div><div class="line">       .fpu_activate= vmx_fpu_activate,  </div><div class="line">       .fpu_deactivate= vmx_fpu_deactivate,  </div><div class="line">   </div><div class="line">       .tlb_flush= vmx_flush_tlb,  </div><div class="line">   </div><div class="line">       .run= vmx_vcpu_run,  </div><div class="line">       .handle_exit= vmx_handle_exit,  </div><div class="line">       .skip_emulated_instruction= skip_emulated_instruction,  </div><div class="line">       .set_interrupt_shadow= vmx_set_interrupt_shadow,  </div><div class="line">       .get_interrupt_shadow= vmx_get_interrupt_shadow,  </div><div class="line">       .patch_hypercall= vmx_patch_hypercall,  </div><div class="line">       .set_irq= vmx_inject_irq,  </div><div class="line">       .set_nmi= vmx_inject_nmi,  </div><div class="line">       .queue_exception= vmx_queue_exception,  </div><div class="line">       .cancel_injection= vmx_cancel_injection,  </div><div class="line">       .interrupt_allowed= vmx_interrupt_allowed,  </div><div class="line">       .nmi_allowed= vmx_nmi_allowed,  </div><div class="line">       .get_nmi_mask= vmx_get_nmi_mask,  </div><div class="line">       .set_nmi_mask= vmx_set_nmi_mask,  </div><div class="line">       .enable_nmi_window= enable_nmi_window,  </div><div class="line">       .enable_irq_window= enable_irq_window,  </div><div class="line">       .update_cr8_intercept= update_cr8_intercept,  </div><div class="line">       .set_virtual_x2apic_mode= vmx_set_virtual_x2apic_mode,  </div><div class="line">       .vm_has_apicv= vmx_vm_has_apicv,  </div><div class="line">       .load_eoi_exitmap= vmx_load_eoi_exitmap,  </div><div class="line">       .hwapic_irr_update= vmx_hwapic_irr_update,  </div><div class="line">       .hwapic_isr_update= vmx_hwapic_isr_update,  </div><div class="line">       .sync_pir_to_irr= vmx_sync_pir_to_irr,  </div><div class="line">       .deliver_posted_interrupt= vmx_deliver_posted_interrupt,  </div><div class="line">   </div><div class="line">       .set_tss_addr= vmx_set_tss_addr,  </div><div class="line">       .get_tdp_level= get_ept_level,  </div><div class="line">       .get_mt_mask= vmx_get_mt_mask,  </div><div class="line">   </div><div class="line">       .get_exit_info= vmx_get_exit_info,  </div><div class="line">   </div><div class="line">       .get_lpage_level= vmx_get_lpage_level,  </div><div class="line">   </div><div class="line">       .cpuid_update= vmx_cpuid_update,  </div><div class="line">   </div><div class="line">       .rdtscp_supported= vmx_rdtscp_supported,  </div><div class="line">       .invpcid_supported= vmx_invpcid_supported,  </div><div class="line">   </div><div class="line">       .set_supported_cpuid= vmx_set_supported_cpuid,  </div><div class="line">   </div><div class="line">       .has_wbinvd_exit= cpu_has_vmx_wbinvd_exit,  </div><div class="line">   </div><div class="line">       .set_tsc_khz= vmx_set_tsc_khz,  </div><div class="line">       .read_tsc_offset= vmx_read_tsc_offset,  </div><div class="line">       .write_tsc_offset= vmx_write_tsc_offset,  </div><div class="line">       .adjust_tsc_offset= vmx_adjust_tsc_offset,  </div><div class="line">       .compute_tsc_offset= vmx_compute_tsc_offset,  </div><div class="line">       .read_l1_tsc= vmx_read_l1_tsc,  </div><div class="line">   </div><div class="line">       .set_tdp_cr3= vmx_set_cr3,  </div><div class="line">   </div><div class="line">       .check_intercept= vmx_check_intercept,  </div><div class="line">       .handle_external_intr= vmx_handle_external_intr,  </div><div class="line">&#125;;</div></pre></td></tr></table></figure></p>
+<p>这个结构体作为参数传递到kvm_init()函数，再传递到kvm_arch_init()函数，再传递到全局变量kvm_x86_ops中，注册各种操作函数，后续可以调用。随后还进行了一些内部<strong>数据结构</strong>以及定时器、调试信息等的一些初始化工作。与此同时，qemu层也会进行大部分的初始化工作，这一部分后一篇再讲。</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/2-2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/2-2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<hr>
+<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟化基础/">虚拟化基础<span class="article-category-count">4</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/QEMU/">QEMU</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtulization/">Virtulization</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-keylogger"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -361,188 +486,11 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-sandbox"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170401/sandbox/">下一代沙盒</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170401/sandbox/" class="article-date">
-	  <time datetime="2017-04-01T02:19:39.000Z" itemprop="datePublished">四月 1, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Source: <a href="https://www.lastline.com/blog/next-generation-sandbox-offers-comprehensive-detection-of-advanced-malware/" target="_blank" rel="external">https://www.lastline.com/blog/next-generation-sandbox-offers-comprehensive-detection-of-advanced-malware/</a><br>Author: <a href="https://www.lastline.com/author/freddy/" target="_blank" rel="external">Freddy Mangum</a></p>
-<hr>
-<p><strong>High-Resolution Security Analysis</strong></p>
-<p>Advanced malware and advanced persistent threats (APT) are frequently used as terms to describe malicious code that bypasses traditional security systems, such as signature-based detectors (anti-virus engines and intrusion detection systems). To counter such advanced threats, a new class of security vendors has introduced sandboxing technology. Sandboxing works by running code inside a tightly controlled environment, in which one can monitor and analyze the code’s behavior. Since it is not necessary to have seen a specific threat before, sandboxing offers the promise to identify advanced malware and zero-day threats.</p>
-<p>But don’t be fooled, not all sandbox technologies provide the same level of detection capabilities.  Let’s take a look.</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/sandbox.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/sandbox.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-
-
-
-<p><strong>Virtualization:</strong> VM (virtual machine) based sandboxing can look at suspicious programs that are contained within virtual machines. This approach provides the lowest level of visibility into relevant malware behaviors, but it is harder for sophisticated malware to evade detection.</p>
-<p><strong>OS Emulation</strong> of the operating system provides a high level of visibility into malware behaviors. Unfortunately, this approach is the easiest for advanced malware to detect and evade.</p>
-<p><strong>Full System Emulation</strong>, where the emulator simulates the physical hardware (including CPU and memory), provides the deepest level of visibility into malware behavior, and it is also the hardest for advanced malware to evade.</p>
-<p>For a more detailed technical explanation of Lastline’s high-resolution sandbox, which uses full system emulation, please read <a href="http://www.csyssec.org/20170401/buildsandbox/" target="_blank" rel="external">How To Build An Effective Sandbox</a>.</p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">9</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Sandbox/">Sandbox</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-unmasking"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170401/unmasking/">揭开内核漏洞利用的神秘面纱</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170401/unmasking/" class="article-date">
-	  <time datetime="2017-04-01T01:27:11.000Z" itemprop="datePublished">四月 1, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Source: <a href="https://www.lastline.com/labsblog/unmasking-kernel-exploits/" target="_blank" rel="external">https://www.lastline.com/labsblog/unmasking-kernel-exploits/</a></p>
-<p>Author: <a href="https://www.lastline.com/author/roman/" target="_blank" rel="external">Roman Vasilenko</a></p>
-<pre><code>Roman Vasilenko started his career as a Virus Analyst     in 2007 at Dr. Web Ltd. From December 2008 to     November 2012 he worked in the Anti-Malware Research Department of Kaspersky Labs as a Research Developer/Senior Research Developer. Roman is the author of two patents: “System and Method of Files Comparison Based on Functionality Patterns” (Russia) and “System and Method for Detecting Unknown Malware” (Russia/USA). He was also a Senior Lecturer in the Department of Mathematics &amp; Mechanics, Saint Petersburg State University, Russia, where he taught a special course titled “Introduction to Malware Research” in 2011/2012. In November 2012, Roman moved to California to join Lastline, Inc. as an Internet Security Analyst. Since 2013 he has held a System Engineer position. His specialties are design and development of the LLAMA engine (Lastline Automated Malware Analysis), in-depth analysis of malicious techniques and malware families, targeted attack analysis, and development of new advanced algorithms of malware detection.
-</code></pre><hr>
-<p>A large set of publicly disclosed Advanced Persistent Threat (APT) and nation state attacks use sophisticated malware (e.g Turla, Duqu, Equation Group, Duqu2, etc.) that make use of at least one component running hidden inside the kernel of the Microsoft Windows operating system (OS). There, malware remains hidden from security solutions, and can abuse the highest privileges available on a computer system to achieve the attacker’s evil objectives.</p>
-<p>With the ability to run in the OS kernel, malicious code has started to evade automated malware analysis solutions (sandboxes) that have limited visibility into actions executed by malware in the context of the kernel. This new wave of kernel-malware makes the ability to provide in-depth kernel-mode analysis a key requirement for effective advanced malware analysis solutions.</p>
-<p>In two recent posts <a href="https://www.lastline.com/labsblog/high-resolution-dynamic-analysis-of-windows-kernel-rootkits/" target="_blank" rel="external">1</a>, <a href="https://www.lastline.com/labsblog/dissecting-turla-rootkit-malware-using-dynamic-analysis/" target="_blank" rel="external">2</a> we have looked at how we can analyze and detect these advanced threats, but we have not yet described how attackers manage to inject their code into the Windows kernel. In this post, we highlight some of the difficulties attackers face, and how security researchers and professionals can use <a href="http://lastline.wpengine.com/labsblog/dyre-malware-does-it-play-nice-in-your-sandbox" target="_blank" rel="external">full-system emulation</a> to analyze, dissect, and detect zero-day kernel exploitation techniques in an automated way.</p>
-<h2 id="Exploiting-Microsoft-Windows-Kernels"><a href="#Exploiting-Microsoft-Windows-Kernels" class="headerlink" title="Exploiting Microsoft Windows Kernels"></a>Exploiting Microsoft Windows Kernels</h2><p>All modern versions of Microsoft Windows enable <a href="https://support.microsoft.com/zh-cn/products/windows" target="_blank" rel="external">User Account Control (UAC)</a> by default, which grants limited privileges to user mode processes, restricting them in the actions they can perform on a host. For example, by default a program cannot access critical system components, modify the system registry, or load new drivers into the kernel, even if the driver is signed by a trusted entity.</p>
-<p>To regain the privileges attackers need to achieve their goals, kernel exploits have become one of the major components in modern attacks. Since we first highlighted malware running in the kernel as a rising threat and announced our own new <a href="https://www.lastline.com/press/deep-kernel-malware-analysis-launch-industry-first/" target="_blank" rel="external">deep kernel malware analysis</a> capabilities at SXSW Interactive in March, several kernel mode exploits have made headlines including:</p>
-<ul>
-<li>As revealed by <a href="https://securelist.com/blog/research/70504/the-mystery-of-duqu-2-0-a-sophisticated-cyberespionage-actor-returns/" target="_blank" rel="external">Kaspersky Lab</a> this month, Duqu2 uses a <a href="http://blog.trendmicro.com/trendlabs-security-intelligence/analysis-of-cve-2015-2360-duqu-2-0-zero-day-vulnerability/" target="_blank" rel="external">kernel mode exploit</a> for CVE-2015-2360 to load its kernel mode component.</li>
-<li>One of the most recent targeted attacks against NATO members and the White House, termed <a href="http://blog.trendmicro.com/trendlabs-security-intelligence/operation-pawn-storm-ramps-up-its-activities-targets-nato-white-house/" target="_blank" rel="external">Operation Pawn Storm</a>, attracted massive media attention in April. The malware used in this campaign was equipped with a <a href="(http://www.securityweek.com/russian-hackers-exploited-windows-zero-day-spy-nato-eu-other-high-profile-targets">kernel exploit for CVE-2015-1701</a>).</li>
-<li>Also reported in April, <a href="http://lastline.wpengine.com/labsblog/dissecting-turla-rootkit-malware-using-dynamic-analysis" target="_blank" rel="external">Turla</a> uses <a href="http://blog.talosintelligence.com/2014/04/snake-campaign-few-words-about-uroburos.html" target="_blank" rel="external">two exploits</a> for [CVE-2009-1123 and CVE-2010-0232].<br>And previously in February the well known, possibly government-sponsored, Equation Group APT was reported to have used malware using up to 10 exploits, <a href="https://securelist.com/blog/research/68750/equation-the-death-star-of-malware-galaxy/" target="_blank" rel="external">3 of them confirmed</a> for CVE-2009-1124, CVE-2011-3402, and CVE-2013-3879.</li>
-</ul>
-<p>But well-funded, government-sponsored attacks aren’t the only ones that leverage kernel exploits. Attacking the kernel has become increasingly common, as can be seen by looking at prominent malware families making use of kernel exploits:</p>
-<ul>
-<li><a href="http://www.malwaredigger.com/2015/05/rovnix-dropper-analysis.html" target="_blank" rel="external">Cidox/Rovnix Bootkit</a> uses exploits for CVE-2013-3660 and CVE-2014-4113.</li>
-<li><a href="http://blog.trendmicro.com/trendlabs-security-intelligence/an-analysis-of-a-windows-kernel-mode-vulnerability-cve-2014-4113/" target="_blank" rel="external">Sandworm</a> uses exploits for CVE-2014-4148 and CVE-2014-4113.</li>
-<li><a href="https://www.welivesecurity.com/2013/08/27/the-powerloader-64-bit-update-based-on-leaked-exploits/" target="_blank" rel="external">PowerLoader</a> uses exploits for CVE-2013-3660, CVE-2012-1864, and CVE-2012-0217.<br>… just to name a few.</li>
-</ul>
-<p>As one can see, the ability to analyze and identify compromises of the operating system kernel has become crucial in detecting modern threats – not only, but especially with advanced, targeted attacks.</p>
-<h2 id="Anatomy-of-Kernel-Exploits"><a href="#Anatomy-of-Kernel-Exploits" class="headerlink" title="Anatomy of Kernel Exploits"></a>Anatomy of Kernel Exploits</h2><p>Before we focus on how we detect kernel exploitation, let’s first dive into how a typical kernel exploit works. Usually, exploitation happens in four stages: host preparation, exploit-code setup, kernel vulnerability exploitation, and payload execution.</p>
-<p><strong>Host Preparation:</strong> In the first phase, the host preparation phase, the attacker tricks the user into executing a piece of user-mode code. This can happen through a conventional exploit, such as a drive-by-download exploit, or by executing the attack as part of user-mode malware already running on a target machine. Increasingly, this user-mode malware is tailor-made to evade traditional sandboxes through a number of techniques <a href="http://lastline.wpengine.com/labsblog/evasive-malware-gone-mainstream" target="_blank" rel="external">we’ve covered before</a>.</p>
-<p><strong>Exploit-code Setup:</strong> Next, in the exploit-code setup phase, the attacker prepares the shellcode that is later invoked using the kernel exploit. To perform any actions in the context of the kernel, the exploit needs to know information about the kernel internals, such as:</p>
-<ul>
-<li>the location or offsets of critical structures in kernel memory, or</li>
-<li>the addresses of kernel API functions.</li>
-</ul>
-<p>Windows kernel modules may vary between different versions of the operating system, between different service pack levels, and even when different system updates have been installed. Thus, an exploit must adapt to these changes. To do this, the user-mode setup code typically opens a kernel image from disk to analyze and find the necessary data.</p>
-<p>At the same time, the setup code can find custom OEM drivers available on the system, which can provide additional vulnerabilities to exploit. To this end, the attacker can search for the presence of drivers and probe for devices available on the system.</p>
-<p><strong>Vulnerability Exploitation:</strong> Once the attacker has gathered all necessary information to make an exploit possible, the kernel vulnerability is exploited. There are two types of exploits that we have to address, depending on the location of the shellcode that is executed: execution of user-space shellcode with kernel privileges (i.e., CPL/Current Privilege Level = 0) versus execution of kernel-space shellcode.</p>
-<p>User-space shellcode is easier to implement, because it only requires overwriting a small amount of data in kernel memory. In many cases, this memory is a function or function-pointer causing the next kernel thread executing this function to jump to the user-space memory prepared with the shellcode.</p>
-<p>The advantage of this type of shellcode is that there is no limitation on the size of the shellcode (because it doesn’t need to be copied to kernel memory). However, this type of exploit does not work in Windows 8 or later, because of a new security feature known as <a href="http://blog.ptsecurity.com/2012/09/intel-smep-overview-and-partial-bypass.html" target="_blank" rel="external">Supervisor Mode Execution Prevention (SMEP)</a>, which prevents execution of code located in user-mode pages with CPL of 0.</p>
-<p>Kernel-space shellcode bypasses SMEP but it is more complicated: it requires copying shellcode to kernel memory, but only very few (known) vulnerabilities allow overwriting large amounts of data in the kernel.</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/unmasking1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/unmasking1.png" width="450"></a><br>    <figcaption>Shellcode type overview</figcaption><br></figure>
-
-
-<p>Because of this, attackers sometimes use a hybrid approach combining both shellcode types: in a first step, using a small shellcode, the attacker disables SMEP, followed by executing a second, larger shellcode in user memory with CPL of 0.</p>
-<p><strong>Payload Execution:</strong> Once the shellcode has successfully been executed, the attacker is able to run any payload in the context of the kernel, that is, without any restrictions imposed by the operating system.</p>
-<p>In exploits against Microsoft Windows kernels, we typically find two types of payloads: In the first type, the attacker tries to elevate privileges of the user-mode process. The idea is to run an entire process, not just a small piece of shellcode, with elevated privileges, which greatly simplifies writing complex payloads.</p>
-<p>To elevate privileges, the payload can copy the access token of the System process and overwrite the current process’ access token. This gives the process the same level of permissions as those granted by the original process’ token. To do this, the payload needs to:</p>
-<ul>
-<li>enumerate <a href="https://msdn.microsoft.com/en-us/library/windows/hardware/ff544273(v=vs.85" target="_blank" rel="external">EPROCESS</a>.aspx) structures in kernel memory,</li>
-<li>find the System process, and</li>
-<li>copy the pointer to the token structure inside the EPROCESS structure of the System process to the current process’ EPROCESS structure.</li>
-</ul>
-<p>By stealing a pointer to the System process token structure, the process receives all <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/aa379571(v=vs.85" target="_blank" rel="external">Security Identifiers</a>.aspx) (SIDs) of that process, including the SID…</p>
-<p>SID: <strong>S-1-5-18</strong><br>Name: Local System<br>Description: A service account that is used by the operating system.</p>
-<p>…which allows performing any actions with system process privileges.</p>
-<p>The second type of payload we frequently find is more sophisticated: instead of elevating privileges of the user-mode process, the payload contains code for loading a malicious driver directly into kernel memory without the use of system APIs.</p>
-<h2 id="Analysis-of-Kernel-Exploit"><a href="#Analysis-of-Kernel-Exploit" class="headerlink" title="Analysis of Kernel Exploit"></a>Analysis of Kernel Exploit</h2><p>An interesting finding that emerged from our research is that some of the attacks are not using their own version of the setup/shellcode/payload functionality. Instead, the attackers use proof-of-concept implementations available on the Internet (sometimes provided for free by researchers, other times sold by specialized exploit groups). Here, the payload invokes a malware process after elevating privileges, providing the attacker with a simple and reliable way to bypass the kernel’s security restrictions.</p>
-<p>This allows traditional security solution to claim “kernel exploit detection” capabilities, because the proof-of-concept implementations can be trivially detected using signature-based approaches. Clearly, sophisticated and well-funded attack groups can leverage zero-day exploits – that is, exploits that have not been publicly documented – as part of their attack, and <a href="http://lastline.wpengine.com/labsblog/malware-in-the-wild-evolving-to-evade-detection" target="_blank" rel="external">use evasive code</a> to identify or bypass traditional analysis systems before launching the kernel exploit.</p>
-<p>As a consequence, the analysis system must not only be able to handle evasive code, but also to inspect code run as part of the operating system kernel. Only then can it correctly identify the malicious behavior and thwart the attack.</p>
-<h2 id="Unmasking-the-Cidox-Rovnix-Bootkit"><a href="#Unmasking-the-Cidox-Rovnix-Bootkit" class="headerlink" title="Unmasking the Cidox/Rovnix Bootkit"></a>Unmasking the Cidox/Rovnix Bootkit</h2><p>Our system performs in-depth analysis of all stages of kernel exploits, as one can see by looking at the following example (found in the wild) of the Cidox/Rovnix Bootkit</p>
-<p>MD5: d3d013aaa07c6217fda7a8a139c42b60<br>SHA1: c2255e187fc08109ee3da450bba1e176b7583384</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/unmasking2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/unmasking2.png" width="450"></a><br>    <figcaption>Analysis overview for Cidox/Rovnix bootkit</figcaption><br></figure>
-
-<p>As we can see, every stage of the kernel exploit discussed above is already highlighted in the analysis overview.</p>
-<p>But the analysis capabilities of our system go well beyond that! As we already covered in <a href="https://www.lastline.com/labsblog/dissecting-payload-injection-using-llama-process-snapshots/" target="_blank" rel="external">previous blog posts</a>, the Lastline analysis system automatically extracts full-process snapshots containing points of interest for subsequent analysis by a security analyst or researcher.</p>
-<p>Our solution tracks the execution of untrusted memory in user- as well as kernel-mode. As a result, the system sees all code fragments associated with the malicious behavior executed as part of the exploit, which can be downloaded as part of the analysis result, and be imported into off-the-shelf tools, such as IDA Pro.</p>
-<p>For example, the process-snapshot extracted as part of the Cidox/Rovnix Bootkit exploit analysis shows the malicious payload executed in the context of the kernel:</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/unmasking3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/unmasking3.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-
-<p>ere, the code searches for the EPROCESS structure of the System process (using its process-ID 4) as well as for the entry of the malicious process using <a href="https://msdn.microsoft.com/en-us/library/windows/hardware/ff551920(v=vs.85" target="_blank" rel="external">PsLookupProcessByProcessId</a>.aspx). Once found, it duplicates the EPROCESS::Token from System to the malicious process, giving it Local System privileges.</p>
-<p>The extracted process-snapshot not only contains all the relevant code-sections (and is stripped from unrelated, benign code cluttering the snapshot), but the system also highlights code areas of interest to guide the analyst in where to look.</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/unmasking4.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/unmasking4.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-<h2 id="Summary"><a href="#Summary" class="headerlink" title="Summary"></a>Summary</h2><p>Kernel exploits are not only part of advanced and sophisticated attacks, but are now also used in many mainstream malware families. As a result, security solutions and analysis sandboxes must be able to provide deep insights into the execution of kernel code to identify and address these types of threats.</p>
-<p>Lastline’s high-resolution sandbox uses a full-system emulation approach that is able to track malicious code running in user- as well as kernel-mode. This provides the analysis system with a complete picture of the malicious behavior exhibited by malware, to catch even the latest zero-day attacks, and provide valuable insights for security professionals and researchers alike.</p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">9</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
     
-    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><a class="page-number" href="/page/3/">3</a><span class="space">&hellip;</span><a class="page-number" href="/page/13/">13</a><a class="extend next" rel="next" href="/page/2/">下一页</a>
+    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><a class="page-number" href="/page/3/">3</a><span class="space">&hellip;</span><a class="page-number" href="/page/14/">14</a><a class="extend next" rel="next" href="/page/2/">下一页</a>
   </nav>
 
 </section>
@@ -630,6 +578,30 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/qemukvm-source2/">Qemu-KVM虚拟机初始化及创建过程源码简要分析（二）</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/qemukvm-source1/">Qemu-KVM虚拟机初始化及创建过程源码简要分析（一）</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -799,30 +771,6 @@
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170307/introspection-papers/">虚拟机监控论文推荐</a></h6>
-          <!--  <span>三月 7, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170307/course-zhiqianglin2/">名人课堂-系统安全与二进制代码分析(上)</a></h6>
-          <!--  <span>三月 7, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -833,7 +781,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">2</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">2</span></li></ul>
     </div>
   </div>
 
@@ -843,7 +791,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.67px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.83px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.5px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.33px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.5px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.83px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.83px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.17px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 15.83px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 16.67px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.33px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.33px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.83px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.33px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.83px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.83px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.83px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.83px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.5px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.67px;">Rootkit</a> <a href="/tags/Sandbox/" style="font-size: 10.83px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.83px;">Stack</a> <a href="/tags/System/" style="font-size: 19.17px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.67px;">Systemcall</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 18.33px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 10px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.67px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Binary/" style="font-size: 10.83px;">Binary</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.5px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.33px;">Course</a> <a href="/tags/Exploit/" style="font-size: 17.5px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/Heap/" style="font-size: 10.83px;">Heap</a> <a href="/tags/Instrumentation/" style="font-size: 10.83px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 14.17px;">Introspection</a> <a href="/tags/KVM/" style="font-size: 16.67px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 15.83px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.33px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.33px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.33px;">Memory</a> <a href="/tags/Migration/" style="font-size: 10.83px;">Migration</a> <a href="/tags/Overflow/" style="font-size: 10.83px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 10.83px;">Paper</a> <a href="/tags/Papers/" style="font-size: 10px;">Papers</a> <a href="/tags/Ph-D/" style="font-size: 10.83px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.5px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15.83px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10px;">ROP</a> <a href="/tags/RR/" style="font-size: 10px;">RR</a> <a href="/tags/Rootkit/" style="font-size: 11.67px;">Rootkit</a> <a href="/tags/Sandbox/" style="font-size: 10.83px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Stack/" style="font-size: 10.83px;">Stack</a> <a href="/tags/System/" style="font-size: 19.17px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.67px;">Systemcall</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 18.33px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 10px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 10px;">XEN</a>
     </div>
   </div>
 

@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>qemu-kvm虚拟机初始化及创建过程源码简要分析（二） | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="作者: Mr_buffoon转载请注明：原作者信息以及CSysSec
+
+ 前面我们讲了KVM内核层创建及初始化虚拟机的一些工作过程，现在讲一下Qemu层的流程以及与KVM内核层的配合过程。Qemu层是从vl.c中的main()函数开始的，这里通过在代码中添加一些注释的方式来进行讲解,中间省略了很多不重要或者我也没有搞清楚的代码。12345678910111213141516171819202122">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Qemu-KVM虚拟机初始化及创建过程源码简要分析（二）">
+<meta property="og:url" content="http://yoursite.com/20170504/qemukvm-source2/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="作者: Mr_buffoon转载请注明：原作者信息以及CSysSec
+
+ 前面我们讲了KVM内核层创建及初始化虚拟机的一些工作过程，现在讲一下Qemu层的流程以及与KVM内核层的配合过程。Qemu层是从vl.c中的main()函数开始的，这里通过在代码中添加一些注释的方式来进行讲解,中间省略了很多不重要或者我也没有搞清楚的代码。12345678910111213141516171819202122">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/3-1.png">
+<meta property="og:updated_time" content="2017-05-04T07:04:53.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Qemu-KVM虚拟机初始化及创建过程源码简要分析（二）">
+<meta name="twitter:description" content="作者: Mr_buffoon转载请注明：原作者信息以及CSysSec
+
+ 前面我们讲了KVM内核层创建及初始化虚拟机的一些工作过程，现在讲一下Qemu层的流程以及与KVM内核层的配合过程。Qemu层是从vl.c中的main()函数开始的，这里通过在代码中添加一些注释的方式来进行讲解,中间省略了很多不重要或者我也没有搞清楚的代码。12345678910111213141516171819202122">
+<meta name="twitter:image" content="http://oij0laovn.bkt.clouddn.com/3-1.png">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">FROM 0 TO 1</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">系统结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/courses">名人课堂</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-qemukvm-source2" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      Qemu-KVM虚拟机初始化及创建过程源码简要分析（二）
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/qemukvm-source2/" class="article-date">
+	  <time datetime="2017-05-04T07:02:19.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者: <a href="http://blog.csdn.net/mrbuffoon" target="_blank" rel="external">Mr_buffoon</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p> 前面我们讲了KVM内核层创建及初始化虚拟机的一些工作过程，现在讲一下Qemu层的流程以及与KVM内核层的配合过程。<br>Qemu层是从vl.c中的main()函数开始的，这里通过在代码中添加一些注释的方式来进行讲解,中间省略了很多不重要或者我也没有搞清楚的代码。<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div><div class="line">73</div><div class="line">74</div><div class="line">75</div><div class="line">76</div><div class="line">77</div><div class="line">78</div><div class="line">79</div><div class="line">80</div><div class="line">81</div><div class="line">82</div><div class="line">83</div><div class="line">84</div><div class="line">85</div><div class="line">86</div><div class="line">87</div><div class="line">88</div><div class="line">89</div><div class="line">90</div><div class="line">91</div><div class="line">92</div><div class="line">93</div><div class="line">94</div><div class="line">95</div><div class="line">96</div><div class="line">97</div><div class="line">98</div><div class="line">99</div><div class="line">100</div><div class="line">101</div><div class="line">102</div><div class="line">103</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, charchar **argv, charchar **envp)</span>  </span></div><div class="line">&#123;  </div><div class="line">    ......  </div><div class="line">    atexit(qemu_run_exit_notifiers);<span class="comment">//注册了Qemu的退出函数  </span></div><div class="line">    ......  </div><div class="line">    module_call_init(MODULE_INIT_QOM);<span class="comment">//初始化Qemu的各个模块，具体见下面注释  </span></div><div class="line">      </div><div class="line"><span class="comment">/* </span></div><div class="line">    module_call_init实际上是设计了一个函数链表ModuleTypeList，参数作为一个Type，相关的函数注册到这个函数链表上， </div><div class="line">    然后内部通过调用e-&gt;init()函数完成所有Type相关的设备的初始化。关于e-&gt;init()的具体内容后面再细说。 </div><div class="line">    Type总计有这些类型： </div><div class="line">    typedef enum &#123; </div><div class="line">    MODULE_INIT_BLOCK, </div><div class="line">    MODULE_INIT_MACHINE, </div><div class="line">    MODULE_INIT_QAPI, </div><div class="line">    MODULE_INIT_QOM, </div><div class="line">    MODULE_INIT_MAX </div><div class="line">    &#125; module_init_type; </div><div class="line">*/   </div><div class="line">  </div><div class="line">    qemu_add_opts(&amp;qemu_drive_opts);<span class="comment">//将各种函数指针（也就是操作）集合添加到链表中   </span></div><div class="line">    qemu_add_opts(&amp;qemu_chardev_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_device_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_netdev_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_net_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_rtc_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_global_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_mon_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_trace_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_option_rom_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_machine_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_boot_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_sandbox_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_add_fd_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_object_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_tpmdev_opts);   </div><div class="line">    qemu_add_opts(&amp;qemu_realtime_opts);  </div><div class="line">     ......   </div><div class="line">    init_clocks();<span class="comment">//时钟初始化相关   </span></div><div class="line">    rtc_clock = host_clock;   </div><div class="line">    ......   </div><div class="line">    module_call_init(MODULE_INIT_MACHINE);   </div><div class="line">    machine = find_default_machine();  </div><div class="line">    ......   </div><div class="line">    ......   </div><div class="line">    cpudef_init();<span class="comment">//初始化CPU def相关  </span></div><div class="line">     ......   </div><div class="line">    <span class="keyword">if</span> (log_mask) &#123;<span class="comment">//日志相关的设置，KVM对外的日志在这里配置   </span></div><div class="line">        <span class="keyword">int</span> mask;   </div><div class="line">        <span class="keyword">if</span> (log_file) &#123;   </div><div class="line">            qemu_set_log_filename(log_file);   </div><div class="line">        &#125;  </div><div class="line">        mask = qemu_str_to_log_mask(log_mask);   </div><div class="line">        <span class="keyword">if</span> (!mask) &#123;   </div><div class="line">            qemu_print_log_usage(<span class="built_in">stdout</span>);   </div><div class="line">            <span class="built_in">exit</span>(<span class="number">1</span>);   </div><div class="line">        &#125;  </div><div class="line">        qemu_set_log(mask);  </div><div class="line">     &#125;   </div><div class="line">    ......   </div><div class="line">    configure_accelerator();<span class="comment">//进行虚拟机模拟器的配置，这里重点注意，它内部调用了accel_list[i].init()函数   </span></div><div class="line">  </div><div class="line"><span class="comment">/* </span></div><div class="line">    for (i = 0; i &lt; ARRAY_SIZE(accel_list); i++) &#123; </div><div class="line">        if (strcmp(accel_list[i].opt_name, buf) == 0) &#123; </div><div class="line">            if (!accel_list[i].available()) &#123; </div><div class="line">                printf("%s not supported for this target\n",accel_list[i].name); </div><div class="line">                continue; </div><div class="line">            &#125; </div><div class="line">            *(accel_list[i].allowed) = true; </div><div class="line">            ret = accel_list[i].init(); </div><div class="line">            if (ret &lt; 0) &#123; </div><div class="line">                init_failed = true; </div><div class="line">                fprintf(stderr, "failed to initialize %s: %s\n",accel_list[i].name,strerror(-ret)); </div><div class="line">               *(accel_list[i].allowed) = false;         </div><div class="line">            &#125; else &#123;             </div><div class="line">                accel_initialised = true;        </div><div class="line">            &#125;        </div><div class="line">            break;    </div><div class="line">         &#125; </div><div class="line">     &#125;  </div><div class="line">    //accel_list定义如下，实际上在kvm平台，我们就关注kvm_init即可。     </div><div class="line">    static struct &#123; </div><div class="line">        const char *opt_name;   </div><div class="line">        const char *name;   </div><div class="line">        int (*available)(void); </div><div class="line">        int (*init)(void); </div><div class="line">        bool *allowed;  </div><div class="line">    &#125; accel_list[] = &#123; </div><div class="line">       &#123; "tcg", "tcg", tcg_available, tcg_init, &amp;tcg_allowed &#125;, </div><div class="line">       &#123; "xen", "Xen", xen_available, xen_init, &amp;xen_allowed &#125;, </div><div class="line">       &#123; "kvm", "KVM", kvm_available, kvm_init, &amp;kvm_allowed &#125;, </div><div class="line">       &#123; "qtest", "QTest", qtest_available, qtest_init, &amp;qtest_allowed &#125;,  </div><div class="line">    &#125;;     </div><div class="line">    //kvm_init函数内首先打开用于用户层以及内核层交互的字符设备文件/dev/kvm，然后通过kvm_ioctl()与内核进行交互，比如     KVM_GET_API_VERSION，KVM_CREATE_VM等命令，其中KVM_CREATE_VM命令创建虚拟机并获得虚拟机句柄，后续kvm_arch_init()、 kvm_irqchip_create()等函数就可以通过kvm_vm_ioctl系统调用进行更进一步的一些配置。这些系统调用实际上是传递到内核层，由内核来完成相应的操作并返回到用户层，内核层的相关函数很多就是前一篇文章注册过的函数指针。 </div><div class="line">*/  </div><div class="line">    ......       </div><div class="line">    ......       </div><div class="line">    cpu_exec_init_all();<span class="comment">//记录CPU执行前的一些初始化工作     </span></div><div class="line">    ......      </div><div class="line">    ......       </div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>前面提到过e-&gt;init()函数，并没有展开细说，现在来说一下这个函数。实际上e-&gt;init()函数是在machine_init(pc_machine_init)函数注册时注册到ModuleTypeList的ModuleEntry上的，module_call_init()针对X86架构时调用amchine_init(),随即调用pc_machine_init()函数，代码如下：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">void</span> <span class="title">pc_machine_init</span><span class="params">(<span class="keyword">void</span>)</span>  </span></div><div class="line">&#123;  </div><div class="line">    qemu_register_machine(&amp;pc_i440fx_machine_v1_5);  </div><div class="line">    qemu_register_machine(&amp;pc_i440fx_machine_v1_4);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v1_3);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v1_2);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v1_1);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v1_0);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_15);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_14);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_13);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_12);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_11);  </div><div class="line">    qemu_register_machine(&amp;pc_machine_v0_10);  </div><div class="line">    qemu_register_machine(&amp;isapc_machine);  </div><div class="line"><span class="meta">#<span class="meta-keyword">ifdef</span> CONFIG_XEN  </span></div><div class="line">    qemu_register_machine(&amp;xenfv_machine);  </div><div class="line"><span class="meta">#<span class="meta-keyword">endif</span>  </span></div><div class="line">&#125;  </div><div class="line">  </div><div class="line">machine_init(pc_machine_init);</div></pre></td></tr></table></figure></p>
+<p>注意这里注册的第一个为pc_i440fx_machine_v1_5，这个结构体定义为下：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">static</span> QEMUMachine pc_i440fx_machine_v1_5 = &#123;  </div><div class="line">    .name = <span class="string">"pc-i440fx-1.5"</span>,  </div><div class="line">    .alias = <span class="string">"pc"</span>,  </div><div class="line">    .desc = <span class="string">"Standard PC (i440FX + PIIX, 1996)"</span>,  </div><div class="line">    .init = pc_init_pci,  </div><div class="line">    .hot_add_cpu = pc_hot_add_cpu,  </div><div class="line">    .max_cpus = <span class="number">255</span>,  </div><div class="line">    .is_default = <span class="number">1</span>,  </div><div class="line">    DEFAULT_MACHINE_OPTIONS,  </div><div class="line">&#125;;</div></pre></td></tr></table></figure></p>
+<p> .init=pc_init_pci, pc_init_pci()即为初始化时候调用的函数，一路跟下去，其实最终调到pc_init1()这个函数。再看pc_init1()这个函数，这里面进行了内存（pc_memory_init）、cpu（pc_cpus_init）、中断等等多种的初始化，这里不细说，重点看cpu的初始化。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">pc_cpus_init</span><span class="params">(<span class="keyword">const</span> charchar *cpu_model, DeviceState *icc_bridge)</span>  </span></div><div class="line">&#123;  </div><div class="line">    <span class="keyword">int</span> i;  </div><div class="line">    X86CPU *cpu = <span class="literal">NULL</span>;  </div><div class="line">    Error *error = <span class="literal">NULL</span>;  </div><div class="line">  </div><div class="line">    <span class="comment">/* init CPUs */</span>  </div><div class="line">    <span class="keyword">if</span> (cpu_model == <span class="literal">NULL</span>) &#123;  </div><div class="line"><span class="meta">#<span class="meta-keyword">ifdef</span> TARGET_X86_64  </span></div><div class="line">        cpu_model = <span class="string">"qemu64"</span>;  </div><div class="line"><span class="meta">#<span class="meta-keyword">else</span>  </span></div><div class="line">        cpu_model = <span class="string">"qemu32"</span>;  </div><div class="line"><span class="meta">#<span class="meta-keyword">endif</span>  </span></div><div class="line">    &#125;  </div><div class="line">    current_cpu_model = cpu_model;  </div><div class="line">  </div><div class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; smp_cpus; i++) &#123;  </div><div class="line">        cpu = pc_new_cpu(cpu_model, x86_cpu_apic_id_from_index(i),<span class="comment">//对每一个CPU进行初始化及创建  </span></div><div class="line">                         icc_bridge, &amp;error);  </div><div class="line">        <span class="keyword">if</span> (error) &#123;  </div><div class="line">            <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>, <span class="string">"%s\n"</span>, error_get_pretty(error));  </div><div class="line">            error_free(error);  </div><div class="line">            <span class="built_in">exit</span>(<span class="number">1</span>);  </div><div class="line">        &#125;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">    <span class="comment">/* map APIC MMIO area if CPU has APIC */</span>  </div><div class="line">    <span class="keyword">if</span> (cpu &amp;&amp; cpu-&gt;env.apic_state) &#123;  </div><div class="line">        <span class="comment">/* <span class="doctag">XXX:</span> what if the base changes? */</span>  </div><div class="line">        sysbus_mmio_map_overlap(SYS_BUS_DEVICE(icc_bridge), <span class="number">0</span>,  </div><div class="line">                                APIC_DEFAULT_ADDRESS, <span class="number">0x1000</span>);  </div><div class="line">    &#125;  </div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p> 该函数内调用pc_new_cpu()函数对每一个CPU进行初始化，其后依次调用关系为：</p>
+ <figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/3-1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/3-1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>下面来看kvm_init_vcpu()函数<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">kvm_init_vcpu</span><span class="params">(CPUState *cpu)</span>  </span></div><div class="line">&#123;  </div><div class="line">    KVMState *s = kvm_state;  </div><div class="line">    <span class="keyword">long</span> mmap_size;  </div><div class="line">    <span class="keyword">int</span> ret;  </div><div class="line">  </div><div class="line">    DPRINTF(<span class="string">"kvm_init_vcpu\n"</span>);  </div><div class="line">  </div><div class="line">    ret = kvm_vm_ioctl(s, KVM_CREATE_VCPU, (voidvoid *)kvm_arch_vcpu_id(cpu));<span class="comment">//通过ioctl调用向内核发起创建CPU请求，内核完成相关工作。  </span></div><div class="line">    <span class="keyword">if</span> (ret &lt; <span class="number">0</span>) &#123;  </div><div class="line">        DPRINTF(<span class="string">"kvm_create_vcpu failed\n"</span>);  </div><div class="line">        <span class="keyword">goto</span> err;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">    cpu-&gt;kvm_fd = ret;  </div><div class="line">    cpu-&gt;kvm_state = s;  </div><div class="line">    cpu-&gt;kvm_vcpu_dirty = <span class="literal">true</span>;  </div><div class="line">  </div><div class="line">    mmap_size = kvm_ioctl(s, KVM_GET_VCPU_MMAP_SIZE, <span class="number">0</span>);<span class="comment">//通过ioctl调用获取内核与用户层共享的内存大小，这部分内存以内存映射的方式进行共享。  </span></div><div class="line">    <span class="keyword">if</span> (mmap_size &lt; <span class="number">0</span>) &#123;  </div><div class="line">        ret = mmap_size;  </div><div class="line">        DPRINTF(<span class="string">"KVM_GET_VCPU_MMAP_SIZE failed\n"</span>);  </div><div class="line">        <span class="keyword">goto</span> err;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">    cpu-&gt;kvm_run = mmap(<span class="literal">NULL</span>, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,<span class="comment">//获取内存大小后，用户层进行共享内存映射。  </span></div><div class="line">                        cpu-&gt;kvm_fd, <span class="number">0</span>);  </div><div class="line">    <span class="keyword">if</span> (cpu-&gt;kvm_run == MAP_FAILED) &#123;  </div><div class="line">        ret = -errno;  </div><div class="line">        DPRINTF(<span class="string">"mmap'ing vcpu state failed\n"</span>);  </div><div class="line">        <span class="keyword">goto</span> err;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">    <span class="keyword">if</span> (s-&gt;coalesced_mmio &amp;&amp; !s-&gt;coalesced_mmio_ring) &#123;  <span class="comment">//mmio相关的一部分共享内存设置  </span></div><div class="line">        s-&gt;coalesced_mmio_ring =  </div><div class="line">            (voidvoid *)cpu-&gt;kvm_run + s-&gt;coalesced_mmio * PAGE_SIZE;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">    ret = kvm_arch_init_vcpu(cpu);<span class="comment">//相关初始化  </span></div><div class="line">    <span class="keyword">if</span> (ret == <span class="number">0</span>) &#123;  </div><div class="line">        qemu_register_reset(kvm_reset_vcpu, cpu);  </div><div class="line">        kvm_arch_reset_vcpu(cpu);  </div><div class="line">    &#125;  </div><div class="line">err:  </div><div class="line">    <span class="keyword">return</span> ret;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>回到上面一些列调用中的qemu_kvm_cpu_thread_fn()函数中，在调用了kvm_init_vcpu()函数完成cpu的初始化之后，又调用kvm_cpu_exec()函数运行cpu，也就是运行了整个虚拟机。<br>我们来看kvm_cpu_exec()这个函数<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">kvm_cpu_exec</span><span class="params">(CPUArchState *env)</span>  </span></div><div class="line">&#123;  </div><div class="line">    .......  </div><div class="line">    <span class="keyword">do</span>&#123;   </div><div class="line">        run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, <span class="number">0</span>);  </div><div class="line">  </div><div class="line">       .......  </div><div class="line">        trace_kvm_run_exit(cpu-&gt;cpu_index, run-&gt;exit_reason);  </div><div class="line">        <span class="keyword">switch</span> (run-&gt;exit_reason) &#123;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_IO:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_MMIO:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_IRQ_WINDOW_OPEN:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_SHUTDOWN:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_UNKNOWN:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_INTERNAL_ERROR:  </div><div class="line">           ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">default</span>:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        &#125;  </div><div class="line">    &#125; <span class="keyword">while</span> (ret == <span class="number">0</span>);  </div><div class="line">  </div><div class="line">    .......  </div><div class="line">    <span class="keyword">return</span> ret;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>首先一个kvm_vcpu_ioctl系统调用，向内核请求运行虚拟机，然后内核运行虚拟机，kvm_cpu_exec()内是有一个while循环，只要是没有错误就会不断运行不会终止，后面的switch语句实际上是接收内核传来的退出原因，因为I/O等是需要Qemu即用户层来完成的，这样虚拟机运行时内核层遇到I/O等就需要退出到Qemu层并记录退出原因，Qemu根据退出原因执行相关操作，完成后再次执行ioctl操作转到内核层继续运行虚拟机。关于异常退出的具体流程下篇文章再详细讲解。<br><br></p>
+<p>关于内存初始化相关工作，在之前提到过的kvm初始化主函数kvm_init()函数里，依次调用：<br>    memory_listener_register(&amp;kvm_memory_listener, &amp;address_space_memory);<br>    listener_add_address_space(listener, as);<br>    listener-&gt;region_add(listener, &amp;section);<br>    .region_add = kvm_region_add,<br>    kvm_set_phys_mem(section, true);<br>    err = kvm_set_user_memory_region(s, mem);<br>    return kvm_vm_ioctl(s, KVM_SET_USER_MEMORY_REGION, &amp;mem);<br>    这些函数依次调用，基本完成内存初始化过程，这里最后的ioctl调用是设置影子页表信息以及设置页面访问权限等。<br><br></p>
+<p>最终，在内核与用户层的配合下完成整个虚拟机的创建和初始化工作，并运行虚拟机。</p>
+<hr>
+<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟化基础/">虚拟化基础<span class="article-category-count">4</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/QEMU/">QEMU</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+        
+	<div id="comment">
+	
+	<!-- 多说评论框 start -->
+	 <div class="ds-thread" data-thread-key="/20170504/qemukvm-source2/" data-title="Qemu-KVM虚拟机初始化及创建过程源码简要分析（二）" data-url="http://yoursite.com/20170504/qemukvm-source2/"></div>
+	<!-- 多说评论框 end -->
+	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+	<script type="text/javascript">
+	var duoshuoQuery = {short_name:"csyssec"};
+	  (function() {
+	    var ds = document.createElement('script');
+	    ds.type = 'text/javascript';ds.async = true;
+	    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+	    ds.charset = 'UTF-8';
+	    (document.getElementsByTagName('head')[0] 
+	     || document.getElementsByTagName('body')[0]).appendChild(ds);
+	  })();
+	  </script>
+	<!-- 多说公共JS代码 end -->
+	
+	</div>
+	<link rel="stylesheet" href="/css/comment.css">
+
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+  
+    <a href="/20170504/qemukvm-source1/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">Qemu-KVM虚拟机初始化及创建过程源码简要分析（一）</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+    <ol class="toc">无</ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+       <!--  自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a> --> 
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/courses" class="mobile-nav-link">Courses</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>
