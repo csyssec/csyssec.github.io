@@ -106,6 +106,188 @@
         
           <section id="main">
   
+    <article id="post-xencolor"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/xencolor/">Xen模式-你的XEN是什么颜色？</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/xencolor/" class="article-date">
+	  <time datetime="2017-05-04T10:23:26.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author:<a href="http://www.brendangregg.com/index.html" target="_blank" rel="external">Brendan D. Gregg</a><br>Source:<a href="http://www.brendangregg.com/blog/2014-05-07/what-color-is-your-xen.html" target="_blank" rel="external">http://www.brendangregg.com/blog/2014-05-07/what-color-is-your-xen.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>What’s faster: <strong>PV</strong>, <strong>HVM</strong>, <strong>HVM with PV drivers</strong>, <strong>PVHVM</strong>, or <strong>PVH</strong>? Cloud computing providers using <a href="http://www.xenproject.org/" target="_blank" rel="external">Xen</a> can offer different virtualization “modes”, based on paravirtualization (PV), hardware virtual machine (HVM), or a hybrid of them. As a customer, you may be required to choose one of these. So, which one?</p>
+<p>Rackspace offers <a href="http://www.rackspace.com/knowledge_center/article/choosing-a-virtualization-mode-pv-versus-pvhvm" target="_blank" rel="external">PV or PVHVM</a>, and Amazon EC2 offers <a href="http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-types.html" target="_blank" rel="external">PV or HVM</a>. I’d summarize the choice today as:</p>
+<pre><code>The best performance is the latest PV/HVM hybrid mode that Xen supports.
+</code></pre><p>For most places right now, PVHVM should deliver the best performance. On AWS EC2, if you create a “HVM” instance, and Linux supports it, you get PVHVM. In the future (Xen 4.4+) the fastest mode will be <a href="http://blog.xen.org/index.php/2014/01/31/linux-3-14-and-pvh/" target="_blank" rel="external">PVH</a>.</p>
+<p>Not picking the latest hybrid mode should only make sense for some corner cases. You can test this yourself, as your mileage and requirements may vary.</p>
+<p>Now, if you search for <a href="http://lmgtfy.com/?q=PV+vs+HVM" target="_blank" rel="external">PV vs HVM</a>, the more you read the more confused you may become. My first hit was a post from 2012 discussing EC2 choices, concluding with:</p>
+<pre><code>&quot;If you want a good performance for Linux/Unix then use PV&quot;
+</code></pre><p>You might still be thinking the same, and a while ago this was right, before many changes in the world of Xen (before PV drivers on HVM, PVHVM, and PVH). At least the post from 2012 has a date on it (like this one).</p>
+<p>What makes this even more confusing is that never versions of the hybrid model have been named as separate “modes”. In this post, I’ll summarize the current virtualization spectrum model, and suggest a slightly different explanation: instead of focusing on the choice of modes, I’ll show them as an evolution of versions.</p>
+<p>Note that I’m not a Xen developer, so I’m not an official source of Truth for this: I’m a performance architect for a large EC2 user, and I’m hoping to contribute to our collective understanding of Xen choices.<br><br></p>
+<h3 id="The-Virtualization-Spectrum"><a href="#The-Virtualization-Spectrum" class="headerlink" title="The Virtualization Spectrum"></a><strong>The Virtualization Spectrum</strong></h3><p>In the articles <a href="http://blog.xen.org/index.php/2012/10/23/the-paravirtualization-spectrum-part-1-the-ends-of-the-spectrum/" target="_blank" rel="external">The Ends of the Spectrum</a> and <a href="http://blog.xen.org/index.php/2012/10/31/the-paravirtualization-spectrum-part-2-from-poles-to-a-spectrum/" target="_blank" rel="external">From Poles to a Spectrum</a>, George Dunlap introduced the idea that there are no longer two modes of Xen virtualization – PV or HVM – but, rather, a spectrum of modes, where PV and HVM are the poles.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/xen-virt-spectrum-crop-800.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/xen-virt-spectrum-crop-800.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>This is pictured in the right diagram <a href="http://www.slideshare.net/xen_com_mgr/linuxcon-eu-virtualization-in-the-cloud-featuring-xen-and-xcp/16" target="_blank" rel="external">from Lars Kurth</a>, which lists different Xen virtualization modes as rows, and features as columns. Full HVM mode is the top row, full PV mode is the bottom, and hybrid modes are in-between. (This shows PVH as a Xen 4.3 feature; it’s now Xen 4.4.)</p>
+<p>The HVM and PV technologies provide their own performance benefits:</p>
+<ul>
+<li><strong>HVM</strong>: A processor technology for accelerating CPU virtualization (privileged instructions, syscalls) and the MMU (page tables). This is supported by Intel (VT-x) and AMD (AMD-V).</li>
+<li><strong>PV</strong>: A software technology where the guest kernel can use an accelerated interface for virtualized components, including disks and network interfaces, rather than emulating hardware.<br>Xen has been developing additional hybrid modes for the best of both words, where a HVM guest can use faster PV kernel parts, or vice versa. At first, PV disk and network drivers on HVM were possible. Then, interrupts and timers. Each of these moves reduced the need for slower emulation, such as via QEMU, improving performance. This is all summarized pretty well by the spectrum diagram.</li>
+</ul>
+<p>You can find more detailed explanations of the modes in those <a href="http://blog.xen.org/index.php/2012/10/23/the-paravirtualization-spectrum-part-1-the-ends-of-the-spectrum/" target="_blank" rel="external">two</a> <a href="http://blog.xen.org/index.php/2012/10/31/the-paravirtualization-spectrum-part-2-from-poles-to-a-spectrum/" target="_blank" rel="external">articles</a>. As George suggested, PVH is expected to be the best hybrid mode, and that other modes could eventually be dropped from the Linux kernel, simplifying it. And, if HVM existed (the Intel VT-x or AMD-V processor features) when Xen was written, PVH would probably have been the chosen mode.<br><br></p>
+<h3 id="The-Colors-of-Xen"><a href="#The-Colors-of-Xen" class="headerlink" title="The Colors of Xen"></a><strong>The Colors of Xen</strong></h3><p>So Xen today is something of a mess – the result of evolving software and hardware features, aiming to provide the best performance possible. And, as George noted in his first article, the terminology has been a little unclear, and has evolved over time.</p>
+<p>The spectrum of modes is great way to make sense of this, but there are some loose ends. One is that a spectrum of modes can imply a choice when doesn’t need to be one: if my instance supports PVHVM, should I study its pros and cons versus PV drivers over HVM? No, PVHVM is just the latest version of the same thing. So, instead of a spectrum of modes, is it more a spectrum of versions?</p>
+<p>There are other sources of confusion: George’s <a href="http://blog.xen.org/index.php/2012/10/31/the-paravirtualization-spectrum-part-2-from-poles-to-a-spectrum/" target="_blank" rel="external">article</a> describes “PVHVM mode” and “PVH mode”, then depicts them inside “HVM mode” and “PV mode” groups, which are labeled as “mode/domain” in the above figure. So “PVHVM mode” is a mode, but “PV mode” is a domain or group of modes?</p>
+<p>His article also warns about PVHVM mode confusion:</p>
+<blockquote>
+<p>(“PVHVM” mode should not be confused with “PV-on-HVM” mode, which is a term sometimes used in the past for “fully virtualized with PV drivers”.)<br>I understand this statement, however, many sources seem to still misuse the terms: the Xen wiki page on PV on HVM describes this as “also called PVHVM or <a href="http://wiki.xen.org/wiki/PV_on_HVM" target="_blank" rel="external">PV-on-HVM</a> drivers”, which seems to contradict the warning. Also, what I think are the developer’s slides on PVHVM are actually titled “<a href="http://www.slideshare.net/xen_com_mgr/6-stefano-spvhvm" target="_blank" rel="external">Linux PV on HVM</a>. Maybe I’m wrong and these are consistent, but I struggle to see how.<br><br></p>
+</blockquote>
+<h3 id="Back-to-Poles"><a href="#Back-to-Poles" class="headerlink" title="Back to Poles"></a><strong>Back to Poles</strong></h3><p>Here’s a different way to think about the modes, if it helps. Lets go back to the poles model (PV and HVM), before the spectrum, and explain the current state of Xen in that context.</p>
+<p>In this model, there are only two modes to worry about, PV and HVM, and each mode may support additional features to improve performance:</p>
+<ul>
+<li><strong>PV</strong>: Use this if the PVH feature is supported, which boots the best type of hybrid. You may also need to choose this if the processor doesn’t do HVM: eg, following the EC2 <em><a href="http://aws.amazon.com/amazon-linux-ami/instance-type-matrix/" target="_blank" rel="external">instance type matrix</a></em> , where you will end up with a fully PV mode instance.</li>
+<li><strong>HVM</strong>: Until PVH, choose this. Xen, and the guest kernel, are likely to support a number of enhancements which use PV code paths, so the booted instance will be a hybrid. The number of enhancements depends on the Xen and guest kernel versions: newer for more.</li>
+</ul>
+<p>This selection of instances is pictured in the flowchart on the right. It shows what can be selected to achieve the highest performance, in general. You may have a corner case that differs, due to different requirements.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/xen-mode-flow.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/xen-mode-flow.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>PVHVM and PVH can be thought of as features and not modes. The choices are PV or HVM, which describes how the instance boots, and your choice may be influenced by the features available. Currently, on EC2, PVH is not available, but PVHVM is: so the best choice for Linux (in general) would be booting a “HVM” instance with PVHVM enabled (eg, setting CONFIG_XEN_PVHVM).</p>
+<p>I’ve redrawn the spectrum picture on the right to emphasize the two modes, and to group all mixed types as “Hybrid”, showing that they are a progression of Xen versions, rather than a group of modes to choose from. Is this helpful?</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/xen-colors.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/xen-colors.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>If you don’t find this an improvement, I’ll try a different way to clarify what your Xen guest is doing in my next post, where I’ll cover tools for feature detection.<br><br></p>
+<h3 id="Enhanced-Networking"><a href="#Enhanced-Networking" class="headerlink" title="Enhanced Networking"></a><strong>Enhanced Networking</strong></h3><p>While my spectrum diagram may be an improvement, I’ve left a loose end untied: <a href="http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/enhanced-networking.html" target="_blank" rel="external">SR-IOV for enhanced networking</a>. If the instance type supports it, this uses hardware virtualization enhancements to improve performance and provide an interface better suited for virtualization. In some ways, this is an evolution of I/O controllers that is similar to what processors have done, with their own virtualization extensions.</p>
+<p>SR-IOV, if you can enable it, should provide the best I/O performance. So perhaps the first feature column in the spectrum diagram should really show two options: P (paravirt) as yellow, and VH (SR-IOV) as green. Here’s how it <a href="http://www.brendangregg.com/blog/images/2014/xen-colors-sriov.png" target="_blank" rel="external">looks</a> (although I’m not sure all the hybrid types support SR-IOV).<br><br></p>
+<h3 id="Conclusion"><a href="#Conclusion" class="headerlink" title="Conclusion"></a><strong>Conclusion</strong></h3><p>Nowadays, there are various hybrid Xen modes (or versions), which obsolete older advice that “PV is fastest”. On AWS EC2 today, “HVM” mode (which supports PVHVM) should be fastest. In the future, it will be PVH. If you can, you can also enable SR-IOV to improve I/O performance further.</p>
+<p>In this post I summarized the spectrum model of the modes, and described them a little differently in terms of the earlier PV or HVM model. The number of Xen modes is a little confusing, and is a result of an evolution of software and hardware, and Xen development work to deliver the fastest guests they can.</p>
+<p>A while ago I wrote a post on <a href="http://dtrace.org/blogs/brendan/2013/01/11/virtualization-performance-zones-kvm-xen/" target="_blank" rel="external">the performance of Zones vs KVM vs Xen</a>, and for Xen I pictured a fully HVM instance with the QEMU I/O proxy, mentioning that paravirtualization drivers could improve I/O performance. That how I’d draw the digram today: as I/O should be using the faster PV drivers, even for <a href="http://docs.aws.amazon.com/AWSEC2/latest/WindowsGuide/Upgrading_PV_drivers.html" target="_blank" rel="external">Windows</a>.</p>
+<p>Despite the Xen improvements, Solaris Zones, or Linux containers, should still be the fastest possible virtualization option, allowing guests to run bare-metal everything. But there is still a road ahead for their widespread adoption: a topic for another post.</p>
+<p>In my <a href="http://www.brendangregg.com/blog/2014-05-09/xen-feature-detection.html" target="_blank" rel="external">next post</a>, I show various tools you can use from your Linux Xen guest to detect which HVM and PV features are enabled.<br><br></p>
+<h3 id="References-and-Resources"><a href="#References-and-Resources" class="headerlink" title="References and Resources"></a><strong>References and Resources</strong></h3><ul>
+<li>George Dunlap’s <a href="http://blog.xen.org/index.php/2012/10/23/the-paravirtualization-spectrum-part-1-the-ends-of-the-spectrum/" target="_blank" rel="external">The Ends of the Spectrum</a> and <a href="http://blog.xen.org/index.php/2012/10/31/the-paravirtualization-spectrum-part-2-from-poles-to-a-spectrum/" target="_blank" rel="external">From Poles to a Spectrum</a> are the best summary of all the modes, and how these have been developed (evolved) little by little.</li>
+<li>Lars Kurth’s talk <a href="http://www.slideshare.net/xen_com_mgr/linuxcon-eu-virtualization-in-the-cloud-featuring-xen-and-xcp/16" target="_blank" rel="external">Virtualization in the Cloud Featuring Xen</a>.</li>
+<li>Stefano Stabellini’s <a href="http://www.slideshare.net/xen_com_mgr/6-stefano-spvhvm" target="_blank" rel="external">Linux PV on HVM</a>, and especially the <a href="http://vimeo.com/33056481" target="_blank" rel="external">video</a>, give the best insight into why the PVHVM features were developed, and the value they bring.</li>
+<li>The Xen <a href="http://wiki.xen.org/wiki/Xen_Linux_PV_on_HVM_drivers" target="_blank" rel="external">Linux PV on HVM drivers</a>shows more commands for studying Xen configuration.</li>
+<li>Also see the Xen wiki <a href="http://wiki.xen.org/wiki/PV_on_HVM" target="_blank" rel="external">PV on HVM</a> page.</li>
+<li><a href="http://blog.xen.org/index.php/2014/01/31/linux-3-14-and-pvh/" target="_blank" rel="external">Linux 3.14 and PVH</a>, describing how to get the development version working.</li>
+<li>See the <a href="http://www.slideshare.net/xen_com_mgr/xen-project-4-4-features-and-futures" target="_blank" rel="external">Xen Project 4.4</a> slides by Russell Pavlicek, Mar 27, 2014, for a recent summary.</li>
+<li>The AWS <a href="http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-types.html" target="_blank" rel="external">EC2 instance types</a> does explain that “HVM” isn’t fully “HVM”.</li>
+<li>The AWS <a href="http://docs.aws.amazon.com/general/latest/gr/glos-chap.html#H" target="_blank" rel="external">glossary</a> also defines “HVM”.</li>
+<li>Rackspace <a href="http://www.rackspace.com/knowledge_center/article/choosing-a-virtualization-mode-pv-versus-pvhvm" target="_blank" rel="external">choosing PV vs PVHVM</a>.</li>
+<li>EC2 <a href="http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/enhanced-networking.html" target="_blank" rel="external">enhanced nerworking (SR-IOV)</a>.</li>
+<li>The first hit from google for <a href="http://palakonda.org/2012/10/30/aws-virtualization-hvm-vs-paravirtualization/" target="_blank" rel="external">PV vs HVM</a> (out of date).</li>
+<li>Moolah ecommerce <a href="http://moolah-ecommerce.com/blog/36-2014/219-amazon-vs-rackspace-performance" target="_blank" rel="external">benchmarked</a> the difference between PV and PVHVM, using <a href="http://www.brendangregg.com/blog/2014-05-02/compilers-love-messing-with-benchmarks.html" target="_blank" rel="external">UnixBench</a>?</li>
+<li>Xen Orchestra has also benchmarked <a href="https://xen-orchestra.com/debian-pvhvm-vs-pv/" target="_blank" rel="external">Debian PVHVM vs PV</a> using … UnixBench? again?? (flips desk.)</li>
+</ul>
+<p>Thanks to the AWS performance engineers for helping me understand this better.</p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟化原理/">虚拟化原理<span class="article-category-count">7</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/XEN/">XEN</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-cloud-osv"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/cloud-osv/">Unikernels为云设计的库操作系统(OSv)</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/cloud-osv/" class="article-date">
+	  <time datetime="2017-05-04T10:21:55.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/11/unikernels-library-operating-systems.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/unikernels-library-operating-systems.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>Unlike a general-purpose, commercial operating system (like Windows, Ubuntu), OSv (<a href="http://osv.io/" target="_blank" rel="external">http://osv.io/</a> from cloudius-systems) is a single-purpose operating system. It is also kind of library operating system <strong><em>designed for the cloud</em></strong>  that running on top of different hypervisors, e.g. XEN, KVM, VMware. So what does OSv like look? </p>
+<p>By quickly taking a look at this slide (<a href="http://www.slideshare.net/dmarti1111/o-sv-usenix-atc-2014" target="_blank" rel="external">http://www.slideshare.net/dmarti1111/o-sv-usenix-atc-2014</a>), we can get to know these two features below. </p>
+<ul>
+<li>General-purpose OS has kernel mode (ring 0) and user mode (ring 3), but <strong>OSv only has code running in Ring 0 mode, it doesn’t have code running in user (ring 3) mode</strong>. This is one of most significant differences.</li>
+<li>The other main difference is that the <strong>OSv only has one single address space</strong> (multiple threads allowed, though) running on a hypervisor as being a single virtual appliance, which serves a single-purpose cloud service. </li>
+</ul>
+<p>So, each OSv holds one specific application (with multiple threads) on top of it, and the OSv itself runs as a guest OS on top of hypervisor. Application and resource isolation is guaranteed by the hypervisor.</p>
+<p>Since an OSv has a single address space, it needs only one CR3 value. Process and address space switch (scheduler) is not required any more, and hence no TLB flush overhead introduced. This also can reduce “kernel” component memory footprint, and let application own more memory space.</p>
+<p>Regarding address translation overheads, e.g. GVA-&gt;GPA-&gt;HPA, by using the larger table (2MB, or even 1GB) for both guest virtual memory page tables and EPT tables, such a translation overhead could be further reduced a lot. </p>
+<p>Note that, as the slides pointed out, <strong>syscalls (user/kernel switch) are no longer required</strong>. Any traditional syscalls now are converted to just function calls in kernel mode only. Although this can significantly reduce performance cost, it also causes a new issue: application ABI compatibility issue. This means that in order to deploy this application on top of OSv, the source code must have to be modified and recompiled. </p>
+<p>There are many challenges, you can check <a href="http://osv.io/" target="_blank" rel="external">http://osv.io/</a> for greater details. But anyway, if OSv is a correct direction for cloud OS (and with a success on having rich application supported) in future, it will definitely have a direct competition with some other solutions like <a href="https://www.docker.com/" target="_blank" rel="external">Docker</a>. </p>
+<p>I like this product in person, the much simpler it is, the more I love it :-).</p>
+<p>Also, see this slide (OSb: <a href="http://www.slideshare.net/yushiomote/osb-osv-on-bitvisor" target="_blank" rel="external">OSv on BitVisor</a>), someone is working on enabling OSv on top of <strong><a href="http://hypervsir.blogspot.com/2014/11/paper-read-bitvisor-thin-hypervisor-for.html" target="_blank" rel="external">BitVisor</a></strong>,  cool ! </p>
+<hr>
+<p><strong><em>Some other references about Library OS:</em></strong></p>
+<p>Unikernels: Rise of the Virtual Library Operating System<br><a href="http://queue.acm.org/detail.cfm?id=2566628" target="_blank" rel="external">http://queue.acm.org/detail.cfm?id=2566628</a></p>
+<p>XPDS14: OSv - A Modern Semi-POSIX LibraryOS - Glauber Costa<br><a href="http://www.xenproject.org/help/presentations-and-videos/video/xpds14v-osv.html" target="_blank" rel="external">http://www.xenproject.org/help/presentations-and-videos/video/xpds14v-osv.html</a></p>
+<p>Rethinking the Library OS from the Top Down:<br><a href="http://research.microsoft.com/pubs/141071/asplos2011-drawbridge.pdf" target="_blank" rel="external">http://research.microsoft.com/pubs/141071/asplos2011-drawbridge.pdf</a></p>
+<p>OSv on bhyve:<br><a href="http://bhyvecon.org/osv_on_bhyve.pdf" target="_blank" rel="external">http://bhyvecon.org/osv_on_bhyve.pdf</a></p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统内核/">系统内核<span class="article-category-count">11</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Cloud/">Cloud</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-securekernel-design"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -324,150 +506,11 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-rop-jop"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/rop-jop/">一种运行时无感的方法防御ROP和JOP攻击</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/rop-jop/" class="article-date">
-	  <time datetime="2017-05-04T10:14:02.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/a-run-time-non-invasive-approach-to.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/a-run-time-non-invasive-approach-to.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>&lt; For some reason, I cannot public it. But I’m planning to open it at some time later &gt;</p>
-<p>This blog presents an idea to defend against both ROP (Return-oriented Programming) and JOP (Jump-oriented Programming) attacks …</p>
-<p>It is a low-overhead, real-time, and non-invasive solution with no need target exploit binary/source change. </p>
-<hr>
-<p> <strong><em>References:</em></strong></p>
-<p>ROP<br><a href="http://en.wikipedia.org/wiki/Return-oriented_programming" target="_blank" rel="external">http://en.wikipedia.org/wiki/Return-oriented_programming</a></p>
-<p>Return-oriented programming without returns, JOP<br><a href="http://dl.acm.org/citation.cfm?id=1866370" target="_blank" rel="external">http://dl.acm.org/citation.cfm?id=1866370</a></p>
-<p>Mitigating ROP via Last Branch Recording (kBouncer)<br><a href="http://blogs.technet.com/b/srd/archive/2012/07/23/technical-analysis-of-the-top-bluehat-prize-submissions.aspx" target="_blank" rel="external">http://blogs.technet.com/b/srd/archive/2012/07/23/technical-analysis-of-the-top-bluehat-prize-submissions.aspx</a><br><a href="http://www.cs.columbia.edu/~vpappas/papers/kbouncer.pdf" target="_blank" rel="external">http://www.cs.columbia.edu/~vpappas/papers/kbouncer.pdf</a></p>
-<p>Hardware-assisted-cfi<br><a href="https://www.informatik.tu-darmstadt.de/fileadmin/user_upload/Group_TRUST/PubsPDF/hardware-assisted-cfi.pdf" target="_blank" rel="external">https://www.informatik.tu-darmstadt.de/fileadmin/user_upload/Group_TRUST/PubsPDF/hardware-assisted-cfi.pdf</a></p>
-<p>ROPecker<br><a href="http://www.mysmu.edu/phdis2008/yqcheng.2008/ROPecker-NDSS14.pdf" target="_blank" rel="external">http://www.mysmu.edu/phdis2008/yqcheng.2008/ROPecker-NDSS14.pdf</a></p>
-<p>&lt; For some reason, I cannot public it at this moment&gt;</p>
-<hr>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">14</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/JOP/">JOP</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/ROP/">ROP</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-arm-xen"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/arm-xen/">为什么ARM平台XEN的代码量更小</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/arm-xen/" class="article-date">
-	  <time datetime="2017-05-04T10:11:43.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/why-smaller-code-size-with-xen-on-arm.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/why-smaller-code-size-with-xen-on-arm.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>This white paper (<a href="http://wiki.xenproject.org/wiki/Xen_ARM_with_Virtualization_Extensions_whitepaper" target="_blank" rel="external">Xen ARM with Virtualization Extensions whitepaper</a>) indicates that “Xen on ARM is 1/6 of the code size of x86_64 Xen, while still providing a similar level of features”. what does this mean? Does this mean that Xen/ARM is better than Xen/x86? We cannot simply just make this conclusion, but anyway smaller code size means smaller <a href="http://en.wikipedia.org/wiki/Trusted_computing_base" target="_blank" rel="external">TCB</a>, which can reduce security risks (e.g. security vulnerabilities). </p>
-<p>First of all, I don’t think that is the latest status on Xen 4.4+ version. see the latest one (in 2014, Xen on ARM summit, in the Reference link below). </p>
-<p>Here I’m going to give some more information. </p>
-<ol>
-<li><p>Unlike x86( or x64) XEN, <strong>no shadow page table management code is required any longer in XEN on ARM</strong>. </p>
-<p>In the first generation of Intel VT-x architecture processors, there is no memory virtualization(no EPT, Extended Page Table), which means there is no hardware support for address translations from guest physical memory to host physical memory. XEN and any other hypervisors must sets up the shadow page tables to do those things in a software way (and keep synchronization with guest virtual address page tables by monitoring MOV-CR3 and INVLPG instructions. This solution is sometimes also called as VTLB (virtual TLB). </p>
-<p>For compatibility reason, this part of code is still in XEN because there are still many machines on the market that have no EPT-capable VT-x processors.<br><strong>However, Xen/ARM doesn’t suffer the similar compatibility issue, because it is started from scratch due to the fact that hardware memory (MMU) virtualization is supported since from ARM virtualization was introduced (true? please correct me if i’m wrong). In ARM architecture, new processor mode (Hyp mode, PL2 privilege) is responsible for controlling a new MMU memory address translation layer, which is called as “stage 2” translation from IPA (Intermediate Physical Address) to final PA</strong>. So XEN/ARM doesn’t require the similar code like Virtual TLB. This can reduce thousands of code lines.</p>
-</li>
-<li><p>The white paper says <strong>Xen/ARM does not need QEMU because it does not do any emulation</strong>. <is this="" still="" true="" on="" latest="" xen="" arm?=""> … it uses paravirtualized interfaces for IO devices. Actually I’m not quite understand the Xen/ARM architecture for device emulation. It still uses Dom0 to hold PV backend drivers that have communication with PV frontend drivers in guest OS (DomU).</is></p>
-<p>For device virtualization, on a Xen/x86 system, there are many legacy devices that still are using I/O port (e.g. IN/OUT instructions) for communication between CPU and memory. In this manner, Xen/ARM doesn’t have such an issue because all the I/O communication interfaces are memory-mapped to system memory bus. so the I/O device access can be initiated by using regular memory operation instruction.</p>
-<p>So Xen/ARM can unify the I/O device interface, and hence simply the Hypervisor design as well as PV backend/frontend driver design. The code size may also be smaller.</p>
-</li>
-<li><p><strong>Xen/x86 has two kinds of guests: HVM guest (unmodified kernel, e.g. Windows OS) and PV guest whose kernel must be modified to be aware of the presence of Xen</strong>. For example, some of low-level CPU or MMU primitive operation functions in PV guest OS must be changed to call a HyperCall interface to communicate with underlying Xen for guest virtualization. </p>
-<p><strong>But Xen/ARM doesn’t want to introduce this differentiation.</strong> Whatever the guest kernel must have to be changed, then change it. I think partly because Xen/ARM won’t need to support Windows OS, or other closed-source operating systems, at least for now. So Xen/ARM code is smaller again.</p>
-</li>
-<li><p><strong>Xen/x86 supports both AMD and Intel Hardware Virtualization Technologies, AMD-v (Pacifica, SVM) and Intel VT-x.</strong> </p>
-<p>Although these two technologies are almost the same from guest’s perspective, the hypervisor still need to maintain two copies of x86 (and x64) code implementations because there are many minor differences in virtual machine monitor (VMM) due to some different virtualization architecture design.</p>
-<p>However, ARM doesn’t have the similar issue either. Till now there are only ARMv7-A and ARMv8-A architectures that support ARM hardware virtualization, and variation is very minimal.</p>
-</li>
-<li><p>Similarly, Xen/x86 also support different generations of AMD/Intel processor architectures and corresponding platform/chipsets. And each of the generations are different, but Xen/x86 must maintain backward compatibilities, so the code size is increasing from time to time.</p>
-<p>For example, Intel processor has 16-bit “real mode” in addition to 32bit protected mode and 64bit protected mode. In the earlier generation VT-x processor (prior to <a href="http://en.wikipedia.org/wiki/Westmere_(microarchitecture" target="_blank" rel="external">Westmere</a>)), the code running in 16-bit “real mode” cannot be natively virtualized, so the VMM/hypervisor software must have to emulate real mode instruction executions on guest logical processor. Until VMX “<strong>Unrestricted Guest</strong>“ mode was introduced, this issue eventually was resolved by just only adding several lines of code to enable it.</p>
-<p>I don’t think Xen/ARM will have NO such an problem in near future. </p>
-</li>
-<li><p>In the latest Intel VT-x processors (Haswell +), a new feature “<strong>Hardware <a href="http://en.wikipedia.org/wiki/Nested_virtualization" target="_blank" rel="external">Nested Virtualization</a></strong>“ is introduced. Intel calls it as “<strong><em>VMCS Shadowing</em></strong> “, which provides kind of hardware virtualization supports to allow VMM/hypervisor software running on top of itself or other 3rd party hypervisors. <strong>Xen currently adds partial nested virtualization support</strong> (The virtualization industry leader, VMware, does it better, most of virtualization features can be nested in their products). This definitely introduces some code overhead. </p>
-</li>
-</ol>
-<p><br><br>These above are just some examples to explain why Xen/ARM has smaller code size. We cannot say which one of architectures is better just based on the code size. As a newcomer for hardware virtualization, ARM should and must do better!</p>
-<hr>
-<p><strong><em>References:</em></strong><br>Xen On ARM - Stefano Stabellini<br><a href="http://www.slideshare.net/xen_com_mgr/xensummit-na-2012-xen-on-arm-cortex-a15" target="_blank" rel="external">http://www.slideshare.net/xen_com_mgr/xensummit-na-2012-xen-on-arm-cortex-a15</a></p>
-<p>Xen-on-arm-xen-developer-summit-2014<br><a href="http://www.slideshare.net/xen_com_mgr/xen-on-arm-xen-developer-summit-2014" target="_blank" rel="external">http://www.slideshare.net/xen_com_mgr/xen-on-arm-xen-developer-summit-2014</a> </p>
-<hr>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟化综合/">虚拟化综合<span class="article-category-count">2</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/XEN/">XEN</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
     
-    <a class="extend prev" rel="prev" href="/page/3/">上一页</a><a class="page-number" href="/">1</a><a class="page-number" href="/page/2/">2</a><a class="page-number" href="/page/3/">3</a><span class="page-number current">4</span><a class="page-number" href="/page/5/">5</a><a class="page-number" href="/page/6/">6</a><span class="space">&hellip;</span><a class="page-number" href="/page/20/">20</a><a class="extend next" rel="next" href="/page/5/">下一页</a>
+    <a class="extend prev" rel="prev" href="/page/3/">上一页</a><a class="page-number" href="/">1</a><a class="page-number" href="/page/2/">2</a><a class="page-number" href="/page/3/">3</a><span class="page-number current">4</span><a class="page-number" href="/page/5/">5</a><a class="page-number" href="/page/6/">6</a><span class="space">&hellip;</span><a class="page-number" href="/page/21/">21</a><a class="extend next" rel="next" href="/page/5/">下一页</a>
   </nav>
 
 </section>
@@ -555,6 +598,30 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170505/cfi-mathias/">控制流完整性-Mathias Payer</a></h6>
+          <!--  <span>五月 5, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170505/vmi-xenproject/">虚拟机自省技术-一个有新商业应用的安全性创造</a></h6>
+          <!--  <span>五月 5, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -724,30 +791,6 @@
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/cloud-osv/">Unikernels为云设计的库操作系统(OSv)</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/securekernel-design/">这是Linux内核中一种好的安全设计吗- thread_info和内核栈的联系</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -758,7 +801,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">10</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -768,7 +811,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.43px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.14px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.71px;">Binary</a> <a href="/tags/CFI/" style="font-size: 11.43px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.14px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 12.86px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 17.14px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.14px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 14.29px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.71px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.71px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.57px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.43px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.86px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 12.86px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 12.86px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.71px;">Malware</a> <a href="/tags/Memory/" style="font-size: 12.86px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.43px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 12.14px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.71px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.43px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.71px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.14px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.71px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.43px;">Rootkit</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.71px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.71px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.57px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.43px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.29px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 12.14px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 12.86px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.54px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 12.31px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
     </div>
   </div>
 

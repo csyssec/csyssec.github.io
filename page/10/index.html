@@ -106,6 +106,193 @@
         
           <section id="main">
   
+    <article id="post-valgrind-memcheck"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170315/valgrind-memcheck/">如何使用Valgrind memcheck工具进行C/C++的内存漏洞检测</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170315/valgrind-memcheck/" class="article-date">
+	  <time datetime="2017-03-15T07:34:22.000Z" itemprop="datePublished">三月 15, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>译者: @一帆<br>出品：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a><br>来源：<a href="http://www.thegeekstuff.com/2011/11/valgrind-memcheck/" target="_blank" rel="external">http://www.thegeekstuff.com/2011/11/valgrind-memcheck/</a></p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<h3 id="写在最前"><a href="#写在最前" class="headerlink" title="写在最前"></a>写在最前</h3><p>系统编程的一个重要方面就是有效处理内存相关问题。编程任务越接近系统，我们便自然要面对更多与内存相关的问题。</p>
+<p>有时这些问题不是很重要，然而很多时候调试内存相关问题就变成噩梦一样。所以，很多工具可用作为调试内存问题的实践。</p>
+<p>在这篇文章中，我们会讨论最广泛应用的开源内存管理框架VALGRIND。</p>
+<pre><code>摘自 [Valgrind.org][1]：
+
+Valgrind是一个用于创建动态分析工具的仪器框架。它包含一系列工具，其中每个可进行某种调试、剖析或相似任务来帮助我们改善程序。Valgrind的结构是模块化的，所以我们可以轻而易举地创建新工具，而不干扰现有结构。
+</code></pre><p>以下是一些标准配置的工具：</p>
+<ol>
+<li>Memcheck是一个内存错误检查器。它可以帮你把程序写的更加准确，尤其是用C和C++语言编写的程序。</li>
+<li>Cachegrind是一个缓存和分支预测分析器，它可以帮你让程序跑的更快。</li>
+<li>Callgrind是一款调用图生成缓存分析器。它的一些功能与Cachegrind有重叠，但它能够收集一些Cachegrind无法得到的信息。</li>
+<li>Helgrind是一个线程错误检测器。它可以帮你编写出更准确的多线程程序。</li>
+<li>DRD也是一个线程错误检测器。尽管它与Helgrind类似，但两者却适用不同的分析方法，因此可能会找出不同的问题。</li>
+<li>Massif是一个堆分析器，它有助于减小程序运行所用内存。</li>
+<li>DHAT是另一种堆分析器。它可以帮助你了解区块的试用期、使用及布局低效问题。</li>
+<li>SGcheck是一个可以检测堆数组和全局数组溢出的工具。它的功能与Memcheck互补： SGcheck可以发现Memcheck发现不了的问题，反之亦然。 </li>
+<li>BBV是一个实验性的SimPoint基础区块向量发生器。它对于计算机架构研究和开发的进行有很大帮助。</li>
+</ol>
+<p>还有一些对于大多数使用者不那么好用的小工具：Lackey就是一个演示仪器基础的示范工具；Nulgrind是最小化的Valgrind工具，不做分析或操作，仅用于测试。</p>
+<p>在这篇文章我们将关注“memcheck”工具。</p>
+<h2 id="使用-Valgrind-Memcheck"><a href="#使用-Valgrind-Memcheck" class="headerlink" title="使用 Valgrind Memcheck"></a>使用 Valgrind Memcheck</h2><p>Memcheck工具的使用如下：</p>
+<pre><code>valgrind --tool=memcheck ./a.out
+</code></pre><p>从以上的命令可以清楚地看到主要的二进数是“Valgrind”，而我们想要使用的工具由选项“-tool”指定。上述“a.out”表示能够如愿以偿运行memcheck的可执行文件。</p>
+<p>这个工具可以检测以下与内存相关的问题：</p>
+<ul>
+<li>使用未初始化的内存</li>
+<li>对释放后的内存读/写</li>
+<li>对malloc‘d（分配内存）区块尾部读/写</li>
+<li>内存泄露</li>
+<li>对malloc/new/new[] 与 free/delete/delete[]的不匹配使用</li>
+<li>双倍释放的内存</li>
+</ul>
+<p>注意：以上列表不是全部但包含了这个工具检测出来的常见问题。</p>
+<p>让我们来一一讨论以上场景：</p>
+<p>注意：所有将要展示的检测代码应用带有-g选项（用来生成memcheck输出中的行号）的gcc来编译。如我们之前在<a href="http://www.thegeekstuff.com/2011/10/c-program-to-an-executable/" target="_blank" rel="external">如何将C程序编译成可执行文件</a>的讨论中提到的，这其中需要经历4个不同的阶段。</p>
+<h3 id="1-使用未初始化内存"><a href="#1-使用未初始化内存" class="headerlink" title="1.使用未初始化内存"></a><strong>1.使用未初始化内存</strong></h3><p>代码：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span> </span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">void</span>)</span></span></div><div class="line">&#123;</div><div class="line">    <span class="keyword">char</span> *p; </div><div class="line"></div><div class="line">    <span class="keyword">char</span> c = *p; </div><div class="line"></div><div class="line">    <span class="built_in">printf</span>(<span class="string">"\n [%c]\n"</span>,c); </div><div class="line"></div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>在以上代码中，我们尝试使用一个未初始化的指针“p”。</p>
+<p>我们一起运行以下memcheck并观察结果。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line">$ valgrind --tool=memcheck ./val</div><div class="line">==<span class="number">2862</span>== Memcheck, a memory error detector</div><div class="line">==<span class="number">2862</span>== Copyright (C) <span class="number">2002</span><span class="number">-2009</span>, and GNU GPL'd, by Julian Seward et al.</div><div class="line">==<span class="number">2862</span>== Using Valgrind<span class="number">-3.6</span><span class="number">.0</span>.SVN-Debian and LibVEX; rerun with -h <span class="keyword">for</span> copyright info</div><div class="line">==<span class="number">2862</span>== Command: ./val</div><div class="line">==<span class="number">2862</span>==</div><div class="line">==<span class="number">2862</span>== Use of uninitialised value of size <span class="number">8</span></div><div class="line">==<span class="number">2862</span>==    at <span class="number">0x400530</span>: main (valgrind.c:<span class="number">8</span>)</div><div class="line">==<span class="number">2862</span>==</div><div class="line"></div><div class="line">[#]</div><div class="line">==<span class="number">2862</span>==</div><div class="line">==<span class="number">2862</span>== HEAP SUMMARY:</div><div class="line">==<span class="number">2862</span>==     in use at <span class="built_in">exit</span>: <span class="number">0</span> bytes in <span class="number">0</span> blocks</div><div class="line">==<span class="number">2862</span>==   total heap usage: <span class="number">0</span> allocs, <span class="number">0</span> frees, <span class="number">0</span> bytes allocated</div><div class="line">==<span class="number">2862</span>==</div><div class="line">==<span class="number">2862</span>== All heap blocks were freed -- no leaks are possible</div><div class="line">==<span class="number">2862</span>==</div><div class="line">==<span class="number">2862</span>== For counts of detected and suppressed errors, rerun with: -v</div><div class="line">==<span class="number">2862</span>== Use --track-origins=yes to see where uninitialized values come from</div><div class="line">==<span class="number">2862</span>== ERROR SUMMARY: <span class="number">1</span> errors from <span class="number">1</span> contexts (suppressed: <span class="number">4</span> from <span class="number">4</span>)</div></pre></td></tr></table></figure>
+<pre><code>从以上输出来看，Valgrind可以检测出未初始化的变量并发出警告（请看上面加粗的几行）。
+</code></pre><h3 id="2-对释放的后内存读-写"><a href="#2-对释放的后内存读-写" class="headerlink" title="2. 对释放的后内存读/写"></a><strong>2. 对释放的后内存读/写</strong></h3><p>代码：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span> </span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">void</span>)</span></span></div><div class="line">&#123;</div><div class="line">    <span class="keyword">char</span> *p = <span class="built_in">malloc</span>(<span class="number">1</span>);</div><div class="line">    *p = <span class="string">'a'</span>; </div><div class="line"></div><div class="line">    <span class="keyword">char</span> c = *p; </div><div class="line"></div><div class="line">    <span class="built_in">printf</span>(<span class="string">"\n [%c]\n"</span>,c); </div><div class="line"></div><div class="line">    <span class="built_in">free</span>(p);</div><div class="line">    c = *p;</div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>在以上代码中，我们释放了指针 ‘p’，然后我们又尝试利用指针获取该值. </p>
+<p>让我们运行memcheck来看一下在这种情况下Valgrind有何帮助。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div></pre></td><td class="code"><pre><div class="line">$ valgrind --tool=memcheck ./val</div><div class="line">==<span class="number">2849</span>== Memcheck, a memory error detector</div><div class="line">==<span class="number">2849</span>== Copyright (C) <span class="number">2002</span><span class="number">-2009</span>, and GNU GPL'd, by Julian Seward et al.</div><div class="line">==<span class="number">2849</span>== Using Valgrind<span class="number">-3.6</span><span class="number">.0</span>.SVN-Debian and LibVEX; rerun with -h <span class="keyword">for</span> copyright info</div><div class="line">==<span class="number">2849</span>== Command: ./val</div><div class="line">==<span class="number">2849</span>== </div><div class="line"></div><div class="line"> [a]</div><div class="line">==<span class="number">2849</span>== Invalid read of size <span class="number">1</span></div><div class="line">==<span class="number">2849</span>==    at <span class="number">0x400603</span>: main (valgrind.c:<span class="number">30</span>)</div><div class="line">==<span class="number">2849</span>==  Address <span class="number">0x51b0040</span> is <span class="number">0</span> bytes inside a block of size <span class="number">1</span> <span class="built_in">free</span>'d</div><div class="line">==<span class="number">2849</span>==    at <span class="number">0x4C270BD</span>: <span class="built_in">free</span> (vg_replace_malloc.c:<span class="number">366</span>)</div><div class="line">==<span class="number">2849</span>==    by <span class="number">0x4005FE</span>: main (valgrind.c:<span class="number">29</span>)</div><div class="line">==<span class="number">2849</span>==</div><div class="line">==<span class="number">2849</span>==</div><div class="line">==<span class="number">2849</span>== HEAP SUMMARY:</div><div class="line">==<span class="number">2849</span>==     in use at <span class="built_in">exit</span>: <span class="number">0</span> bytes in <span class="number">0</span> blocks</div><div class="line">==<span class="number">2849</span>==   total heap usage: <span class="number">1</span> allocs, <span class="number">1</span> frees, <span class="number">1</span> bytes allocated</div><div class="line">==<span class="number">2849</span>==</div><div class="line">==<span class="number">2849</span>== All heap blocks were freed -- no leaks are possible</div><div class="line">==<span class="number">2849</span>==</div><div class="line">==<span class="number">2849</span>== For counts of detected and suppressed errors, rerun with: -v</div><div class="line">==<span class="number">2849</span>== ERROR SUMMARY: <span class="number">1</span> errors from <span class="number">1</span> contexts (suppressed: <span class="number">4</span> from <span class="number">4</span>)</div></pre></td></tr></table></figure>
+<p>从以上结果看出，这个工具可以检测出无效的读取操作并输出‘Invalid read of size 1’的警告.</p>
+<p>边注：<a href="http://www.thegeekstuff.com/2010/03/debug-c-program-using-gdb/" target="_blank" rel="external">用gdb调试C语言程序</a></p>
+<h3 id="3-对malloc‘d（分配内存）区块尾部进行读-写"><a href="#3-对malloc‘d（分配内存）区块尾部进行读-写" class="headerlink" title="3.对malloc‘d（分配内存）区块尾部进行读/写"></a><strong>3.对malloc‘d（分配内存）区块尾部进行读/写</strong></h3><p>代码：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span> </span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">void</span>)</span></span></div><div class="line">&#123;</div><div class="line">    <span class="keyword">char</span> *p = <span class="built_in">malloc</span>(<span class="number">1</span>);</div><div class="line">    *p = <span class="string">'a'</span>; </div><div class="line"></div><div class="line">    <span class="keyword">char</span> c = *(p+<span class="number">1</span>); </div><div class="line"></div><div class="line">    <span class="built_in">printf</span>(<span class="string">"\n [%c]\n"</span>,c); </div><div class="line"></div><div class="line">    <span class="built_in">free</span>(p);</div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>在上面这段代码中，我们给‘p’分配了一个字节的内存，而当我们将值读取给‘c’时用的是p+1的地址。</p>
+<p>现在让我们在这段代码中运行一下Valgrind：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div></pre></td><td class="code"><pre><div class="line">$ valgrind --tool=memcheck ./val</div><div class="line">==<span class="number">2835</span>== Memcheck, a memory error detector</div><div class="line">==<span class="number">2835</span>== Copyright (C) <span class="number">2002</span><span class="number">-2009</span>, and GNU GPL'd, by Julian Seward et al.</div><div class="line">==<span class="number">2835</span>== Using Valgrind<span class="number">-3.6</span><span class="number">.0</span>.SVN-Debian and LibVEX; rerun with -h <span class="keyword">for</span> copyright info</div><div class="line">==<span class="number">2835</span>== Command: ./val</div><div class="line">==<span class="number">2835</span>==</div><div class="line">==<span class="number">2835</span>== Invalid read of size <span class="number">1</span></div><div class="line">==<span class="number">2835</span>==    at <span class="number">0x4005D9</span>: main (valgrind.c:<span class="number">25</span>)</div><div class="line">==<span class="number">2835</span>==  Address <span class="number">0x51b0041</span> is <span class="number">0</span> bytes after a block of size <span class="number">1</span> alloc'd</div><div class="line">==<span class="number">2835</span>==    at <span class="number">0x4C274A8</span>: <span class="built_in">malloc</span> (vg_replace_malloc.c:<span class="number">236</span>)</div><div class="line">==<span class="number">2835</span>==    by <span class="number">0x4005C5</span>: main (valgrind.c:<span class="number">22</span>)</div><div class="line">==<span class="number">2835</span>== </div><div class="line"></div><div class="line"> []</div><div class="line">==<span class="number">2835</span>==</div><div class="line">==<span class="number">2835</span>== HEAP SUMMARY:</div><div class="line">==<span class="number">2835</span>==     in use at <span class="built_in">exit</span>: <span class="number">0</span> bytes in <span class="number">0</span> blocks</div><div class="line">==<span class="number">2835</span>==   total heap usage: <span class="number">1</span> allocs, <span class="number">1</span> frees, <span class="number">1</span> bytes allocated</div><div class="line">==<span class="number">2835</span>==</div><div class="line">==<span class="number">2835</span>== All heap blocks were freed -- no leaks are possible</div><div class="line">==<span class="number">2835</span>==</div><div class="line">==<span class="number">2835</span>== For counts of detected and suppressed errors, rerun with: -v</div><div class="line">==<span class="number">2835</span>== ERROR SUMMARY: <span class="number">1</span> errors from <span class="number">1</span> contexts (suppressed: <span class="number">4</span> from <span class="number">4</span>)</div></pre></td></tr></table></figure></p>
+<p>同样，在这种情况下这个工具也检测出无效的读取操作。</p>
+<h3 id="4-内存泄露"><a href="#4-内存泄露" class="headerlink" title="4.内存泄露"></a><strong>4.内存泄露</strong></h3><p>代码：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span> </span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">void</span>)</span></span></div><div class="line">&#123;</div><div class="line">    <span class="keyword">char</span> *p = <span class="built_in">malloc</span>(<span class="number">1</span>);</div><div class="line">    *p = <span class="string">'a'</span>; </div><div class="line"></div><div class="line">    <span class="keyword">char</span> c = *p; </div><div class="line"></div><div class="line">    <span class="built_in">printf</span>(<span class="string">"\n [%c]\n"</span>,c); </div><div class="line"></div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>在这个代码中，我们分配了一字节的内存但没有释放它。现在让我们运行一下Valgrind来看下现象:<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div></pre></td><td class="code"><pre><div class="line">$ valgrind --tool=memcheck --leak-check=full ./val</div><div class="line">==2888== Memcheck, a memory error detector</div><div class="line">==2888== Copyright (C) 2002-2009, and GNU GPL&apos;d, by Julian Seward et al.</div><div class="line">==2888== Using Valgrind-3.6.0.SVN-Debian and LibVEX; rerun with -h for copyright info</div><div class="line">==2888== Command: ./val</div><div class="line">==2888== </div><div class="line"></div><div class="line"> [a]</div><div class="line">==2888==</div><div class="line">==2888== HEAP SUMMARY:</div><div class="line">==2888==     in use at exit: 1 bytes in 1 blocks</div><div class="line">==2888==   total heap usage: 1 allocs, 0 frees, 1 bytes allocated</div><div class="line">==2888==</div><div class="line">==2888== 1 bytes in 1 blocks are definitely lost in loss record 1 of 1</div><div class="line">==2888==    at 0x4C274A8: malloc (vg_replace_malloc.c:236)</div><div class="line">==2888==    by 0x400575: main (valgrind.c:6)</div><div class="line">==2888==</div><div class="line">==2888== LEAK SUMMARY:</div><div class="line">==2888==    definitely lost: 1 bytes in 1 blocks</div><div class="line">==2888==    indirectly lost: 0 bytes in 0 blocks</div><div class="line">==2888==      possibly lost: 0 bytes in 0 blocks</div><div class="line">==2888==    still reachable: 0 bytes in 0 blocks</div><div class="line">==2888==         suppressed: 0 bytes in 0 blocks</div><div class="line">==2888==</div><div class="line">==2888== For counts of detected and suppressed errors, rerun with: -v</div><div class="line">==2888== ERROR SUMMARY: 1 errors from 1 contexts (suppressed: 4 from 4)</div></pre></td></tr></table></figure></p>
+<p>输出行（上面加粗部分）表示这个工具是能够检测出内存泄漏的。</p>
+<p>注：在这个情况下我们加了一个额外的选择“-leak-check=full”来得到详细的内存泄漏相关细节。</p>
+<h3 id="5-对malloc-new-new-与-free-delete-delete-的不匹配使用"><a href="#5-对malloc-new-new-与-free-delete-delete-的不匹配使用" class="headerlink" title="5.对malloc/new/new[] 与 free/delete/delete[]的不匹配使用"></a><strong>5.对malloc/new/new[] 与 free/delete/delete[]的不匹配使用</strong></h3><p>代码：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span><span class="meta-string">&lt;iostream&gt;</span> </span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">void</span>)</span></span></div><div class="line">&#123;</div><div class="line">    <span class="keyword">char</span> *p = (<span class="keyword">char</span>*)<span class="built_in">malloc</span>(<span class="number">1</span>);</div><div class="line">    *p = <span class="string">'a'</span>; </div><div class="line"></div><div class="line">    <span class="keyword">char</span> c = *p; </div><div class="line"></div><div class="line">    <span class="built_in">printf</span>(<span class="string">"\n [%c]\n"</span>,c);</div><div class="line">    <span class="keyword">delete</span> p;</div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>在以上代码中，我们用到了<code>malloc()</code>来分配内存但用delete运算符来删除内存。</p>
+<p>注：我们用g++来编译以上代码，是因为delete运算符是从C++中引入的；g++工具用于C++代码编译。</p>
+<p>让我们来运行这个工具看看：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div></pre></td><td class="code"><pre><div class="line">$ valgrind --tool=memcheck --leak-check=full ./val</div><div class="line">==<span class="number">2972</span>== Memcheck, a memory error detector</div><div class="line">==<span class="number">2972</span>== Copyright (C) <span class="number">2002</span><span class="number">-2009</span>, and GNU GPL'd, by Julian Seward et al.</div><div class="line">==<span class="number">2972</span>== Using Valgrind<span class="number">-3.6</span><span class="number">.0</span>.SVN-Debian and LibVEX; rerun with -h <span class="keyword">for</span> copyright info</div><div class="line">==<span class="number">2972</span>== Command: ./val</div><div class="line">==<span class="number">2972</span>== </div><div class="line"></div><div class="line"> [a]</div><div class="line">==<span class="number">2972</span>== Mismatched <span class="built_in">free</span>() / <span class="keyword">delete</span> / <span class="keyword">delete</span> []</div><div class="line">==<span class="number">2972</span>==    at <span class="number">0x4C26DCF</span>: <span class="keyword">operator</span> <span class="keyword">delete</span>(<span class="keyword">void</span>*) (vg_replace_malloc.c:<span class="number">387</span>)</div><div class="line">==<span class="number">2972</span>==    by <span class="number">0x40080B</span>: main (valgrind.c:<span class="number">13</span>)</div><div class="line">==<span class="number">2972</span>==  Address <span class="number">0x595e040</span> is <span class="number">0</span> bytes inside a block of size <span class="number">1</span> alloc'd</div><div class="line">==<span class="number">2972</span>==    at <span class="number">0x4C274A8</span>: <span class="built_in">malloc</span> (vg_replace_malloc.c:<span class="number">236</span>)</div><div class="line">==<span class="number">2972</span>==    by <span class="number">0x4007D5</span>: main (valgrind.c:<span class="number">7</span>)</div><div class="line">==<span class="number">2972</span>==</div><div class="line">==<span class="number">2972</span>==</div><div class="line">==<span class="number">2972</span>== HEAP SUMMARY:</div><div class="line">==<span class="number">2972</span>==     in use at <span class="built_in">exit</span>: <span class="number">0</span> bytes in <span class="number">0</span> blocks</div><div class="line">==<span class="number">2972</span>==   total heap usage: <span class="number">1</span> allocs, <span class="number">1</span> frees, <span class="number">1</span> bytes allocated</div><div class="line">==<span class="number">2972</span>==</div><div class="line">==<span class="number">2972</span>== All heap blocks were freed -- no leaks are possible</div><div class="line">==<span class="number">2972</span>==</div><div class="line">==<span class="number">2972</span>== For counts of detected and suppressed errors, rerun with: -v</div><div class="line">==<span class="number">2972</span>== ERROR SUMMARY: <span class="number">1</span> errors from <span class="number">1</span> contexts (suppressed: <span class="number">4</span> from <span class="number">4</span>)</div></pre></td></tr></table></figure></p>
+<p>我们从以上输出结果（粗体显示）可以看到，这个工具清楚地说明了‘Mismatched free()/delete/delete[]’</p>
+<p>你可以试着在检测代码中结合使用‘new’和‘free’，看一看这个工具可以给出怎样的结果。</p>
+<h3 id="6-重复释放的内存"><a href="#6-重复释放的内存" class="headerlink" title="6.重复释放的内存"></a><strong>6.重复释放的内存</strong></h3><p>代码：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span> </span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">void</span>)</span></span></div><div class="line">&#123;</div><div class="line">    <span class="keyword">char</span> *p = (<span class="keyword">char</span>*)<span class="built_in">malloc</span>(<span class="number">1</span>);</div><div class="line">    *p = <span class="string">'a'</span>; </div><div class="line"></div><div class="line">    <span class="keyword">char</span> c = *p;</div><div class="line">    <span class="built_in">printf</span>(<span class="string">"\n [%c]\n"</span>,c);</div><div class="line">    <span class="built_in">free</span>(p);</div><div class="line">    <span class="built_in">free</span>(p);</div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>在这段代码中，我们两次释放了被‘p’指向的内存。现在，让我们运行以下memcheck工具：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div></pre></td><td class="code"><pre><div class="line">$ valgrind --tool=memcheck --leak-check=full ./val</div><div class="line">==<span class="number">3167</span>== Memcheck, a memory error detector</div><div class="line">==<span class="number">3167</span>== Copyright (C) <span class="number">2002</span><span class="number">-2009</span>, and GNU GPL'd, by Julian Seward et al.</div><div class="line">==<span class="number">3167</span>== Using Valgrind<span class="number">-3.6</span><span class="number">.0</span>.SVN-Debian and LibVEX; rerun with -h <span class="keyword">for</span> copyright info</div><div class="line">==<span class="number">3167</span>== Command: ./val</div><div class="line">==<span class="number">3167</span>== </div><div class="line"></div><div class="line"> [a]</div><div class="line">==<span class="number">3167</span>== Invalid <span class="built_in">free</span>() / <span class="keyword">delete</span> / <span class="keyword">delete</span>[]</div><div class="line">==<span class="number">3167</span>==    at <span class="number">0x4C270BD</span>: <span class="built_in">free</span> (vg_replace_malloc.c:<span class="number">366</span>)</div><div class="line">==<span class="number">3167</span>==    by <span class="number">0x40060A</span>: main (valgrind.c:<span class="number">12</span>)</div><div class="line">==<span class="number">3167</span>==  Address <span class="number">0x51b0040</span> is <span class="number">0</span> bytes inside a block of size <span class="number">1</span> <span class="built_in">free</span>'d</div><div class="line">==<span class="number">3167</span>==    at <span class="number">0x4C270BD</span>: <span class="built_in">free</span> (vg_replace_malloc.c:<span class="number">366</span>)</div><div class="line">==<span class="number">3167</span>==    by <span class="number">0x4005FE</span>: main (valgrind.c:<span class="number">11</span>)</div><div class="line">==<span class="number">3167</span>==</div><div class="line">==<span class="number">3167</span>==</div><div class="line">==<span class="number">3167</span>== HEAP SUMMARY:</div><div class="line">==<span class="number">3167</span>==     in use at <span class="built_in">exit</span>: <span class="number">0</span> bytes in <span class="number">0</span> blocks</div><div class="line">==<span class="number">3167</span>==   total heap usage: <span class="number">1</span> allocs, <span class="number">2</span> frees, <span class="number">1</span> bytes allocated</div><div class="line">==<span class="number">3167</span>==</div><div class="line">==<span class="number">3167</span>== All heap blocks were freed -- no leaks are possible</div><div class="line">==<span class="number">3167</span>==</div><div class="line">==<span class="number">3167</span>== For counts of detected and suppressed errors, rerun with: -v</div><div class="line">==<span class="number">3167</span>== ERROR SUMMARY: <span class="number">1</span> errors from <span class="number">1</span> contexts (suppressed: <span class="number">4</span> from <span class="number">4</span>)</div></pre></td></tr></table></figure>
+<p>从以上输出结果我们可以看到，这个工具检测出了我们对同一个指针两次释放内存的操作。</p>
+<p>在这篇文章中，我们主要介绍了内存管理框架Valgrind，然后利用memcheck工具（由这个框架提供的）来了解它是怎样方便经常与内存打交道的开发者的。这个工具可以检测很多手动检测不到的内存相关问题。</p>
+<hr>
+<p>译者: @一帆<br>出品：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a><br>来源：<a href="http://www.thegeekstuff.com/2011/11/valgrind-memcheck/" target="_blank" rel="external">http://www.thegeekstuff.com/2011/11/valgrind-memcheck/</a></p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/二进制分析/">二进制分析<span class="article-category-count">2</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Instrumentation/">Instrumentation</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Valgrind/">Valgrind</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-phd-expectations-realities"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170312/phd-expectations-realities/">PhD expectations and reality</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170312/phd-expectations-realities/" class="article-date">
+	  <time datetime="2017-03-12T11:42:48.000Z" itemprop="datePublished">三月 12, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>来源： <a href="http://nebelwelt.net/blog/20120921-phd-expectations-and-reality.html" target="_blank" rel="external">http://nebelwelt.net/blog/20120921-phd-expectations-and-reality.html</a><br>作者：<a href="http://nebelwelt.net/" target="_blank" rel="external">Mathias Payer</a></p>
+<hr>
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>Deciding to do a PhD is a huge commitment as you are just dedicating a couple of years of your life to a single cause. When I decided to do a PhD in 2006 I was not completely sure what would expect me. I just finished my master of science (MSc) at ETH Zurich and I knew that I really liked working on the research project that I chose. On the other hand I worked in programming and web development for the last couple of years to finance my studies and I discovered that only doing project/programming work is too boring for me. I had no clear picture how the PhD would be like, but I assumed that it would be a combination of a continuation of the research I did during my master thesis, writing papers, going to conferences to present your research, and in the end writing a thesis that proofs your thesis statement.</p>
+<p>Many others before me have already blogged or written books about the life as a PhD student, how to carry out a PhD, defined what research, yet I think that I can add my two cents to the existing stories. My experiences are still fresh (I started my PhD in 2006, defended beginning of May 2012, and started my PostDoc here at UC Berkeley in September 2012) and I hope that I can give a good description about the qualitative aspects of a PhD.</p>
+<h2 id="The-three-phases-of-a-research-PhD"><a href="#The-three-phases-of-a-research-PhD" class="headerlink" title="The three phases of a research PhD"></a>The three phases of a research PhD</h2><p>In my time as a PhD student at ETH Zurich I had uncounted discussions with peers, assistant professors, professors, researchers, and people related to academia. During these discussions we discovered that a PhD can be segmented into three basic phases: the first phase identifies the research topic and bootstraps the student; the second phase is the productive phase where the research bears fruits and is turned into papers (or at least communicated to other people); and the last phase consists in wrapping up, writing the thesis, and finally the defense. Every successful PhD student goes through three phases during his PhD. Each phase has different requirements and relies on different personality aspects. The phases follow after each other but there is no clear transition from one phase to the other yet one knows if the transition completed.</p>
+<p>The search for the holy grail: ramping up and finding your topic</p>
+<p>The first phase of a PhD is like the ‘get to know each other’ phase at the beginning of a relationship. You don’t really know what to expect but you are interested and you want to explore. Yes, there are some peculiarities but you are not too concerned about that right now. In this first phase you dig into the field that is interesting to you and you start reading up about prior research approaches about the problem you want to tackle. Some ideas start to form in your head and you decide on a topic for your thesis. In more practical research areas you start building prototypes and you execute small tests; in more theoretical areas you try to come up with some theorems and you have a rough idea about the general topic.</p>
+<p>Depending on your adviser he or she will restrict your search in one way or another. The most restrictive adviser tells you exactly what you should do (sometimes they have a grant proposal for a specific project and/or only need a code monkey to implement their grand idea) other advisers let you run free and let you come up with your own idea in a (sub-)field. Both extremes have their advantages and the kind of adviser that is best for you is basically an optimization problem that you need to solve for yourself.</p>
+<p>On one end of the scale you are given a topic by your adviser. This approach ensures that your adviser cares/should care deeply about your project and it gives you a head start, on the other hand you’ll have to make up for this pre-selection and you’ll have a harder time to bring in your own (research) ideas into the already existing project. On the other end you can choose your topic in an open void. It is up to you to make your adviser care about the project and you need to come up with the core idea. This great opportunity usually results in additional time needed to complete this phase. In the real world your adviser will usually set the limits anywhere between these two extremes.</p>
+<p>From my experience I would say that the average student stays in this phase from one to three years. I was lucky enough to have an adviser that allowed me to choose freely in any field that he was comfortable with. During my first three years I discussed a huge set of possible research ideas with him and even after we had settled on a specific topic the details kept changing as I passed through the later phases. Two key aspects in this phase are: (i) creativity, you need to come up with a good research idea and research plan. Nobody will tell you what to do, there is neither a customer who demands a specific feature, nor is there a pre-set plan like in a play. You need to be focused and keep yourself together to pass through this phase. (ii) Due to the fact that you need an idea and you are responsible for the schedule you build up a huge amount of psychological pressure. Most people that drop out during this phase fail due to either a lack of ideas (and creativity) or because they are unable to self-organize themselves in an unstructured work environment.</p>
+<h2 id="The-paper-mill"><a href="#The-paper-mill" class="headerlink" title="The paper mill"></a>The paper mill</h2><p>After you have decided on the (main) topic of your thesis and built the first prototype (or come up with the first layout of the system) you gradually transition from the first phase to the second phase. You are now trapped in the paper mill. This is the most productive phase as you try to publish your work in as many (good) conferences as possible. The quality of your work is (somewhat) measured in the number of papers that you publish at top tier conferences. You are evaluated based on the quality of your work combined with the human factor how you present yourself.</p>
+<p>In this phase you start to become an expert in your field: you have claimed a little spot in a bigger field that you extend with your research. Your adviser will try to keep you in this phase as long as you are able to produce more good papers (given that your adviser has enough funding and that you do not run into any hard time limits given by your university).</p>
+<p>The core qualifications for this phase are that you can (i) work hard and (ii) present yourself at conferences. You have to write all these papers and at the same time you should refill your pipeline of ideas to get the next publications in order. In addition you have to express all these ideas to others and you have to play the social game at conferences. Building your social network during conferences is actually hard work and you need to try to make friends with some of the bigger shots in your field as this can be helpful for future collaborations, additional papers, or even reviews. If other people understand your ideas from beginning to end and you can convince them (in person) that the ideas are great then they are more likely to accept your paper that they’ll review later on. This (productive) phase usually lasts about two years and is your opportunity to build your social network for possible future positions. A side quest during this time is to select your thesis committee. You already know in what area you will write your thesis about, you should have an idea about your thesis statement, and you should know who the experts are in this area. Hint: conferences are a good place to chat up possible committee members!</p>
+<h2 id="The-exit-strategy-wrapping-up-and-writing-your-thesis"><a href="#The-exit-strategy-wrapping-up-and-writing-your-thesis" class="headerlink" title="The exit strategy: wrapping up and writing your thesis"></a>The exit strategy: wrapping up and writing your thesis</h2><p>After you churned out a bunch of papers during your time on the paper mill you are finally ready to graduate. At one point in time you start to feel ready, you have published a couple of papers (or at least written a couple of technical reports if you weren’t able to publish the papers) and you developed a good understanding of what research in your area is about. In your (regular or not so regular) meetings with your adviser you should also get a feeling if he or she thinks that you are ready.</p>
+<p>At ETH you write your thesis from scratch. I started with reading (or at least skimming) my prior papers before I wrote my thesis. After that I came up with the basic outline and the vision that my thesis should get across. The goal of the thesis is to write down your thesis statement and to prove said statement. It is important that your thesis is a self-contained and self-consistent document.</p>
+<p>In this phase you should have settled on your thesis committee. Your committee consists of a couple of professors (or people with a PhD depending on your university) that are experts in your area of research. These experts will read your thesis and grill you during your defense. Some people quit at this late stage of the PhD due to timing constraints or due to burn out. After a couple of years they are worn out and run into deadlines imposed by their adviser or by the university. It makes me sad when I see colleagues that come up to this point in their career and then quit so close to the finish line.</p>
+<p>The defense is the end of this last phase and after you have passed this final test you have almost completed your PhD. At most universities there are some bureaucratic hurdles that are left for you to take and there might be some minor (or major) revisions to your written thesis that you have to carry out. Other than that you are done and at some delta t after the defense you are allowed to call yourself PhD (or Dr. Sc in my case).</p>
+<h2 id="The-teaching-aspect-in-a-PhD"><a href="#The-teaching-aspect-in-a-PhD" class="headerlink" title="The teaching aspect in a PhD"></a>The teaching aspect in a PhD</h2><p>Teaching is an orthogonal experience to the research experience. At ETH you are supposed to be the teaching assistant (TA) for one lecture per semester. At the beginning you will start off as a regular TA but as you progress in your PhD you will be trusted with more and more responsibilities, e.g. you will teach lectures if the professor is sick, or you will be head TA for a complete lecture. Head TAs are responsible to coordinate the lecture, to supervise the other TAs, and to organize the individual exercises.</p>
+<p>I really enjoyed teaching during my almost 5 1/2 years at ETH and I think that it is a great experience that every PhD should have. During the exercise hours that you have to supervise you learn how to speak in front of a group (a skill that is not that common in Switzerland and that is not part of the regular curriculum at high school or college), you learn how to prepare the material so that you can present it to a group of students, and most importantly you learn how to interact with all kinds of students that have different problems with the material, the course, or a specific exercise. All in all you learn a new skill: how to teach some specific material to students. If you plan an academic career then this might come in handy at one point in time.</p>
+<h2 id="The-PhD-grind"><a href="#The-PhD-grind" class="headerlink" title="The PhD grind"></a>The PhD grind</h2><p>Right when I was finishing my thesis Philip Guo published his memoirs about his own PhD experience in an e-book called <a href="http://pgbovine.net/PhD-memoir/pguo-PhD-grind.pdf" target="_blank" rel="external">“The PhD Grind”</a>. In the book Philip tells us about his PhD experience year for year in chronological order. Each year of his PhD is covered in a chapter and he writes about all the ups and downs during that time. The book is a great read and I warmly recommend that you read it too if you are interested in research and academia.</p>
+<p>I agree with many of his observations, e.g., that it is important that you focus on conferences that your adviser already has published in recent years. Your adviser will know the right lingo and the right buzzwords for the conference and the members of the committee will know your adviser which in turn will help as well.</p>
+<p>On the other hand there are a couple of things where I don’t agree with Philip. Most importantly Philip mentioned that being a TA only delays the PhD (page 70, of the e-book). As I explained above I really valued the teaching experience - from a personal as well as from a professional point of view. During the discussions with the students I learned several new and interesting details in areas that I actually assumed to know in depth. Another area I don’t agree with Philip is about how to select your thesis committee. Philip tells us that usually the adviser selects the thesis committee (page 56, of the e-book), I on the other side had the pleasure to select my own committee. I discussed possible members of the committee with my adviser and then approached each member myself. For me this was an interesting experience - first coming up with possible and plausible fits and then approaching these professors myself.</p>
+<h2 id="Conclusion"><a href="#Conclusion" class="headerlink" title="Conclusion"></a>Conclusion</h2><p>A PhD is certainly not the right career path for everyone. Doing a PhD is challenging, requires a lot of self-control and self-organization. The PhD is not (pre-)structured and you will need a lot of creativity. In addition you get less pay than an industry position with a comparable education. On the other hand you learn a huge amount of new skills during your PhD. This is your opportunity to do academic research, you can publish at conferences, you’ll meet a huge amount of new people, and you learn to network. I enjoyed my time and I recommend doing a PhD to all the curious and interested people out there that are interested in academia and who want to go that extra mile.</p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/博士之路/">博士之路<span class="article-category-count">2</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Ph-D/">Ph.D</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-paperwriting-collaboration"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -745,185 +932,11 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-conference-ndss2017"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170307/conference-ndss2017/">NDSS 2017 Accepted Papers</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170307/conference-ndss2017/" class="article-date">
-	  <time datetime="2017-03-07T09:02:45.000Z" itemprop="datePublished">三月 7, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>来源：<a href="https://www.internetsociety.org/events/ndss-symposium/ndss-symposium-2017/ndss-2017-programme/ndss-2017-accepted-papers" target="_blank" rel="external">https://www.internetsociety.org/events/ndss-symposium/ndss-symposium-2017/ndss-2017-programme/ndss-2017-accepted-papers</a></p>
-<hr>
-<p><strong>CSysSec注</strong>： 本系列文章旨在收集主流会议每年录用的文章信息，并做相关的总结，持续更新。</p>
-<p><strong>转载请注明</strong>： <a href="http://www.csyssec.org/20170307/conference-ndss2017/" target="_blank" rel="external">主流会议-NDSS 2017录用文章</a>与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<ul>
-<li><strong>Indiscreet Logs: Diffie-Hellman Backdoors in TLS</strong><br>(Kristen Dorey, Nicholas Chang-Fong, Aleksander Essex)</li>
-<li><strong>On the Safety and Efficiency of Virtual Firewall Elasticity Control</strong><br>(Juan Deng, Hongda Li, Hongxin Hu, Kuang-Ching Wang, - Gail-Joon Ahn, Siming Zhao, Wonkyu Han)</li>
-<li><strong>Fake Co-visitation Injection Attacks to Recommender Systems</strong><br>(Guolei Yang, Neil Zhenqiang Gong, Ying Cai)</li>
-<li><strong>KEH-Gait: Towards a Mobile Healthcare User Authentication System by Kinetic Energy Harvesting</strong><br>(Weitao Xu, Guohao Lan, Qi Lin, Sara Khalifa, Neil - Bergmann, Mahbub Hassan, Wen Hu)</li>
-<li><strong>Dynamic Virtual Address Range Adjustment for Intra-Level Privilege Separation on ARM</strong><br>(Yeongpil Cho, Donghyun Kwon, Hayoon Yi, Yunheung Paek)</li>
-<li><strong>Automated Analysis of Privacy Requirements for Mobile Apps</strong><br>(Sebastian Zimmeck, Ziqi Wang, Lieyong Zou, Roger Iyengar, Bin Liu, Florian Schaub, Shomir Wilson, Norman Sadeh, Steven M. Bellovin, Joel Reidenberg)</li>
-<li><strong>SGX-Shield: Enabling Address Space Layout Randomization for SGX Programs</strong><br>(Jaebaek Seo, Byoungyoung Lee, Seongmin Kim, Ming-Wei Shih, Insik Shin, Dongsu Han, Taesoo Kim)</li>
-<li><strong>ContexIoT: Towards Providing Contextual Integrity to Appified IoT Platforms</strong><br>(Yunhan Jack Jia, Qi Alfred Chen, Shiqi Wang, Amir Rahmati, Earlence Fernandes, Z. Morley Mao, Atul Prakash)</li>
-<li><strong>Constant Round Maliciously Secure 2PC with Function-independent Preprocessing using LEGO</strong><br>(Jesper Buus Nielsen, Thomas Schneider, Roberto Trifiletti)</li>
-<li><strong>A Large-scale Analysis of the Mnemonic Password Advice</strong><br>(Johannes Kiesel, Benno Stein, Stefan Lucks)</li>
-<li><strong>TumbleBit: An Untrusted Bitcoin-Compatible Anonymous Payment Hub</strong><br>(Ethan Heilman, Leen Alshenibr, Foteini Baldimtsi, Alessandra Scafuro, Sharon Goldberg)</li>
-<li><strong>Fast Actively Secure OT Extension for Short Secrets</strong><br>(Arpita Patra, Pratik Sarkar, Ajith Suresh)</li>
-<li><strong>Show Me the Money! Finding Flawed Implementations of Third-party In-app Payment in Android Apps</strong><br>(Wenbo Yang, Juanru Li, Hui Liu, Qing Wang, Yueheng Zhang, Yuanyuan Zhang, Dawu Gu)</li>
-<li><strong>MARX: Uncovering Class Hierarchies in C++ Programs</strong><br>(Andre Pawlowski, Moritz Contag, Victor van der Veen, Chris Ouwehand, Thorsten Holz, Herbert Bos, Elias Athanasopoulos, Cristiano Giuffrida)</li>
-<li><strong>Pushing the Communication Barrier in Secure Computation using Lookup Tables</strong><br>(Ghada Dessouky, Farinaz Koushanfar, Ahmad-Reza Sadeghi, Thomas Schneider, Shaza Zeitouni, Michael Zohner)</li>
-<li><strong>FBS-Radar: Uncovering Fake Base Stations at Scale in the Wild</strong><br>(Zhenhua Li, Weiwei Wang, Christo Wilson, Jian Chen, Chen Qian, Taeho Jung, Lan Zhang, Kebin Liu, Xiangyang Li, Yunhao Liu)</li>
-<li><strong>Enabling Reconstruction of Attacks on Users via Efficient Browsing Snapshots</strong><br>(Phani Vadrevu, Jienan Liu, Bo Li, Babak Rahbarinia, Kyu Hyung Lee, Roberto Perdisci)</li>
-<li><strong>A Call to ARMs: Understanding the Costs and Benefits of JIT Spraying Mitigations</strong><br>(Wilson Lian, Hovav Shacham, Stefan Savage)</li>
-<li><strong>Using Fully Homomorphic Encryption for Statistical Analysis of Categorical, Ordinal and Numerical Data</strong><br>(Wen-jie Lu, Shohei Kawasaki, Jun Sakuma)</li>
-<li><strong>Are We There Yet? On RPKI’s Deployment and Security</strong><br>(Yossi Gilad, Avichai Cohen, Amir Herzberg, Michael Schapira, Haya Shulman)</li>
-<li><strong>Cracking Android Pattern Lock in Five Attempts</strong><br>(Guixin Ye, Zhanyong Tang, Dingyi Fang, Xiaojiang Chen, Kwang In Kim, Ben Taylor, Zheng Wang)</li>
-<li><strong>Internet-scale Probing of CPS: Inference, Characterization and Orchestration Analysis</strong><br>(Claude Fachkha, Elias Bou-Harb, Anastasis Keliris, Nasir Memon, Mustaque Ahamad)</li>
-<li><strong>(Cross-)Browser Fingerprinting via OS and Hardware Level Features</strong><br>(Yinzhi Cao, Song Li, Erik Wijmans)</li>
-<li><strong>WireGuard: Next Generation Kernel Network Tunnel</strong><br>(Jason A. Donenfeld)</li>
-<li><strong>Dial One for Scam: A Large-Scale Analysis of Technical Support Scams</strong><br>(Najmeh Miramirkhani, Oleksii Starov, Nick Nikiforakis)</li>
-<li><strong>Measuring small subgroup attacks against Diffie-Hellman</strong><br>(Luke Valenta, David Adrian, Antonio Sanso, Shaanan Cohney, Joshua Fried, Marcella Hastings, J. Alex Halderman, Nadia Heninger)</li>
-<li><strong>SafeInit: Comprehensive and Practical Mitigation of Uninitialized Read Vulnerabilities</strong><br>(Alyssa Milburn, Herbert Bos, Cristiano Giuffrida)</li>
-<li><strong>ObliviSync: Practical Oblivious File Backup and Synchronization</strong><br>(Adam J. Aviv, Seung Geol Choi, Travis Mayberry, Daniel S. Roche)</li>
-<li><strong>T-SGX: Eradicating Controlled-Channel Attacks Against Enclave Programs</strong><br>(Ming-Wei Shih, Sangho Lee, Taesoo Kim, Marcus Peinado)</li>
-<li><strong>An Evil Copy: How the Loader Betrays You</strong><br>(Xinyang Ge, Mathias Payer, Trent Jaeger)</li>
-<li><strong>PSI: Precise Security Instrumentation for Enterprise Networks</strong><br>(Tianlong Yu, Seyed K. Fayaz, Michael Collins, Vyas Sekar, Srinivasan Seshan)</li>
-<li><strong>Catching Worms, Trojan Horses and PUPs: Unsupervised Detection of Silent Delivery Campaigns</strong><br>(Bum Jun Kwon, Virinchi Srinivas, Amol Deshpande, Tudor Dumitras)</li>
-<li><strong>Dachshund: Digging for and Securing (Non-)Blinded Constants in JIT Code</strong><br>(Giorgi Maisuradze, Michael Backes, Christian Rossow)</li>
-<li><strong>Ramblr: Making Reassembly Great Again</strong><br>(Ruoyu Wang, Yan Shoshitaishvili, Antonio Bianchi, Aravind Machiry, John Grosen, Paul Grosen, Christopher Kruegel, Giovanni Vigna)</li>
-<li><strong>BOOMERANG: Exploiting the Semantic Gap in Trusted Execution Environments</strong><br>(Aravind Machiry, Eric Gustafson, Chad Spensky, - Christopher Salls, Nick Stephens, Ruoyu Wang, Antonio Bianchi, Yung Ryn Choe, Christopher Kruegel, Giovanni Vigna)</li>
-<li><strong>Dynamic Differential Location Privacy with Personalized Error Bounds</strong><br>(Lei Yu, Ling Liu, Calton Pu)</li>
-<li><strong>A Broad View of the Ecosystem of Socially Engineered Exploit Documents</strong><br>(Stevens Le Blond, Cedric Gilbert, Utkarsh Upadhyay, Manuel Gomez Rodriguez, David Choffnes)</li>
-<li><strong>Dark Hazard: Learning-based, Large-Scale Discovery of Hidden Sensitive Operations in Android Apps</strong><br>(Xiaorui Pan, Xueqiang Wang, Yue Duan, XiaoFeng Wang, Heng Yin)</li>
-<li><strong>ASLR on the Line: Practical Cache Attacks on the MMU</strong><br>(Ben Gras, Kaveh Razavi, Erik Bosman, Herbert Bos, Cristiano Giuffrida)</li>
-<li><strong>Stack Bounds Protection with Low Fat Pointers</strong><br>(Gregory J. Duck, Roland H.C. Yap, Lorenzo Cavallaro)</li>
-<li><strong>Towards Implicit Visual Memory-Based Authentication</strong><br>(Claude Castelluccia, Markus Duermuth, Maximilian Golla, Fatma Imamoglu)</li>
-<li><strong>Hello from the Other Side: SSH over Robust Cache Covert Channels in the Cloud</strong><br>(Clementine Maurice, Manuel Weber, Michael Schwarz, Lukas Giner, Daniel Gruss, Carlo Alberto Boano, Stefan Mangard, Kay Rœmer)</li>
-<li><strong>Avoiding The Man on the Wire: Improving Tor’s Security with Trust-Aware Path Selection</strong><br>(Aaron Johnson, Rob Jansen, Aaron D. Jaggard, Joan Feigenbaum Paul Syverson)</li>
-<li><strong>The Effect of DNS on Tor’s Anonymity</strong><br>(Benjamin Greschbach, Tobias Pulls, Laura M. Roberts, Philipp Winter, Nick Feamster)</li>
-<li><strong>Hey, My Malware Knows Physics! Attacking PLCs with Physical Model Aware Rootkit</strong><br>(Luis Garcia, Ferdinand Brasser, Mehmet H. Cintuglu, Ahmad-Reza Sadeghi, Osama Mohammed, Saman A. Zonouz)</li>
-<li><strong>Wi-Fly?: Detecting Privacy Invasion Attacks by Consumer Drones</strong><br>(Simon Birnbach, Richard Baker, Ivan Martinovic)</li>
-<li><strong>Dissecting Tor Bridges: a Security Evaluation of their Private and Public Infrastructures</strong><br>(Srdjan Matic, Carmela Troncoso, Juan Caballero)</li>
-<li><strong>HOP: Hardware makes Obfuscation Practical</strong><br>(Kartik Nayak, Christopher Fletcher, Ling Ren, Nishanth Chandran, Satya Lokam, Elaine Shi, Vipul Goyal)</li>
-<li><strong>MaMaDroid: Detecting Android Malware by Building Markov Chains of Behavioral Models</strong><br>(Enrico Mariconti, Lucky Onwuzurike, Panagiotis Andriotis, Emiliano De Cristofaro, Gordon Ross, Gianluca Stringhini)</li>
-<li><strong>TenantGuard: Scalable Runtime Verification of Cloud-Wide VM-Level Network Isolation</strong><br>(Yushun Wang, Taous Madi, Suryadipta Majumdar, Yosr Jarraya, Amir Alimohammadifar, Makan Pourzandi, Lingyu Wang, Mourad Debbabi)</li>
-<li><strong>Automated Synthesis of Semantic Malware Signatures using Maximum Satisfiability</strong><br>(Yu Feng, Osbert Bastani, Ruben Martins, Isil Dillig, Saswat Anand)</li>
-<li><strong>Unleashing Use-Before-Initialization Vulnerabilities in the Linux Kernel Using Targeted Stack Spraying</strong><br>(Kangjie Lu, Marie-Therese Walter, David Pfaff, Stefan Nuernberger, Wenke Lee, Michael Backes)</li>
-<li><strong>IO-DSSE: Scaling Dynamic Searchable Encryption to Millions of Indexes By Improving Locality</strong><br>(Ian Miers, Payman Mohassel)</li>
-<li><strong>VUzzer: Application-aware Evolutionary Fuzzing</strong><br>(Sanjay Rawat, Vivek Jain, Ashish Kumar, Lucian Cojocar, Cristiano Giuffrida, Herbert Bos)</li>
-<li><strong>Broken Hearted: How To Attack ECG Biometrics</strong><br>(Simon Eberz, Nicola Paoletti, Marc Roeschlin, Andrea Patane, marta Kwiatkowska, Ivan Martinovic)</li>
-<li><strong>HisTorε: Differentially Private and Robust Statistics Collection for Tor</strong><br>(Akshaya Mani, Micah Sherr)</li>
-<li><strong>Thou Shalt Not Depend on Me: Analysing the Use of Outdated JavaScript Libraries on the Web</strong><br>(Tobias Lauinger, Abdelberi Chaabane, Sajjad Arshad, William Robertson, Christo Wilson, Engin Kirda)</li>
-<li><strong>P2P Mixing and Unlinkable Bitcoin Transactions</strong><br>(Tim Ruffing, Pedro Moreno-Sanchez, Aniket Kate)</li>
-<li><strong>PT-Rand: Practical Mitigation of Data-only Attacks against Page Tables</strong><br>(Lucas Davi, David Gens, Christopher Liebchen, Ahmad-Reza Sadeghi)</li>
-<li><strong>SilentWhispers: Enforcing Security and Privacy in Decentralized Credit Networks</strong><br>(Giulio Malavolta, Pedro Moreno-Sanchez, Aniket Kate, Matteo Maffei)</li>
-<li><strong>Deconstructing Xen</strong><br>(Lei Shi, Yuming Wu, Yubin Xia, Nathan Dautenhahn, Haibo Chen, Binyu Zang, Haibing Guan, Jinming Li)</li>
-<li><strong>The Security Impact of HTTPS Interception</strong><br>(Zakir Durumeric, Zane Ma, Drew Springall, Richard Barnes, Nick Sullivan, Elie Bursztein, Michael Bailey, J. Alex Halderman, Vern Paxson)</li>
-<li><strong>DELTA: A Security Assessment Framework for Software-Defined Networks</strong><br>(Seungsoo Lee, Changhoon Yoon, Chanhee Lee, Seungwon Shin, Vinod Yegneswaran, Phillip Porras)</li>
-<li><strong>Obfuscation-Resilient Privacy Leak Detection for Mobile Apps Through Differential Analysis</strong><br>(Andrea Continella, Yanick Fratantonio, Martina Lindorfer, Alessandro Puccetti, Ali Zand, Christopher Kruegel, Giovanni Vigna)</li>
-<li><strong>A2C: Self Destructing Exploit Executions via Input Perturbation</strong><br>(Yonghwi Kwon, Brendan Saltaformaggio, I Luk Kim, Kyu Hyung Lee, Xiangyu Zhang, Dongyan Xu)</li>
-<li><strong>Address Oblivious Code Reuse: On the Effectiveness of Leakage Resilient Diversity</strong><br>(Robert Rudd, Richard Skowyra, David Bigelow, Veer Dedhia, Thomas Hobson, Stephen Crane, Christopher Liebchen, Per Larsen, Lucas Davi, Michael Franz, Ahmad-Reza Sadeghi, Hamed Okhravi)</li>
-<li><strong>Panoply: Low-TCB Linux Applications With SGX Enclaves</strong><br>(Shweta Shinde, Dat Le Tien, Shruti Tople, Prateek Saxena)</li>
-<li><strong>WindowGuard: Systematic Protection of GUI Security in Android</strong><br>(Chuangang Ren, Peng Liu, Sencun Zhu)</li>
-</ul>
-<hr>
-<p><strong>转载请注明</strong>： <a href="http://www.csyssec.org/20170307/conference-ndss2017/" target="_blank" rel="external">主流会议-NDSS 2017录用文章</a>与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/主流会议/">主流会议<span class="article-category-count">4</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Conference/">Conference</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Paper/">Paper</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-introspection-papers"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170307/introspection-papers/">虚拟机监控论文推荐</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170307/introspection-papers/" class="article-date">
-	  <time datetime="2017-03-07T02:00:14.000Z" itemprop="datePublished">三月 7, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <hr>
-<p><strong>CSysSec注</strong>： 本系列文章旨在收集相关领域经典论文阅读列表，持续更新中。<br><strong>转载请注明：</strong> <a href="http://www.csyssec.org/20170307/introspection-papers/" target="_blank" rel="external">《虚拟机监控推荐》</a></p>
-<hr>
-<h3 id="SOK系列"><a href="#SOK系列" class="headerlink" title="SOK系列"></a>SOK系列</h3><p><a href="https://pdfs.semanticscholar.org/5752/a746cd143d30b22d837e1077fa9c971860fb.pdf" target="_blank" rel="external">Exploring VM Introspection: Techniques and Trade-offs, VEE’15</a><br><a href="https://coinsrs.no/wp-content/uploads/2015/08/2015-ACM-Survey-on-VMI.pdf" target="_blank" rel="external">A Survey on Hypervisor Based Monitoring: Approaches, Applications, and Evolutions, CSUR’15</a><br><a href="https://www.cs.unc.edu/~porter/pubs/sok14.pdf" target="_blank" rel="external">SoK: Introspections on Trust and the Semantic Gap, S&amp;P’14</a></p>
-<hr>
-<p><strong>转载请注明：</strong> <a href="http://www.csyssec.org/20170307/introspection-papers/" target="_blank" rel="external">《虚拟机监控推荐》</a></p>
-<hr>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">10</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Introspection/">Introspection</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
     
-    <a class="extend prev" rel="prev" href="/page/9/">上一页</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/8/">8</a><a class="page-number" href="/page/9/">9</a><span class="page-number current">10</span><a class="page-number" href="/page/11/">11</a><a class="page-number" href="/page/12/">12</a><span class="space">&hellip;</span><a class="page-number" href="/page/20/">20</a><a class="extend next" rel="next" href="/page/11/">下一页</a>
+    <a class="extend prev" rel="prev" href="/page/9/">上一页</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/8/">8</a><a class="page-number" href="/page/9/">9</a><span class="page-number current">10</span><a class="page-number" href="/page/11/">11</a><a class="page-number" href="/page/12/">12</a><span class="space">&hellip;</span><a class="page-number" href="/page/21/">21</a><a class="extend next" rel="next" href="/page/11/">下一页</a>
   </nav>
 
 </section>
@@ -1011,6 +1024,30 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170505/cfi-mathias/">控制流完整性-Mathias Payer</a></h6>
+          <!--  <span>五月 5, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170505/vmi-xenproject/">虚拟机自省技术-一个有新商业应用的安全性创造</a></h6>
+          <!--  <span>五月 5, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -1180,30 +1217,6 @@
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/cloud-osv/">Unikernels为云设计的库操作系统(OSv)</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/securekernel-design/">这是Linux内核中一种好的安全设计吗- thread_info和内核栈的联系</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -1214,7 +1227,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">10</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -1224,7 +1237,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 11.43px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.14px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.71px;">Binary</a> <a href="/tags/CFI/" style="font-size: 11.43px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.14px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 12.86px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 17.14px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.14px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 14.29px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.71px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.71px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.57px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.43px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.86px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 12.86px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 12.86px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.71px;">Malware</a> <a href="/tags/Memory/" style="font-size: 12.86px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.43px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 12.14px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.71px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.43px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.71px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.14px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 15px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.71px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.43px;">Rootkit</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.71px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.71px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.57px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.43px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.29px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 12.14px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 12.86px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 11.54px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Virtulization/" style="font-size: 12.31px;">Virtulization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
     </div>
   </div>
 

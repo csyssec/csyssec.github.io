@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>虚拟机自省技术-一个有新商业应用的安全性创造 | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="译者：Diting0x来源：https://blog.xenproject.org/2016/08/15/virtual-machine-introspection-a-security-innovation-with-new-commercial-applications/转载请注明: CSysSec:虚拟机自省技术-一个有新商业应用的安全性创造
+
+这篇由Xen工程主席Lars Kurth编写的">
+<meta property="og:type" content="article">
+<meta property="og:title" content="虚拟机自省技术-一个有新商业应用的安全性创造">
+<meta property="og:url" content="http://yoursite.com/20170505/vmi-xenproject/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="译者：Diting0x来源：https://blog.xenproject.org/2016/08/15/virtual-machine-introspection-a-security-innovation-with-new-commercial-applications/转载请注明: CSysSec:虚拟机自省技术-一个有新商业应用的安全性创造
+
+这篇由Xen工程主席Lars Kurth编写的">
+<meta property="og:updated_time" content="2017-05-05T05:19:02.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="虚拟机自省技术-一个有新商业应用的安全性创造">
+<meta name="twitter:description" content="译者：Diting0x来源：https://blog.xenproject.org/2016/08/15/virtual-machine-introspection-a-security-innovation-with-new-commercial-applications/转载请注明: CSysSec:虚拟机自省技术-一个有新商业应用的安全性创造
+
+这篇由Xen工程主席Lars Kurth编写的">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">FROM 0 TO 1</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">系统结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/courses">名人课堂</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-vmi-xenproject" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      虚拟机自省技术-一个有新商业应用的安全性创造
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170505/vmi-xenproject/" class="article-date">
+	  <time datetime="2017-05-05T05:17:38.000Z" itemprop="datePublished">五月 5, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>译者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a><br>来源：<a href="https://blog.xenproject.org/2016/08/15/virtual-machine-introspection-a-security-innovation-with-new-commercial-applications/" target="_blank" rel="external">https://blog.xenproject.org/2016/08/15/virtual-machine-introspection-a-security-innovation-with-new-commercial-applications/</a><br>转载请注明: <a href="http://www.csyssec.org/20170505/vmi-xenproject/" target="_blank" rel="external">CSysSec:虚拟机自省技术-一个有新商业应用的安全性创造</a></p>
+<hr>
+<p>这篇由Xen工程主席Lars Kurth编写的文章最初发表在<a href="https://www.linux.com/news/virtual-machine-introspection-security-innovation-new-commercial-applications" target="_blank" rel="external">Linux.com</a>.</p>
+<p>几周前，Citrix和Bitdefender开启了XenServer 7 和Bitdefender Hypervisor Introspect技术研究，这项研究构成了Xen工程中Hypervisor的虚拟机自省研究（VMI）下部构造的第一个商业应用。在这篇文章中，我们会涉及一下两点：一是为何这项技术具有如此革命性，二是Xen工程区的成员和早期VMI的采用者（最受关注的<a href="http://libvmi.com/" target="_blank" rel="external">LibVMI</a>和<a href="https://drakvuf.com/" target="_blank" rel="external">DRAKVUF</a>）是如何协调成功应用这项技术的。</p>
+<h2 id="在虚拟环境下发展安全挑战"><a href="#在虚拟环境下发展安全挑战" class="headerlink" title="在虚拟环境下发展安全挑战"></a><strong>在虚拟环境下发展安全挑战</strong></h2><p>今天，恶意软件在与反恶意软件相同的环境并利用与之相同的特权运行。这也是一个愈发凸显的问题。我在这篇<a href="https://www.linux.com/news/open-source-security-process-part-1-cloud-security-introduction" target="_blank" rel="external">Linux.com文章</a>中与the Walking Dead（行尸走肉）的类比再次显现出帮助。让我们来看看传统反恶意软件是怎样与这个画面相契合，并且我们的类比是否应用于反恶意软件。</p>
+<p>在<a href="http://walkingdead.wikia.com/wiki/The_Walking_Dead_Wiki" target="_blank" rel="external">Walking Dead</a>，<a href="http://walkingdead.wikia.com/wiki/Walker" target="_blank" rel="external">Wakers尸行者</a>已控制地球，大肆蚕食剩余的人类。尸行者时时刻刻都活跃着，被声音吸引着，最终形成一个可能超出你防御范围的尸群。他们很是强壮，但却十分的木讷。正如我们在那个Linux.com的文章中探知到的，人们会犯错误，所以我们不可能一直避免尸行者侵犯我们的领地。</p>
+<p>在这一类比中，我们将尸行者比作恶意软件。试想我们的虚拟主机是一个由个人住房（虚拟机）组成的村子，Hypervisor和网络提供将村子联系起来的基础设施（街道，篱笆，供电…）。</p>
+<p>进入反恶意软件的世界：试想那些剩余的人类生存了一段时间并重新发展他们的技术，能够快速识别尸行者并修复带来的一切破坏。这可以替代巡逻队、闭路电视监控系统、警报墙/窗口等安全设施、用于抗击已发现尸行者的军队和修复所有毁坏的清理组。不幸的是，传统反恶意软件技术的现实只用于个人房屋内（亦称虚拟机），而且它们不在村里的街道。</p>
+<p>更严重的是，直到最近恶意软件相对来说还比较愚钝。然而，这个情况在最近的几年有了显著的改观。我们的尸行者逐渐进化成更快更强更智能的 <a href="http://wayward-pines.wikia.com/wiki/Wayward_Pines_Wiki" target="_blank" rel="external">Wayward Pine</a>的<a href="http://wayward-pines.wikia.com/wiki/Abby" target="_blank" rel="external">Abbies</a>。换言之，恶意软件现如今已经能够入侵或破坏掉我们的安全机制。</p>
+<p>我们所需要的是用于监视整个村落的卫星监视的替代品和在它们尝试并闯入我们的房屋时的远程破坏激光束。当然，我们还可以用这个新发现的性能来快速部署所需陆军和清理人员。这本质上是虚拟机内省技术给我们的承诺。它允许我们从操作系统外部解决安全问题，而不用依赖由地面呈现的不可靠的功能。下面会更详细的介绍这一问题。</p>
+<h2 id="从虚拟机自省技术到第一次商业应用：一个合作佳话"><a href="#从虚拟机自省技术到第一次商业应用：一个合作佳话" class="headerlink" title="从虚拟机自省技术到第一次商业应用：一个合作佳话"></a><strong>从虚拟机自省技术到第一次商业应用：一个合作佳话</strong></h2><p>将虚拟机自省技术应用到Xen Hypervisor项目上的想法是在2007年在Georgis Tech以 [Tal Garfinkel与Mendel Rosenblum]在2003年的研究为基础的。Xen Hypervisor项目在2009年通过XenAccess和内存事件的API第一次将这项技术集成进来。在某种程度上，这是对VMware的VMsafe技术的一次回应，VMsafe技术在2008年被提出，由于这项技术在可扩展性上有很大的限制在2012年被废弃。Vmsafe被vShield替代，vShield是Vmsafe的有效子集，是一种基于agent，hypervisor-facilitated, 文件系统反病毒的解决方案。</p>
+<p>在Xen项目内部，虚拟机自省技术能存活的原因在于此项技术强大的研究兴趣，并且一些专业的安全应用程序在安全性上牺牲一些性能是可以接受的。这最终导致LibVMI的诞生(2010)，这让这些API变得更容易访问。<a href="http://libvmi.com/" target="_blank" rel="external">LibVMI</a>提供了一种抽象能够最终将XEN的VMI功能的自己能暴露给其他的开源虚拟化技术，比如KVM和QEMU。</p>
+<p>在2013年5月，Intel发型了Haswell CPU，其能够利用#VE和VMFUNC扩展在VMCS上维护512个EPT指针。这被证明是对VMI技术一次潜在的颠覆，可以让hypervisor控制并让硬件在VM之间实现强隔离，而且开销比之前还小，这也让来自Bitdefender, Cisco, Intel, Novetta, TU Munich和 Zentific的安全研究员和工程师们合作起来。从2014年到2015年，XenAccess和内存事件(mem-events)API被重构到了Xen Hypervisor项目的新的VMI子系统中，添加了<a href="https://blog.xenproject.org/2016/04/13/stealthy-monitoring-with-xen-altp2m/" target="_blank" rel="external">atl2pm</a>和其它硬件特性，并且支持ARM CPU， 在Xen 4.6版本中已经发行。</p>
+<p>Citrix和Bitdefender合作将VMI技术带向市场： XenServer 7.0引入了基于Xen项目VMI接口构建的Direct Inspect APIs。用Bitdefender HVI实现，能安全地将自省能力赋予安全容器。</p>
+<h2 id="今天到底能做什么？"><a href="#今天到底能做什么？" class="headerlink" title="今天到底能做什么？"></a><strong>今天到底能做什么？</strong></h2><p>回到我们的类比：我们需要的是卫星监视系统的替代物来观察整个村庄。VMI能做到吗？在理论上：VMI将观察任意一个虚拟机的状态变为可能（村庄里的房子和它周围)，这些状态包括内存，CPU状态并且当虚拟机改变时候能接受事情。在实际上，如果不使用硬件特性的话，这样做的性能开行还是太大了。</p>
+<p>在我们想象的世界里到处都是Walkers和Abbies，这就好比我们不能监控所有的东西，意味着我们要利用自己的资源集中关注一些高价值的东西。换句话说，我们需要集中关注系统界限(每个房子的最近区域)的可疑行为。</p>
+<p>这种集中关注是通过监控可疑行为的敏感内存区域来实现的。当检测到恶意行为时，能有一种解决方案对进程状态(阻塞，杀死）或者VM状态(暂停，关闭)作出正确反映，与此同时，能在一个正运行的VM中直接收集并报告取证细节。</p>
+<p>任何时候Abbie或者Walker要接近我们的房子，想象一下我们卫星上的激光束。在技术上来说，卫星和激光设施对应XenServer的Direct Inspect API，控制和监控我们数据的软件对应Bitdefenders Hypervisor Introspection。 </p>
+<p>很重要的一点是要强调利用hypervisor来提供硬件实现的隔离，监控和补救行为发生在外部。这意味着攻击者不能破坏卫星或者激光束。</p>
+<p>当然，没有一种安全方案是完美的。如果可疑行为不会影响到VM的内存，监控软件可能不总是能检测到这种行为。这并不会削弱基于文件系统安全的地位。我们仍然需要保持警惕，没有一种完美的防御方法。在我们的村庄类比重，我们照样会被地下基础设施（比如隧道和运河）攻击。在本质上，这意味着我们必须将VMI技术和传统的反恶意软件同时利用起来。</p>
+<p>VMI和传统的hypervisor-facilitated 反病毒方案(比如vShield)相比如何呢？在我们的类比重，这些方案需要对安装在房子里的所有监控设备(CCTV,报警们/报警窗)做集中管理，然而对事件的监控特别像集中在我们村庄大厅的一个安全控制中心。即使这种方法能极大地简化发生在虚拟机里面的监控和管理方式，并不会提供自省方法能提供的额外的保护。</p>
+<p>你可以在下面找到更多有关 VMI, XenServer Direct Inspect API 和BitDefender Hypervisor Introspection 的信息(包括一些demo).</p>
+<h3 id="Xen项目虚拟机自省"><a href="#Xen项目虚拟机自省" class="headerlink" title="Xen项目虚拟机自省"></a><strong>Xen项目虚拟机自省</strong></h3><ul>
+<li>Xen项目<a href="https://wiki.xenproject.org/wiki/Virtual_Machine_Introspection" target="_blank" rel="external">虚拟机自省</a></li>
+<li>XenServer <a href="https://www.citrix.com/blogs/2016/06/21/a-revolutionary-approach-to-advanced-malware-protection/" target="_blank" rel="external">Direct Inspect API</a></li>
+<li>Bitdefender <a href="https://www.bitdefender.com/business/hypervisor-introspection.html" target="_blank" rel="external">Hypervisor Introspection</a></li>
+</ul>
+<h2 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h2><p>VMI技术的发展和它的首次开源以及商业应用都表明Xen项目社区是如何以创新的方式在发展，并能将革命性的方案带向市场。阅读代码的稀有性，从中学到一些东西，提问以及提供该井让安全研究者和像Citrix和Bitdefender这种的供应商将解决方案带向市场。</p>
+<p>值得一提的是，硬件使能的安全技术发展的非常快：只有Intel的#VE和VMFUNC的扩展子集如今被应用到了VMI技术上。利用更多的硬件扩展,能让out-of-guest工具带来的安全性以及in-guest工具带来的性能同时看到希望。</p>
+<p>更令人鼓舞的是，其它的供应商如 A1Logic, Star Lab和 Zentific在研究新的基于Xen项目的安全解决方案。另外，集中关注安全，基于Xen的<a href="http://openxt.org/" target="_blank" rel="external">OpenXT project </a>项目已经开始和Xen项目社区走的越来越近了，并保证未来在安全上的创新。</p>
+<p>这些话题的一部分会在en Project Developer Summit happening in Toronto, CA from August 25 – 26, 2016上讲得更加详细。你可以在<a href="http://events.linuxfoundation.org/events/xen-project-developer-summit" target="_blank" rel="external">这里</a>了解更多</p>
+<p>原文作者：<a href="https://blog.xenproject.org/author/lars-kurth/" target="_blank" rel="external">Lars Kurth</a></p>
+<hr>
+<p>转载请注明: <a href="http://www.csyssec.org/20170505/vmi-xenproject/" target="_blank" rel="external">CSysSec:虚拟机自省技术-一个有新商业应用的安全性创造</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">11</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Introspection/">Introspection</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Monitoring/">Monitoring</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+        
+	<div id="comment">
+	
+	<!-- 多说评论框 start -->
+	 <div class="ds-thread" data-thread-key="/20170505/vmi-xenproject/" data-title="虚拟机自省技术-一个有新商业应用的安全性创造" data-url="http://yoursite.com/20170505/vmi-xenproject/"></div>
+	<!-- 多说评论框 end -->
+	<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+	<script type="text/javascript">
+	var duoshuoQuery = {short_name:"csyssec"};
+	  (function() {
+	    var ds = document.createElement('script');
+	    ds.type = 'text/javascript';ds.async = true;
+	    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+	    ds.charset = 'UTF-8';
+	    (document.getElementsByTagName('head')[0] 
+	     || document.getElementsByTagName('body')[0]).appendChild(ds);
+	  })();
+	  </script>
+	<!-- 多说公共JS代码 end -->
+	
+	</div>
+	<link rel="stylesheet" href="/css/comment.css">
+
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/20170505/cfi-mathias/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">上一篇</strong>
+      <div class="article-nav-title">
+        
+          控制流完整性-Mathias Payer
+        
+      </div>
+    </a>
+  
+  
+    <a href="/20170504/cf-exception/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">控制流分支指令上的控制流处理器异常(单步执行)</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#在虚拟环境下发展安全挑战"><span class="toc-number">1.</span> <span class="toc-text">在虚拟环境下发展安全挑战</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#从虚拟机自省技术到第一次商业应用：一个合作佳话"><span class="toc-number">2.</span> <span class="toc-text">从虚拟机自省技术到第一次商业应用：一个合作佳话</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#今天到底能做什么？"><span class="toc-number">3.</span> <span class="toc-text">今天到底能做什么？</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#Xen项目虚拟机自省"><span class="toc-number">3.1.</span> <span class="toc-text">Xen项目虚拟机自省</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#结论"><span class="toc-number">4.</span> <span class="toc-text">结论</span></a></li></ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+       <!--  自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a> --> 
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/courses" class="mobile-nav-link">Courses</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>
