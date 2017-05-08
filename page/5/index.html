@@ -106,6 +106,75 @@
         
           <section id="main">
   
+    <article id="post-secureos"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/secureos/">安全操作系统内核设计-一种阻止恶意软件覆盖关键系统内核数据结构的思想</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/secureos/" class="article-date">
+	  <time datetime="2017-05-04T10:16:12.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/security-os-design-idea-to-prevent.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/security-os-design-idea-to-prevent.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>Recently, when reading this paper “<strong><a href="http://www.csc.ncsu.edu/faculty/jiang/pubs/OAKLAND10.pdf" target="_blank" rel="external">HyperSafe - A Lightweight Approach to Provide Lifetime Hypervisor Control-Flow Integrity</a></strong>“, an idea just comes out from my mind: using write protection (CR0.WP) and read-only (RO) page attribute to prevent the critical kernel data structures being overwritten by malicious software through buffer (stack, heap) overflow in an exploitable kernel module.</p>
+<p>In a virtual memory management system, OS kernel can configure a Read-Only (RO) virtual page by clearing R/W bit in corresponding page table entry (PTE) so that a virtual page cannot be modified by OS kernel and/or application.</p>
+<p>Write Protection (CR0.WP) allows virtual pages to be protected from supervisor-mode writes. If CR0.WP = 0, supervisor-mode write accesses are allowed to linear addresses with read-only access rights; if CR0.WP = 1, such write accesses are not allowed. However, note that user-mode write accesses are never allowed to virtual addresses with Read-Only access rights, regardless of the value of CR0.WP.</p>
+<p>In a modern operating system design, Write Protection bit by default is always set by kernel, which means that even the kernel code cannot directly modify the Read-Only pages. And basically the Read-Only access permission are used in these two ways below:</p>
+<ol>
+<li><p>COW (Copy-On-Write). WP and RO facilitates implementation of the copy-on-write method of creating a new process (fork()). &gt;<br>When a new child process is created, the OS kernel doesn’t create a whole bunch of things at one time, instead, the child process shares most of pages with its parent process, and OS kernel only clears corresponding PTE.R/W bit for those shared pages. Whenever a process (parent or child) modifies a shared page, a write access violation (#PF) occurs, then a separate copy of that particular page alone will be made by the #PF handler for that process (parent or child).</p>
+</li>
+<li><p>Write protection for kernel code and static data. Obviously, at OS runtime, those pages (except Self-Modified Code) should never be changed by any legitimate software. So generally speaking OS kernel must configure them with Read-Only access right.</p>
+</li>
+</ol>
+<p>However, this post presents a 3rd usage in OS kernel design: <strong><em>Setting Read-Only  access permission even for the critical system kernel data structures that previously are configured with write access permission</em></strong>. Here are the reasons.</p>
+<p>Like <a href="http://hypervsir.blogspot.com/2014/10/in-linux-kernel-threadinfo-is-small-cpu.html" target="_blank" rel="external">my last post</a> explained, thread_info structure is just one of critical data structures. Its field addr_limit can be overwritten by exploiting stack overflows existing in any kernel module/driver. This is because the thread_info structure is a writable page (the corresponding PTE.R/W bit = 1). </p>
+<p>So the question is - what if we configure that page (e.g. thread_info page) with Read-Only permission? </p>
+<p>In this way, we can prevent such those stack overflow attacks, because whenever a kernel module has an exploitable bug that attempts to overwrite this read-only structure, a write access violation (#PF, page fault) will be triggered.</p>
+<p>But this will cause a problem, when a kernel legitimately writes/modifies that read-only structure, an access violation will happen too. To solve this problem, the legitimate kernel code must turn off write protection (clearing CR0.WP bit) before writing that read-only structure, and turn it on back after write access. </p>
+<p>In a summary, the OS kernel designer can arrange the critical data structures together as possible as we can, and set those pages with read-only access permission. Whenever the OS kernel attempts to modify them, it turns off WP, and after modification turns it on again. And as a security design rule, the kernel module (e.g. *.ko) should not directly modify any kernel critical data structures, only kernel itself can modify the those write-protected kernel data structures (actually, this is the case in any modern operating system design).</p>
+<p>However, this introduces performance issue (but not too bad), for example, on each legitimate write access, extra CPU cycles will be consumed by writing CR0.WP bit. However, we can reduce this by grouping those legitimate access code to decrease the times of writing CR0.WP bit. Another problem might be interrupts. During the window of disabling CR0.WP and enabling it, an interrupt might happen. We can solve this by disabling interrupt (or preemption) or saving/restoring CR0.WP bit in the interrupt handler (ISR).  </p>
+<hr>
+<p><strong><em>UPDATE:</em></strong><br>thread_info is not a good example, because it shares the same space with kernel stack which must have to be configured as Read-Write attribute. </p>
+<p>Some other kernel structures, like task_struct, mm_struct might be good examples for this design. </p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统内核/">系统内核<span class="article-category-count">11</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-rop-jop"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -379,69 +448,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-unpriviledged-ins"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/unpriviledged-ins/">非特权指令的内核信息泄露</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/unpriviledged-ins/" class="article-date">
-	  <time datetime="2017-05-04T08:09:19.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/kernel-information-leak-with.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/kernel-information-leak-with.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>In computer security, information leaking is one of threats to software security. For example, the memory address of kernel critical resource should not be visible to user mode. Address space layout randomization (ASLR) is just one of techniques to prevent an attacker from reliably getting a particular exploited function in memory. </p>
-<p>However, I’m just very curious about why x86 processor leaks kernel data structures by some unprivileged instructions. Is this a bad CPU design?</p>
-<p>Here is an example. </p>
-<p>x86 IDTR register holds the base memory address for the Interrupt Descriptor Table entries (vector 0 through 255). As long as we gets its address, we can calculate and get all the ISR memory addresses of all exceptions/interrupts in a system. </p>
-<p><strong>But an user program can simply get the IDTR address by executing SIDT instruction.</strong></p>
-<p>See these two real-world example exploits below, <strong>if SIDT instruction in x86 were not allowed to execute in user mode, then one more roadblock would be placed to mitigate such an attack.</strong></p>
-<p>1) Linux Kernel ptrace/sysret - Local Privilege Escalation<br>    <a href="http://www.exploit-db.com/exploits/34134/" target="_blank" rel="external">http://www.exploit-db.com/exploits/34134/</a></p>
-<p>2) Ubuntu 12.04.0-2LTS x64 - perf_swevent_init Kernel Local Root Exploit<br>    <a href="http://www.exploit-db.com/exploits/33589/" target="_blank" rel="external">http://www.exploit-db.com/exploits/33589/</a></p>
-<p>So the questions:  </p>
-<ul>
-<li><strong>Why does Intel/x86 allow such an instruction to be executed by unprivileged program/task in user mode?</strong></li>
-<li><strong>Is there any legitimate application in user mode that must have to use this instruction to get kernel structure address?</strong></li>
-</ul>
-<p>The similar instructions are SGDT (retrieving Global Descriptor Table Register), and even seldom used instructions like STR, SLDT, SMSW. </p>
-<p>Anybody (Intel processor architect or application software developer) can tell me the reason of that? </p>
-<hr>
-<h4 id="Update"><a href="#Update" class="headerlink" title="Update:"></a><strong><em>Update:</em></strong></h4><p><strong><a href="https://groups.google.com/forum/#!msg/comp.arch/RV4w6yfDxtA/05g1URTkdcIJ" target="_blank" rel="external">Why SIDT/SGDT instructions are allowed to execute in user mode (x86/Intel)?</a></strong></p>
-<hr>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">9</span></a>
-
-
-      
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -534,6 +540,18 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170508/intro-aslr/">intro-aslr</a></h6>
+          <!--  <span>五月 8, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -710,18 +728,6 @@
             
 
               <h6 style="margin: 0;"><a href="/20170504/bitvisor/">BitVisor- 一种实施I/O设备安全的轻量级Hypervisor</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/xencolor/">Xen模式-你的XEN是什么颜色？</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
