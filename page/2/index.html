@@ -106,6 +106,210 @@
         
           <section id="main">
   
+    <article id="post-vmi-xenproject"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170505/vmi-xenproject/">虚拟机自省技术-一个有新商业应用的安全性创造</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170505/vmi-xenproject/" class="article-date">
+	  <time datetime="2017-05-05T05:17:38.000Z" itemprop="datePublished">五月 5, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>译者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a><br>来源：<a href="https://blog.xenproject.org/2016/08/15/virtual-machine-introspection-a-security-innovation-with-new-commercial-applications/" target="_blank" rel="external">https://blog.xenproject.org/2016/08/15/virtual-machine-introspection-a-security-innovation-with-new-commercial-applications/</a><br>转载请注明: <a href="http://www.csyssec.org/20170505/vmi-xenproject/" target="_blank" rel="external">CSysSec:虚拟机自省技术-一个有新商业应用的安全性创造</a></p>
+<hr>
+<p>这篇由Xen工程主席Lars Kurth编写的文章最初发表在<a href="https://www.linux.com/news/virtual-machine-introspection-security-innovation-new-commercial-applications" target="_blank" rel="external">Linux.com</a>.</p>
+<p>几周前，Citrix和Bitdefender开启了XenServer 7 和Bitdefender Hypervisor Introspect技术研究，这项研究构成了Xen工程中Hypervisor的虚拟机自省研究（VMI）下部构造的第一个商业应用。在这篇文章中，我们会涉及一下两点：一是为何这项技术具有如此革命性，二是Xen工程区的成员和早期VMI的采用者（最受关注的<a href="http://libvmi.com/" target="_blank" rel="external">LibVMI</a>和<a href="https://drakvuf.com/" target="_blank" rel="external">DRAKVUF</a>）是如何协调成功应用这项技术的。</p>
+<h2 id="在虚拟环境下发展安全挑战"><a href="#在虚拟环境下发展安全挑战" class="headerlink" title="在虚拟环境下发展安全挑战"></a><strong>在虚拟环境下发展安全挑战</strong></h2><p>今天，恶意软件在与反恶意软件相同的环境并利用与之相同的特权运行。这也是一个愈发凸显的问题。我在这篇<a href="https://www.linux.com/news/open-source-security-process-part-1-cloud-security-introduction" target="_blank" rel="external">Linux.com文章</a>中与the Walking Dead（行尸走肉）的类比再次显现出帮助。让我们来看看传统反恶意软件是怎样与这个画面相契合，并且我们的类比是否应用于反恶意软件。</p>
+<p>在<a href="http://walkingdead.wikia.com/wiki/The_Walking_Dead_Wiki" target="_blank" rel="external">Walking Dead</a>，<a href="http://walkingdead.wikia.com/wiki/Walker" target="_blank" rel="external">Wakers尸行者</a>已控制地球，大肆蚕食剩余的人类。尸行者时时刻刻都活跃着，被声音吸引着，最终形成一个可能超出你防御范围的尸群。他们很是强壮，但却十分的木讷。正如我们在那个Linux.com的文章中探知到的，人们会犯错误，所以我们不可能一直避免尸行者侵犯我们的领地。</p>
+<p>在这一类比中，我们将尸行者比作恶意软件。试想我们的虚拟主机是一个由个人住房（虚拟机）组成的村子，Hypervisor和网络提供将村子联系起来的基础设施（街道，篱笆，供电…）。</p>
+<p>进入反恶意软件的世界：试想那些剩余的人类生存了一段时间并重新发展他们的技术，能够快速识别尸行者并修复带来的一切破坏。这可以替代巡逻队、闭路电视监控系统、警报墙/窗口等安全设施、用于抗击已发现尸行者的军队和修复所有毁坏的清理组。不幸的是，传统反恶意软件技术的现实只用于个人房屋内（亦称虚拟机），而且它们不在村里的街道。</p>
+<p>更严重的是，直到最近恶意软件相对来说还比较愚钝。然而，这个情况在最近的几年有了显著的改观。我们的尸行者逐渐进化成更快更强更智能的 <a href="http://wayward-pines.wikia.com/wiki/Wayward_Pines_Wiki" target="_blank" rel="external">Wayward Pine</a>的<a href="http://wayward-pines.wikia.com/wiki/Abby" target="_blank" rel="external">Abbies</a>。换言之，恶意软件现如今已经能够入侵或破坏掉我们的安全机制。</p>
+<p>我们所需要的是用于监视整个村落的卫星监视的替代品和在它们尝试并闯入我们的房屋时的远程破坏激光束。当然，我们还可以用这个新发现的性能来快速部署所需陆军和清理人员。这本质上是虚拟机内省技术给我们的承诺。它允许我们从操作系统外部解决安全问题，而不用依赖由地面呈现的不可靠的功能。下面会更详细的介绍这一问题。</p>
+<h2 id="从虚拟机自省技术到第一次商业应用：一个合作佳话"><a href="#从虚拟机自省技术到第一次商业应用：一个合作佳话" class="headerlink" title="从虚拟机自省技术到第一次商业应用：一个合作佳话"></a><strong>从虚拟机自省技术到第一次商业应用：一个合作佳话</strong></h2><p>将虚拟机自省技术应用到Xen Hypervisor项目上的想法是在2007年在Georgis Tech以 [Tal Garfinkel与Mendel Rosenblum]在2003年的研究为基础的。Xen Hypervisor项目在2009年通过XenAccess和内存事件的API第一次将这项技术集成进来。在某种程度上，这是对VMware的VMsafe技术的一次回应，VMsafe技术在2008年被提出，由于这项技术在可扩展性上有很大的限制在2012年被废弃。Vmsafe被vShield替代，vShield是Vmsafe的有效子集，是一种基于agent，hypervisor-facilitated, 文件系统反病毒的解决方案。</p>
+<p>在Xen项目内部，虚拟机自省技术能存活的原因在于此项技术强大的研究兴趣，并且一些专业的安全应用程序在安全性上牺牲一些性能是可以接受的。这最终导致LibVMI的诞生(2010)，这让这些API变得更容易访问。<a href="http://libvmi.com/" target="_blank" rel="external">LibVMI</a>提供了一种抽象能够最终将XEN的VMI功能的自己能暴露给其他的开源虚拟化技术，比如KVM和QEMU。</p>
+<p>在2013年5月，Intel发型了Haswell CPU，其能够利用#VE和VMFUNC扩展在VMCS上维护512个EPT指针。这被证明是对VMI技术一次潜在的颠覆，可以让hypervisor控制并让硬件在VM之间实现强隔离，而且开销比之前还小，这也让来自Bitdefender, Cisco, Intel, Novetta, TU Munich和 Zentific的安全研究员和工程师们合作起来。从2014年到2015年，XenAccess和内存事件(mem-events)API被重构到了Xen Hypervisor项目的新的VMI子系统中，添加了<a href="https://blog.xenproject.org/2016/04/13/stealthy-monitoring-with-xen-altp2m/" target="_blank" rel="external">atl2pm</a>和其它硬件特性，并且支持ARM CPU， 在Xen 4.6版本中已经发行。</p>
+<p>Citrix和Bitdefender合作将VMI技术带向市场： XenServer 7.0引入了基于Xen项目VMI接口构建的Direct Inspect APIs。用Bitdefender HVI实现，能安全地将自省能力赋予安全容器。</p>
+<h2 id="今天到底能做什么？"><a href="#今天到底能做什么？" class="headerlink" title="今天到底能做什么？"></a><strong>今天到底能做什么？</strong></h2><p>回到我们的类比：我们需要的是卫星监视系统的替代物来观察整个村庄。VMI能做到吗？在理论上：VMI将观察任意一个虚拟机的状态变为可能（村庄里的房子和它周围)，这些状态包括内存，CPU状态并且当虚拟机改变时候能接受事情。在实际上，如果不使用硬件特性的话，这样做的性能开行还是太大了。</p>
+<p>在我们想象的世界里到处都是Walkers和Abbies，这就好比我们不能监控所有的东西，意味着我们要利用自己的资源集中关注一些高价值的东西。换句话说，我们需要集中关注系统界限(每个房子的最近区域)的可疑行为。</p>
+<p>这种集中关注是通过监控可疑行为的敏感内存区域来实现的。当检测到恶意行为时，能有一种解决方案对进程状态(阻塞，杀死）或者VM状态(暂停，关闭)作出正确反映，与此同时，能在一个正运行的VM中直接收集并报告取证细节。</p>
+<p>任何时候Abbie或者Walker要接近我们的房子，想象一下我们卫星上的激光束。在技术上来说，卫星和激光设施对应XenServer的Direct Inspect API，控制和监控我们数据的软件对应Bitdefenders Hypervisor Introspection。 </p>
+<p>很重要的一点是要强调利用hypervisor来提供硬件实现的隔离，监控和补救行为发生在外部。这意味着攻击者不能破坏卫星或者激光束。</p>
+<p>当然，没有一种安全方案是完美的。如果可疑行为不会影响到VM的内存，监控软件可能不总是能检测到这种行为。这并不会削弱基于文件系统安全的地位。我们仍然需要保持警惕，没有一种完美的防御方法。在我们的村庄类比重，我们照样会被地下基础设施（比如隧道和运河）攻击。在本质上，这意味着我们必须将VMI技术和传统的反恶意软件同时利用起来。</p>
+<p>VMI和传统的hypervisor-facilitated 反病毒方案(比如vShield)相比如何呢？在我们的类比重，这些方案需要对安装在房子里的所有监控设备(CCTV,报警们/报警窗)做集中管理，然而对事件的监控特别像集中在我们村庄大厅的一个安全控制中心。即使这种方法能极大地简化发生在虚拟机里面的监控和管理方式，并不会提供自省方法能提供的额外的保护。</p>
+<p>你可以在下面找到更多有关 VMI, XenServer Direct Inspect API 和BitDefender Hypervisor Introspection 的信息(包括一些demo).</p>
+<h3 id="Xen项目虚拟机自省"><a href="#Xen项目虚拟机自省" class="headerlink" title="Xen项目虚拟机自省"></a><strong>Xen项目虚拟机自省</strong></h3><ul>
+<li>Xen项目<a href="https://wiki.xenproject.org/wiki/Virtual_Machine_Introspection" target="_blank" rel="external">虚拟机自省</a></li>
+<li>XenServer <a href="https://www.citrix.com/blogs/2016/06/21/a-revolutionary-approach-to-advanced-malware-protection/" target="_blank" rel="external">Direct Inspect API</a></li>
+<li>Bitdefender <a href="https://www.bitdefender.com/business/hypervisor-introspection.html" target="_blank" rel="external">Hypervisor Introspection</a></li>
+</ul>
+<h2 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h2><p>VMI技术的发展和它的首次开源以及商业应用都表明Xen项目社区是如何以创新的方式在发展，并能将革命性的方案带向市场。阅读代码的稀有性，从中学到一些东西，提问以及提供该井让安全研究者和像Citrix和Bitdefender这种的供应商将解决方案带向市场。</p>
+<p>值得一提的是，硬件使能的安全技术发展的非常快：只有Intel的#VE和VMFUNC的扩展子集如今被应用到了VMI技术上。利用更多的硬件扩展,能让out-of-guest工具带来的安全性以及in-guest工具带来的性能同时看到希望。</p>
+<p>更令人鼓舞的是，其它的供应商如 A1Logic, Star Lab和 Zentific在研究新的基于Xen项目的安全解决方案。另外，集中关注安全，基于Xen的<a href="http://openxt.org/" target="_blank" rel="external">OpenXT project </a>项目已经开始和Xen项目社区走的越来越近了，并保证未来在安全上的创新。</p>
+<p>这些话题的一部分会在en Project Developer Summit happening in Toronto, CA from August 25 – 26, 2016上讲得更加详细。你可以在<a href="http://events.linuxfoundation.org/events/xen-project-developer-summit" target="_blank" rel="external">这里</a>了解更多</p>
+<p>原文作者：<a href="https://blog.xenproject.org/author/lars-kurth/" target="_blank" rel="external">Lars Kurth</a></p>
+<hr>
+<p>转载请注明: <a href="http://www.csyssec.org/20170505/vmi-xenproject/" target="_blank" rel="external">CSysSec:虚拟机自省技术-一个有新商业应用的安全性创造</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">11</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Introspection/">Introspection</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Monitoring/">Monitoring</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-cf-exception"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/cf-exception/">控制流分支指令上的控制流处理器异常(单步执行)</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/cf-exception/" class="article-date">
+	  <time datetime="2017-05-04T12:06:50.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2015/01/processor-exception-after-control.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2015/01/processor-exception-after-control.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>“single-stepping on branches” is processor hardware feature of x86/Intel architecture. When it is enabled, the processor generates a single-step debug exception <strong>only after instructions that cause a branch</strong>. This mechanism allows a debugger to single-step on <strong>control transfers caused by branches</strong>. What does this imply to defense against control-flow hijacking attacks (e.g. ROP or JOP) ? </p>
+<h3 id="Control-flow-Transfer-Instructions"><a href="#Control-flow-Transfer-Instructions" class="headerlink" title="Control-flow Transfer Instructions"></a><strong>Control-flow Transfer Instructions</strong></h3><p>Control-flow hijacking attacks allow an attacker to overwrite a value that is loaded into the program counter (EIP) of a running program, typically redirecting execution to his own injected code or existing ROP/JOP gadget chains for executing arbitrary malicious code. In general, the value that is subverted could a jump target address, function pointer, or return address in a user-controlled stack. </p>
+<p>Call/Jmp/Ret instructions, called as control-transfer branch instructions, are used by control-flow hijacking attacks to redirect CPU execution. There are many software tools that can perform binary analysis on those instructions, for example, by dynamically instrumenting control-flow graph (CFG) for control-flow integrity (CFI) enforcement. So it would be good if the hardware processor can generate an exception on (or after) those control-transfer instructions. </p>
+<h3 id="Single-stepping-on-Branches"><a href="#Single-stepping-on-Branches" class="headerlink" title="Single-stepping on Branches"></a><strong>Single-stepping on Branches</strong></h3><p>In x86/Intel processor architecture, there is a bit (Trap Flag, TF) in EFLAGS register as below. It is set to enable single-step mode for debugging, clear to disable single-step mode. </p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/control-flow1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/control-flow1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>In single-step mode, the processor generates a debug exception (#DB) after each instruction. This allows the execution state of a program to be inspected after each instruction.</p>
+<p>However, things are changed under a special condition as indicated below. When BTF (single-step on branches) flag in IA32_DEBUGCTL MSR is set, the processor treats the TF flag in the EFLAGS register as a “single-step on branches” flag rather than a “single-step on instructions” flag. This mechanism allows single-stepping the processor on taken branches. Note that the exception is a trap-class exception, which means the exception is generated after the branch instruction (call/ret/jmp) is executed.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/control-flow2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/control-flow2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>So now we can make processor generate an exception (#DB) on (^after^, actually) every call/jmp/ret instruction. </p>
+<h3 id="Potential-Usages"><a href="#Potential-Usages" class="headerlink" title="Potential Usages"></a><strong>Potential Usages</strong></h3><p>We might have some usages with this capability, for example:</p>
+<ol>
+<li>Build dynamical CFG (Control Flow Graph) without changes to software binary or source code.</li>
+<li>Detect unknown control-flow hijacking vulnerabilities by using dynamic taint analysis, e.g. when a tainted value loaded into the program counter (EIP) has been influenced by data from the untrusted inputs.</li>
+<li>Perform software-invisible hooks for function calling (target of “call” instruction).<br><br></li>
+</ol>
+<p>However, there are some <strong><em>limitations</em></strong>:</p>
+<ol>
+<li>Performance overhead !!! (unless we use it under some environment where performance is not a big concern).</li>
+<li>It cannot control jmp/ret/call individually, for example, trigger exceptions only on CALL instructions, or RET instructions, or even only on “indirect” jmp/call instructions (because normally code with direct-jmp/call is trusted due to W^X on code section). </li>
+<li>It also has no CPL (user or kernel) controls, but we can control it through EFLAGS.TF bit crossing system call/ret. </li>
+<li>Because this #DB is controlled by EFLAGS bit, it can be easy to be disabled by using a “popf” instruction if the stack is controlled by an attacker:( . </li>
+<li>It obviously requires OS kernel changes (Does OS provide legitimate #DB handler registration?) </li>
+</ol>
+<p>Please let me know if you have any comments.</p>
+<hr>
+<p><strong><em>References:</em></strong><br>Intel IA32 architecture software development manual:<br><a href="http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html" target="_blank" rel="external">http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html</a> </p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">9</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/CFI/">CFI</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-cfi-development"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/cfi-development/">控制流完整性的发展历程</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/cfi-development/" class="article-date">
+	  <time datetime="2017-05-04T10:47:57.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：武成刚，李建军<br>-中科院计算所<br>Source: <a href="https://www.inforsec.org/wp/?p=495" target="_blank" rel="external">https://www.inforsec.org/wp/?p=495</a></p>
+<p>控制流劫持是一种危害性极大的攻击方式，攻击者能够通过它来获取目标机器的控制权，甚至进行提权操作，对目标机器进行全面控制。当攻击者掌握了被攻击程序的内存错误漏洞后，一般会考虑发起控制流劫持攻击。早期的攻击通常采用代码注入的方式，通过上载一段代码，将控制转向这段代码执行。为了阻止这类攻击，后来的计算机系统中都基本上都部署了DEP(Data Execution Prevention)机制，通过限定内存页不能同时具备写权限和执行权限，来阻止攻击者所上载的代码的执行。为了突破DEP的防御，攻击者又探索出了代码重用攻击方式，他们利用被攻击程序中的代码片段，进行拼接以形成攻击逻辑。代码重用攻击包括Return­to­libc、ROP(Return Oriented Programming)、JOP（Jump Oriented Programming）等。研究表明，当被攻击程序的代码量达到一定规模后，一般能够从被攻击程序中找到图灵完备的代码片段。<br>为了抵御控制流劫持攻击，加州大学和微软公司于2005年提出了控制流完整性（Control Flow Integrity, CFI）的防御机制。其核心思想是限制程序运行中的控制转移，使之始终处于原有的控制流图所限定的范围内。具体做法是通过分析程序的控制流图，获取间接转移指令（包括间接跳转、间接调用、和函数返回指令）目标的白名单，并在运行过程中，核对间接转移指令的目标是否在白名单中。控制流劫持攻击往往会违背原有的控制流图，CFI使得这种攻击行为难以实现，从而保障软件系统的安全。CFI从实现角度上，被分为细粒度和粗粒度两种。细粒度CFI严格控制每一个间接转移指令的转移目标，这种精细的检查，在现有的系统环境中，通常会引入很大的开销。而粗粒度CFI则是将一组类似或相近类型的目标归到一起进行检查，以降低开销，但这种方法会导致安全性的下降。CFI已经被提出十多年的今天，依然有许多研究者在探索新的CFI技术，使其在可接受的开销下能获得高安全性，图1给出了CFI的发展历程，本文将介绍在该历程中的重要的技术创新和相关研究成果。</p>
+<p>全文可参考<a href="https://www.inforsec.org/wp/?p=495" target="_blank" rel="external">这里</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/内核安全/">内核安全<span class="article-category-count">2</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/CFI/">CFI</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-cfi-ccs05"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -253,199 +457,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-ropjop-research"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/ropjop-research/">ROP/JOP攻击与防御最新研究进展</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/ropjop-research/" class="article-date">
-	  <time datetime="2017-05-04T10:42:57.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/11/latest-researching-status-of-ropjop.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/latest-researching-status-of-ropjop.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>Control Flow Hijacking, like ROP, becomes a hot topic in recent years since ever DEP(W^X enforcement) and SMEP were introduced in h/w processor. Based upon the papers that I read recently, this post just gives a brief introduction on the recent researching status (though incomplete) about control flow attacks and defenses. </p>
-<p>When code injection attacks become more and more difficult, attackers start to seek other opportunities to execute arbitrary code with completely re-using existing executable code in application image and/or shared libraries.</p>
-<p>Typically, for example, those techniques without code injection could be return-to-libc, ROP (Return Oriented Programming), JOP (Jump Oriented Programming), or even SROP (Sigreturn Oriented Programming, see <a href="https://www.cs.vu.nl/~herbertb/papers/srop_sp14.pdf" target="_blank" rel="external">Framing Signals—A Return to Portable Shellcode</a>). </p>
-<p>Regarding techniques that defend against those control flow hijackings, here below are the lists (also incomplete).</p>
-<ul>
-<li>Change existing compilers to re-generate the code binaries. There are some typical solutions like, generate return-less binary code, generate control flow friendly binary (with extra IDs/labels for CFG hardening), modify all the control flow (ret, jmp, call) instructions to a well-known center redirection table, etc.</li>
-<li>Without binary changes, make static binary instrument and dynamic control flow tracing. For instance, build control flow graph, and enforce the control flow execution exactly aligning with the known CFG paths.</li>
-<li>Hardware assisted CFI. CFI(Control-Flow Integrity) is an efficient way to defend against ROP/JOP attacks. However, due to performance issue, complete CFI enforcement is impossible in practice. So, there are some lightweight CFI checks with the help of latest processor LBR (last branch record) to examine the control flow behaviors base upon the experience (rather than the full CFG analysis).</li>
-<li>THere are some specific solutions, like stack shadowing (to check if the target “ret” is call-preceding instruction), code section shadowing. But most of them are not a generic solution, but have many assumptions and limitations. </li>
-</ul>
-<p>Regarding to the defenses with CFI, there are many papers that focus on the policy of checking whether or not the history control flow instructions behave as a malicious software. Typically, for example:</p>
-<ul>
-<li>Some solutions to <strong><em>check the length of each one of ROP gadgets</em></strong>. If it is very short (e.g. less than 5~6 instructions), it might be suspected. If there are consecutive chain of gadgets with “short” instruction sequences in a control flow, then it might be a ROP attack.</li>
-<li>Some of them to <strong><em>check whether if the target of “ret” is a Call-Preceded instruction</em></strong> (the instruction immediately preceding is a CALL instruction), this is because normally, every “ret” instruction returns back to an instruction that immediately follows a corresponding “call” instruction. </li>
-<li>Or check if <strong><em>the target of all the indirect call/jmp instructions are the “entry-point” functions</em></strong>. This is also normally true for a legitimate application, because generally an indirect “jmp” or “call” won’t be calling into a certain middle location in a function. </li>
-</ul>
-<p>However, just as those papers (see the links in References below) indicate, all the current CFI solutions based upon above assumptions can be bypassed with advanced ROP gadgets. </p>
-<p>For example, in Nicholas’s paper, he just used some call-preceded ROP gadgets and long termination gadgets for flushing attacking history to bypass checks of the famous kBouncer and ROPecker CFI solutions.</p>
-<p>But his solution has an assumption for kBounce/ROPecker: the last branch records (LBR) can be stored in only 16 (at most) pairs of LBR MSRs. </p>
-<p>As a matter of fact, if appropriately configured, the last branch records can also be stored into a variable-sized memory-resident branch trace store (BTS) buffer specified by DS(Debug Store) save area pointed by the IA32_DS_AREA MSR . And processor doesn’t restrict how many pairs of last branch records could be stored in that BTS buffer, it also allows us to make processor generate an interrupt before the count of records reaches to the max records configured (or when the BTS buffer is nearly full). This means that we will never miss history LBR records. If we don’t consider performance cost when enforcing CFI check at run time, this could be a good solution to trace all the control flow information. </p>
-<p><strong>However, even if we can get all the control flow traces (to defend against Nicholas’s “history flushing” solution), does it mean that we can completely defend against control flow attacks?</strong> Unless that we can make full CFI checks with CFG, one of another problems that we might always encounter is how to design a better policy to reduce “false positive”, and at the same time to catch all the ROP attacks at run time with acceptable performance cost in practice. </p>
-<hr>
-<p><strong><em>References:</em></strong></p>
-<ul>
-<li>Nicholas Carlini, David Wagner, ROP is Still Dangerous: Breaking Modern Defenses<br><a href="http://www.cs.berkeley.edu/~daw/papers/rop-usenix14.pdf" target="_blank" rel="external">http://www.cs.berkeley.edu/~daw/papers/rop-usenix14.pdf</a></li>
-<li>Enes Gökta¸s, Size Does Matter - Why Using Gadget-Chain Length to Prevent Code-Reuse Attacks is Hard<br><a href="http://www.cs.columbia.edu/~mikepo/papers/chainlength.sec14.pdf" target="_blank" rel="external">http://www.cs.columbia.edu/~mikepo/papers/chainlength.sec14.pdf</a></li>
-<li>Out Of Control: Overcoming Control-Flow Integrity:  <a href="http://www.ieee-security.org/TC/SP2014/papers/OutOfControl_c_OvercomingControl-FlowIntegrity.pdf" target="_blank" rel="external">http://www.ieee-security.org/TC/SP2014/papers/OutOfControl_c_OvercomingControl-FlowIntegrity.pdf</a></li>
-<li>Technical Report TR-HGI-2014-001:<br><a href="http://www.hgi.ruhr-uni-bochum.de/media/emma/veroeffentlichungen/2014/05/09/TR-HGI-2014-001_1_1.pdf" target="_blank" rel="external">http://www.hgi.ruhr-uni-bochum.de/media/emma/veroeffentlichungen/2014/05/09/TR-HGI-2014-001_1_1.pdf</a></li>
-</ul>
-<hr>
-<p> 转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">14</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Attack/">Attack</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-nmi-virtual"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/nmi-virtual/">虚拟化技术的NMI窗口退出</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/nmi-virtual/" class="article-date">
-	  <time datetime="2017-05-04T10:41:33.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2015/04/what-how-and-why-on-interrupt-window-or.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2015/04/what-how-and-why-on-interrupt-window-or.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>More recently, one of my colleagues asked me <strong><em>why</em></strong>  there is a feature called “<strong><em>Interrupt Window exiting</em></strong> “ in virtualization technology, and <strong><em>how</em></strong> it can be used by VMM? This blog is going to briefly describe its “what, how and why” .</p>
-<h3 id="WHAT-and-HOW"><a href="#WHAT-and-HOW" class="headerlink" title="WHAT, and HOW"></a><strong>WHAT, and HOW</strong></h3><p>“Interrupt Window Exiting” is one of VM exit reasons (#7 in Intel Technology). If “interrupt-window exiting” VM-execution control is set, this VM exit happens right after a VM entry and at the beginning of an any instruction:</p>
-<ul>
-<li>at which RFLAGS.IF = 1 (external interrupt is unmaksed) and,</li>
-<li>on which the interruptibility state of the guest would allow delivery of an interrupt (for example, not being blocked by STI or by MOV SS).<br><br><br></li>
-</ul>
-<h3 id="WHY"><a href="#WHY" class="headerlink" title="WHY"></a><strong>WHY</strong></h3><p>In a typical case, the VMM software wants to inject/deliver a (virtual) interrupt to its one of Guest VM at some point, but unfortunately the interruptibility state of its guest would NOT allow delivery of an interrupt at that moment (for example, since its guest RFLAGS.IF = 0). </p>
-<p>So, in order to deliver this interrupt, the VMM will need to poll and check the interruptibility state of the guest, once the interruptibility state of its guest allows delivery of an interrupt (A window is open), then VMM can deliver it at this moment. This is inefficient way to do so.</p>
-<p><strong><em>So, the problem is that – How does a VMM get to know when its guest becomes interruptible?</em></strong></p>
-<p>With this feature supported, a VMM is allowed to queue a virtual interrupt to its guest when the guest is not in an interruptible state. The VMM can just only set the “interrupt-window exiting” VM-execution control for that guest and depend on a VM exit to know when the guest becomes interruptible (and, therefore, when it can inject a virtual interrupt). The VMM can detect such VM exits by checking for the basic exit reason “interrupt-window”, if the value of exit reason is 7, then VMM knows it is right time to deliver a virtual interrupt to its specific guest.</p>
-<p><strong><em>Similarly, those also apply to “NMI window exiting” feature in Virtualization Technology.</em></strong></p>
-<hr>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟化原理/">虚拟化原理<span class="article-category-count">7</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-lbr-ret2dir"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/lbr-ret2dir/">利用LBR特性检测ret2dir攻击</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/lbr-ret2dir/" class="article-date">
-	  <time datetime="2017-05-04T10:38:55.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/12/using-lbr-last-branch-record-feature-to.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/12/using-lbr-last-branch-record-feature-to.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>SMEP (Supervisor Mode Execution Prevention) is a mitigation that aims to prevent the CPU from running code from user-mode while in kernel-mode, however this post (<strong><a href="https://labs.mwrinfosecurity.com/blog/2014/08/15/windows-8-kernel-memory-protections-bypass/" target="_blank" rel="external">Windows 8 Kernel Memory Protections Bypass</a></strong>) presents a generic technique for exploiting kernel vulnerabilities with bypassing SMEP. Unlike my previous post (<strong><a href="http://hypervsir.blogspot.com/2014/11/page-structure-table-corruption-attacks.html" target="_blank" rel="external">Page Table Structure Corruption Attacks - How to Mitigate it?</a></strong>) that presented a mitigation to that attack, this post will present a solution to detect such a ret2usr attack due to MMU paging structure corruption.</p>
-<p>In Intel/x86 recent processors, the LBR (last branch record) feature has some filtering capabilities like CPL (current privilege level) filtering and indirect jmp/call filterings. </p>
-<p>For instance, for a specific suspicious process or application, we can configure LBR to only record last branch recording addresses (like LastBranchToIP) for indirect jmp/call and ret branch instructions in kernel mode (CPL=0). </p>
-<p>Therefore, by analyzing the LastBranchToIP addresses in BTS (branch trace store) buffer resident in system RAM, we can get to know that whether or not a “ret2usr” attack occurred. </p>
-<p>The rule is pretty simple:<br><strong><em>check all the LastBranchToIP addresses, if we can find out that any one or more of addresses are located in the range of 0~2GB, then it indicates that a “ret2usr” attack occurred in a “monitored” process or application.</em></strong></p>
-<p>This is typically because the user mode virtual address space range is 0~2GB by default on a 32-bit Windows Operating system, even if the paging-structure entry (e.g. PTE) U/S bit is corrupted by a write-what-where vulnerability which causes a user mode memory to be interpreted as a kernel memory.  </p>
-<hr>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">14</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Attack/">Attack</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Hardware/">Hardware</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -538,6 +549,42 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170513/memorysafety-defense/">内存持久战之防御措施</a></h6>
+          <!--  <span>五月 13, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170513/memorysafety-attack/">内存支持战之攻击模型</a></h6>
+          <!--  <span>五月 13, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170513/memorysafety/">内存持久战之内存安全性</a></h6>
+          <!--  <span>五月 13, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -690,42 +737,6 @@
             
 
               <h6 style="margin: 0;"><a href="/20170504/smep-virtual/">如何利用虚拟化技术实现基于软件的SMEP(监督模式执行)</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/tsx-exploit/">TSX处理器技术对漏洞利用意味着什么？</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/lbr-idthooking/">使用LRB(最近分支记录)特性检测IDT Hooking</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/bitvisor/">BitVisor- 一种实施I/O设备安全的轻量级Hypervisor</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 

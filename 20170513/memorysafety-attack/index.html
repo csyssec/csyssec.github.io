@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>内存支持战之攻击模型 | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="作者：Diting0x
+
+CSysSec注： 本系列文章主要介绍内存的安全性问题，以及相应的攻击模型及防御措施，对整个系统安全问题的概览有很大的帮助。转载本文请务必注明，文章出处：《内存持久战之攻击模型》与作者信息：Diting0x
+
+
+
+0X01 基本攻击模型
+0X02 构建攻击模型
+
+
+内存破坏是计算机安全中亘古不变的话题。内存破坏也被看作是top three危险的软件错误。像C/C++这种底">
+<meta property="og:type" content="article">
+<meta property="og:title" content="内存支持战之攻击模型">
+<meta property="og:url" content="http://yoursite.com/20170513/memorysafety-attack/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="作者：Diting0x
+
+CSysSec注： 本系列文章主要介绍内存的安全性问题，以及相应的攻击模型及防御措施，对整个系统安全问题的概览有很大的帮助。转载本文请务必注明，文章出处：《内存持久战之攻击模型》与作者信息：Diting0x
+
+
+
+0X01 基本攻击模型
+0X02 构建攻击模型
+
+
+内存破坏是计算机安全中亘古不变的话题。内存破坏也被看作是top three危险的软件错误。像C/C++这种底">
+<meta property="og:image" content="http://7xppf1.com1.z0.glb.clouddn.com/hijack-bound.png">
+<meta property="og:image" content="http://7xppf1.com1.z0.glb.clouddn.com/hijack-dangling.png">
+<meta property="og:updated_time" content="2017-05-13T02:11:16.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="内存支持战之攻击模型">
+<meta name="twitter:description" content="作者：Diting0x
+
+CSysSec注： 本系列文章主要介绍内存的安全性问题，以及相应的攻击模型及防御措施，对整个系统安全问题的概览有很大的帮助。转载本文请务必注明，文章出处：《内存持久战之攻击模型》与作者信息：Diting0x
+
+
+
+0X01 基本攻击模型
+0X02 构建攻击模型
+
+
+内存破坏是计算机安全中亘古不变的话题。内存破坏也被看作是top three危险的软件错误。像C/C++这种底">
+<meta name="twitter:image" content="http://7xppf1.com1.z0.glb.clouddn.com/hijack-bound.png">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">Diting0x@</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">系统结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/courses">名人课堂</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-memorysafety-attack" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      内存支持战之攻击模型
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170513/memorysafety-attack/" class="article-date">
+	  <time datetime="2017-05-13T02:09:22.000Z" itemprop="datePublished">五月 13, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本系列文章主要介绍内存的安全性问题，以及相应的攻击模型及防御措施，对整个系统安全问题的概览有很大的帮助。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170513/memorysafety-attack/" target="_blank" rel="external">内存持久战之攻击模型</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<blockquote>
+<ul>
+<li>0X01 基本攻击模型</li>
+<li>0X02 构建攻击模型</li>
+</ul>
+</blockquote>
+<p>内存破坏是计算机安全中亘古不变的话题。内存破坏也被看作是top three危险的软件错误。像C/C++这种底层语言很容易引来这些bugs. 这些程序语言无法对内存安全性的保证，以至于让一些攻击者利用内存bugs改变程序行为或甚至控制整个控制流（control-flow).  要了解什么是内存安全性，可参考上一篇文章：<a href="http://www.csyssec.org/20170513/memorysafety/" target="_blank" rel="external">内存持久战-内存安全性</a>.  然而，一种最显而易见的解决方案就是避免这些容易引起内存破坏的程序语言，用一种内存安全的程序语言去重写这些程序。显然这是不切实际的，比如重写整个OS？<br>尽管papers的许多防御措施层出不穷，但大部分都无法应用到工业上，归结于以下问题：性能开销太大、与现有的程序特性并不兼容、不够健壮、不够完整、依赖于编译器或源码等等。<br>对内存的破坏与保护是一场持久战。本文重在总结利用内存破坏的相关攻击及其实施过程。</p>
+<hr>
+<h3 id="0X01-基本攻击类型"><a href="#0X01-基本攻击类型" class="headerlink" title="0X01 基本攻击类型"></a>0X01 基本攻击类型</h3><ul>
+<li>代码破坏攻击(Code corruption):  攻击者在内存中覆盖程序代码，执行自己写入的代码.</li>
+<li>数据流劫持（Control-flow hijack）: 攻击者重写程序的返回地址或跳转地址，转而执行自己的代码（shell code).</li>
+<li>数据攻击（Data-only attack）: 攻击者并不会修改程序控制流，而是操作程序中的关键数据获取额外权限或泄露重要信息。</li>
+<li>信息泄露（Information leak attack）:任何类型的内存错误都有可能导致内存内容的泄露 </li>
+</ul>
+<p>注意，也许你会问，怎么没有缓冲区溢出攻击，format string攻击等？ 这些都只是实施细节，属于过程，最终目的都可划分为以上的四种攻击模型。可具体看下文的构建攻击模型。<br><a id="more"></a></p>
+<h3 id="0X02-构建攻击模型"><a href="#0X02-构建攻击模型" class="headerlink" title="0X02 构建攻击模型"></a>0X02 构建攻击模型</h3><p>攻击者要实施一次完整的攻击，首先要触发内存错误，具体可按照以下六个步骤进行：<br>注：<em>Step 1&amp;2</em> 是上述攻击模型通用的过程，必不可少，目的是为了触发内存错误。至于 <em>Step 3-6</em>，有些攻击需要完整的步骤才能执行，有些则在前几个阶段就可以完成。</p>
+<p><strong><em>Step 1: 让指针无效</em></strong>。</p>
+<p>要让指针无效，可以强制让指针越界（out of bounds)，引用越界指针引发空间错误（spatial error)。包括：触发未经过检测的空间分配失败错误（allocation failure),这时指针将变成空指针；在循环中不作边界检测，不断递增或递减数组指针，让指针指向数组边界之外的内存空间导致缓冲区溢出；索引越界，一般由整数溢出、截断、对齐、错误的指针映射导致。</p>
+<p>或可让指针指向已经被删除的对象,这时指针称为悬挂指针(dangling pointer).比如，利用不正确的异常处理器（exception handler)回收对象，但并不重新初始化指向这个对象的指针。<br>引用悬挂指针引发时域错误（temporal error). 时域错误也称为use-after-free漏洞，因为引用（used)悬挂指针是在指针指向的内存区域已经被回收（freed)到内存管理系统之后. 大部分此类的错误指针在heap上分配的对象，但局部变量的指针分配给全局变量后会造成指针逃逸(escape)出局部作用域，在函数返回或栈上的局部变量被删除后逃逸的指针将会变成悬挂指针。</p>
+<p><strong><em>Step 2: 强制让程序引用（读或写）无效指针</em></strong>。</p>
+<p><strong><em>Step 3: 利用无效指针修改对象</em></strong>。修改的对象包括数据指针、代码指针、代码、数据变量，以及输出数据变量</p>
+<p><strong><em>Step 4: 偏离源程序执行</em></strong>。可将修改的对象转向攻击者特定的代码（code curruption attack)、也可指向shellcode或者gadget(指一些指令序列）的地址、修改变量特定值、解析输出的数据变量（information leak attack). 注：此时，code currupttion attack与information lead attack过程都已全部完成。</p>
+<p><strong><em>Step 5: 使用修改后的对象</em></strong>。包括利用间接跳转指令 <em>call/jump</em> 引用指针，利用返回指令引用指针，以及引用破坏后的数据变量（data-only attack).至此，数据攻击过程已全部完成。</p>
+<p><strong><em>Step 6: 执行恶意代码</em></strong>。包括重用现有的函数/gadgets以及执行注入的shellcode(control-flow hijack).至此，control-flow hijack过程已全部完成。</p>
+<p>最后看两张图，分别是control-flow hijack利用越界指针与悬挂指针劫持控制流的完整过程：</p>
+<figure><br>    <a href="http://7xppf1.com1.z0.glb.clouddn.com/hijack-bound.png" target="_blank" rel="external"><img src="http://7xppf1.com1.z0.glb.clouddn.com/hijack-bound.png" width="300"></a><br>    <figcaption></figcaption><br></figure>
+
+<figure><br>    <a href="http://7xppf1.com1.z0.glb.clouddn.com/hijack-dangling.png" target="_blank" rel="external"><img src="http://7xppf1.com1.z0.glb.clouddn.com/hijack-dangling.png" width="300"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p>既然谈论的是持久战，针对内存破坏相关攻击的防御措施将在下一篇文章<a href="http://www.csyssec.org/20170513/memorysafety-attack/" target="_blank" rel="external">内存持久战-防御措施</a>详细介绍。</p>
+<h3 id="References"><a href="#References" class="headerlink" title="References"></a>References</h3><p><a href="https://nebelwelt.net/publications/files/13Oakland.pdf" target="_blank" rel="external">S&amp;P’13 Eternal War in Memory </a></p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170513/memorysafety-attack/" target="_blank" rel="external">内存持久战之攻击模型</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/内存安全/">内存安全<span class="article-category-count">3</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Memory/">Memory</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/20170513/memorysafety-defense/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">上一篇</strong>
+      <div class="article-nav-title">
+        
+          内存持久战之防御措施
+        
+      </div>
+    </a>
+  
+  
+    <a href="/20170513/memorysafety/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">内存持久战之内存安全性</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+      <ol class="toc"><li class="toc-item toc-level-3"><a class="toc-link" href="#0X01-基本攻击类型"><span class="toc-number">1.</span> <span class="toc-text">0X01 基本攻击类型</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#0X02-构建攻击模型"><span class="toc-number">2.</span> <span class="toc-text">0X02 构建攻击模型</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#References"><span class="toc-number">3.</span> <span class="toc-text">References</span></a></li></ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+       <!--  自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a> --> 
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/courses" class="mobile-nav-link">Courses</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>

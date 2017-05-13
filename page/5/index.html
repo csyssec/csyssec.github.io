@@ -106,6 +106,223 @@
         
           <section id="main">
   
+    <article id="post-cloud-osv"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/cloud-osv/">Unikernels为云设计的库操作系统(OSv)</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/cloud-osv/" class="article-date">
+	  <time datetime="2017-05-04T10:21:55.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/11/unikernels-library-operating-systems.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/unikernels-library-operating-systems.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>Unlike a general-purpose, commercial operating system (like Windows, Ubuntu), OSv (<a href="http://osv.io/" target="_blank" rel="external">http://osv.io/</a> from cloudius-systems) is a single-purpose operating system. It is also kind of library operating system <strong><em>designed for the cloud</em></strong>  that running on top of different hypervisors, e.g. XEN, KVM, VMware. So what does OSv like look? </p>
+<p>By quickly taking a look at this slide (<a href="http://www.slideshare.net/dmarti1111/o-sv-usenix-atc-2014" target="_blank" rel="external">http://www.slideshare.net/dmarti1111/o-sv-usenix-atc-2014</a>), we can get to know these two features below. </p>
+<ul>
+<li>General-purpose OS has kernel mode (ring 0) and user mode (ring 3), but <strong>OSv only has code running in Ring 0 mode, it doesn’t have code running in user (ring 3) mode</strong>. This is one of most significant differences.</li>
+<li>The other main difference is that the <strong>OSv only has one single address space</strong> (multiple threads allowed, though) running on a hypervisor as being a single virtual appliance, which serves a single-purpose cloud service. </li>
+</ul>
+<p>So, each OSv holds one specific application (with multiple threads) on top of it, and the OSv itself runs as a guest OS on top of hypervisor. Application and resource isolation is guaranteed by the hypervisor.</p>
+<p>Since an OSv has a single address space, it needs only one CR3 value. Process and address space switch (scheduler) is not required any more, and hence no TLB flush overhead introduced. This also can reduce “kernel” component memory footprint, and let application own more memory space.</p>
+<p>Regarding address translation overheads, e.g. GVA-&gt;GPA-&gt;HPA, by using the larger table (2MB, or even 1GB) for both guest virtual memory page tables and EPT tables, such a translation overhead could be further reduced a lot. </p>
+<p>Note that, as the slides pointed out, <strong>syscalls (user/kernel switch) are no longer required</strong>. Any traditional syscalls now are converted to just function calls in kernel mode only. Although this can significantly reduce performance cost, it also causes a new issue: application ABI compatibility issue. This means that in order to deploy this application on top of OSv, the source code must have to be modified and recompiled. </p>
+<p>There are many challenges, you can check <a href="http://osv.io/" target="_blank" rel="external">http://osv.io/</a> for greater details. But anyway, if OSv is a correct direction for cloud OS (and with a success on having rich application supported) in future, it will definitely have a direct competition with some other solutions like <a href="https://www.docker.com/" target="_blank" rel="external">Docker</a>. </p>
+<p>I like this product in person, the much simpler it is, the more I love it :-).</p>
+<p>Also, see this slide (OSb: <a href="http://www.slideshare.net/yushiomote/osb-osv-on-bitvisor" target="_blank" rel="external">OSv on BitVisor</a>), someone is working on enabling OSv on top of <strong><a href="http://hypervsir.blogspot.com/2014/11/paper-read-bitvisor-thin-hypervisor-for.html" target="_blank" rel="external">BitVisor</a></strong>,  cool ! </p>
+<hr>
+<p><strong><em>Some other references about Library OS:</em></strong></p>
+<p>Unikernels: Rise of the Virtual Library Operating System<br><a href="http://queue.acm.org/detail.cfm?id=2566628" target="_blank" rel="external">http://queue.acm.org/detail.cfm?id=2566628</a></p>
+<p>XPDS14: OSv - A Modern Semi-POSIX LibraryOS - Glauber Costa<br><a href="http://www.xenproject.org/help/presentations-and-videos/video/xpds14v-osv.html" target="_blank" rel="external">http://www.xenproject.org/help/presentations-and-videos/video/xpds14v-osv.html</a></p>
+<p>Rethinking the Library OS from the Top Down:<br><a href="http://research.microsoft.com/pubs/141071/asplos2011-drawbridge.pdf" target="_blank" rel="external">http://research.microsoft.com/pubs/141071/asplos2011-drawbridge.pdf</a></p>
+<p>OSv on bhyve:<br><a href="http://bhyvecon.org/osv_on_bhyve.pdf" target="_blank" rel="external">http://bhyvecon.org/osv_on_bhyve.pdf</a></p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统内核/">系统内核<span class="article-category-count">11</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Cloud/">Cloud</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-securekernel-design"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/securekernel-design/">这是Linux内核中一种好的安全设计吗- thread_info和内核栈的联系</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/securekernel-design/" class="article-date">
+	  <time datetime="2017-05-04T10:19:40.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/in-linux-kernel-threadinfo-is-small-cpu.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/in-linux-kernel-threadinfo-is-small-cpu.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>In Linux kernel, <strong><em>thread_info</em></strong> is a small CPU-specific data structure that stores some low-level task data for corresponding process, it also has a pointer to <strong><em>task_struct</em></strong>, which is a processor-independent process control block data structure, e.g. scheduling, virtual memory structures.<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* x86 * 64 */</span></div><div class="line"><span class="keyword">struct</span> thread_info &#123;</div><div class="line"><span class="keyword">struct</span> task_struct   *task;        <span class="comment">/* main task structure */</span></div><div class="line"><span class="keyword">struct</span> exec_domain  *exec_domain; <span class="comment">/* execution domain */</span></div><div class="line">__u32               flags;        <span class="comment">/* low level flags */</span></div><div class="line">__u32               status;       <span class="comment">/* thread synchronous flags*/</span></div><div class="line">__u32                cpu;          <span class="comment">/* current CPU */</span></div><div class="line"><span class="keyword">int</span>                  saved_preempt_count;</div><div class="line"><span class="keyword">mm_segment_t</span>         addr_limit;</div><div class="line"><span class="keyword">struct</span> restart_block restart_block;</div><div class="line"><span class="keyword">void</span> __user          *sysenter_return;</div><div class="line"><span class="keyword">unsigned</span> <span class="keyword">int</span>         sig_on_uaccess_error:<span class="number">1</span>;</div><div class="line"><span class="keyword">unsigned</span> <span class="keyword">int</span>         uaccess_err:<span class="number">1</span>; <span class="comment">/* uaccess failed */</span></div><div class="line">&#125;;</div></pre></td></tr></table></figure></p>
+<p>Every user process has its unique two stacks, one is for code running in user mode, and the other is <strong><em>kernel stack</em></strong> for code execution running in kernel mode. </p>
+<p>The current design is like below picture, the kernel stack space of process and its thread_info structure are located together (at two ends because stack grows down). This is because it offers a key benefit in terms of efficiency: the kernel can easily obtain the address of the <em>*</em>thread_info structure of the process currently running on a CPU from the value of its kernel ESP register. </p>
+<p>For example as below, %eax eventually holds the pointer to <strong><em>thread_info</em></strong> structure.<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">movl $<span class="number">0xFFFFE000</span>, %eax</div><div class="line">andl %esp,        %eax (mask out last <span class="number">13</span> bits)</div></pre></td></tr></table></figure></p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/thread_info_stack%281%29.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/thread_info_stack%281%29.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/thread_info_stack%282%29.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/thread_info_stack%282%29.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<ul>
+<li>Note that these pictures above are from Junfeng’s operating system course slides.<br><a href="http://www.cs.columbia.edu/~junfeng/10sp-w4118/syllabus.html" target="_blank" rel="external">http://www.cs.columbia.edu/~junfeng/10sp-w4118/syllabus.html</a> (or <a href="http://www.cs.columbia.edu/~junfeng/" target="_blank" rel="external">link</a>).</li>
+</ul>
+<p>From security’s point of view, this means that whenever the address of kernel stack is leaked for some reasons (e.g. a bug, vulnerability), the address of corresponding <strong><em>thread_info</em></strong> structure will also be leaked. And as you can see that we can also get the address of <strong><em>task_struct</em></strong> as long as the address of thread_info is gotten. </p>
+<p>The <strong><em>task_struct</em></strong> is a one of very critical kernel data structures in Linux system, for example, it contains the credentials (uid, gid, suid, sgid…). Provided that there is a kernel vulnerability that can cause arbitrary kernel memory overwrite, then those credential fields could be clear by an exploit to get root privilege even without executing any code in kernel mode. </p>
+<p>So, the question: is this a bad security design? Could we do something to improve it? </p>
+<p>See my <a href="http://hypervsir.blogspot.com/2014/09/windows-os-thread-scheduling-monitoring.html" target="_blank" rel="external">previous post</a> for monitoring Windows thread scheduling, it seems that Windows operating system uses FS (or GS) to retrieve thread-related structure for current running thread. However, as far as I know, in Linux system, fs/gs are used for LTS (Local Thread Storage) purpose. </p>
+<hr>
+<p><strong>UPDATE:</strong></p>
+<ol>
+<li><strong>Fortunately I got an idea (not too bad idea:-) to mitigate this issue, I will talk about it later in a new post.</strong></li>
+<li>Add references for “stack overflow” attack against this bad design.</li>
+</ol>
+<p><br><br>Exploiting Stack Overflows in the Linux Kernel<br><a href="https://jon.oberheide.org/blog/2010/11/29/exploiting-stack-overflows-in-the-linux-kernel/" target="_blank" rel="external">https://jon.oberheide.org/blog/2010/11/29/exploiting-stack-overflows-in-the-linux-kernel/</a></p>
+<p>Exploiting stack overflows<br><a href="https://jon.oberheide.org/files/infiltrate12-thestackisback.pdf" target="_blank" rel="external">https://jon.oberheide.org/files/infiltrate12-thestackisback.pdf</a></p>
+<p>Exploiting the Futex Bug and uncovering Towelroot<br><a href="http://tinyhack.com/2014/07/07/exploiting-the-futex-bug-and-uncovering-towelroot/" target="_blank" rel="external">http://tinyhack.com/2014/07/07/exploiting-the-futex-bug-and-uncovering-towelroot/</a></p>
+<p>SMEP: What is It, and How to Beat It on Linux<br><a href="http://vulnfactory.org/blog/2011/06/05/smep-what-is-it-and-how-to-beat-it-on-linux/" target="_blank" rel="external">http://vulnfactory.org/blog/2011/06/05/smep-what-is-it-and-how-to-beat-it-on-linux/</a></p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统内核/">系统内核<span class="article-category-count">11</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
+    <article id="post-secureos2"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/secureos2/">安全操作系统设计-Linux内核关键数据结构写保护</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/secureos2/" class="article-date">
+	  <time datetime="2017-05-04T10:18:05.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/11/security-os-design-cont-write.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/security-os-design-cont-write.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>To be continued for <a href="http://hypervsir.blogspot.com/2014/10/security-os-design-idea-to-prevent.html" target="_blank" rel="external">previous post</a>, let me review what must be changed in Linux kernel in order to prevent buffer overrun/overflow attacks from modifying the critical kernel data structures, like GDT, IDT, task_struct, mm_struct, etc.</p>
+<p>There are some kernel data structures that are never changed at runtime as long as the operating system completes their initialization. For example, the GDT and IDT table, the system call table, or SSDT (pointed by nt!KeServiceDescriptorTable, see this <a href="http://resources.infosecinstitute.com/hooking-system-service-dispatch-table-ssdt/" target="_blank" rel="external">link</a> for SSDT hooking in Windows OS). Note that in Linux system, some of GDT table entries will also be updated by kernel. </p>
+<p>For those data structures, we can directly configure them with Read-Only memory permission in page table entries. </p>
+<p>However, there are many kernel data structures like task_struct, mm_struct, GDT, which must have to be configured with Read-Write attribute because they are changed very frequently during OS runtime. </p>
+<p>But the good thing is that those data are only changed by kernel itself. Basically, the system drivers or other LKMs must not change them, and we can even think that any changes to them by those LKMs are illegitimate, and not desired behaviors. </p>
+<p>So, with this assumption we can now take a look at what we should have to do on existing Linux kernel system or a new operating system started from scratch.</p>
+<h3 id="Kernel-virtual-memory-management-subsystem"><a href="#Kernel-virtual-memory-management-subsystem" class="headerlink" title="Kernel virtual memory management subsystem:"></a><strong>Kernel virtual memory management subsystem:</strong></h3><p>First of all, add a new type of memory allocation to support Read-Only memory allocation (with kmalloc() or even vmalloc() ), for example, adding a new parameter GFP_ROMEM. </p>
+<p>This means that the kernel internal memory management subsystem (e.g. Linux slab allocator) must be extended to group RO memory chunks together in a single or multiple RO pages (4KB or 2MB in size), and traditional RW memory chunks into other multiple RW pages in 4KB or 2MB size. This might greatly increase the complicity of memory management system design. </p>
+<h3 id="Memory-allocation-for-kernel-itself-and-drivers-or-any-LKMs"><a href="#Memory-allocation-for-kernel-itself-and-drivers-or-any-LKMs" class="headerlink" title="Memory allocation for kernel itself and drivers (or any LKMs)"></a><strong>Memory allocation for kernel itself and drivers (or any LKMs)</strong></h3><p>Once we add a new type GFP_ROMEM, we must define the rules to use it. </p>
+<p>The first rule #1 is … for the data structures that will only be modified by kernel module itself, we must use this new type for memory allocation in kernel (e.g. scheduler). All the drivers (or other LKMs) are disallowed to use this new type, we can use code static analysis tool to enforce this usage. </p>
+<p>The second rule #2 is … since the data structure are now RO attribute, and by default CR0.WP bit is set, so kernel module must have to disable CR0.WP before writing access to those data structures. So the code logic is as below:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">disable_wp();                              // clear CR0.WP bit.</div><div class="line">write access to RO data fields.</div><div class="line">enable_wp();                             // set CR0.WP bit again.</div></pre></td></tr></table></figure>
+<p> At the same time, any legitimate drivers (LKMs) are not allowed to change CR0.WP bit (code scanning to enforce this).</p>
+<p>With solution, we can prevent many buffer overflow attacks like, some driver bug that causes arbitrary kernel memory overwriting. However, ROP (JOP) attacks might bypass this solution, but this security design is not intended to address such a specific attack like ROP. </p>
+<p>Problems: </p>
+<ol>
+<li>This will increase tremendous changes to existing Linux kernel system. But it would be good if we plan to write our own operating system starting from scratch. </li>
+<li>Performance impact. Too many extra cycles for disabling/enabling CR0.WP bit. But we can optimize it, the real impact might not so big.</li>
+<li>Need to consider the interrupts or NMIs between disable_wp() and enable_wp() functions. This is just an implementation consideration. It can be solved very easily. </li>
+</ol>
+<p>Any other big issues? </p>
+<hr>
+<h3 id="Update"><a href="#Update" class="headerlink" title="[Update]:"></a><strong>[Update]:</strong></h3><p>The memory <strong><em>Protection Keys</em></strong> feature can do kind of similar protection for key data structures. With this feature enabled, each process also has a protection key value associated with it. On a memory access the hardware checks that the current process’s protection key matches the value associated with the memory block being accessed; if not, an exception occurs. </p>
+<p>See the wikipedia page for details: <a href="http://en.wikipedia.org/wiki/Memory_protection#Protection_keys" target="_blank" rel="external">http://en.wikipedia.org/wiki/Memory_protection#Protection_keys</a></p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统内核/">系统内核<span class="article-category-count">11</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-secureos"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -235,219 +452,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-arm-xen"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/arm-xen/">为什么ARM平台XEN的代码量更小</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/arm-xen/" class="article-date">
-	  <time datetime="2017-05-04T10:11:43.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/why-smaller-code-size-with-xen-on-arm.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/why-smaller-code-size-with-xen-on-arm.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>This white paper (<a href="http://wiki.xenproject.org/wiki/Xen_ARM_with_Virtualization_Extensions_whitepaper" target="_blank" rel="external">Xen ARM with Virtualization Extensions whitepaper</a>) indicates that “Xen on ARM is 1/6 of the code size of x86_64 Xen, while still providing a similar level of features”. what does this mean? Does this mean that Xen/ARM is better than Xen/x86? We cannot simply just make this conclusion, but anyway smaller code size means smaller <a href="http://en.wikipedia.org/wiki/Trusted_computing_base" target="_blank" rel="external">TCB</a>, which can reduce security risks (e.g. security vulnerabilities). </p>
-<p>First of all, I don’t think that is the latest status on Xen 4.4+ version. see the latest one (in 2014, Xen on ARM summit, in the Reference link below). </p>
-<p>Here I’m going to give some more information. </p>
-<ol>
-<li><p>Unlike x86( or x64) XEN, <strong>no shadow page table management code is required any longer in XEN on ARM</strong>. </p>
-<p>In the first generation of Intel VT-x architecture processors, there is no memory virtualization(no EPT, Extended Page Table), which means there is no hardware support for address translations from guest physical memory to host physical memory. XEN and any other hypervisors must sets up the shadow page tables to do those things in a software way (and keep synchronization with guest virtual address page tables by monitoring MOV-CR3 and INVLPG instructions. This solution is sometimes also called as VTLB (virtual TLB). </p>
-<p>For compatibility reason, this part of code is still in XEN because there are still many machines on the market that have no EPT-capable VT-x processors.<br><strong>However, Xen/ARM doesn’t suffer the similar compatibility issue, because it is started from scratch due to the fact that hardware memory (MMU) virtualization is supported since from ARM virtualization was introduced (true? please correct me if i’m wrong). In ARM architecture, new processor mode (Hyp mode, PL2 privilege) is responsible for controlling a new MMU memory address translation layer, which is called as “stage 2” translation from IPA (Intermediate Physical Address) to final PA</strong>. So XEN/ARM doesn’t require the similar code like Virtual TLB. This can reduce thousands of code lines.</p>
-</li>
-<li><p>The white paper says <strong>Xen/ARM does not need QEMU because it does not do any emulation</strong>. <is this="" still="" true="" on="" latest="" xen="" arm?=""> … it uses paravirtualized interfaces for IO devices. Actually I’m not quite understand the Xen/ARM architecture for device emulation. It still uses Dom0 to hold PV backend drivers that have communication with PV frontend drivers in guest OS (DomU).</is></p>
-<p>For device virtualization, on a Xen/x86 system, there are many legacy devices that still are using I/O port (e.g. IN/OUT instructions) for communication between CPU and memory. In this manner, Xen/ARM doesn’t have such an issue because all the I/O communication interfaces are memory-mapped to system memory bus. so the I/O device access can be initiated by using regular memory operation instruction.</p>
-<p>So Xen/ARM can unify the I/O device interface, and hence simply the Hypervisor design as well as PV backend/frontend driver design. The code size may also be smaller.</p>
-</li>
-<li><p><strong>Xen/x86 has two kinds of guests: HVM guest (unmodified kernel, e.g. Windows OS) and PV guest whose kernel must be modified to be aware of the presence of Xen</strong>. For example, some of low-level CPU or MMU primitive operation functions in PV guest OS must be changed to call a HyperCall interface to communicate with underlying Xen for guest virtualization. </p>
-<p><strong>But Xen/ARM doesn’t want to introduce this differentiation.</strong> Whatever the guest kernel must have to be changed, then change it. I think partly because Xen/ARM won’t need to support Windows OS, or other closed-source operating systems, at least for now. So Xen/ARM code is smaller again.</p>
-</li>
-<li><p><strong>Xen/x86 supports both AMD and Intel Hardware Virtualization Technologies, AMD-v (Pacifica, SVM) and Intel VT-x.</strong> </p>
-<p>Although these two technologies are almost the same from guest’s perspective, the hypervisor still need to maintain two copies of x86 (and x64) code implementations because there are many minor differences in virtual machine monitor (VMM) due to some different virtualization architecture design.</p>
-<p>However, ARM doesn’t have the similar issue either. Till now there are only ARMv7-A and ARMv8-A architectures that support ARM hardware virtualization, and variation is very minimal.</p>
-</li>
-<li><p>Similarly, Xen/x86 also support different generations of AMD/Intel processor architectures and corresponding platform/chipsets. And each of the generations are different, but Xen/x86 must maintain backward compatibilities, so the code size is increasing from time to time.</p>
-<p>For example, Intel processor has 16-bit “real mode” in addition to 32bit protected mode and 64bit protected mode. In the earlier generation VT-x processor (prior to <a href="http://en.wikipedia.org/wiki/Westmere_(microarchitecture" target="_blank" rel="external">Westmere</a>)), the code running in 16-bit “real mode” cannot be natively virtualized, so the VMM/hypervisor software must have to emulate real mode instruction executions on guest logical processor. Until VMX “<strong>Unrestricted Guest</strong>“ mode was introduced, this issue eventually was resolved by just only adding several lines of code to enable it.</p>
-<p>I don’t think Xen/ARM will have NO such an problem in near future. </p>
-</li>
-<li><p>In the latest Intel VT-x processors (Haswell +), a new feature “<strong>Hardware <a href="http://en.wikipedia.org/wiki/Nested_virtualization" target="_blank" rel="external">Nested Virtualization</a></strong>“ is introduced. Intel calls it as “<strong><em>VMCS Shadowing</em></strong> “, which provides kind of hardware virtualization supports to allow VMM/hypervisor software running on top of itself or other 3rd party hypervisors. <strong>Xen currently adds partial nested virtualization support</strong> (The virtualization industry leader, VMware, does it better, most of virtualization features can be nested in their products). This definitely introduces some code overhead. </p>
-</li>
-</ol>
-<p><br><br>These above are just some examples to explain why Xen/ARM has smaller code size. We cannot say which one of architectures is better just based on the code size. As a newcomer for hardware virtualization, ARM should and must do better!</p>
-<hr>
-<p><strong><em>References:</em></strong><br>Xen On ARM - Stefano Stabellini<br><a href="http://www.slideshare.net/xen_com_mgr/xensummit-na-2012-xen-on-arm-cortex-a15" target="_blank" rel="external">http://www.slideshare.net/xen_com_mgr/xensummit-na-2012-xen-on-arm-cortex-a15</a></p>
-<p>Xen-on-arm-xen-developer-summit-2014<br><a href="http://www.slideshare.net/xen_com_mgr/xen-on-arm-xen-developer-summit-2014" target="_blank" rel="external">http://www.slideshare.net/xen_com_mgr/xen-on-arm-xen-developer-summit-2014</a> </p>
-<hr>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟化综合/">虚拟化综合<span class="article-category-count">2</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/XEN/">XEN</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-armtrustzone"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/armtrustzone/">ARM TrustZone安全扩展和虚拟化扩展 vs X86虚拟化技术</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/armtrustzone/" class="article-date">
-	  <time datetime="2017-05-04T10:09:56.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/09/arm-trustzone-security-extension-and_28.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/09/arm-trustzone-security-extension-and_28.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>A typical virtualization system on both x86 and ARM includes three major parts:</p>
-<ul>
-<li>CPU virtualization</li>
-<li>Memory virtualization, and </li>
-<li>I/O virtualization (device, interrupt virtualization). </li>
-</ul>
-<p>Because the 3rd one above normally requires additional platform/chipset support, in this article I’m going to only talk about the first two virtualization extensions that are related only to processor architectures. I will back to the 3rd one later as another topic especially for device I/O virtualization and emulation.</p>
-<p>&lt; TO-BE-STARTED&gt;</p>
-<hr>
-<p><strong><em>Update:</em></strong><br>I found there is very very good lecture about ARM Virtualization Technology from National Tsing Hua University, the link is here:<br><a href="http://www.cs.nthu.edu.tw/~ychung/slides/Virtualization/VM-Lecture-7-2-Hardware%20support-ARM.pptx" target="_blank" rel="external">http://www.cs.nthu.edu.tw/~ychung/slides/Virtualization/VM-Lecture-7-2-Hardware%20support-ARM.pptx</a></p>
-<hr>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">9</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/TrustZone/">TrustZone</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
-    <article id="post-monitoring-int80"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/monitoring-int80/">X86/Intel虚拟化技术监控/陷入软件中断INT80H系统调用</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/monitoring-int80/" class="article-date">
-	  <time datetime="2017-05-04T08:12:04.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/monitortrap-software-interrupt-int-08h.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/monitortrap-software-interrupt-int-08h.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>In an unix-like system, before syscall/sysret and/or sysenter/sysexit instructions were introduced by x86/Intel processors, software interrupt “<strong>INT 80h</strong>“ was used as system call interface. Unlike <a href="http://hypervsir.blogspot.com/2014/10/yet-another-solution-to-monitortrap.html" target="_blank" rel="external">my previous post</a>, this one is going to talk about how to monitor this old type system call.</p>
-<p>The INT n instruction is the general mnemonic for executing a software-generated call to an interrupt handler. So when INT 80h is executed in an user application, the processor will immediately switch to kernel mode (normally ring 0, depends on the 0x80 interrupt descriptor settings), and jump to the corresponding interrupt handler. After the request is served by the handler in kernel mode, IRET (interrupt return) is executed, and processor then will switch back to user mode and continue to execute user mode application.</p>
-<p>In a x86 hardware virtualization environment, <strong><em>Intel VT-x technology unfortunately doesn’t provide a means to make software interrupt through INTn instruction generate a VMexit, which means that the system call INT 80h cannot be monitored directly by VMM software.</em></strong> </p>
-<p>However, we can still have a small trick so that VMM can monitor and trap any INT 80h system call. The idea is basically the same as the one that is summarized as <a href="http://hypervsir.blogspot.com/2014/10/yet-another-solution-to-monitortrap.html" target="_blank" rel="external">a generic solution in my previous post</a>.</p>
-<p>If you take a look at the <a href="http://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-instruction-set-reference-manual-325383.pdf" target="_blank" rel="external">Intel Architecture Instruction Set Reference Manual</a>, you may see there is a special exception type for INT instruction execution in protected mode, as below. </p>
-<p>  <strong>#NP(error_code)<br>   If code segment, interrupt-, trap-, or task gate, or TSS is not present.</strong></p>
-<p>Here, the #NP is exception <strong><em>Segment Not Present</em></strong> , one of Intel reserved exception type whose vector is 11. According to Intel Software Development Manual, </p>
-<p><em>“A not-present indication in a gate descriptor, however, does not indicate that a segment is not present (because gates do not correspond to segments). The operating system may use the present flag for gate descriptors to trigger exceptions of special significance to the operating system”</em></p>
-<p>In other words, if we intentionally clear the “<strong><em>present</em></strong> “ bit in the interrupt or trap gate descriptor of vector 80h in IDT table, all the software interrupts through INT 80h system call, will trigger a #NP exception, hence the CPU control will instead be transferred to the fault handler in vector 11 (#NP) of IDT.</p>
-<p>Meanwhile, by checking the corresponding “error_code” for this exception in the exception stack, and decoding the instruction address at which the #NP exception was triggered, we can easily know that this #NP fault is generated intentionally by executing “INT 80h” system call.  </p>
-<p>In a virtualization environment, similarly VMM software can configure <strong><em>Exception-Bitmap VMCS</em></strong> structure to make such an #NP fault generate a VMexit. </p>
-<p><strong><em>So, finally here is the idea to monitor and trap the Linux/Unix system call through software interrupt INT 0x80:</em></strong></p>
-<ol>
-<li>VMM software locates the interrupt descriptor of vector 0x80 in guest IDT table, and clears the “present” bit;</li>
-<li>VMM software also configures Exception-Bitmap VMCS structure to trap guest #NP fault exception, which means that all the guest #NP exceptions will incur a VMexit, instead of being handled directly by guest #NP handler in guest IDT;</li>
-<li>At runtime, all the system call “INT 0x80” from user mode application will generate a CPU #NP fault because the corresponding 0x80 descriptor “present” bit is clear in step 1 above;</li>
-<li>Such a #NP fault will then cause a VMexit because of step 2 settings above;</li>
-<li>Then, VMM software can check various VMexit VMCS information structures (e.g. VM-Exit Interruption-Information Field, IDT-vectoring information Field, and IDT-vectoring Error Code Field), and decode the fault instruction to determine whether or not this #NP fault VMexit is an intended exception by executing system call “INT 0x80”:</li>
-</ol>
-<ul>
-<li>If yes, VMM software emulates the “INT 0x80” behavior, discards this #NP exception, and resumes back to guest with RIP pointing to the system call handler that is defined in vector 0x80 interrupt descriptor of guest IDT table.</li>
-<li>Otherwise, inject this exception back to guest OS, and let guest OS handle the #NP fault as normally.</li>
-</ul>
-<p>With this idea, whenever a system call through INT 0x80 is made by user application software, VMM software can get notified immediately. <br></p>
-<hr>
-<h4 id="Update"><a href="#Update" class="headerlink" title="Update:"></a><strong><em>Update:</em></strong></h4><p>The same idea can apply to any external interrupt (vector 32~255) traps, e.g. ATA device, Audio interrupts. </p>
-<hr>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">11</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Monitoring/">Monitoring</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/SYSCALL/">SYSCALL</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -540,6 +544,42 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170513/memorysafety-defense/">内存持久战之防御措施</a></h6>
+          <!--  <span>五月 13, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170513/memorysafety-attack/">内存支持战之攻击模型</a></h6>
+          <!--  <span>五月 13, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170513/memorysafety/">内存持久战之内存安全性</a></h6>
+          <!--  <span>五月 13, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -692,42 +732,6 @@
             
 
               <h6 style="margin: 0;"><a href="/20170504/smep-virtual/">如何利用虚拟化技术实现基于软件的SMEP(监督模式执行)</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/tsx-exploit/">TSX处理器技术对漏洞利用意味着什么？</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/lbr-idthooking/">使用LRB(最近分支记录)特性检测IDT Hooking</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/bitvisor/">BitVisor- 一种实施I/O设备安全的轻量级Hypervisor</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 

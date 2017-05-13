@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>内存持久战之防御措施 | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="作者：Diting0x
+
+CSysSec注： 本系列主要介绍内存的安全性问题，以及相应的攻击模型及防御措施，对整个系统安全问题的概览有很大的帮助。转载本文请务必注明，文章出处：《内存持久战之防御措施》与作者信息：Diting0x
+
+
+
+0X01 广泛部署的防御机制
+0X02 防御机制Step-by-step 
+
+
+继前两篇文章 内存持久战-内存安全性, 内存持久战-攻击模型, 再加上防御措施，才能">
+<meta property="og:type" content="article">
+<meta property="og:title" content="内存持久战之防御措施">
+<meta property="og:url" content="http://yoursite.com/20170513/memorysafety-defense/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="作者：Diting0x
+
+CSysSec注： 本系列主要介绍内存的安全性问题，以及相应的攻击模型及防御措施，对整个系统安全问题的概览有很大的帮助。转载本文请务必注明，文章出处：《内存持久战之防御措施》与作者信息：Diting0x
+
+
+
+0X01 广泛部署的防御机制
+0X02 防御机制Step-by-step 
+
+
+继前两篇文章 内存持久战-内存安全性, 内存持久战-攻击模型, 再加上防御措施，才能">
+<meta property="og:image" content="http://7xppf1.com1.z0.glb.clouddn.com/memorywar.png">
+<meta property="og:updated_time" content="2017-05-13T02:13:27.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="内存持久战之防御措施">
+<meta name="twitter:description" content="作者：Diting0x
+
+CSysSec注： 本系列主要介绍内存的安全性问题，以及相应的攻击模型及防御措施，对整个系统安全问题的概览有很大的帮助。转载本文请务必注明，文章出处：《内存持久战之防御措施》与作者信息：Diting0x
+
+
+
+0X01 广泛部署的防御机制
+0X02 防御机制Step-by-step 
+
+
+继前两篇文章 内存持久战-内存安全性, 内存持久战-攻击模型, 再加上防御措施，才能">
+<meta name="twitter:image" content="http://7xppf1.com1.z0.glb.clouddn.com/memorywar.png">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">Diting0x@</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">系统结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/courses">名人课堂</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-memorysafety-defense" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      内存持久战之防御措施
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170513/memorysafety-defense/" class="article-date">
+	  <time datetime="2017-05-13T02:11:39.000Z" itemprop="datePublished">五月 13, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本系列主要介绍内存的安全性问题，以及相应的攻击模型及防御措施，对整个系统安全问题的概览有很大的帮助。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170513/memorysafety-defense/" target="_blank" rel="external">内存持久战之防御措施</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<blockquote>
+<ul>
+<li>0X01 广泛部署的防御机制</li>
+<li>0X02 防御机制Step-by-step </li>
+</ul>
+</blockquote>
+<p>继前两篇文章 <a href="http://www.csyssec.org/20170513/memorysafety/" target="_blank" rel="external">内存持久战-内存安全性</a>, <a href="http://www.csyssec.org/20170513/memorysafety-attack/" target="_blank" rel="external">内存持久战-攻击模型</a>, 再加上防御措施，才能算是完整的内存战争。本文首先介绍目前广泛部署的防御机制，然后根据 <a href="http://www.csyssec.org/20170513/memorysafety-attack/" target="_blank" rel="external">内存持久战-攻击模型</a> 每一步实施的攻击破坏介绍相对应的防御细节。</p>
+<h3 id="0X01-广泛部署的防御机制"><a href="#0X01-广泛部署的防御机制" class="headerlink" title="0X01 广泛部署的防御机制"></a>0X01 广泛部署的防御机制</h3><p>目前广泛部署的防御机制有栈粉碎性保护（Stack smashing protection)，DEP/W⊕X以及ASLR(Address Space Layout Randomization)。针对Windows平台，也提出了一些特殊的机制，比如 SafeSEH 与 SEHOP 用来保护堆的元数据和异常处理器。</p>
+<p>栈粉碎性保护,SafeSEH以及SEHOP的基本思想是在返回地址与缓冲区(比如函数入口）之间放置随机数作为哨兵（称为cookie或canary),在函数返回前先检测哨兵的值是否被篡改，以达到检测缓冲区溢出攻击的目的。这些机制都属于代码指针保护方式（code pointer integrity),主要检测一些特殊代码指针，如栈上的返回地址、异常处理器指针的完整性，然而对于直接修改（比如索引错误）却无能为力。有关stack smashing 可参考这篇文章 <a href="http://www.drdobbs.com/security/anatomy-of-a-stack-smashing-attack-and-h/240001832?pgno=1" target="_blank" rel="external">Anatomy of a Stack Smashing Attack and How GCC Prevents It
+</a></p>
+<p>W⊕X（write XOR executable)属于DEP（data execution prevention)的子集，是不可执行数据（Non-executable data）与代码完整性(code integrity)的结合。所有现代CPU都支持设置不可执行页面权限，结合不可写代码权限，就可以实施W⊕X机制，很简单也很实际。然而无法防御ROP（return oriented programming),ROP指的是在将现有代码中的可复用代码（可以是现有的函数）以及一些指令序列（gadgets)连接起来实施恶意操作。有关ROP可参考这篇文章，<a href="https://www.blackhat.com/presentations/bh-usa-08/Shacham/BH_US_08_Shacham_Return_Oriented_Programming.pdf" target="_blank" rel="external">Return-oriented Programming:<br>Exploitation without Code Injection</a>.</p>
+<p>ASLR在下文会详细描述。</p>
+<h3 id="0X02-防御机制Step-by-step"><a href="#0X02-防御机制Step-by-step" class="headerlink" title="0X02 防御机制Step-by-step"></a>0X02 防御机制Step-by-step</h3><p>从目前提出的所有防御机制来看，可将其划分为两大类：概率性以及确定性防御。概率性机制用来随机化一些对象，如ISR(Instruction Set Randomization), ASLR(Address Space Randomizatioin)以及DSR(Data Space Randomization),可选手段相对较少。 确定性防御机制实施reference monitor, 有关reference monitor的定义可参考，<a href="https://en.wikipedia.org/wiki/Reference_monitor" target="_blank" rel="external">wikipedia page on reference monior</a>, 主要就是在参考验证机制上定义了一些设计要求。 其主要利用静态与动态注入技术，静态注入可在编译阶段实施，动态注入需要在运行时加入代码，损耗相对较大。有关注入技术，可参考前面的文章 <a href="http://www.chongh.wiki/blog/2015/12/18/pin-for-dynamic-binary-instrumentation/" target="_blank" rel="external">PIN for Dynamic Binary Instrumentation</a>。</p>
+<p>下面将针对攻击模型中实施的每个步骤介绍相对应的防御机制，每种防御机制对应每一步的攻击过程。<br>可以先去回顾一下 <a href="http://www.csyssec.org/20170513/memorysafety-attack/" target="_blank" rel="external">内存持久战之攻击模型</a> 的完整实施过程。注意，以下介绍的防御机制并没有时序关系,以横向关系依次描述。</p>
+<p><strong><em>Step 1&amp;2: Memory safety.</em></strong> 考虑完整的内存安全性，空间错误和时域错误都需要阻止。类型安全（Type-safe)的语言通过检查数组边界并使用自动垃圾回收来实施空间与时域安全性。对于非类型安全语言，可嵌入reference monitor针对非安全代码实施类似的策略，对象可以是源码、中间语言、二进制。</p>
+<p>针对空间安全，可跟踪指针边界，将指针结构体的表示方法扩展，加入额外信息。但是这种需要源码标注(annotation)，对于庞大的代码基是不实用的，甚至会改变内存结构带来二进制兼容性问题。可参考 <a href="https://www.cs.virginia.edu/~weimer/p/p477-necula.pdf" target="_blank" rel="external">CCured</a> 项目。为解决兼容性问题，越来越多研究者开始追踪对象边界，不但要知道对象分配的内存区域边界，并利用指针运算而不是引用指针来保护指针边界。</p>
+<p>然而，检测边界并不能解决use-after-free, double-free(use-after-free的特列)问题. 此时，实施时域安全可作为补充。1）特殊的分配器：释放的内存只能被同类型对象重用并对齐。此策略可阻止user-after-free攻击，但对dangling pointers无效；2）基于对象的方法：利用影子内存标记每一块释放的内存位置，如果访问最近被释放的空间就能被检测到。著名的Valgrind内存检测就是利用此方法来检测user-after-free错误的。有关Valgrind的内存检测技术将会在后续的文章<a href="http://www.chongh.wiki/blog/2016/02/20/valgrind-memory/" target="_blank" rel="external">Valgrind内存检测</a> 详细介绍。如果标记的内存区域重新被新的指针指向，对其的非法访问就检测不到了；3）基于指针的方法：同时维护指针的边界信息与内存分配信息实施全面的内存安全。</p>
+<p><strong><em>Step 3: 代码完整性(code integrity, 对应修改代码),代码指针完整性(code pointer integrity，对应修改代码指针)以及数据完整性（data integrity，对应修改数据变量).</em></strong></p>
+<p>代码完整性保证程序中的代码不可写性，可以将含有代码的所有内存页面设置为read-only,所有现代CPU都支持此操作。但是，代码完整性并不支持自我修改(self-modifying)的代码以及即时(Just-In-Time, JIT)编译。代码指针完整性保护指针不被修改，对于不变指针，如全局偏移表、虚拟函数表（vtable),可将其内存页设置read-only。但大部分指针，如定义的函数指针或保存的返回地址必须是可写的。另外，就算内存中所有的函数指针都能实施代码指针完整性，并不能防御use-after-free攻击，例如，通过悬挂指针读取错误的vtable<br>来改变程序的控制流并不会涉及内存中的覆盖代码指针操作。</p>
+<p>数据完整性的实施近似空间安全保护，但并没有实施时域安全保护。数据完整性包括基于对象的完整性保护以及基于points-to集合的完整性保护。基于对象的完整性保护利用静态指针分析来鉴别出不安全的指针集(比如可能会越界的指针)以及指针的points-to集合，然后在代码中插入用影子内存跟踪对象的创建与释放的代码，当对不安全的指针进行写操作或引用操作时会检测指针的位置是否标记在影子内存中。基于points-to集合的完整性保护在基于对象的完整性保护上加了一个限制，每个解引用只能写它自己指向的集合对象，是对其保护的加强。</p>
+<p><strong><em>Step 4: ISR(对应指针转向攻击者特定代码),ASLR（对应指向shellcode或者gadget的地址),DSR(对应解析输出的数据变量).</em></strong></p>
+<p>ISR随机化系统指令来保护代码破坏攻击，随着硬件的更新与发展,ISR技术已经废弃；ASLR随机化代码和数据的存储位置来防御控制流劫持攻击，如果payload(指恶意代码中执行恶意操作的部分）在虚拟内存空间的地址不是固定的，攻击者就无法转移控制流。ASLR也是目前用来保护劫持攻击运用最广泛的技术，然后ASLR的随机化是可预测的，尤其是32位机器，heap-spraying以及JIT-spraying技术可以多次填充payload使随机化失效；</p>
+<p>DSR将存储在内存中的数据形式，而不是存储位置，进行随机化。它为每个变量,包括指针，生成不同的key并进行加密操作，数据的每次读取/存储操作都多了个加解密过程。该方法在代码注入之前都要对指针进行静态分析，overhead较大，但保护比较健壮，能有效防止信息泄露，还能防御控制流劫持以及数据攻击。</p>
+<p><strong><em>Step 5: 控制流完整性（control-flow integrity,对应利用间接跳转指令 call/jump 引用指针，利用返回指令引用指针)以及数据流完整性(data-flow integrity，对应引用破坏后的数据变量).</em></strong></p>
+<p>控制流完整性包括动态返回完整性以及静态控制流图完整性。前文提到的栈粉碎性保护机制不能保护间接调转（call and jump)，不能防御直接修改破坏以及信息泄露，但开销小，兼容性好，所以运用比较广泛。影子栈技术能够解决栈粉碎性保护的信息泄露以及直接修改破坏问题，它把返回地址存入隔离的影子栈中，当函数返回时，对原有栈和影子栈两处保存的值做比较，已保证不被篡改。为了防御控制流劫持，不但要保护返回值，还要保护间接跳转，静态控制流图完整性的方式标记所有的call,jump，并将其标记信息存储在特殊的影子内存中或直接放进代码里; 数据流完整性在数据被使用前，通过检查read指令检测数据是否被破坏。它使用静态points-to分析构建一个全局的可达定义集合（reaching definition sets)，保证数据变量最近一次被写是通过程序中的写指令写入的，而不是攻击者可控制的写入。有关reaching definition sets的定义可参考 <a href="https://en.wikipedia.org/wiki/Reaching_definition" target="_blank" rel="external">wikipedia page on Reaching definition</a>.</p>
+<p><strong><em>Step 6: 不可写数据策略(Non-executable data,对应执行注入的shellcode).</em></strong><br>Non-executable data 保护栈、堆之类的内存页面不可执行，只需要设置内存页面的执行位即可。实际上Non-executable data策略与代码完整性结合就是W⊕X机制。</p>
+<p>每个攻击过程对应的防御机制都已讲完。横向来看，所有攻击模型的每个步骤都有多个防御方法；纵向来看，每种攻击在不同的实施阶段也有不同的防御方法，如控制流劫持攻击，从Step1-6分别有，内存安全性机制（step 1-2),代码指针完整性(step 3),ASLR(step 4), 控制流完整性（step 5）以及不可写数据策略（step 6)不同的防御机制。要阻止某种攻击或多种攻击，需要结合多种防御机制，每种机制也都有其优势与弱点。评判防御机制的性质，可从以下方面去衡量，保护强度、误报率、漏报率、性能开销、内存开销、兼容性，是否模块化等。</p>
+<p>至此，内存持久战系列文章就到这里了，水平有限，很多不到位的地方欢迎补充修正。 回顾一下，最后用下面这张图总结，就清晰明了了。[图来源于S&amp;P’13]</p>
+<figure><br>    <a href="http://7xppf1.com1.z0.glb.clouddn.com/memorywar.png" target="_blank" rel="external"><img src="http://7xppf1.com1.z0.glb.clouddn.com/memorywar.png" width="350"></a><br>    <figcaption></figcaption><br></figure>
+
+<h3 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h3><p><a href="http://www.drdobbs.com/security/anatomy-of-a-stack-smashing-attack-and-h/240001832?pgno=1" target="_blank" rel="external">Anatomy of a Stack Smashing Attack and How GCC Prevents It
+</a></p>
+<p><a href="https://www.blackhat.com/presentations/bh-usa-08/Shacham/BH_US_08_Shacham_Return_Oriented_Programming.pdf" target="_blank" rel="external">Return-oriented Programming: Exploitation without Code Injection</a>.</p>
+<p><a href="https://en.wikipedia.org/wiki/Reference_monitor" target="_blank" rel="external">wikipedia page on reference monior</a></p>
+<p><a href="https://www.cs.virginia.edu/~weimer/p/p477-necula.pdf" target="_blank" rel="external">CCured</a></p>
+<p><a href="https://nebelwelt.net/publications/files/13Oakland.pdf" target="_blank" rel="external">S&amp;P’13 Eternal War in Memory </a></p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170513/memorysafety-defense/" target="_blank" rel="external">内存持久战之防御措施</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/内存安全/">内存安全<span class="article-category-count">3</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Memory/">Memory</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+  
+    <a href="/20170513/memorysafety-attack/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">内存支持战之攻击模型</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+      <ol class="toc"><li class="toc-item toc-level-3"><a class="toc-link" href="#0X01-广泛部署的防御机制"><span class="toc-number">1.</span> <span class="toc-text">0X01 广泛部署的防御机制</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#0X02-防御机制Step-by-step"><span class="toc-number">2.</span> <span class="toc-text">0X02 防御机制Step-by-step</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#参考"><span class="toc-number">3.</span> <span class="toc-text">参考</span></a></li></ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+       <!--  自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a> --> 
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/courses" class="mobile-nav-link">Courses</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>
