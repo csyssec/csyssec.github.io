@@ -39,7 +39,7 @@ CSysSec注： 本系列文章主要介绍内存的安全性问题，以及相应
 内存破坏是计算机安全中亘古不变的话题。内存破坏也被看作是top three危险的软件错误。像C/C++这种底">
 <meta property="og:image" content="http://7xppf1.com1.z0.glb.clouddn.com/hijack-bound.png">
 <meta property="og:image" content="http://7xppf1.com1.z0.glb.clouddn.com/hijack-dangling.png">
-<meta property="og:updated_time" content="2017-05-13T05:36:55.000Z">
+<meta property="og:updated_time" content="2017-05-15T13:45:18.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="内存支持战之攻击模型">
 <meta name="twitter:description" content="作者：Diting0x
@@ -177,7 +177,7 @@ CSysSec注： 本系列文章主要介绍内存的安全性问题，以及相应
 <hr>
 <h3 id="0X01-基本攻击类型"><a href="#0X01-基本攻击类型" class="headerlink" title="0X01 基本攻击类型"></a>0X01 基本攻击类型</h3><ul>
 <li>代码破坏攻击(Code corruption):  攻击者在内存中覆盖程序代码，执行自己写入的代码.</li>
-<li>数据流劫持（Control-flow hijack）: 攻击者重写程序的返回地址或跳转地址，转而执行自己的代码（shell code).</li>
+<li>控制流劫持（Control-flow hijack）: 攻击者重写程序的返回地址或跳转地址，转而执行自己的代码（shell code).</li>
 <li>数据攻击（Data-only attack）: 攻击者并不会修改程序控制流，而是操作程序中的关键数据获取额外权限或泄露重要信息。</li>
 <li>信息泄露（Information leak attack）:任何类型的内存错误都有可能导致内存内容的泄露 </li>
 </ul>
