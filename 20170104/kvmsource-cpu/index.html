@@ -13,36 +13,39 @@
   
   <meta name="description" content="作者：Oen Han
 
-CSysSec注： 本KVM源码分析系列文章来自系Intel中国Linux内核与虚拟化开发工程师Oen Han的博客,Oen Han 在虚拟化领域有丰富的开发经验，其写的KVM源码分析系列是本人目前见过最好最详细的，值得推荐。转载本文请务必注明，文章出处：《KVM源码分析之CPU虚拟化》及原作者信息:Oen Han
+CSysSec注： 本KVM源码分析系列文章来自系Intel中国Linux内核与虚拟化开发工程师Oen Han的博客,Oen Han 在虚拟化领域有丰富的开发经验，其写的KVM源码分析系列是本人目前见过最棒的，值得推荐。转载本文请务必注明，文章出处：《KVM源码分析之CPU虚拟化》及原作者信息:Oen Han
 
 
 
 0X01 VT-x 技术
-0X02 VMCS寄存器">
+0X02 VMCS寄存器
+0X0">
 <meta property="og:type" content="article">
 <meta property="og:title" content="KVM源码分析之CPU虚拟化">
 <meta property="og:url" content="http://yoursite.com/20170104/kvmsource-cpu/index.html">
 <meta property="og:site_name" content="Index of Computer System and Security">
 <meta property="og:description" content="作者：Oen Han
 
-CSysSec注： 本KVM源码分析系列文章来自系Intel中国Linux内核与虚拟化开发工程师Oen Han的博客,Oen Han 在虚拟化领域有丰富的开发经验，其写的KVM源码分析系列是本人目前见过最好最详细的，值得推荐。转载本文请务必注明，文章出处：《KVM源码分析之CPU虚拟化》及原作者信息:Oen Han
+CSysSec注： 本KVM源码分析系列文章来自系Intel中国Linux内核与虚拟化开发工程师Oen Han的博客,Oen Han 在虚拟化领域有丰富的开发经验，其写的KVM源码分析系列是本人目前见过最棒的，值得推荐。转载本文请务必注明，文章出处：《KVM源码分析之CPU虚拟化》及原作者信息:Oen Han
 
 
 
 0X01 VT-x 技术
-0X02 VMCS寄存器">
+0X02 VMCS寄存器
+0X0">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/kvmsource301.jpg">
-<meta property="og:updated_time" content="2017-01-04T11:52:44.000Z">
+<meta property="og:updated_time" content="2017-05-26T14:03:37.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="KVM源码分析之CPU虚拟化">
 <meta name="twitter:description" content="作者：Oen Han
 
-CSysSec注： 本KVM源码分析系列文章来自系Intel中国Linux内核与虚拟化开发工程师Oen Han的博客,Oen Han 在虚拟化领域有丰富的开发经验，其写的KVM源码分析系列是本人目前见过最好最详细的，值得推荐。转载本文请务必注明，文章出处：《KVM源码分析之CPU虚拟化》及原作者信息:Oen Han
+CSysSec注： 本KVM源码分析系列文章来自系Intel中国Linux内核与虚拟化开发工程师Oen Han的博客,Oen Han 在虚拟化领域有丰富的开发经验，其写的KVM源码分析系列是本人目前见过最棒的，值得推荐。转载本文请务必注明，文章出处：《KVM源码分析之CPU虚拟化》及原作者信息:Oen Han
 
 
 
 0X01 VT-x 技术
-0X02 VMCS寄存器">
+0X02 VMCS寄存器
+0X0">
 <meta name="twitter:image" content="http://oij0laovn.bkt.clouddn.com/kvmsource301.jpg">
   
     <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
@@ -157,7 +160,7 @@ CSysSec注： 本KVM源码分析系列文章来自系Intel中国Linux内核与�
       
         <p>作者：<a href="http://www.oenhan.com/about" target="_blank" rel="external">Oen Han</a></p>
 <hr>
-<p><strong>CSysSec注</strong>： 本KVM源码分析系列文章来自系Intel中国Linux内核与虚拟化开发工程师Oen Han的<a href="http://www.oenhan.com/kvm-src-3-cpu" target="_blank" rel="external">博客</a>,Oen Han 在虚拟化领域有丰富的开发经验，其写的KVM源码分析系列是本人目前见过最好最详细的，值得推荐。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/kvmsource-cpu/" target="_blank" rel="external">KVM源码分析之CPU虚拟化</a>》及原作者信息:<a href="http://www.oenhan.com/about" target="_blank" rel="external">Oen Han</a></p>
+<p><strong>CSysSec注</strong>： 本KVM源码分析系列文章来自系Intel中国Linux内核与虚拟化开发工程师Oen Han的<a href="http://www.oenhan.com/kvm-src-3-cpu" target="_blank" rel="external">博客</a>,Oen Han 在虚拟化领域有丰富的开发经验，其写的KVM源码分析系列是本人目前见过最棒的，值得推荐。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/kvmsource-cpu/" target="_blank" rel="external">KVM源码分析之CPU虚拟化</a>》及原作者信息:<a href="http://www.oenhan.com/about" target="_blank" rel="external">Oen Han</a></p>
 <hr>
 <blockquote>
 <ul>
