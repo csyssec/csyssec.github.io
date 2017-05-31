@@ -110,6 +110,85 @@
         
           <section id="main">
   
+    <article id="post-cfi-mathias"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170505/cfi-mathias/">控制流完整性-Mathias Payer</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170505/cfi-mathias/" class="article-date">
+	  <time datetime="2017-05-05T05:19:10.000Z" itemprop="datePublished">五月 5, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>译者: <a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a><br>来源: <a href="https://nebelwelt.net/blog/20160913-ControlFlowIntegrity.html#cfi" target="_blank" rel="external">https://nebelwelt.net/blog/20160913-ControlFlowIntegrity.html#cfi</a><br>转载请注明： <a href="http://www.csyssec.org/20170505/cfi-mathias" target="_blank" rel="external">CSysSec:控制流完整性</a></p>
+<hr>
+<p>从高层面上说，控制流完整性(Contro-Flow Integrity, 简称CFI) 将程序的控制流限制到有效的执行踪迹中。CFI在运行时监控程序的执行并将其状态与预先设定好的有效状态对比来执行这一性质。如果检测到一种无效状态，就会发出警告，通常是终止程序的执行。这样一来，CFI属于利用运行时监控器来检测特定攻击面(控制流劫持)的防御方法，之后在运行时标记出漏洞利用尝试。其它运行时监控器的例子包括：ASan（Address Sanitizer,针对空间内存奔溃)，UBSan（Undefined Behavior Sanitize，针对C/C++中的未定义行为, 以及DangNull(针对时间内存崩溃)。大部分的这类监控器针对开发环境，在测试程序时检测违背原则。另一方面，CFI是一种有效的防御机制，并且所有的现代编译器,比如GCC,LLVM以及微软Visual Studio都以一种低开销但不同安全性保证上实现了CFI机制。</p>
+<p>CFI通过限制控制流转移的目标来检测控制流劫持。在一次攻击流劫持攻击中，攻击者将程序的控制流重定向到不会到达正常执行的位置，比如，在一种可替换环境下注入代码或者复用代码。</p>
+<p><a href="https://www.microsoft.com/en-us/research/publication/control-flow-integrity/?from=http%3A%2F%2Fresearch.microsoft.com%2Fpubs%2F64250%2Fccs05.pdf" target="_blank" rel="external">[1]</a>的初始想法中的防御机制，也是第一个(闭源)原型,在2005年被提出。此后，提出并实现了许多CFI防御机制的代替品。尽管所有的这些替代品只是简单的改变了底层实现或者分析过程，它们都在尝试实现CFI策略。这篇文章的目标不是像我们在这篇文章中<a href="https://nebelwelt.net/publications/files/18CSUR.pdf" target="_blank" rel="external">[2]</a>(阅读这篇文章可以看到CFI领域非常详细的相关工作)做的去说明每种CFI机制的差异性，也不是像我们在<a href="https://nebelwelt.net/blog/20141007-CFICPSCPIdiffs.html" target="_blank" rel="external">[3]</a>中做的将CFI和这些替代品去做比较，而是解释CFI是什么，CFI能做什么以及CFI的局限性在哪。</p>
+<p>任何的CFI机制都包括两个抽象模块:一个分析模块(通常是静态分析)用来(在不同精确度下)恢复程序的控制流图(CFG)和一个动态实现机制用来根据生成的CFG来限制控制流。</p>
+<p>下面的样例代码展示了一个含有5个函数的简单程序。foo函数用一个函数指针，CFI机制注入一个前向边(forward-edge)和一个后向边(backward-edge)检测。函数指针要么指向bar要么指向baz.依赖于forward-edge分析，不同目标集合可以被允许通过。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">bar</span><span class="params">()</span></span>;</div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">baz</span><span class="params">()</span></span>;</div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">buz</span><span class="params">()</span></span>;</div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">bez</span><span class="params">(<span class="keyword">int</span>, <span class="keyword">int</span>)</span></span>;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">foo</span><span class="params">(<span class="keyword">int</span> usr)</span> </span>&#123;</div><div class="line">  <span class="keyword">void</span> (*func)();</div><div class="line"></div><div class="line">  <span class="comment">// func either points to bar or baz</span></div><div class="line">  <span class="keyword">if</span> (usr == MAGIC)</div><div class="line">    func = bar;</div><div class="line">  <span class="keyword">else</span></div><div class="line">    func = baz;</div><div class="line"></div><div class="line">  <span class="comment">// forward edge CFI check</span></div><div class="line">  <span class="comment">// depending on the precision of CFI:</span></div><div class="line">  <span class="comment">// a) all functions &#123;bar, baz, buz, bez, foo&#125; are allowed</span></div><div class="line">  <span class="comment">// b) all functions with prototype "void (*)()" are allowed,</span></div><div class="line">  <span class="comment">//    i.e., &#123;bar, baz, buz&#125;</span></div><div class="line">  <span class="comment">// c) only address taken functions are allowed, i.e., &#123;bar, baz&#125;</span></div><div class="line">  CHECK_CFI_FORWARD(func);</div><div class="line">  func();</div><div class="line"></div><div class="line">  <span class="comment">// backward edge CFI check</span></div><div class="line">  CHECK_CFI_BACKWARD();</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<h2 id="控制流转移"><a href="#控制流转移" class="headerlink" title="控制流转移"></a><strong>控制流转移</strong></h2><p>一种架构上的指令可以分为控制流转移指令和计算指令。计算指令被顺序执行(一个紧接着一个）,然而控制流转移指令以一种特定的方式改变控制流，有条件地或无条件地将控制流重定向到一个特定的代码区域。</p>
+<p>控制流转移指令可以进一步分为直接和间接控制流转移指令，间接控制流转移的目标依赖于运行时的值，比如某个寄存器或某个内存中的值，而直接控制流转移，其目标通常是指令本身中的最近偏移。</p>
+<p>对直接控制流转移的保护是很直接的，在大部分架构上，让可执行代码是只读的，因此目标不会被攻击者修改(就算发生了任意内存崩溃，因为可写位必须被禁止)。这些直接控制流转移通过只读或者独立内存页面来保护，这种保护是通过底层硬件(内存管理单元)来实现(没有开销)的。CFI假设可执行代码是只读的，否则攻击者就能简单的覆盖代码并移除运行时监控器。</p>
+<p>间接控制流转移可以进一步分为forward-edge控制流转移和backward-edge控制流转移。Forward-edge控制流将代码向前转移到一个新的位置并且在间接跳转中使用，间接调用指令被映射到源代码级别，比如switch语句，间接调用或者虚拟调用。Backward-edge被用来返回到之前forward-edge中使用的位置中，比如，当使用return指令从函数调用中返回时。为了简单点，我们不讨论中断、中断返回以及异常。</p>
+<h2 id="生成控制流图"><a href="#生成控制流图" class="headerlink" title="生成控制流图"></a><strong>生成控制流图</strong></h2><p>一个CFG是涵盖所有程序有效执行的图。图中的结点是程序中控制流转移的位置，边代表可达到的目标。CFG是一种抽象概念，不同的CFI机制使用不同的方法(依赖可执行文件或源代码进行静态和动态分析)来生成CFG。</p>
+<p>对于前向边，CFG列举所有可能的目标，通常是利用源代码的信息。C/C++中的switch语句就是一个很好的例子，不同目标是能通过统计知道的，并且编译器能生成一个固定跳转表并通过边界检测释放一个间接跳转来保证运行时使用的目标是switch语句中有效的目标。</p>
+<p>对于通过函数指针的间接函数调用，由于目标不能提前知道的缘故，分析变得更复杂。常用的基于源代码分析的方法利用一个基于类型的方法并检查函数指针中使用的函数原型，列举所有匹配的函数。不同的CFI机制利用不同形式的类型相等性(比如任何有效的函数，相同参数数量的函数，相同签名(相同参数数量并且相同参数类型)的函数。在运行时，任意具有相同匹配签名的函数都是被允许的。</p>
+<p>仅仅检查函数类型可能会违背一些冲突(比如函数是可达的但实际上从不会被调用)。这种分析可能会过大估计目标的有效集合。实际上，编译器能检查哪个函数是address taken（就是说有一行代码能生成函数的地址并且存储这个地址)<br>CFI机制通过将相同函数原型的集合与address taken函数的集合求交集可能会减少可允许目标的数量。</p>
+<p>对于虚拟调用，比如C++中依赖于对象类型与类关系的间接调用，分析可以进一步利用对象的类型来限制有效函数，比如，所有对象构造器有相同的签名单只有相关类的子集构造器是可行的。</p>
+<p>到目前为止，构造的CFG是无状态的，比如，没有考虑执行环境并且每个控制流转移与其它是独立的。一方面，在运行时只有一个目标是允许被任意可能的转移，也就是说目标地址当前存储在代码指针指向的内存区域中。另一方面，依赖于不同精确度的分析，CFG的构造在不同粒度中过度估计了有效目标的数量。有些机制将路径限制考虑在内并且利用动态分析的方法验证当前执行的有效性来检查(有限的深度)程序中执行的路径是否可行。由于动态追踪在运行时的开销问题，只有一小部分机制会检查这种路径环境。</p>
+<h2 id="实施CFI"><a href="#实施CFI" class="headerlink" title="实施CFI"></a>实施CFI</h2><p>CFI可以在不同级别上来实施。有时分析阶段(CFG构造)以及实施阶段会有交叉的部分(比如，当考虑路径限制时)。大部分机制有两个基本的机制，一个用来前向边转移，另一个用来后向边转移。</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/cfitransfers.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/cfitransfers.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p>上图展示了CFI是如何通过执行运行时监控器(根据可允许目标构建的集合)来限定可能目标的集合。如果观察的目标不在集合内，程序将被终止。</p>
+<p>对于前向边转移来说，代码通常利用一些相等性检查的形式注入。这种检查确保在运行时观察的目标在有效目标的集合内。这可以通过完整集合检查或简单的类型比较来实现(比如，哈希函数，然后检查当前目标的哈希值是否等于调用点中期待的哈希值)。函数的哈希可以嵌入到函数内部，函数之前或者一个不相交的metadata表中。</p>
+<p>后向边转移更难保护，因为如果用同样的方法，攻击者可能会在函数返回时，将控制流重定向到任意有效的调用点。强的后向边保护会利用栈中之前调用的函数的执行环境。实施栈完整性的机制能确保任意后向边转移职能返回到最近之前的调用者。这种性质能通过将之前调用点存储在shadow栈中或者在栈中确保内存安全性来实现。比如，如果return指令不能被修改，那就能保证栈的完整性。后向边控制流的实现比前向边控制流的实现更“简单”，因为函数调用和返回形成了一种symbiotic关系，而这种关系能在防御的设计中被利用起来，比如，一个函数返回总是返回到之前函数调用的文职。这种关系在前向边中是没有的。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>如果能实施正确，CFI是个强防御机制，其能限定攻击者的自由。攻击者可能仍可以破坏内存，并且数据攻击仍然存在。对于前向边，一个强机制必须要考虑语言特定的语义来尽可能多的限定有效目标的集合。此外，对于前向边的大部分机制都是无状态的，这就允许攻击者将控制流重定向到任意一个CFG识别的有效位置。限制目标集合的大小能约束前向边中的攻击者。对于后向边，一种实施栈完整性的执行环境敏感的方法能保证完整的保护。</p>
+<p><strong>References</strong></p>
+<ul>
+<li>[1]    Control-Flow Integrity. Martin Abadi, Mihai Budiu, Ulfar Erlingsson, Jay Ligatti. In CCS’05</li>
+<li>[2]    Control-Flow Integrity: Precision, Security, And Performance. Nathan Burow, Scott A. Carr, Stefan Brunthaler, Mathias Payer, Joseph Nash, Per Larsen, Michael Franz</li>
+<li>[3]    On differences between the CFI, CPS, and CPI properties. Mathias Payer and Volodymyr Kuznetsov</li>
+</ul>
+<hr>
+<p>转载请注明： <a href="http://www.csyssec.org/20170505/cfi-mathias" target="_blank" rel="external">CSysSec:控制流完整性</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/内核完整性/">内核完整性<span class="article-category-count">1</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/CFI/">CFI</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-vmi-xenproject"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -405,62 +484,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-rop-intel"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/rop-intel/">因特尔发布新的技术规范去防御 ROP 攻击</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/rop-intel/" class="article-date">
-	  <time datetime="2017-05-04T10:45:02.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author: <a href="http://mudongliang.github.io/about/" target="_blank" rel="external">Dongliang Mu</a><br>Source: <a href="http://mudongliang.github.io/2016/08/04/intel-release-new-technology-specifications-to-protect-against-rop-attacks-zh.html" target="_blank" rel="external">http://mudongliang.github.io/2016/08/04/intel-release-new-technology-specifications-to-protect-against-rop-attacks-zh.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>英特尔长期同软件社区合作，并且在运行在现代电脑系统上的操作系统和软件的加固保护方面取得了很大进展。因为这些防御发挥了作用，攻击者们开始寻找创造性的替代攻击方法来绕过这些防御。<strong>Return Oriented Programming</strong> （也称为 <strong>ROP</strong>）和 <strong>Jump Oriented Programming</strong>（也称为 <strong>JOP</strong>）就是两种正在日益流行的这类技术。<strong>JOP</strong> 和 <strong>ROP</strong> 特别难以检测或防御，因为攻击者使用了可执行内存中的已有代码，以一种创造性的方式修改了程序的行为。<strong>ROP/JOP</strong> 难以防御的原因就在于攻击者使用的是可执行内存中的已有代码。已经开发和部署了一些基于软件的检测和防御技术，只是收效甚微。</p>
-<p><a href="http://twitter.com/home/?status=Intel%20and%20Microsoft%20recognized%20the%20seriousness%20of%20ROP%20attacks%20https%3A%2F%2Fblogs.intel.com%2Fevangelists%2F2016%2F06%2F09%2Fintel-release-new-technology-specifications-protect-rop-attacks%2F%20@IntelSWevents%20%23InfoSec" target="_blank" rel="external">英特尔和微软已经意识到 ROP 攻击的危害性</a>，以及开发防御 <strong>ROP/JOP</strong> 的方法的难度。总之，我们评估过超过十项的技术创新来解决这些最近 7 年内新兴起的威胁，并且将范围缩小到 <strong>x86/x64</strong> 的 <strong>CET</strong> 标准来更有效地处理 <strong>ROP</strong> 威胁。基于之前定义指令集扩展方面的经验，以及对采用新 ISA 带来的挑战，我们把目标定在一个用于 <strong>ROP/JOP</strong> 防御而设计的 ISA，并且它对于大部分设计良好的软件是透明的，只需要很小的修改，甚至零修改；也允许需要修改的软件取消该功能。我们也想确认这个解决方案并不只是适用于应用，还适用于操作系统内核，并且对大多数编程语言写的软件也有益。我们也想确保开启了 <strong>CET</strong> 的软件可以无修改地在老的平台系统上运行（虽然没有任何安全益处）。最终，也是最重要的，我们想去解决所有已有的 <strong>ROP/JOP</strong> 攻击。</p>
-<p>虽然我们在这里包含一个 <strong>CET</strong> 的简要描述，但是并不应该取代对<a href="https://software.intel.com/en-us/isa-extensions/cet-preview" target="_blank" rel="external">完整标准</a>的仔细阅读。这里我们强调 ISA 的两个关键方面来帮助你入门，即 <strong>shadow stack</strong> 和 <strong>indirect branch tracking</strong>。<strong>CET</strong> 是这两者的结合，而这两者都是为了处理 <strong>ROP</strong> 和 <strong>JOP</strong> 而设计的。</p>
-<p>除了用于控制转移和数据的传统栈，<strong>CET</strong> 定义了第二个栈（<strong>shadow stack</strong>），专门用于控制转移操作。当 <strong>CET</strong> 启用的时候，<code>CALL</code> 指令除了完成把返回地址压入普通栈的正常行为（对于传统的栈操作没有改变）之外，还把返回地址压入到 <strong>shadow stack</strong> 中。而返回指令（比如说，<code>RET</code>）会将 <strong>shadow stack</strong> 和传统栈上的返回地址弹出，同时只有当两个栈的返回地址相同时才会执行控制转移为弹出来的地址。对于 <strong>shadow stack</strong> 的写操作有诸多的限制，使得攻击者通过修改页表来修改两个栈上的返回地址变得更加困难。因此限制 <strong>shadow stack</strong> 仅用于 <code>call</code> 和 <code>return</code> 操作就是为了只存储返回地址。通过防御非计划中的或者恶意的切换 <strong>shadow stack</strong> 或者对于 <strong>shadow stack</strong> 的 <strong>overflow</strong> 和 <strong>underflow</strong>，<strong>shadow stack</strong> 的页表保护机制也是设计用于保护 <strong>shadow stack</strong> 的完整性。</p>
-<p><code>ENDBRANCH</code> 指令是为了标记一个间接分支或者跳转而新添加到 <strong>ISA</strong> 的指令。因此如果 ENDBRANCH 不是一个间接分支或者跳转的目标，<strong>CPU</strong> 生成一个表明非计划中的或者恶意的行为异常。为了后向兼容和在软件中提前启用，这个特定的指令已经在当前的 <strong>Intel</strong> 处理器被实现为 <code>NOP</code> 指令（类似于一些 MPX 指令）。</p>
-<p>正如我们过去有的，英特尔努力去减少安全特性所带来性能影响，<strong>CET</strong> 也不例外，然而，请记住性能影响高度依赖于特定软件和工作内容。</p>
-<p>最后，我们想承认一点，这个标准受益于同微软大量的合作。</p>
-<hr>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">14</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Attack/">Attack</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -553,6 +576,18 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170531/ravel/">会找漏洞的时光机-Pinpointing Vulnerabilities</a></h6>
+          <!--  <span>五月 31, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -734,18 +769,6 @@
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/smep-virtual/">如何利用虚拟化技术实现基于软件的SMEP(监督模式执行)</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -756,7 +779,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
