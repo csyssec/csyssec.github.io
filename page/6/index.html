@@ -112,79 +112,6 @@
         
           <section id="main">
   
-    <article id="post-secureos2"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/secureos2/">安全操作系统设计-Linux内核关键数据结构写保护</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/secureos2/" class="article-date">
-	  <time datetime="2017-05-04T10:18:05.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/11/security-os-design-cont-write.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/security-os-design-cont-write.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>To be continued for <a href="http://hypervsir.blogspot.com/2014/10/security-os-design-idea-to-prevent.html" target="_blank" rel="external">previous post</a>, let me review what must be changed in Linux kernel in order to prevent buffer overrun/overflow attacks from modifying the critical kernel data structures, like GDT, IDT, task_struct, mm_struct, etc.</p>
-<p>There are some kernel data structures that are never changed at runtime as long as the operating system completes their initialization. For example, the GDT and IDT table, the system call table, or SSDT (pointed by nt!KeServiceDescriptorTable, see this <a href="http://resources.infosecinstitute.com/hooking-system-service-dispatch-table-ssdt/" target="_blank" rel="external">link</a> for SSDT hooking in Windows OS). Note that in Linux system, some of GDT table entries will also be updated by kernel. </p>
-<p>For those data structures, we can directly configure them with Read-Only memory permission in page table entries. </p>
-<p>However, there are many kernel data structures like task_struct, mm_struct, GDT, which must have to be configured with Read-Write attribute because they are changed very frequently during OS runtime. </p>
-<p>But the good thing is that those data are only changed by kernel itself. Basically, the system drivers or other LKMs must not change them, and we can even think that any changes to them by those LKMs are illegitimate, and not desired behaviors. </p>
-<p>So, with this assumption we can now take a look at what we should have to do on existing Linux kernel system or a new operating system started from scratch.</p>
-<h3 id="Kernel-virtual-memory-management-subsystem"><a href="#Kernel-virtual-memory-management-subsystem" class="headerlink" title="Kernel virtual memory management subsystem:"></a><strong>Kernel virtual memory management subsystem:</strong></h3><p>First of all, add a new type of memory allocation to support Read-Only memory allocation (with kmalloc() or even vmalloc() ), for example, adding a new parameter GFP_ROMEM. </p>
-<p>This means that the kernel internal memory management subsystem (e.g. Linux slab allocator) must be extended to group RO memory chunks together in a single or multiple RO pages (4KB or 2MB in size), and traditional RW memory chunks into other multiple RW pages in 4KB or 2MB size. This might greatly increase the complicity of memory management system design. </p>
-<h3 id="Memory-allocation-for-kernel-itself-and-drivers-or-any-LKMs"><a href="#Memory-allocation-for-kernel-itself-and-drivers-or-any-LKMs" class="headerlink" title="Memory allocation for kernel itself and drivers (or any LKMs)"></a><strong>Memory allocation for kernel itself and drivers (or any LKMs)</strong></h3><p>Once we add a new type GFP_ROMEM, we must define the rules to use it. </p>
-<p>The first rule #1 is … for the data structures that will only be modified by kernel module itself, we must use this new type for memory allocation in kernel (e.g. scheduler). All the drivers (or other LKMs) are disallowed to use this new type, we can use code static analysis tool to enforce this usage. </p>
-<p>The second rule #2 is … since the data structure are now RO attribute, and by default CR0.WP bit is set, so kernel module must have to disable CR0.WP before writing access to those data structures. So the code logic is as below:</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">disable_wp();                              // clear CR0.WP bit.</div><div class="line">write access to RO data fields.</div><div class="line">enable_wp();                             // set CR0.WP bit again.</div></pre></td></tr></table></figure>
-<p> At the same time, any legitimate drivers (LKMs) are not allowed to change CR0.WP bit (code scanning to enforce this).</p>
-<p>With solution, we can prevent many buffer overflow attacks like, some driver bug that causes arbitrary kernel memory overwriting. However, ROP (JOP) attacks might bypass this solution, but this security design is not intended to address such a specific attack like ROP. </p>
-<p>Problems: </p>
-<ol>
-<li>This will increase tremendous changes to existing Linux kernel system. But it would be good if we plan to write our own operating system starting from scratch. </li>
-<li>Performance impact. Too many extra cycles for disabling/enabling CR0.WP bit. But we can optimize it, the real impact might not so big.</li>
-<li>Need to consider the interrupts or NMIs between disable_wp() and enable_wp() functions. This is just an implementation consideration. It can be solved very easily. </li>
-</ol>
-<p>Any other big issues? </p>
-<hr>
-<h3 id="Update"><a href="#Update" class="headerlink" title="[Update]:"></a><strong>[Update]:</strong></h3><p>The memory <strong><em>Protection Keys</em></strong> feature can do kind of similar protection for key data structures. With this feature enabled, each process also has a protection key value associated with it. On a memory access the hardware checks that the current process’s protection key matches the value associated with the memory block being accessed; if not, an exception occurs. </p>
-<p>See the wikipedia page for details: <a href="http://en.wikipedia.org/wiki/Memory_protection#Protection_keys" target="_blank" rel="external">http://en.wikipedia.org/wiki/Memory_protection#Protection_keys</a></p>
-<hr>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/系统内核/">系统内核<span class="article-category-count">11</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
     <article id="post-secureos"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -452,11 +379,86 @@
 <!-- Table of Contents -->
 
   
+    <article id="post-monitoring-int80"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/monitoring-int80/">X86/Intel虚拟化技术监控/陷入软件中断INT80H系统调用</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/monitoring-int80/" class="article-date">
+	  <time datetime="2017-05-04T08:12:04.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/monitortrap-software-interrupt-int-08h.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/monitortrap-software-interrupt-int-08h.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>In an unix-like system, before syscall/sysret and/or sysenter/sysexit instructions were introduced by x86/Intel processors, software interrupt “<strong>INT 80h</strong>“ was used as system call interface. Unlike <a href="http://hypervsir.blogspot.com/2014/10/yet-another-solution-to-monitortrap.html" target="_blank" rel="external">my previous post</a>, this one is going to talk about how to monitor this old type system call.</p>
+<p>The INT n instruction is the general mnemonic for executing a software-generated call to an interrupt handler. So when INT 80h is executed in an user application, the processor will immediately switch to kernel mode (normally ring 0, depends on the 0x80 interrupt descriptor settings), and jump to the corresponding interrupt handler. After the request is served by the handler in kernel mode, IRET (interrupt return) is executed, and processor then will switch back to user mode and continue to execute user mode application.</p>
+<p>In a x86 hardware virtualization environment, <strong><em>Intel VT-x technology unfortunately doesn’t provide a means to make software interrupt through INTn instruction generate a VMexit, which means that the system call INT 80h cannot be monitored directly by VMM software.</em></strong> </p>
+<p>However, we can still have a small trick so that VMM can monitor and trap any INT 80h system call. The idea is basically the same as the one that is summarized as <a href="http://hypervsir.blogspot.com/2014/10/yet-another-solution-to-monitortrap.html" target="_blank" rel="external">a generic solution in my previous post</a>.</p>
+<p>If you take a look at the <a href="http://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-instruction-set-reference-manual-325383.pdf" target="_blank" rel="external">Intel Architecture Instruction Set Reference Manual</a>, you may see there is a special exception type for INT instruction execution in protected mode, as below. </p>
+<p>  <strong>#NP(error_code)<br>   If code segment, interrupt-, trap-, or task gate, or TSS is not present.</strong></p>
+<p>Here, the #NP is exception <strong><em>Segment Not Present</em></strong> , one of Intel reserved exception type whose vector is 11. According to Intel Software Development Manual, </p>
+<p><em>“A not-present indication in a gate descriptor, however, does not indicate that a segment is not present (because gates do not correspond to segments). The operating system may use the present flag for gate descriptors to trigger exceptions of special significance to the operating system”</em></p>
+<p>In other words, if we intentionally clear the “<strong><em>present</em></strong> “ bit in the interrupt or trap gate descriptor of vector 80h in IDT table, all the software interrupts through INT 80h system call, will trigger a #NP exception, hence the CPU control will instead be transferred to the fault handler in vector 11 (#NP) of IDT.</p>
+<p>Meanwhile, by checking the corresponding “error_code” for this exception in the exception stack, and decoding the instruction address at which the #NP exception was triggered, we can easily know that this #NP fault is generated intentionally by executing “INT 80h” system call.  </p>
+<p>In a virtualization environment, similarly VMM software can configure <strong><em>Exception-Bitmap VMCS</em></strong> structure to make such an #NP fault generate a VMexit. </p>
+<p><strong><em>So, finally here is the idea to monitor and trap the Linux/Unix system call through software interrupt INT 0x80:</em></strong></p>
+<ol>
+<li>VMM software locates the interrupt descriptor of vector 0x80 in guest IDT table, and clears the “present” bit;</li>
+<li>VMM software also configures Exception-Bitmap VMCS structure to trap guest #NP fault exception, which means that all the guest #NP exceptions will incur a VMexit, instead of being handled directly by guest #NP handler in guest IDT;</li>
+<li>At runtime, all the system call “INT 0x80” from user mode application will generate a CPU #NP fault because the corresponding 0x80 descriptor “present” bit is clear in step 1 above;</li>
+<li>Such a #NP fault will then cause a VMexit because of step 2 settings above;</li>
+<li>Then, VMM software can check various VMexit VMCS information structures (e.g. VM-Exit Interruption-Information Field, IDT-vectoring information Field, and IDT-vectoring Error Code Field), and decode the fault instruction to determine whether or not this #NP fault VMexit is an intended exception by executing system call “INT 0x80”:</li>
+</ol>
+<ul>
+<li>If yes, VMM software emulates the “INT 0x80” behavior, discards this #NP exception, and resumes back to guest with RIP pointing to the system call handler that is defined in vector 0x80 interrupt descriptor of guest IDT table.</li>
+<li>Otherwise, inject this exception back to guest OS, and let guest OS handle the #NP fault as normally.</li>
+</ul>
+<p>With this idea, whenever a system call through INT 0x80 is made by user application software, VMM software can get notified immediately. <br></p>
+<hr>
+<h4 id="Update"><a href="#Update" class="headerlink" title="Update:"></a><strong><em>Update:</em></strong></h4><p>The same idea can apply to any external interrupt (vector 32~255) traps, e.g. ATA device, Audio interrupts. </p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">11</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Monitoring/">Monitoring</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/SYSCALL/">SYSCALL</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
 
 
   <nav id="page-nav">
     
-    <a class="extend prev" rel="prev" href="/page/5/">上一页</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/4/">4</a><a class="page-number" href="/page/5/">5</a><span class="page-number current">6</span><a class="page-number" href="/page/7/">7</a><a class="page-number" href="/page/8/">8</a><span class="space">&hellip;</span><a class="page-number" href="/page/22/">22</a><a class="extend next" rel="next" href="/page/7/">下一页</a>
+    <a class="extend prev" rel="prev" href="/page/5/">上一页</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/4/">4</a><a class="page-number" href="/page/5/">5</a><span class="page-number current">6</span><a class="page-number" href="/page/7/">7</a><a class="page-number" href="/page/8/">8</a><span class="space">&hellip;</span><a class="page-number" href="/page/21/">21</a><a class="extend next" rel="next" href="/page/7/">下一页</a>
   </nav>
 
 </section>
@@ -552,18 +554,6 @@
             
 
               <h6 style="margin: 0;"><a href="/20170807/bypassaslr-analysis/">ASLR保护机制被突破的攻击技术分析</a></h6>
-          <!--  <span>八月 7, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170807/offensivesec/">offensivesec</a></h6>
           <!--  <span>八月 7, 2017</span> -->
             </div>
 
@@ -732,6 +722,18 @@
             
 
               <h6 style="margin: 0;"><a href="/20170504/lbr-ret2dir/">利用LBR特性检测ret2dir攻击</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/virtual-ret2dir/">利用虚拟化技术防御ret2dir攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 

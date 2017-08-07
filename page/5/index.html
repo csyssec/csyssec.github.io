@@ -112,83 +112,6 @@
         
           <section id="main">
   
-    <article id="post-lbr-idthooking"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/lbr-idthooking/">使用LRB(最近分支记录)特性检测IDT Hooking</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/lbr-idthooking/" class="article-date">
-	  <time datetime="2017-05-04T10:27:43.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>Thanks to <a href="https://twitter.com/ysmoo" target="_blank" rel="external">Yushi</a> who shared a presentation (<a href="http://www.iolanes.eu/_docs/eli_asplos12_slides.pdf" target="_blank" rel="external">ELI: Bare-Metal Performance for I/O Virtualization</a>) with me. In that hypervisor (ELI), it innovates an idea of gust IDT shadow (or IDT virtualization) design for some specific usage models. I’m going to talk a little bit about this idea.</p>
-<p>This post firstly gives an introduction about IDT shadow in that paper, then talks about guest IDT hooking with this technique, and finally explains how to detect such a hooking with processor LBR feature. </p>
-<h3 id="IDT-Shadow-Virtualization"><a href="#IDT-Shadow-Virtualization" class="headerlink" title="IDT Shadow/Virtualization"></a><strong>IDT Shadow/Virtualization</strong></h3><p>See picture below (captured from that presentation), it presents an idea of <em>Exitess Interrupt Delivery.</em></p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/VIDT.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/VIDT.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>The basic ideas are as follows:</p>
-<ul>
-<li><strong><em>Setup a guest shadow IDT table. With hardware virtualization’s help, we can easily to cheat guest OS software by monitoring and trapping guest execution of LIDT and SIDT instruction.</em></strong><br>We can maintain a shadow IDT table (and keep it sync’ed with the original one), then let the real guest logical processor IDTR.base point to our shadow IDT table.</li>
-<li>And in shadow IDT table, it clears Present bit or reduces IDTR.limit to trap the wanted guest interrupts/exceptions.<br>The former idea is exactly the same with my idea in <a href="http://hypervsir.blogspot.com/2014/10/monitortrap-software-interrupt-int-08h.html" target="_blank" rel="external">previous post by generating #NP fault</a>. The later idea (triggering #GP) is not recommended in my opinion because decreasing DITR.limit will cause many false positives (please correct me if I am wrong). </li>
-</ul>
-<p>In that paper (see References at the end of this post for the link of this full paper), ELI utilizes the shadow IDT to implement a high-performance guest/host interrupt delivery solution without changes to guest OS kernel.</p>
-<p>And one of other benefits is that the guest OS kernel integrity check (like Windows x64 OS<a href="http://en.wikipedia.org/wiki/Kernel_Patch_Protection" target="_blank" rel="external"> PatchGuard</a>) cannot even detect it.<br><br></p>
-<h3 id="Guest-IDT-vector-entry-hooking"><a href="#Guest-IDT-vector-entry-hooking" class="headerlink" title="Guest IDT vector entry hooking"></a><strong>Guest IDT vector entry hooking</strong></h3><p>Another usage of shadow IDT is to <strong><em>hook any one of guest IDT ISRs by changing the corresponding ISR entry in the shadow IDT table</em></strong>. </p>
-<p>For example, to implement an interrupt filter for a particular interrupt, we can change the IDT entry in the shadow IDT table and let it point to our own hooking ISR entry. After that, whenever that particular interrupt is triggered, the processor will firstly pass on the control to our hooking ISR routine, and we can do something (e.g. filtering), then jump to original OS kernel ISR for further handling. And under some circumstance, we can even let the control be back to our routine after original ISR handling (see the patent in the References).</p>
-<p><strong><em>However, what if this kind guest IDT hooking is done by a malicious hypervisor? Then how to detect it in guest OS?</em></strong><br><br></p>
-<h3 id="Detect-IDT-hooking-with-LBR-Last-Branch-Record"><a href="#Detect-IDT-hooking-with-LBR-Last-Branch-Record" class="headerlink" title="Detect IDT hooking with LBR (Last Branch Record)"></a><strong>Detect IDT hooking with LBR (Last Branch Record)</strong></h3><p>Nowadays, all the x86/Intel processors have a feature: Last Branch Record. </p>
-<p>When it is enabled, the processor records a running trace of the most recent branches, <strong><em>interrupts, and/or exceptions</em></strong> taken by the processor in the last branch record (LBR) stack (could be in MSRs and/or Branch Trace Store (BTS) Buffer in DS save memory area). </p>
-<p>To be specific, when this feature is configured by guest OS kernel, the processor will capture the trace (e.g. LastBranchToIP address) in LBR stack whenever an interrupt is generated by processor. So <strong><em>when the OS original ISR gets executed, it can check the content of LastBranchToIP in LBR stack, to see if it matches with the OS original ISR entry. If there is a mismatch, then it indicates that the corresponding ISR entry is hooked by others, e.g. by a malicious hypervisor.</em></strong> </p>
-<p>But in a hypervisor environment, there are some solutions to prevent guest OS kernel from detecting IDT hooking with LBR feature, e.g.,</p>
-<ul>
-<li>Hide LBR and disabling this feature by trapping corresponding CPUID instruction (LBR capability check) and MSR read/write access to LBR control MSRs.</li>
-<li>Because LBR stack could be stored with some LBR MSRs, hypervisor must trap those MSRs, and return faked values.</li>
-<li>And hypervisor must also trap read access to Branch Trace Store (BTS) Buffer of DS-save memory area if guest OS configures the LBR stack to be also stored in BTS buffer. </li>
-</ul>
-<hr>
-<p><strong><em>References:</em></strong></p>
-<p>Ravi, et al.,Patent: Secure handling of interrupted events utilizing a virtual interrupt definition table (VIDT):<br><a href="http://patft.uspto.gov/netacgi/nph-Parser?Sect2=PTO1&amp;Sect2=HITOFF&amp;p=1&amp;u=/netahtml/PTO/search-bool.html&amp;r=1&amp;f=G&amp;l=50&amp;d=PALL&amp;RefSrch=yes&amp;Query=PN/8578080" target="_blank" rel="external">http://patft.uspto.gov/netacgi/nph-Parser?Sect2=PTO1&amp;Sect2=HITOFF&amp;p=1&amp;u=/netahtml/PTO/search-bool.html&amp;r=1&amp;f=G&amp;l=50&amp;d=PALL&amp;RefSrch=yes&amp;Query=PN/8578080</a></p>
-<p>The full paper for ELI presentation from IBM israel research lab: Abel Gordon, et al. ELI: Bare-Metal Performance for I/O Virtualization<br><a href="http://www.mulix.org/pubs/eli/eli.pdf" target="_blank" rel="external">http://www.mulix.org/pubs/eli/eli.pdf</a></p>
-<hr>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">9</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Hardware/">Hardware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Hooking/">Hooking</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
     <article id="post-bitvisor"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -524,11 +447,84 @@
 <!-- Table of Contents -->
 
   
+    <article id="post-secureos2"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/secureos2/">安全操作系统设计-Linux内核关键数据结构写保护</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/secureos2/" class="article-date">
+	  <time datetime="2017-05-04T10:18:05.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/11/security-os-design-cont-write.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/security-os-design-cont-write.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>To be continued for <a href="http://hypervsir.blogspot.com/2014/10/security-os-design-idea-to-prevent.html" target="_blank" rel="external">previous post</a>, let me review what must be changed in Linux kernel in order to prevent buffer overrun/overflow attacks from modifying the critical kernel data structures, like GDT, IDT, task_struct, mm_struct, etc.</p>
+<p>There are some kernel data structures that are never changed at runtime as long as the operating system completes their initialization. For example, the GDT and IDT table, the system call table, or SSDT (pointed by nt!KeServiceDescriptorTable, see this <a href="http://resources.infosecinstitute.com/hooking-system-service-dispatch-table-ssdt/" target="_blank" rel="external">link</a> for SSDT hooking in Windows OS). Note that in Linux system, some of GDT table entries will also be updated by kernel. </p>
+<p>For those data structures, we can directly configure them with Read-Only memory permission in page table entries. </p>
+<p>However, there are many kernel data structures like task_struct, mm_struct, GDT, which must have to be configured with Read-Write attribute because they are changed very frequently during OS runtime. </p>
+<p>But the good thing is that those data are only changed by kernel itself. Basically, the system drivers or other LKMs must not change them, and we can even think that any changes to them by those LKMs are illegitimate, and not desired behaviors. </p>
+<p>So, with this assumption we can now take a look at what we should have to do on existing Linux kernel system or a new operating system started from scratch.</p>
+<h3 id="Kernel-virtual-memory-management-subsystem"><a href="#Kernel-virtual-memory-management-subsystem" class="headerlink" title="Kernel virtual memory management subsystem:"></a><strong>Kernel virtual memory management subsystem:</strong></h3><p>First of all, add a new type of memory allocation to support Read-Only memory allocation (with kmalloc() or even vmalloc() ), for example, adding a new parameter GFP_ROMEM. </p>
+<p>This means that the kernel internal memory management subsystem (e.g. Linux slab allocator) must be extended to group RO memory chunks together in a single or multiple RO pages (4KB or 2MB in size), and traditional RW memory chunks into other multiple RW pages in 4KB or 2MB size. This might greatly increase the complicity of memory management system design. </p>
+<h3 id="Memory-allocation-for-kernel-itself-and-drivers-or-any-LKMs"><a href="#Memory-allocation-for-kernel-itself-and-drivers-or-any-LKMs" class="headerlink" title="Memory allocation for kernel itself and drivers (or any LKMs)"></a><strong>Memory allocation for kernel itself and drivers (or any LKMs)</strong></h3><p>Once we add a new type GFP_ROMEM, we must define the rules to use it. </p>
+<p>The first rule #1 is … for the data structures that will only be modified by kernel module itself, we must use this new type for memory allocation in kernel (e.g. scheduler). All the drivers (or other LKMs) are disallowed to use this new type, we can use code static analysis tool to enforce this usage. </p>
+<p>The second rule #2 is … since the data structure are now RO attribute, and by default CR0.WP bit is set, so kernel module must have to disable CR0.WP before writing access to those data structures. So the code logic is as below:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">disable_wp();                              // clear CR0.WP bit.</div><div class="line">write access to RO data fields.</div><div class="line">enable_wp();                             // set CR0.WP bit again.</div></pre></td></tr></table></figure>
+<p> At the same time, any legitimate drivers (LKMs) are not allowed to change CR0.WP bit (code scanning to enforce this).</p>
+<p>With solution, we can prevent many buffer overflow attacks like, some driver bug that causes arbitrary kernel memory overwriting. However, ROP (JOP) attacks might bypass this solution, but this security design is not intended to address such a specific attack like ROP. </p>
+<p>Problems: </p>
+<ol>
+<li>This will increase tremendous changes to existing Linux kernel system. But it would be good if we plan to write our own operating system starting from scratch. </li>
+<li>Performance impact. Too many extra cycles for disabling/enabling CR0.WP bit. But we can optimize it, the real impact might not so big.</li>
+<li>Need to consider the interrupts or NMIs between disable_wp() and enable_wp() functions. This is just an implementation consideration. It can be solved very easily. </li>
+</ol>
+<p>Any other big issues? </p>
+<hr>
+<h3 id="Update"><a href="#Update" class="headerlink" title="[Update]:"></a><strong>[Update]:</strong></h3><p>The memory <strong><em>Protection Keys</em></strong> feature can do kind of similar protection for key data structures. With this feature enabled, each process also has a protection key value associated with it. On a memory access the hardware checks that the current process’s protection key matches the value associated with the memory block being accessed; if not, an exception occurs. </p>
+<p>See the wikipedia page for details: <a href="http://en.wikipedia.org/wiki/Memory_protection#Protection_keys" target="_blank" rel="external">http://en.wikipedia.org/wiki/Memory_protection#Protection_keys</a></p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统内核/">系统内核<span class="article-category-count">11</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
 
 
   <nav id="page-nav">
     
-    <a class="extend prev" rel="prev" href="/page/4/">上一页</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/3/">3</a><a class="page-number" href="/page/4/">4</a><span class="page-number current">5</span><a class="page-number" href="/page/6/">6</a><a class="page-number" href="/page/7/">7</a><span class="space">&hellip;</span><a class="page-number" href="/page/22/">22</a><a class="extend next" rel="next" href="/page/6/">下一页</a>
+    <a class="extend prev" rel="prev" href="/page/4/">上一页</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/3/">3</a><a class="page-number" href="/page/4/">4</a><span class="page-number current">5</span><a class="page-number" href="/page/6/">6</a><a class="page-number" href="/page/7/">7</a><span class="space">&hellip;</span><a class="page-number" href="/page/21/">21</a><a class="extend next" rel="next" href="/page/6/">下一页</a>
   </nav>
 
 </section>
@@ -624,18 +620,6 @@
             
 
               <h6 style="margin: 0;"><a href="/20170807/bypassaslr-analysis/">ASLR保护机制被突破的攻击技术分析</a></h6>
-          <!--  <span>八月 7, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170807/offensivesec/">offensivesec</a></h6>
           <!--  <span>八月 7, 2017</span> -->
             </div>
 
@@ -804,6 +788,18 @@
             
 
               <h6 style="margin: 0;"><a href="/20170504/lbr-ret2dir/">利用LBR特性检测ret2dir攻击</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/virtual-ret2dir/">利用虚拟化技术防御ret2dir攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 

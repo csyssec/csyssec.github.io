@@ -112,81 +112,6 @@
         
           <section id="main">
   
-    <article id="post-monitoring-int80"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/monitoring-int80/">X86/Intel虚拟化技术监控/陷入软件中断INT80H系统调用</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/monitoring-int80/" class="article-date">
-	  <time datetime="2017-05-04T08:12:04.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/monitortrap-software-interrupt-int-08h.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/monitortrap-software-interrupt-int-08h.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>In an unix-like system, before syscall/sysret and/or sysenter/sysexit instructions were introduced by x86/Intel processors, software interrupt “<strong>INT 80h</strong>“ was used as system call interface. Unlike <a href="http://hypervsir.blogspot.com/2014/10/yet-another-solution-to-monitortrap.html" target="_blank" rel="external">my previous post</a>, this one is going to talk about how to monitor this old type system call.</p>
-<p>The INT n instruction is the general mnemonic for executing a software-generated call to an interrupt handler. So when INT 80h is executed in an user application, the processor will immediately switch to kernel mode (normally ring 0, depends on the 0x80 interrupt descriptor settings), and jump to the corresponding interrupt handler. After the request is served by the handler in kernel mode, IRET (interrupt return) is executed, and processor then will switch back to user mode and continue to execute user mode application.</p>
-<p>In a x86 hardware virtualization environment, <strong><em>Intel VT-x technology unfortunately doesn’t provide a means to make software interrupt through INTn instruction generate a VMexit, which means that the system call INT 80h cannot be monitored directly by VMM software.</em></strong> </p>
-<p>However, we can still have a small trick so that VMM can monitor and trap any INT 80h system call. The idea is basically the same as the one that is summarized as <a href="http://hypervsir.blogspot.com/2014/10/yet-another-solution-to-monitortrap.html" target="_blank" rel="external">a generic solution in my previous post</a>.</p>
-<p>If you take a look at the <a href="http://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-instruction-set-reference-manual-325383.pdf" target="_blank" rel="external">Intel Architecture Instruction Set Reference Manual</a>, you may see there is a special exception type for INT instruction execution in protected mode, as below. </p>
-<p>  <strong>#NP(error_code)<br>   If code segment, interrupt-, trap-, or task gate, or TSS is not present.</strong></p>
-<p>Here, the #NP is exception <strong><em>Segment Not Present</em></strong> , one of Intel reserved exception type whose vector is 11. According to Intel Software Development Manual, </p>
-<p><em>“A not-present indication in a gate descriptor, however, does not indicate that a segment is not present (because gates do not correspond to segments). The operating system may use the present flag for gate descriptors to trigger exceptions of special significance to the operating system”</em></p>
-<p>In other words, if we intentionally clear the “<strong><em>present</em></strong> “ bit in the interrupt or trap gate descriptor of vector 80h in IDT table, all the software interrupts through INT 80h system call, will trigger a #NP exception, hence the CPU control will instead be transferred to the fault handler in vector 11 (#NP) of IDT.</p>
-<p>Meanwhile, by checking the corresponding “error_code” for this exception in the exception stack, and decoding the instruction address at which the #NP exception was triggered, we can easily know that this #NP fault is generated intentionally by executing “INT 80h” system call.  </p>
-<p>In a virtualization environment, similarly VMM software can configure <strong><em>Exception-Bitmap VMCS</em></strong> structure to make such an #NP fault generate a VMexit. </p>
-<p><strong><em>So, finally here is the idea to monitor and trap the Linux/Unix system call through software interrupt INT 0x80:</em></strong></p>
-<ol>
-<li>VMM software locates the interrupt descriptor of vector 0x80 in guest IDT table, and clears the “present” bit;</li>
-<li>VMM software also configures Exception-Bitmap VMCS structure to trap guest #NP fault exception, which means that all the guest #NP exceptions will incur a VMexit, instead of being handled directly by guest #NP handler in guest IDT;</li>
-<li>At runtime, all the system call “INT 0x80” from user mode application will generate a CPU #NP fault because the corresponding 0x80 descriptor “present” bit is clear in step 1 above;</li>
-<li>Such a #NP fault will then cause a VMexit because of step 2 settings above;</li>
-<li>Then, VMM software can check various VMexit VMCS information structures (e.g. VM-Exit Interruption-Information Field, IDT-vectoring information Field, and IDT-vectoring Error Code Field), and decode the fault instruction to determine whether or not this #NP fault VMexit is an intended exception by executing system call “INT 0x80”:</li>
-</ol>
-<ul>
-<li>If yes, VMM software emulates the “INT 0x80” behavior, discards this #NP exception, and resumes back to guest with RIP pointing to the system call handler that is defined in vector 0x80 interrupt descriptor of guest IDT table.</li>
-<li>Otherwise, inject this exception back to guest OS, and let guest OS handle the #NP fault as normally.</li>
-</ul>
-<p>With this idea, whenever a system call through INT 0x80 is made by user application software, VMM software can get notified immediately. <br></p>
-<hr>
-<h4 id="Update"><a href="#Update" class="headerlink" title="Update:"></a><strong><em>Update:</em></strong></h4><p>The same idea can apply to any external interrupt (vector 32~255) traps, e.g. ATA device, Audio interrupts. </p>
-<hr>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">11</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Monitoring/">Monitoring</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/SYSCALL/">SYSCALL</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
     <article id="post-unpriviledged-ins"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -493,11 +418,76 @@
 <!-- Table of Contents -->
 
   
+    <article id="post-monitoring-schduling"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/monitoring-schduling/">使用硬件虚拟化技术无感监控Windows OS调度事件</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/monitoring-schduling/" class="article-date">
+	  <time datetime="2017-05-04T07:49:55.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/09/windows-os-thread-scheduling-monitoring.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/09/windows-os-thread-scheduling-monitoring.html</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>A <strong><a href="http://en.wikipedia.org/wiki/Rootkit" target="_blank" rel="external">rootkit</a></strong> is a stealthy type of software, typically malicious, designed to hide the existence of itself or certain processes/programs from normal methods of detection and enable continued privileged access to a computer. However, even though the malicious process/program can be invisible to users, internally it must have to get time slices for running, otherwise if it has no chance to get scheduled by CPU, such an existence is meaningless for malware author. </p>
+<p>This article provides a solution to detect the malware and inspect its behaviors by monitoring each OS thread scheduling event.</p>
+<p>This article is organized into two parts: 1) explain Windows scheduling things and related data structures; 2) then explain how to get notified in underlying VMM software without any changes to guest Windows OS.</p>
+<h4 id="Windows-thread-scheduling"><a href="#Windows-thread-scheduling" class="headerlink" title="Windows thread scheduling"></a><strong>Windows thread scheduling</strong></h4><p>Thread (rather than Process) is the fundamental schedulable entity in the Windows operating system. It is represented by a <strong><a href="http://www.nirsoft.net/kernel_struct/vista/ETHREAD.html" target="_blank" rel="external">_ETHREAD</a></strong> structure that includes a <strong><a href="http://www.nirsoft.net/kernel_struct/vista/KETHREAD.html" target="_blank" rel="external">_KTHREAD structure</a></strong>. For every thread in the system there is an ETHREAD structure, including threads in the System Idle Process. The ETHREAD.<strong><em>Tcb</em></strong> field (Thread Control Block)/KTHREAD is used to store information related to thread scheduling. Every process stores a list of ETHREAD structures, representing all the threads running in that process, in the <strong><em>TheadListHead</em></strong> field of the <strong><a href="http://www.nirsoft.net/kernel_struct/vista/_EPROCESS.html" target="_blank" rel="external">_EPROCESS</a></strong> structure.</p>
+<p>In a SMP system, each processor (CPU) has a unique <strong><a href="http://www.nirsoft.net/kernel_struct/vista/KPCR.html" target="_blank" rel="external">KPCR</a></strong> (Kernel Processor Control Region) structure, which contains per-CPU information shared by the kernel and the HAL. In this structure, there is a <strong><em>Prcb</em></strong> field, contains an embedded <strong><a href="http://www.nirsoft.net/kernel_struct/vista/KPRCB.html" target="_blank" rel="external">KPRCB</a></strong> structure that represents the Kernel Processor Control Block. And in this KPRCB structure, there is a field <strong><em>CurrentThread</em></strong> that pointers to the KTHREAD of current running thread on this processor. </p>
+<p>Here is the interesting thing, before scheduling to a particular thread for running, the OS scheduler will update the pointer field <strong><em>CurrentThread</em></strong> with that corresponding KTHEAD structure. Besides, in a 32bit Windows OS, the KPCR of the current CPU is always accessible at FS:[0] in kernel, while in a x64 Windows OS it is always at GS:[0] in kernel space.  Here below illustrates the relationship:</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/FS-GS.png" target="_blank" rel="external"><br>    <img src="http://oij0laovn.bkt.clouddn.com/FS-GS.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>As long as we get the address of KTHREAD structure of particular thread, we can also get the address of ETHREAD structure, because the KTHRAD is embedded in (not pointed by) the ETHREAD structure, and KTHREAD is the first field of ETHREAD, the address of ETHREAD and KTHREAD is the same for a particular thread. Besides, we can also get the address of EPROCESS information structure by KTHEAD-&gt;Process for the process which that running thread belongs to. </p>
+<p>Once we get this process information, we can analyze it and check if it is a hidden malicious process for example by analyzing this process signatures. </p>
+<p>So now the question is how to get notified before a particular thread gets scheduled to run? The second part below explains one of implementations.</p>
+<p><br></p>
+<h4 id="Monitoring-thread-scheduling-events-with-debug-register"><a href="#Monitoring-thread-scheduling-events-with-debug-register" class="headerlink" title="Monitoring thread scheduling events with debug register."></a><strong>Monitoring thread scheduling events with debug register.</strong></h4><p>In order to monitor the changes to the field “PKTHREAD <strong><em>CurrentThread</em></strong> “ in _KPRCB structure, one of approaches is presented in <strong><a href="http://hypervsir.blogspot.com/2014/09/debug-registers-on-intel-x86-processor.html" target="_blank" rel="external">my previous blog for Debug Register usages</a></strong>. We can set the address of that field into one of DR0~DR3 registers, and configure the hardware breakpoint condition as WRITE triggering. Whenever the OS scheduler updates that field, a #DB exception will be generated by processor. If such an exception is configured by VMM to generate a VMexit, then the corresponding VMM exit handler will be invoked to handle this event. </p>
+<p>Now, the problem is how to get the address of that field “PKTHREAD <strong><em>CurrentThread</em></strong> “. See the picture above, originally we must have to retrieve the segment base address for FS segment or GS segment. Fortunately, we can directly read the guest FS_BASE_MSR (one of <strong><a href="http://en.wikipedia.org/wiki/Model-specific_register" target="_blank" rel="external">Model Specific Registers</a></strong>, the index is 0xC0000100) on 32bit OS and GS_BASE_MSR (0xC0000101) on 64bit OS to get that base address value. After getting this address value, we can walk through the KPCR and KPRCB structure to get the address of that field “PKTHREAD <strong><em>CurrentThread</em></strong> “. </p>
+<p>However, this solution might be only for academic/research or education purposes because it has some limitations, for example, all the data structures (KPCR, KPRCB, THREAD, ETHREAD) might be changed from OS version to version so it is not to walk through the data structure for all OS versions, it also may have compatibility issue with 3rd party software debugger because it must have to use one of debug registers, performance overhead might also be a problem because whenever a thread scheduling event occurs, there will be a #DB exception triggered. </p>
+<p> &lt; The End&gt;</p>
+<hr>
+<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">11</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/HAV/">HAV</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Monitoring/">Monitoring</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
 
 
   <nav id="page-nav">
     
-    <a class="extend prev" rel="prev" href="/page/6/">上一页</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/5/">5</a><a class="page-number" href="/page/6/">6</a><span class="page-number current">7</span><a class="page-number" href="/page/8/">8</a><a class="page-number" href="/page/9/">9</a><span class="space">&hellip;</span><a class="page-number" href="/page/22/">22</a><a class="extend next" rel="next" href="/page/8/">下一页</a>
+    <a class="extend prev" rel="prev" href="/page/6/">上一页</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/5/">5</a><a class="page-number" href="/page/6/">6</a><span class="page-number current">7</span><a class="page-number" href="/page/8/">8</a><a class="page-number" href="/page/9/">9</a><span class="space">&hellip;</span><a class="page-number" href="/page/21/">21</a><a class="extend next" rel="next" href="/page/8/">下一页</a>
   </nav>
 
 </section>
@@ -593,18 +583,6 @@
             
 
               <h6 style="margin: 0;"><a href="/20170807/bypassaslr-analysis/">ASLR保护机制被突破的攻击技术分析</a></h6>
-          <!--  <span>八月 7, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170807/offensivesec/">offensivesec</a></h6>
           <!--  <span>八月 7, 2017</span> -->
             </div>
 
@@ -773,6 +751,18 @@
             
 
               <h6 style="margin: 0;"><a href="/20170504/lbr-ret2dir/">利用LBR特性检测ret2dir攻击</a></h6>
+          <!--  <span>五月 4, 2017</span> -->
+            </div>
+
+          </li>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170504/virtual-ret2dir/">利用虚拟化技术防御ret2dir攻击</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
