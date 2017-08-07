@@ -112,6 +112,63 @@
         
           <section id="main">
   
+    <article id="post-mtf"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/mtf/">MTF在基于EPT的客户机物理内存监控中的使用</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/mtf/" class="article-date">
+	  <time datetime="2017-05-04T07:46:37.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>来源：<a href="http://hypervsir.blogspot.com/2014/11/monitor-trap-flag-mtf-usage-in-ept.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/monitor-trap-flag-mtf-usage-in-ept.html</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>Monitor Trap Flag (MTF) is a flag specifically designed for single-stepping in x86/Intel hardware virtualization VT-x technology. When MTF is set, the guest will trigger a VM Exit after executing each instruction (need to consider NMI or other interrupt delivery boundary). This <a href="https://www.cerias.purdue.edu/assets/pdf/bibtex_archive/2013-5.pdf" target="_blank" rel="external">paper</a> presents an idea to use MTF for memory write allowing when monitoring modification to guest virtual-to-physical mapping (page table entries) tables. </p>
+<p>In that paper (SPIDER: Stealthy Binary Program Instrumentation and Debugging via Hardware Virtualization), it details a solution to trap guest virtual-to-physical mapping address changes by monitoring the corresponding guest page tables. <strong>Based upon my previous experience, monitoring page table entries (with read-only permission in EPT PTE settings) will cause significant performance cost</strong>. In this post, I am not challenging that solution since it is not a product after all.</p>
+<p>As we all know that EPT can be configured to monitor guest physical memory access with appropriate RWX permission settings. For example, for a guest data page, we can configure the corresponding EPT page table entry with !W permission, then whenever the processor fetches the instructions in that guest physical page for execution (e.g. code injection for shellcode execution), an EPT violation vmexit (or <a href="http://hypervsir.blogspot.com/2014/10/thoughts-on-virtualization-exception.html" target="_blank" rel="external">#VE interrupt</a>) will occur. </p>
+<p>However, the contents of some guest physical page might be swapped out to disk by OS under a low memory pressure condition, and then that physical page might be remapped to another guest virtual address used for by other process. In this case, we must restore the EPT permission to default (e.g. RWX), otherwise there are many unwanted EPT violations occur. </p>
+<p>One of solutions is to monitor guest virtual-to-physical mapping page table entries just as what the paper does. For example, we can monitor guest PTE page (guest physical address) with EPT Read-Only permission. Whenever a page remapping is required, the guest OS kernel will update the corresponding guest PTE entry. </p>
+<p>Since the PTE entry in EPT permission is read-only, any change to that entry will trigger EPT violation vmexit. After hypervisor captures this event, it will record the current values of PTE entry, then temporarily set the PTE page to writable and let the guest single-step (through enabling MTF) through the instruction that performs the write access. <strong>After the single-stepping, hypervisor will read the new values of PTE entry and see which ones of them have been modified, and take appropriate actions based up mapping updates. After that, hypervisor will disable MTF flag and set the PTE page back to read-only to capture future remapping event.</strong></p>
+<p>In the real case, the guest page table may have multiple levels, also changes to page table entries<br>may be very frequent, and minimal EPT page granularity is 4KB (too large), therefore this can only be an experimental solution due to huge performance penalty.</p>
+<p>However, using MTF flag to grant a data write access and/or inspect the write content on a data page that is wrote less frequently is acceptable.</p>
+<hr>
+<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">11</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/HAV/">HAV</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Hardware/">Hardware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Monitoring/">Monitoring</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-hardware-security-x86arm"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -425,72 +482,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-kvm-exception"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/kvm-exception/">KVM异常处理流程源码简要分析</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/kvm-exception/" class="article-date">
-	  <time datetime="2017-05-04T07:06:21.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者:<a href="http://blog.csdn.net/mrbuffoon" target="_blank" rel="external">Mr_buffoon</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>前面文章中我们讲过Qemu、KVM、Guest OS这三种层次以及对应的三种模式，也知道这三种模式之间的配合，下面上一张图回顾一下。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/4-1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/4-1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>  
-
-<p>那现在我们就从代码的角度来讲一下这三层之间具体是如何配合的。</p>
-<p>前面我们也讲过，首先Qemu层用户发起启动虚拟机命令后会通过ioctl调用进入到kvm内核层，完成相关初始化工作之后就运行虚拟机。</p>
-<p>在kvm内核层中，当接收到ioctl的KVM_RUN命令后，实际调用的是kvm_arch_vcpu_ioctl_run()函数。<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">case</span> KVM_RUN:  </div><div class="line">                   r = -EINVAL;  </div><div class="line">                   <span class="keyword">if</span> (arg)  </div><div class="line">                            <span class="keyword">goto</span> out;  </div><div class="line">                   r =kvm_arch_vcpu_ioctl_run(vcpu, vcpu-&gt;run);<span class="comment">//  </span></div><div class="line">                   trace_kvm_userspace_exit(vcpu-&gt;run-&gt;exit_reason,r);  </div><div class="line">                   <span class="keyword">break</span>;</div></pre></td></tr></table></figure></p>
-<p> 随后依次调用__vcpu_run()，vcpu_enter_guest()，kvm_x86_ops-&gt;run()，vmx_vcpu_run()，在vmx_vcpu_run()函数中有一段汇编语言被调用，这段汇编中执行了ASM_VMX_VMLAUNCH或者ASM_VMX_VMRESUME指令进入到客户模式。<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">asm</span>(  </div><div class="line">                   .........<span class="comment">//省略部分代码  </span></div><div class="line">                   <span class="comment">/* Enter guest mode */</span>  </div><div class="line">                   <span class="string">"jne 1f \n\t"</span>  </div><div class="line">                   __ex(ASM_VMX_VMLAUNCH)<span class="string">"\n\t"</span>  </div><div class="line">                   <span class="string">"jmp 2f \n\t"</span>  </div><div class="line">                   <span class="string">"1: "</span>__ex(ASM_VMX_VMRESUME) <span class="string">"\n\t"</span>  </div><div class="line">        ........<span class="comment">//省略部分代码  </span></div><div class="line">);</div></pre></td></tr></table></figure></p>
-<p>执行汇编指令进入到客户模式能够实现是因为KVM采用了硬件虚拟化的技术，比如Intel的芯片上提供了硬件支持并提供了相关一系列指令。再具体我也不知道了，查看Intel手册吧。那么进入到客户模式后，客户模式因为一些异常需要退出到KVM内核进行处理，这个是怎么实现的呢？</p>
-<p>首先我们要说一下一个与异常处理相关的重要的数据结构VMCS。VMCS是虚拟机控制结构，他分为三部分：版本信息；终止标识符；VMCS数据域。其中VMCS数据域包含六类信息：客户状态域，宿主机状态域，VM-Entry控制域，VM-Execution控制域，VM-Exit控制域以及VM-Exit信息域。宿主机状态域保存了基本的寄存器信息，其中CS:RIP指向KVM中异常处理程序的入口地址，VM-Exit信息域中存放异常退出原因等信息。实际上，在KVM内核初始化vcpu时就将异常处理程序入口地址装载进VMCS中CS:RIP寄存器结构，当客户机发生异常时，就根据这个入口地址退出到内核模式执行异常处理程序。</p>
-<p>KVM内核中异常处理总入口函数是vmx_handle_exit()函数。<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">static</span> <span class="title">intvmx_handle_exit</span><span class="params">(<span class="keyword">struct</span> kvm_vcpu *vcpu)</span>  </span></div><div class="line">&#123;  </div><div class="line">         <span class="keyword">struct</span> vcpu_vmx *vmx = to_vmx(vcpu);  </div><div class="line">         u32 exit_reason = vmx-&gt;exit_reason;  </div><div class="line">         ........<span class="comment">//一些处理，省略这部分代码  </span></div><div class="line">         <span class="keyword">if</span> (exit_reason &lt;kvm_vmx_max_exit_handlers  </div><div class="line">            &amp;&amp; kvm_vmx_exit_handlers[exit_reason])  </div><div class="line">                   returnkvm_vmx_exit_handlers[exit_reason](vcpu);  </div><div class="line">         <span class="keyword">else</span> &#123;  </div><div class="line">                   vcpu-&gt;run-&gt;exit_reason= KVM_EXIT_UNKNOWN;  </div><div class="line">                   vcpu-&gt;run-&gt;hw.hardware_exit_reason= exit_reason;  </div><div class="line">         &#125;  </div><div class="line">         <span class="keyword">return</span> <span class="number">0</span>;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>该函数中，首先读取exit_reason，然后进行一些必要的处理，最后调用kvm_vmx_exit_handlers<a href="vcpu">exit_reason</a>，我们来看一下这个结构，实际上是一个函数指针数组，里面对应着所有的异常相应的异常处理函数。<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">static</span> <span class="title">int</span><span class="params">(*<span class="keyword">const</span> kvm_vmx_exit_handlers[])</span><span class="params">(<span class="keyword">struct</span> kvm_vcpu *vcpu)</span> </span>= &#123;  </div><div class="line">         [EXIT_REASON_EXCEPTION_NMI]           = handle_exception,  </div><div class="line">         [EXIT_REASON_EXTERNAL_INTERRUPT]      = handle_external_interrupt,  </div><div class="line">         [EXIT_REASON_TRIPLE_FAULT]            = handle_triple_fault,  </div><div class="line">         [EXIT_REASON_NMI_WINDOW]          = handle_nmi_window,  </div><div class="line">         [EXIT_REASON_IO_INSTRUCTION]          = handle_io,  </div><div class="line">         [EXIT_REASON_CR_ACCESS]               = handle_cr,  </div><div class="line">         [EXIT_REASON_DR_ACCESS]               = handle_dr,  </div><div class="line">         [EXIT_REASON_CPUID]                   = handle_cpuid,  </div><div class="line">         [EXIT_REASON_MSR_READ]                = handle_rdmsr,  </div><div class="line">         [EXIT_REASON_MSR_WRITE]               = handle_wrmsr,  </div><div class="line">         [EXIT_REASON_PENDING_INTERRUPT]       = handle_interrupt_window,  </div><div class="line">         [EXIT_REASON_HLT]                     = handle_halt,  </div><div class="line">         [EXIT_REASON_INVD]                     = handle_invd,  </div><div class="line">         [EXIT_REASON_INVLPG]               = handle_invlpg,  </div><div class="line">         [EXIT_REASON_RDPMC]                   = handle_rdpmc,  </div><div class="line">         [EXIT_REASON_VMCALL]                  = handle_vmcall,  </div><div class="line">         [EXIT_REASON_VMCLEAR]                    = handle_vmclear,  </div><div class="line">         [EXIT_REASON_VMLAUNCH]                = handle_vmlaunch,  </div><div class="line">         [EXIT_REASON_VMPTRLD]                 = handle_vmptrld,  </div><div class="line">         [EXIT_REASON_VMPTRST]                 = handle_vmptrst,  </div><div class="line">         [EXIT_REASON_VMREAD]                  = handle_vmread,  </div><div class="line">         [EXIT_REASON_VMRESUME]                = handle_vmresume,  </div><div class="line">         [EXIT_REASON_VMWRITE]                 = handle_vmwrite,  </div><div class="line">         [EXIT_REASON_VMOFF]                   = handle_vmoff,  </div><div class="line">         [EXIT_REASON_VMON]                    = handle_vmon,  </div><div class="line">         [EXIT_REASON_TPR_BELOW_THRESHOLD]     = handle_tpr_below_threshold,  </div><div class="line">         [EXIT_REASON_APIC_ACCESS]             = handle_apic_access,  </div><div class="line">         [EXIT_REASON_APIC_WRITE]              = handle_apic_write,  </div><div class="line">         [EXIT_REASON_EOI_INDUCED]             = handle_apic_eoi_induced,  </div><div class="line">         [EXIT_REASON_WBINVD]                  = handle_wbinvd,  </div><div class="line">         [EXIT_REASON_XSETBV]                  = handle_xsetbv,  </div><div class="line">         [EXIT_REASON_TASK_SWITCH]             = handle_task_switch,  </div><div class="line">         [EXIT_REASON_MCE_DURING_VMENTRY]      = handle_machine_check,  </div><div class="line">         [EXIT_REASON_EPT_VIOLATION]         = handle_ept_violation,  </div><div class="line">         [EXIT_REASON_EPT_MISCONFIG]           = handle_ept_misconfig,  </div><div class="line">         [EXIT_REASON_PAUSE_INSTRUCTION]       = handle_pause,  </div><div class="line">         [EXIT_REASON_MWAIT_INSTRUCTION]       =handle_invalid_op,  </div><div class="line">         [EXIT_REASON_MONITOR_INSTRUCTION]     = handle_invalid_op,  </div><div class="line">&#125;;</div></pre></td></tr></table></figure></p>
-<p>这里面比如handle_ept_violation就是影子页（EPT页）缺页异常的处理函数。</p>
-<p>我们以handle_ept_violation()为例向下说明，依次调用kvm_mmu_page_fault()，vcpu-&gt;arch.mmu.page_fault()，tdp_page_fault()等后续函数完成缺页处理。</p>
-<p>在这里，我们要注意kvm_vmx_exit_handlers<a href="vcpu">exit_reason</a>的返回值，比如当实际调用handle_ept_violation()时返回值大于0，就直接切回客户模式。但是有时候可能需要Qemu的协助。在实际调用（r = kvm_x86_ops-&gt;handle_exit(vcpu);）时，返回值大于0，那么就说明KVM已经处理完成，可以再次切换进客户模式，但如果返回值小于等于0，那就说明需要Qemu的协助，KVM会在run结构体中的exit_reason中记录退出原因，并进入到Qemu中进行处理。这个判断过程是在__vcpu_run()函数中进行的，实际是一个while循环。<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">static</span> <span class="title">int__vcpu_run</span><span class="params">(<span class="keyword">struct</span> kvm_vcpu *vcpu)</span>  </span></div><div class="line">&#123;  </div><div class="line">         ......<span class="comment">//省略部分代码  </span></div><div class="line">         r = <span class="number">1</span>;  </div><div class="line">         <span class="keyword">while</span> (r &gt; <span class="number">0</span>) &#123;  </div><div class="line">                   <span class="keyword">if</span> (vcpu-&gt;arch.mp_state ==KVM_MP_STATE_RUNNABLE &amp;&amp;  </div><div class="line">                       !vcpu-&gt;arch.apf.halted)  </div><div class="line">                            r =vcpu_enter_guest(vcpu);  </div><div class="line">                   <span class="keyword">else</span> &#123;  </div><div class="line">                            ......<span class="comment">//省略部分代码  </span></div><div class="line">                   &#125;  </div><div class="line">                   <span class="keyword">if</span> (r &lt;= <span class="number">0</span>)  </div><div class="line">                            <span class="keyword">break</span>;  </div><div class="line">           ......<span class="comment">//省略部分代码  </span></div><div class="line">         &#125;  </div><div class="line">         srcu_read_unlock(&amp;kvm-&gt;srcu,vcpu-&gt;srcu_idx);  </div><div class="line">         vapic_exit(vcpu);  </div><div class="line">         <span class="keyword">return</span> r;  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>上面函数中vcpu_enter_guest()我们前面讲过，是在kvm内核中转入客户模式的函数，他处于while循环中，也就是如果不需要Qemu的协助，即r&gt;0，那就继续循环，然后重新切换进客户系统运行，如果需要Qemu的协助，那返回值r&lt;=0,退出循环，向上层返回r。</p>
-<p>上面说的r一直往上层返回，直到kvm_vcpu_ioctl()函数中的<br>case KVM_RUN：<br>trace_kvm_userspace_exit(vcpu-&gt;run-&gt;exit_reason, r);<br>这一条语句就是将退出原因注入到Qemu层。<br>Qemu层这时候读取到ioctl的返回值，然后继续执行，就会判断有没有KVM的异常注入，这里其实我在前一篇文章中简单提及了一下<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">kvm_cpu_exec</span><span class="params">(CPUArchState *env)</span>  </span></div><div class="line">&#123;  </div><div class="line">    .......  </div><div class="line">    <span class="keyword">do</span> &#123;  </div><div class="line">        ......  </div><div class="line">        run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN,<span class="number">0</span>);  </div><div class="line">        ......  </div><div class="line">        trace_kvm_run_exit(cpu-&gt;cpu_index,run-&gt;exit_reason);  </div><div class="line">        <span class="keyword">switch</span> (run-&gt;exit_reason) &#123;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_IO:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_MMIO:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_IRQ_WINDOW_OPEN:  </div><div class="line">            .......  </div><div class="line">           <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_SHUTDOWN:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_UNKNOWN:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">case</span> KVM_EXIT_INTERNAL_ERROR:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        <span class="keyword">default</span>:  </div><div class="line">            ......  </div><div class="line">            <span class="keyword">break</span>;  </div><div class="line">        &#125;  </div><div class="line">    &#125; <span class="keyword">while</span> (ret == <span class="number">0</span>);  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p> trace_kvm_run_exit(cpu-&gt;cpu_index,run-&gt;exit_reason);这条语句就是接收内核注入的退出原因，后面switch语句进行处理，每一个case对应一种退出原因，这里你也可以自己添加的。因为也是在while循环中，处理完一次后又进行ioctl调用运行虚拟机并切换到客户模式，这就形成了一个完整的闭环。</p>
-<hr>
-<p> <strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟化基础/">虚拟化基础<span class="article-category-count">6</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -583,6 +574,18 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170807/offensivesec/">offensivesec</a></h6>
+          <!--  <span>八月 7, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -759,18 +762,6 @@
             
 
               <h6 style="margin: 0;"><a href="/20170504/virtual-ret2dir/">利用虚拟化技术防御ret2dir攻击</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/smep-nx/">利用NX位实现基于软件的SMEP</a></h6>
           <!--  <span>五月 4, 2017</span> -->
             </div>
 
