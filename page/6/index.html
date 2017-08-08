@@ -112,6 +112,82 @@
         
           <section id="main">
   
+    <article id="post-securekernel-design"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/securekernel-design/">这是Linux内核中一种好的安全设计吗- thread_info和内核栈的联系</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/securekernel-design/" class="article-date">
+	  <time datetime="2017-05-04T10:19:40.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/in-linux-kernel-threadinfo-is-small-cpu.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/in-linux-kernel-threadinfo-is-small-cpu.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>In Linux kernel, <strong><em>thread_info</em></strong> is a small CPU-specific data structure that stores some low-level task data for corresponding process, it also has a pointer to <strong><em>task_struct</em></strong>, which is a processor-independent process control block data structure, e.g. scheduling, virtual memory structures.<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* x86 * 64 */</span></div><div class="line"><span class="keyword">struct</span> thread_info &#123;</div><div class="line"><span class="keyword">struct</span> task_struct   *task;        <span class="comment">/* main task structure */</span></div><div class="line"><span class="keyword">struct</span> exec_domain  *exec_domain; <span class="comment">/* execution domain */</span></div><div class="line">__u32               flags;        <span class="comment">/* low level flags */</span></div><div class="line">__u32               status;       <span class="comment">/* thread synchronous flags*/</span></div><div class="line">__u32                cpu;          <span class="comment">/* current CPU */</span></div><div class="line"><span class="keyword">int</span>                  saved_preempt_count;</div><div class="line"><span class="keyword">mm_segment_t</span>         addr_limit;</div><div class="line"><span class="keyword">struct</span> restart_block restart_block;</div><div class="line"><span class="keyword">void</span> __user          *sysenter_return;</div><div class="line"><span class="keyword">unsigned</span> <span class="keyword">int</span>         sig_on_uaccess_error:<span class="number">1</span>;</div><div class="line"><span class="keyword">unsigned</span> <span class="keyword">int</span>         uaccess_err:<span class="number">1</span>; <span class="comment">/* uaccess failed */</span></div><div class="line">&#125;;</div></pre></td></tr></table></figure></p>
+<p>Every user process has its unique two stacks, one is for code running in user mode, and the other is <strong><em>kernel stack</em></strong> for code execution running in kernel mode. </p>
+<p>The current design is like below picture, the kernel stack space of process and its thread_info structure are located together (at two ends because stack grows down). This is because it offers a key benefit in terms of efficiency: the kernel can easily obtain the address of the <em>*</em>thread_info structure of the process currently running on a CPU from the value of its kernel ESP register. </p>
+<p>For example as below, %eax eventually holds the pointer to <strong><em>thread_info</em></strong> structure.<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">movl $<span class="number">0xFFFFE000</span>, %eax</div><div class="line">andl %esp,        %eax (mask out last <span class="number">13</span> bits)</div></pre></td></tr></table></figure></p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/thread_info_stack%281%29.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/thread_info_stack%281%29.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/thread_info_stack%282%29.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/thread_info_stack%282%29.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<ul>
+<li>Note that these pictures above are from Junfeng’s operating system course slides.<br><a href="http://www.cs.columbia.edu/~junfeng/10sp-w4118/syllabus.html" target="_blank" rel="external">http://www.cs.columbia.edu/~junfeng/10sp-w4118/syllabus.html</a> (or <a href="http://www.cs.columbia.edu/~junfeng/" target="_blank" rel="external">link</a>).</li>
+</ul>
+<p>From security’s point of view, this means that whenever the address of kernel stack is leaked for some reasons (e.g. a bug, vulnerability), the address of corresponding <strong><em>thread_info</em></strong> structure will also be leaked. And as you can see that we can also get the address of <strong><em>task_struct</em></strong> as long as the address of thread_info is gotten. </p>
+<p>The <strong><em>task_struct</em></strong> is a one of very critical kernel data structures in Linux system, for example, it contains the credentials (uid, gid, suid, sgid…). Provided that there is a kernel vulnerability that can cause arbitrary kernel memory overwrite, then those credential fields could be clear by an exploit to get root privilege even without executing any code in kernel mode. </p>
+<p>So, the question: is this a bad security design? Could we do something to improve it? </p>
+<p>See my <a href="http://hypervsir.blogspot.com/2014/09/windows-os-thread-scheduling-monitoring.html" target="_blank" rel="external">previous post</a> for monitoring Windows thread scheduling, it seems that Windows operating system uses FS (or GS) to retrieve thread-related structure for current running thread. However, as far as I know, in Linux system, fs/gs are used for LTS (Local Thread Storage) purpose. </p>
+<hr>
+<p><strong>UPDATE:</strong></p>
+<ol>
+<li><strong>Fortunately I got an idea (not too bad idea:-) to mitigate this issue, I will talk about it later in a new post.</strong></li>
+<li>Add references for “stack overflow” attack against this bad design.</li>
+</ol>
+<p><br><br>Exploiting Stack Overflows in the Linux Kernel<br><a href="https://jon.oberheide.org/blog/2010/11/29/exploiting-stack-overflows-in-the-linux-kernel/" target="_blank" rel="external">https://jon.oberheide.org/blog/2010/11/29/exploiting-stack-overflows-in-the-linux-kernel/</a></p>
+<p>Exploiting stack overflows<br><a href="https://jon.oberheide.org/files/infiltrate12-thestackisback.pdf" target="_blank" rel="external">https://jon.oberheide.org/files/infiltrate12-thestackisback.pdf</a></p>
+<p>Exploiting the Futex Bug and uncovering Towelroot<br><a href="http://tinyhack.com/2014/07/07/exploiting-the-futex-bug-and-uncovering-towelroot/" target="_blank" rel="external">http://tinyhack.com/2014/07/07/exploiting-the-futex-bug-and-uncovering-towelroot/</a></p>
+<p>SMEP: What is It, and How to Beat It on Linux<br><a href="http://vulnfactory.org/blog/2011/06/05/smep-what-is-it-and-how-to-beat-it-on-linux/" target="_blank" rel="external">http://vulnfactory.org/blog/2011/06/05/smep-what-is-it-and-how-to-beat-it-on-linux/</a></p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统内核/">系统内核<span class="article-category-count">11</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-secureos2"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -393,65 +469,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-armtrustzone"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/armtrustzone/">ARM TrustZone安全扩展和虚拟化扩展 vs X86虚拟化技术</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/armtrustzone/" class="article-date">
-	  <time datetime="2017-05-04T10:09:56.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/09/arm-trustzone-security-extension-and_28.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/09/arm-trustzone-security-extension-and_28.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>A typical virtualization system on both x86 and ARM includes three major parts:</p>
-<ul>
-<li>CPU virtualization</li>
-<li>Memory virtualization, and </li>
-<li>I/O virtualization (device, interrupt virtualization). </li>
-</ul>
-<p>Because the 3rd one above normally requires additional platform/chipset support, in this article I’m going to only talk about the first two virtualization extensions that are related only to processor architectures. I will back to the 3rd one later as another topic especially for device I/O virtualization and emulation.</p>
-<p>&lt; TO-BE-STARTED&gt;</p>
-<hr>
-<p><strong><em>Update:</em></strong><br>I found there is very very good lecture about ARM Virtualization Technology from National Tsing Hua University, the link is here:<br><a href="http://www.cs.nthu.edu.tw/~ychung/slides/Virtualization/VM-Lecture-7-2-Hardware%20support-ARM.pptx" target="_blank" rel="external">http://www.cs.nthu.edu.tw/~ychung/slides/Virtualization/VM-Lecture-7-2-Hardware%20support-ARM.pptx</a></p>
-<hr>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">9</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/TrustZone/">TrustZone</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -544,6 +561,18 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170808/rowhammer/">神乎其神的Rowhammer：用比特位翻转实现云虚拟机夺权</a></h6>
+          <!--  <span>八月 8, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -725,18 +754,6 @@
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/lbr-ret2dir/">利用LBR特性检测ret2dir攻击</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -747,7 +764,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -757,7 +774,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10.77px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
     </div>
   </div>
 

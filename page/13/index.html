@@ -112,6 +112,435 @@
         
           <section id="main">
   
+    <article id="post-course-zhiqianglin2"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170307/course-zhiqianglin2/">名人课堂-系统安全与二进制代码分析(上)</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170307/course-zhiqianglin2/" class="article-date">
+	  <time datetime="2017-03-07T01:09:30.000Z" itemprop="datePublished">三月 7, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>来源：<a href="https://www.utdallas.edu/~zxl111930/spring2012.html" target="_blank" rel="external">https://www.utdallas.edu/~zxl111930/spring2012.html</a></p>
+<hr>
+<p><strong>CSysSec注：</strong> 本系列文章在于收集知名海外教授在计算机系统与安全领域的授课信息，会包含课程详细信息以及slides。<br><strong>转载本文请务必注明</strong>，文章出处：<a href="http://www.csyssec.org/20170307/course-zhiqianglin2/" target="_blank" rel="external">《名人课堂-系统安全与二进制代码分析(上)》</a>与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<h3 id="教授"><a href="#教授" class="headerlink" title="教授"></a>教授</h3><p><a href="https://www.utdallas.edu/~zxl111930" target="_blank" rel="external">Zhiqiang Lin</a></p>
+<h3 id="课程简介"><a href="#课程简介" class="headerlink" title="课程简介"></a>课程简介</h3><p>CS-6V81 is a graduate level, research oriented, system and software security course.</p>
+<p>The goal of this course is to explain the low-level system details from compiler, linker, loader, to OS kernel and computer architectures, examine the weakest link in each system component, explore the left bits and bytes after all these transformations, and study the state-of-the-art offenses and defenses.</p>
+<p>The learning outcome is students shall be able to understand how an attack is launched (e.g., how an expoit is created), and how to do the defense (e.g., developing OS patches, analyzing the binary code, and detecting intrusions)</p>
+<p>In particular, we will cover</p>
+<p>Memory exploits. We will investigate the unsafe but widely used system programming language C, cover typical vulnerabilities such as buffer overflows, format strings, integer overflows, etc. How to create robust shell code using such as ROP, HeapSpray.<br>OS Kernel Internals. What’s the behavior when a program is running on top of OS. Why we use paging. How virtual to physical address translation is performed. How MMU (e.g., TLB) helps this. How OS manage files, and disks. How can we model the program behavior when sitting at OS layer. We will use both Linux and Windows as working kernel.<br>Linker and Loader Internals. How a program can be dynamically linked, and what an attacker can do to cheat the system and meanwhile what we can do to protect the system.<br>Kernel-level Defense, how can we defend against the common exploits, techniques including such as ASR, and DEP, NX-bits.<br>User-level Defense. Safe library, Compiler extension, Binary Transformation/Rewriting, Runtime Verification.<br>Binary code reverse engineering. Static binary code analysis. Dynamic Binary code instrumentation. Data flow analysis, and control flow analysis. Malware packing and unpacking.<br>The class will also have a heavy-hands on project. Students could choose either to perform research (will work on a semester-long research topic of their choosing), or perform an engineering project.</p>
+<h3 id="课程安排"><a href="#课程安排" class="headerlink" title="课程安排"></a>课程安排</h3><table>
+<thead>
+<tr>
+<th style="text-align:left">Date</th>
+<th style="text-align:left">Topic To Be Covered</th>
+<th style="text-align:left">Presenter</th>
+<th>Slides</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">01/18</td>
+<td style="text-align:left">Course Overview</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec1.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>System and Software Security Foundations: Understanding Binary Code Analysis</strong></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align:left">01/23</td>
+<td style="text-align:left">Binary Code/Data Representation</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec2.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">01/25</td>
+<td style="text-align:left">Program Representation</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec3.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">01/30</td>
+<td style="text-align:left">Dynamic Binary Instrumentation (PIN, Valgrind, Qemu)</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec4.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/01</td>
+<td style="text-align:left">Principles of Program Analysis</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec5.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/06</td>
+<td style="text-align:left">Guest Lecture: Recent Cyber Attacks and Implications</td>
+<td style="text-align:left">Jon Shapiro</td>
+<td><a href="http://oij0laovn.bkt.clouddn.com/lec6.pptx" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/08</td>
+<td style="text-align:left">Guest Lecture: Web Vulnerability (SQL injection, Cross-site scripting) Analysis</td>
+<td style="text-align:left">Duong Ngo</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td style="text-align:left">02/13</td>
+<td style="text-align:left">Design and Implementation of a Data Flow Analysis (taint analysis)</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec6.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>System and Software Security Foundations: Understanding the OS Kernel</strong></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left">02/15</td>
+<td style="text-align:left">Understanding the OS Architecture and Linux History</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec7.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/20</td>
+<td style="text-align:left">An Overview of Linux and Windows Kernel</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec8.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/22</td>
+<td style="text-align:left">Process Management</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec9.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/27</td>
+<td style="text-align:left">Virtual Memory (I)</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec10.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/29</td>
+<td style="text-align:left">Virtual Memory (II)</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec11.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/05</td>
+<td style="text-align:left">File System (I)</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec12.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/07</td>
+<td style="text-align:left">File System (II)</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec13.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/12*</td>
+<td style="text-align:left">No-class (Spring-break)</td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left">03/14*</td>
+<td style="text-align:left">No-class (Spring-break)</td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>System and Software Security Foundations: Beyond OS Kernel</strong></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left">03/19</td>
+<td style="text-align:left">Revealing Internals of Executable File Format</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec14.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/21</td>
+<td style="text-align:left">Revealing Internals of Compiler (gcc)</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec15.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/26</td>
+<td style="text-align:left">Revealing Internals of Linker (ld)</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec16.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/28</td>
+<td style="text-align:left">Revealing Internals of Loader (ld-linux.so)</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec17.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>System and Software Security: Techniques, Tools, and Applications</strong></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left">04/02</td>
+<td style="text-align:left">Library Interposition</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec18.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">04/04</td>
+<td style="text-align:left">Virtual Machine Monitor (QEMU/VirtualBox/Xen/KVM)</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec19.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">04/09</td>
+<td style="text-align:left">Symbolic Execution and Whitebox Fuzzing</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec20.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">04/11</td>
+<td style="text-align:left">Exploits: Buffer Overflows, Heap Overflow, Integer Overflow</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec21.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">04/16</td>
+<td style="text-align:left">Robust Exploits: ROP shellcode, Heap Spray</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec22.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">04/18</td>
+<td style="text-align:left">Fighting for Malware: Unpack, Disassemble, Decompile</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec23.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">04/23</td>
+<td style="text-align:left">Binary Code Reusing</td>
+<td style="text-align:left">Instructor</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/public/lec24.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">Student Presentation (15 minutes)</td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Vulnerability, Exploit, Malware</strong></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left">01/23</td>
+<td style="text-align:left">Smashing the stack for fun and profit</td>
+<td style="text-align:left">Mitch Adair</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec2.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">01/25</td>
+<td style="text-align:left">Smashing the stack in 2011</td>
+<td style="text-align:left">Andrew Folloder</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec3.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">01/30</td>
+<td style="text-align:left">Exploiting Format String Vulnerabilities</td>
+<td style="text-align:left">Sanjay Bysani</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec4.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/01</td>
+<td style="text-align:left">English Shellcode</td>
+<td style="text-align:left">Shwetha Gopalan</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec5.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/13</td>
+<td style="text-align:left">Return-oriented programming    Scott Hand</td>
+<td style="text-align:left"><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec8.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/15</td>
+<td style="text-align:left">ASLR Smack and Laugh Reference    Mohammed</td>
+<td style="text-align:left">Andaleeb Iftekhar</td>
+<td><a href="http://oij0laovn.bkt.clouddn.com/lec9.pptx" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/20</td>
+<td style="text-align:left">Automated Exploit Generation</td>
+<td style="text-align:left">Matthew Stephen</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec10.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/22</td>
+<td style="text-align:left">How to Shop for Free Online - Security Analysis of Cashier-as-a-Service Based Web Stores</td>
+<td style="text-align:left">Isaac Strohl,Avinash Joshi</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec11.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>System Defenses: Architecture, OS, Compilation Extension, Code Transformation, Runtime Verification</strong></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left">02/27</td>
+<td style="text-align:left">Traps and Pitfalls: Practical Problems in System Call Interposition Based Security Tools</td>
+<td style="text-align:left">Vinay Gangasani</td>
+<td><a href="http://oij0laovn.bkt.clouddn.com/lec12.pptx" target="_blank" rel="external">ppt</a></td>
+</tr>
+<tr>
+<td style="text-align:left">02/29</td>
+<td style="text-align:left">Control Flow Integrity</td>
+<td style="text-align:left">Murugesan, Sureshbabu</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec13.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/05</td>
+<td style="text-align:left">On the Effectiveness of Address Space Randomization</td>
+<td style="text-align:left">Brian Ricks,Vasundhara Chimmad</td>
+<td><a href="http://oij0laovn.bkt.clouddn.com/lec14.pptx" target="_blank" rel="external">ppt</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/07</td>
+<td style="text-align:left">Dynamic Taint Analysis for Automatic Detection, Analysis, and Signature Generation of Exploits on Commodity Software</td>
+<td style="text-align:left">Sheikh Qumruzzaman, Khaled Al-Naami</td>
+<td><a href="http://oij0laovn.bkt.clouddn.com/taint.pptx" target="_blank" rel="external">ppt</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/19</td>
+<td style="text-align:left">Efficient and Accurate Detection of Integer-based Attacks</td>
+<td style="text-align:left">Allen Helton, Nishant Chithambaram</td>
+<td><a href="http://oij0laovn.bkt.clouddn.com/lec15.pptx" target="_blank" rel="external">ppt</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/21</td>
+<td style="text-align:left">Bouncer: Securing Software by Blocking Bad Input</td>
+<td style="text-align:left">Yufei Gu,Sathish Kuppuswamy</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec16.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/26</td>
+<td style="text-align:left">Static detection of C++ vtable escape vulnerabilities in binary</td>
+<td style="text-align:left">Huseyin Ulusoy</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/vtable.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">03/28</td>
+<td style="text-align:left">Kruiser: Semi-synchronized Non-blocking Concurrent Kernel Heap Buffer Overflow</td>
+<td style="text-align:left">Shishir K Prasad</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec17.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">04/02</td>
+<td style="text-align:left">Native Client: A Sandbox for Portable, Untrusted x86 Native Code</td>
+<td style="text-align:left">Gil Lundquist</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec18.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">04/04</td>
+<td style="text-align:left">Software fault isolation with API integrity and multi-principal modules.</td>
+<td style="text-align:left">Junyuan Zeng</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/lec19.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">04/09</td>
+<td style="text-align:left">A Virtual Machine Introspection Based Architecture for Intrusion Detection</td>
+<td style="text-align:left">Donald Talkington,sundarajan srinivasan</td>
+<td>[ppt]</td>
+</tr>
+<tr>
+<td style="text-align:left">04/16</td>
+<td style="text-align:left">Robust Defenses for Cross-Site Request</td>
+<td style="text-align:left">Forgery    Saravana M Subramanian</td>
+<td><a href="http://oij0laovn.bkt.clouddn.com/csr.pptx" target="_blank" rel="external">ppt</a></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Malicious Code Analysis</strong></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left">04/18</td>
+<td style="text-align:left">Deobfuscation of virtualization-obfuscated software</td>
+<td style="text-align:left">Selvakumar Gopal Rajendran</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/de.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left">04/23</td>
+<td style="text-align:left">Who Wrote This Code? Identifying the Authors of Program Binaries</td>
+<td style="text-align:left">Camron</td>
+<td>[ppt]</td>
+</tr>
+<tr>
+<td style="text-align:left">04/25</td>
+<td style="text-align:left">Measuring Pay-per-Install: The Commoditization of Malware Distribution</td>
+<td style="text-align:left">Kevin Hulin</td>
+<td><a href="https://www.utdallas.edu/~zxl111930/spring2012/kevin.pdf" target="_blank" rel="external">pdf</a></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Project Presentation</strong></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left">04/30</td>
+<td style="text-align:left">Project Presentation        </td>
+</tr>
+<tr>
+<td style="text-align:left">05/02</td>
+<td style="text-align:left">Project Presentation        </td>
+</tr>
+</tbody>
+</table>
+<h3 id="阅读列表"><a href="#阅读列表" class="headerlink" title="阅读列表"></a>阅读列表</h3><p>We do not have a text book, but we have the following reading list. Students are required to read all of these papers.</p>
+<p>Smashing the Stack for Fun and Profit<br>Smashing the Stack in 2011<br>Exploiting Format String Vulnerabilities<br>English Shellcode<br>On the Effectiveness of Address Space Randomization<br>Return-oriented programming<br>Backwards-Compatible Array Bound Checking for C<br>ASLR Smack and Laugh Reference<br>Control Flow Integrity<br>Robust Defenses for Cross-Site Request Forgery<br>All you ever wanted to know about dynamic taint analysis and symbolic execution<br>Dynamic Taint Analysis for Automatic Detection, Analysis, and Signature Generation of Exploits on Commodity Software<br>Automated Exploit Generation<br>Traps and Pitfalls: Practical Problems in System Call Interposition Based Security Tools<br>Native Client: A Sandbox for Portable, Untrusted x86 Native Code<br>Deobfuscation of virtualization-obfuscated software<br>BitShred: Fast, Scalable Code Reuse Detection in Binary Code<br>Kruiser: Semi-synchronized Non-blocking Concurrent Kernel Heap Buffer Overflow<br>How to Shop for Free Online - Security Analysis of Cashier-as-a-Service Based Web Stores<br>Differential Slicing: Identifying Causal Execution Differences for Security Applications<br>Efficient and Accurate Detection of Integer-based Attacks<br>Bouncer: Securing Software by Blocking Bad Input<br>Semantics-aware Malware Detection<br>Static detection of C++ vtable escape vulnerabilities in binary<br>Identifying and Analyzing Pointer Misuses for Sophisticated Memory-corruption Exploit<br>A Virtual Machine Introspection Based Architecture for Intrusion Detection<br>Software fault isolation with API integrity and multi-principal modules.<br>Measuring Pay-per-Install: The Commoditization of Malware Distribution<br>A Study of the Packer Problem and Its Solutions</p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：<a href="http://www.csyssec.org/20170307/course-zhiqianglin2/" target="_blank" rel="external">《名人课堂-系统安全与二进制代码分析(上)》</a>与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/名人课堂/">名人课堂<span class="article-category-count">5</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Binary/">Binary</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Course/">Course</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-course-zhiqianglin1"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -1049,87 +1478,6 @@ make
 <!-- Table of Contents -->
 
   
-    <article id="post-compile-link"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170301/compile-link/">理清编译链接的那些事儿</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170301/compile-link/" class="article-date">
-	  <time datetime="2017-03-01T05:26:03.000Z" itemprop="datePublished">三月 1, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
-<p><strong>CSysSec注</strong>： 本文来自<a href="http://www.chongh.wiki/about/" target="_blank" rel="external">Diting0x</a>的<a href="http://www.chongh.wiki/blog/2016/05/25/lib-compile-link/" target="_blank" rel="external">个人博客</a>，主要介绍了Linux内核中一系列的内存分配函数及其原理<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170301/compile-link/" target="_blank" rel="external">理清编译链接的那些事儿</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
-<p>当你在linux下写C/C++代码的时候，是不是会遇到许多编译链接的问题？ 时不时报个glibc,gcc，g++等相关的错误？ 很多时候都无从下手，而且比较混乱。 这也是编译链接过程中经常出现的问题。</p>
-<p>这篇文章不是去介绍如何编译链接，而是理清编译链接过程中碰到的一些概念和出现的问题。尤其是，libc,,glib,glibc,eglibc，libc++，libstdc++，gcc,g++。 </p>
-<p>从libc说起。<br>libc是Linux下原来的标准C库，也就是当初写hello world时包含的头文件#include &lt; stdio.h> 定义的地方。 </p>
-<p>后来逐渐被glibc取代，也就是传说中的GNU C Library,在此之前除了有libc，还有klibc,uclibc。现在只要知道用的最多的是glibc就行了，主流的一些linux操作系统如 Debian, Ubuntu，Redhat等用的都是glibc（或者其变种，下面会说到).</p>
-<p>那glibc都做了些什么呢？ glibc是Linux系统中最底层的API，几乎其它任何的运行库都要依赖glibc。 glibc最主要的功能就是对系统调用的封装，你想想看，你怎么能在C代码中直接用fopen函数就能打开文件？ 打开文件最终还是要触发系统中的sys_open系统调用，而这中间的处理过程都是glibc来完成的。<a href="http://www.chongh.wiki/blog/2016/04/08/linux-syscalls/" target="_blank" rel="external">这篇文章</a>详细介绍了glibc是如何与上层应用程序和系统调用交互的。除了封装系统调用，glibc自身也提供了一些上层应用函数必要的功能,如string,malloc,stdlib,linuxthreads,locale,signal等等。</p>
-<p>好了，那eglibc又是什么？ 这里的e是Embedded的意思，也就是前面说到的变种glibc。eglibc的主要特性是为了更好的支持嵌入式架构，可以支持不同的shell(包括嵌入式)，但它是二进制兼容glibc的，就是说如果你的代码之前依赖eglibc库，那么换成glibc后也不需要重新编译。ubuntu系统用的就是eglibc（而不是glibc）,不信，你执行 ldd –version 或者 /lib/i386-linux-gnu/libc.so.6<br>(64位系统运行/lib/x86_64-linux-gnu）看看，便会显示你系统中eglibc/glibc的版本信息。  这里提到了libc.so.6,这个文件就是eglibc/glibc编译后的生成库文件。</p>
-<p>好了，还有一个glib看起来也很相似，那它又是什么呢？glib也是个c程序库，不过比较轻量级，glib将C语言中的数据类型统一封装成自己的数据类型，提供了C语言常用的数据结构的定义以及处理函数，有趣的宏以及可移植的封装等(注：glib是可移植的，说明你可以在linux下，也可以在windows下使用它）。那它跟glibc有什么关系吗？其实并没有，除非你的程序代码会用到glib库中的数据结构或者函数，glib库在ubuntu系统中并不会默认安装(可以通过apt-get install libglib2.0-dev手动安装)，著名的GTK+和Gnome底层用的都是glib库。想更详细了解glib？ 可以参考 <a href="https://developer.gnome.org/glib/" target="_blank" rel="external">这里</a></p>
-<p>看到这里，你应该知道这些库有多重要了吧？ 你写的C代码在编译的过程中有可能出现明明是这些库里面定义的变,却量还会出现’Undefined’, ‘Unreference’等错误，这时候你可能会怀疑是不是这些库出问题了？ 是不是该动手换个gilbc/eglibc了？ 这里强调一点，在你准备更换/升级这些库之前，你应该好好思考一下，你真的要更换/升级吗？你要知道你自己在做什么！你要时刻知道glibc/eglibc的影响有多大，不管你之前部署的什么程序，linux系统的ls,cd,mv,ps等等全都得依赖它，很多人在更换/升级都有过惨痛的教训，甚至让整个系统奔溃无法启动。所以，强烈不建议更换/升级这些库！</p>
-<p>当然如果你写的是C++代码，还有两个库也要非常重视了，libc++/libstdc++,这两个库有关系吗？有。两个都是C++标准库。libc++是针对clang编译器特别重写的C++标准库，那libstdc++自然就是gcc的事儿了。libstdc++与gcc的关系就像clang与libc++. 其中的区别这里不作详细介绍了。</p>
-<p>再说说libstdc++，glibc的关系。 libstdc++与gcc是捆绑在一起的，也就是说安装gcc的时候会把libstdc++装上。 那为什么glibc和gcc没有捆绑在一起呢？<br>相比glibc，libstdc++虽然提供了c++程序的标准库，但它并不与内核打交道。对于系统级别的事件，libstdc++首先是会与glibc交互，才能和内核通信。相比glibc来说，libstdc++就显得没那么基础了。</p>
-<p>说完了这些库，这些库最终都是拿来干嘛的？当然是要将它们与你的程序链接在一起！ 这时候就不得不说说gcc了(当然还有前文提到的clang以及llvm等编译器，本文就不细说它们的区别了)。</p>
-<p>你写的C代码.c文件通过gcc首先转化为汇编.S文件，之后汇编器as将.S文件转化为机器代码.o文件，生成的.o文件再与其它.o文件，或者之前提到的libc.so.6库文件通过ld链接器链接在一块生成可执行文件。当然，在你编译代码使用gcc的时候，gcc命令已经帮你把这些细节全部做好了。</p>
-<p>那g++是做什么的? 慢慢说来，不要以为gcc只能编译C代码，g++只能编译c++代码。 后缀为.c的，gcc把它当作是C程序，而g++当作是c++程序；后缀为.cpp的，两者都会认为是c++程序，注意，虽然c++是c的超集，但是两者对语法的要求是有区别的。在编译阶段，g++会调用gcc,对于c++代码，两者是等价的，但是因为gcc命令不能自动和C++程序使用的库联接，需要这样，gcc -lstdc++, 所以如果你的Makefile文件并没有手动加上libstdc++库，一般就会提示错误，要求你安装g++编译器了。</p>
-<p>好了，就说到这，理清这些库与编译器之间的关系，相信会对你解决编译链接过程中遇到的错误起到一点帮助。</p>
-<p>如果你的编译器不支持一些新的C/C++特性，想升级gcc/g++, 这里也给出一个基于ubuntu系统的参考方法。</p>
-<p>添加ppa</p>
-<pre><code>sudo add-apt-repository ppa:ubuntu-toolchain-r/test
-sudo apt-get update
-</code></pre><p>添加ppa，是因为你所用的ubuntu版本的更新源中可能并没有你想要的gcc/g++版本。</p>
-<p>安装新版gcc/g++</p>
-<pre><code>sudo apt-get install gcc-4.8
-sudo apt-get install g++-4.8
-</code></pre><p>可以到/usr/bin/gcc查看新安装的gcc,g++</p>
-<p>配置系统gcc/g++</p>
-<p>使用update-alternatives,统一更新gcc/g++</p>
-<pre><code>sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.6 60 --slave /usr/bin/g++ g++ /usr/bin/g++-4.6
-sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8 80 --slave /usr/bin/g++ g++ /usr/bin/g++-4.8
-sudo update-alternatives --config gcc
-</code></pre><p>数字优先级(如60，80)高的会被系统选择为默认的编译器,也可以执行第三条命令就是来手动配置系统的gcc,此处按照提示,选择4.8版本的即可。</p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170301/compile-link/" target="_blank" rel="external">理清编译链接的那些事儿</a>》与作者信息：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a></p>
-<hr>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/系统内核/">系统内核<span class="article-category-count">11</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Compiler/">Compiler</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -1222,6 +1570,18 @@ sudo update-alternatives --config gcc
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170808/rowhammer/">神乎其神的Rowhammer：用比特位翻转实现云虚拟机夺权</a></h6>
+          <!--  <span>八月 8, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -1403,18 +1763,6 @@ sudo update-alternatives --config gcc
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/lbr-ret2dir/">利用LBR特性检测ret2dir攻击</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -1425,7 +1773,7 @@ sudo update-alternatives --config gcc
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -1435,7 +1783,7 @@ sudo update-alternatives --config gcc
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10.77px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
     </div>
   </div>
 

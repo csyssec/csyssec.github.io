@@ -112,6 +112,91 @@
         
           <section id="main">
   
+    <article id="post-vmcs-vmxon"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/vmcs-vmxon/">VT-x技术VMXON与VMCS区域的思考-从安全的角度</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/vmcs-vmxon/" class="article-date">
+	  <time datetime="2017-05-04T07:59:28.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/09/thoughts-on-vmxon-and-vmcs-regions-in.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/09/thoughts-on-vmxon-and-vmcs-regions-in.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>Previously when I was working on a Hypervisor based on Intel VT-x. I always did exactly as what I’m told to do in the VT-x specification when programing VMM software.<br>But now I’m going to revisit this again starting by asking these questions: What if I won’t do it as what we’re told to do? Is Intel VT-x exploitable? Can we find vulnerabilities in hardware VT-x implementation? Is it possible to do “reverse-engineering” to get internals on VT-x CPU implementation? Can we take advantage of VT-x to attack other privileged resource? Can we bypass EPT layer?  However, those are just some open questions, I don’t have answers either, but it has a lot of fun when you look into it.</p>
+<h4 id="VMXON-Region"><a href="#VMXON-Region" class="headerlink" title="VMXON Region"></a><strong>VMXON Region</strong></h4><p>If you take a look at the Intel SDM (<a href="http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html" target="_blank" rel="external">Software Development Manual</a>), you can see some words about VMXON region like below:</p>
+<ul>
+<li><em>“Before executing VMXON, software allocates a region of memory (called the VMXON region) that the logical processor uses to support VMX operation….. Software should use a separate region for each logical processor and should not access or modify the VMXON region of a logical processor between execution of VMXON and VMXOFF on that logical processor. Doing otherwise may lead to unpredictable behaviors”</em></li>
+<li><em>“Before entering VMX operation, the host VMM allocates a VMXON region. A VMM can host several virtual machines and have many VMCSs active under its management. A unique VMCS region is required for each virtual machine; a VMXON region is required for the VMM itself.”</em><br><br></li>
+</ul>
+<p>When you are reading these texts, probably some questions will come out in your mind: What’re unpredictable behaviors if we modify the content of VMXON region? How is the VMXON region layout organized?*</p>
+<p>We know that basically in the IA32 specification, almost all the operations/instructions have the corresponding defined behaviors even if they are the exceptions. Why are there so many undefined behaviors for VT-x specification, can we inspect the “so-called undefined behaviors” if we modify VMXON region during the period of VMX operation?</p>
+<p>According to the VT-x specification, we also are told that the format of VMXON region is not architecturally defined, meaning that its format varies from processor generations to generations. Therefore, <strong>can we assume that “Intel says theire behaviors are unpredictable just because the format is different between VT-capable processors”? In other words, for a particular processor, the behaviors of read/write access to the VMXON region might be well-defined to some extent</strong>. If this happens to be true, then the question now is how to explore the internal structure/format of VMXON region? What are we able to do if we can exactly know the format for a particular processor? Are we able to control the VMX operation behaviors by simply programming the VMXON region with ordinary read/write access operation instructions like MOV? </p>
+<p>I don’t know the answers. But I will talk about a prototype later about how to inspect the internal format/layout of VMXON region and other VT-x regions with a software solution. </p>
+<p><br></p>
+<h4 id="VMCS-Regions"><a href="#VMCS-Regions" class="headerlink" title="VMCS Regions"></a><strong>VMCS Regions</strong></h4><p>Now let’s take a look at VMCS structure. </p>
+<p>  “Software should use the VMREAD and VMWRITE instructions to access the different fields in the current VMCS. Software should never access or modifythe VMCS data of an active VMCS using ordinary memory operations, <em>in part because the format used to store the VMCS data is implementation-specific and not architecturally defined, and also because a logical processor may maintain some VMCS data of an active VMCS on the processor and <strong>not in the VMCS region (then where?)</strong></em>. The following items detail some of the hazards of accessing VMCS data using ordinary memory operations:</p>
+<ul>
+<li>Any data read from a VMCS with an ordinary memory read does not reliably reflect the state of the VMCS. Results may vary from time to time or from logical processor to logical processor.</li>
+<li>Writing to a VMCS with an ordinary memory write is not guaranteed to have a deterministic effect on the VMCS. Doing so may cause the VMCS to become corrupted (see below).<br>(Software can avoid these hazards by removing any linear-address mappings to a VMCS region before executing a VMPTRLD for that region and by not remapping it until after executing VMCLEAR for that region.)<br>This section has identified operations that may cause a VMCS to become corrupted. These operations may cause the VMCS’s data to become undefined. Behavior may be unpredictable if that VMCS used subsequently on any logical processor. The following items detail some hazards of VMCS corruption: </li>
+<li>VM entries may fail for unexplained reasons or may load undesired processor state. </li>
+<li>The processor may not correctly support VMX non-root operation as documented and may generate unexpected VM exits. </li>
+<li>VM exits may load undesired processor state, save incorrect state into the VMCS, or cause the logical processor to transition to a shutdown state.”</li>
+</ul>
+<p>So, we know that the behaviors of VMX operations (root mode and non-root mode) are also controlled by VMCS regions, and the format/layout of those regions are also undefined, and read/write access to them with ordinary memory operations are unpredictable too.</p>
+<p><strong>How to do ‘reverse-engineering’-like things to look into the internal <em>VMXON/VMCS</em>  region memory layout</strong><br>Here is an idea (software solution, without any hardware device but a particular VT-capable processor):</p>
+<ul>
+<li>Implement a tiny VMM/Hypervisor and a tiny Guest VM software, both with only code running in ring 0 mode. No need complex things like thread, multiple processor, scheduling, interrupt/exceptions, etc.. just a piece of code that can execute in VMX root mode and non-root mode respectively. </li>
+<li>Hypervisor allocates machine physical memory spaces for VMXON and VMCS region, and make these areas visible to guest VM software so that the guest software can read/write the VMXON/VMCS memory regions directly to inspect the content. </li>
+<li>After environment is setup, we can do inspections instruction by instruction or event by event.. for example, if we want to know what memory bits are changed during a vmentry, then we can do it like this:<br>(1)  In VMX-root mode, the VMM software logs all the contents of VMCS/VMXON regions right prior to calling VMRESUME;<br>(2)  Just right after resuming back to guest, the VM software logs all the contents of VMCS/VMXON regions again, then compares the differences between this two points;<br>(3)  The difference in some of memory areas might indicate something important that can control the behaviors of VMX operations. </li>
+<li>Repeatedly do above things again and again for all kinds of VMX transition events. </li>
+<li>Besides, for VMCS regions, we can read the contents before and after a legal VMCS write instruction, for example, VMCS_WRITE(GUEST_RIP) to get what has been changed for GUEST_RIP area.</li>
+</ul>
+<p>I didn’t do this, but I think this must be fun once you can get the VT-x internals. </p>
+<p>However, even though we could get the internal VMCS/VMXON data structure layout, what can we do? Imaging that there is a bug in a Hypervisor (XEN, KVM…), e.g. a buffer/stack overflow, that can lead to arbitrary memory overwriting… see below…:-)</p>
+<p>One more question:</p>
+<ul>
+<li><strong>How does the processor determine if the current processor execution mode is in VMX root mode or non-root mode? Does it look at some certain VMX mode state bit in VMXON region or VMCS regions before executing any instruction?</strong> This is unknown to us. But if my guess is true (hope not), then we can change that corresponding bit to control instruction behavior. For example, provided that there is a vulnerability in Hypervisor that can lead us overwrite arbitrary memory including VMCS/VMXON region, we can take advantage of it to change “such a bit”, and then any malicious code that is executed in VMX non-root mode will be treated as execution in VMX root mode… this is horrible, since for example we can bypass EPT to directly write machine physical memory space even in VMX non-root mode.<br>&lt; Note that, however, for other process modes like protected mode and real mode, we can easily check CR0.PE bit, for different privilege modes (ring), we can check CPL bit of CS selector to determine ring 0~3 &gt;</li>
+</ul>
+<p>&lt; The End&gt;</p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/硬件虚拟化/">硬件虚拟化<span class="article-category-count">1</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/HAV/">HAV</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/VT-x/">VT-x</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-monitoring-schduling"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -425,62 +510,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-xen-event"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/xen-event/">XEN事件通道机制及其实例</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/xen-event/" class="article-date">
-	  <time datetime="2017-05-04T07:11:11.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者:<a href="http://blog.csdn.net/mrbuffoon" target="_blank" rel="external">Mr_buffoon</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>事件通道机制是xen用于Domain和Xen之间，或者Domain和Domain之间的异步事件通知机制。事件通道在xen中应用非常广泛，像物理中断，虚拟中断以及域间通信等均是通过事件通道实现的。<br>    根据用途划分，事件通道一般分为四类：域间通信，域内通信，虚拟中断，物理中断。域间通信主要用于Domain与Domain之间通信，或者Xen与Domain之间通信。域内通信就是同一个域内不同VCPU之间通信。物理中断与虚拟中断都是绑定中断源，实现Xen的中断。<br>    Xen在内核态和用户态代码中都封装了很多事件通道相关的操作函数，像分配通道，绑定通道，置pending位等，如果需要可以自己研究源码。『Xen虚拟化技术（石磊 邹得清 金海）』一书中对事件通道的原理，函数，数据结构讲解的比较全面，可以参考。<br>    我这里主要是简单讲一下我自己实现的Domain0与Xen进行通信的例子。</p>
-<p>因为项目需要，我需要实现Xen给Domain0发送事件通知，Domain0收到事件通知后就执行某些操作。这里使用域间通信来实现，大概的流程就是Xen内核态代码中先为Domain0分配一个事件通道端口，用户态通过超级调用获取这个事件通道，并进行通道绑定。然后用户态陷入循环等待中，等待Xen内核发来事件通知，收到通知后就执行预先写好的那部分代码。</p>
-<p>具体代码：<br>内核态分配通道端口：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//save_domid这里指定为0  </span></div><div class="line"><span class="keyword">int</span> event_channel_port=alloc_unbound_xen_event_channel(current, save_domid, <span class="literal">NULL</span>);</div></pre></td></tr></table></figure></p>
-<p>内核态分配了端口后，传到用户态，即event_channel_port。<br>用户态进行绑定：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line">xc_evtchn *xc_event_iface = xc_evtchn_open(<span class="literal">NULL</span>,<span class="number">0</span>);  </div><div class="line"><span class="keyword">if</span>(!xc_event_iface)  </div><div class="line">&#123;  </div><div class="line">    PERROR(<span class="string">"Could not open interface to libxc event channels"</span>);  </div><div class="line">&#125;  </div><div class="line">  </div><div class="line">  </div><div class="line"><span class="keyword">int</span> event_port = xc_evtchn_bind_interdomain(xc_event_iface, DOMID_SELF, event_channel_port);  </div><div class="line"><span class="keyword">if</span>(event_port != <span class="number">-1</span>)  </div><div class="line">&#123;  </div><div class="line">    PERROR(<span class="string">"event_port is: %d"</span>,event_port);  </div><div class="line">&#125;  </div><div class="line"><span class="keyword">else</span>  </div><div class="line">&#123;  </div><div class="line">    PERROR(<span class="string">"Could not bind xen port to local port"</span>);  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>用户态绑定后，可以设置一个循环等待事件通知的到来，当然根据自己的需求进行修改。<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">while</span>(<span class="number">1</span>)  </div><div class="line">&#123;  </div><div class="line">    <span class="keyword">int</span> pending_port = xc_evtchn_pending(xc_event_iface);  </div><div class="line">    <span class="keyword">if</span>(pending_port == event_port)<span class="comment">//收到事件通知  </span></div><div class="line">    &#123;             </div><div class="line">    <span class="keyword">if</span>(xc_evtchn_unmask(xc_event_iface, event_port) == <span class="number">-1</span>)  </div><div class="line">    &#123;  </div><div class="line">        perror(<span class="string">"Could not unmask event port in loop"</span>);  </div><div class="line">        <span class="keyword">break</span>;  </div><div class="line">    &#125;  </div><div class="line">    <span class="comment">//下面就是自定义的收到事件通知后的处理代码  </span></div><div class="line">        <span class="comment">//。。。。。。。。。  </span></div><div class="line">        。  </div><div class="line">        。  </div><div class="line">        。  </div><div class="line">        。  </div><div class="line">    &#125;  </div><div class="line">    <span class="keyword">else</span>  </div><div class="line">    &#123;  </div><div class="line">    PERROR(<span class="string">"Unknown event port pending: %d"</span>, pending_port);  </div><div class="line">    &#125;  </div><div class="line">&#125;<span class="comment">//end while  </span></div><div class="line"><span class="comment">//事件通道使用完了后进行解绑释放  </span></div><div class="line">xc_evtchn_unbind(xc_event_iface, event_port);  </div><div class="line">xc_evtchn_close(xc_event_iface);  </div><div class="line"><span class="built_in">free</span>(xc_event_iface);</div></pre></td></tr></table></figure></p>
-<p>内核态发送通知代码如下：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">notify_via_specific_xen_event_channel</span><span class="params">(<span class="keyword">struct</span> domain *ld, <span class="keyword">int</span> lport)</span>  </span></div><div class="line">&#123;  </div><div class="line">    <span class="keyword">struct</span> evtchn *lchn, *rchn;  </div><div class="line">    <span class="keyword">struct</span> domain *rd;  </div><div class="line">    <span class="keyword">int</span>            rport;  </div><div class="line">  </div><div class="line">  </div><div class="line">    spin_lock(&amp;ld-&gt;event_lock);  </div><div class="line">  </div><div class="line">  </div><div class="line">    <span class="keyword">if</span> ( unlikely(ld-&gt;is_dying) )  </div><div class="line">    &#123;  </div><div class="line">        spin_unlock(&amp;ld-&gt;event_lock);  </div><div class="line">        <span class="keyword">return</span>;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">  </div><div class="line">    ASSERT(port_is_valid(ld, lport));  </div><div class="line">    lchn = evtchn_from_port(ld, lport);<span class="comment">//bind local event channel  </span></div><div class="line">    ASSERT(consumer_is_xen(lchn));  </div><div class="line">  </div><div class="line">  </div><div class="line">    <span class="keyword">if</span> ( likely(lchn-&gt;state == ECS_INTERDOMAIN) )  </div><div class="line">    &#123;  </div><div class="line">        rd    = lchn-&gt;u.interdomain.remote_dom;  </div><div class="line">        rport = lchn-&gt;u.interdomain.remote_port;  </div><div class="line">        rchn  = evtchn_from_port(rd, rport);  </div><div class="line">        evtchn_set_pending(rd-&gt;vcpu[rchn-&gt;notify_vcpu_id], rport);  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">  </div><div class="line">    spin_unlock(&amp;ld-&gt;event_lock);  </div><div class="line">&#125;  </div><div class="line">  </div><div class="line">  </div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">notify_domu_before_page_modify</span><span class="params">(<span class="keyword">void</span>)</span>  </span></div><div class="line">&#123;  </div><div class="line">    <span class="keyword">struct</span> domain *ld;  </div><div class="line">    ld = rcu_lock_domain_by_id(save_domid);  </div><div class="line">    notify_via_specific_xen_event_channel(ld,event_channel_port);  </div><div class="line">    rcu_unlock_domain(ld);  </div><div class="line">&#125;  </div><div class="line">  </div><div class="line">  </div><div class="line">notify_domu_before_page_modify();</div></pre></td></tr></table></figure></p>
-<p>  这样，Xen就可以向Domain0发送事件通知了。</p>
-<hr>
-<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟化基础/">虚拟化基础<span class="article-category-count">6</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/XEN/">XEN</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -573,6 +602,18 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170808/rowhammer/">神乎其神的Rowhammer：用比特位翻转实现云虚拟机夺权</a></h6>
+          <!--  <span>八月 8, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -754,18 +795,6 @@
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/lbr-ret2dir/">利用LBR特性检测ret2dir攻击</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -776,7 +805,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -786,7 +815,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10.77px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
     </div>
   </div>
 

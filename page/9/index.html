@@ -112,6 +112,62 @@
         
           <section id="main">
   
+    <article id="post-xen-event"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/xen-event/">XEN事件通道机制及其实例</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/xen-event/" class="article-date">
+	  <time datetime="2017-05-04T07:11:11.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者:<a href="http://blog.csdn.net/mrbuffoon" target="_blank" rel="external">Mr_buffoon</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>事件通道机制是xen用于Domain和Xen之间，或者Domain和Domain之间的异步事件通知机制。事件通道在xen中应用非常广泛，像物理中断，虚拟中断以及域间通信等均是通过事件通道实现的。<br>    根据用途划分，事件通道一般分为四类：域间通信，域内通信，虚拟中断，物理中断。域间通信主要用于Domain与Domain之间通信，或者Xen与Domain之间通信。域内通信就是同一个域内不同VCPU之间通信。物理中断与虚拟中断都是绑定中断源，实现Xen的中断。<br>    Xen在内核态和用户态代码中都封装了很多事件通道相关的操作函数，像分配通道，绑定通道，置pending位等，如果需要可以自己研究源码。『Xen虚拟化技术（石磊 邹得清 金海）』一书中对事件通道的原理，函数，数据结构讲解的比较全面，可以参考。<br>    我这里主要是简单讲一下我自己实现的Domain0与Xen进行通信的例子。</p>
+<p>因为项目需要，我需要实现Xen给Domain0发送事件通知，Domain0收到事件通知后就执行某些操作。这里使用域间通信来实现，大概的流程就是Xen内核态代码中先为Domain0分配一个事件通道端口，用户态通过超级调用获取这个事件通道，并进行通道绑定。然后用户态陷入循环等待中，等待Xen内核发来事件通知，收到通知后就执行预先写好的那部分代码。</p>
+<p>具体代码：<br>内核态分配通道端口：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//save_domid这里指定为0  </span></div><div class="line"><span class="keyword">int</span> event_channel_port=alloc_unbound_xen_event_channel(current, save_domid, <span class="literal">NULL</span>);</div></pre></td></tr></table></figure></p>
+<p>内核态分配了端口后，传到用户态，即event_channel_port。<br>用户态进行绑定：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line">xc_evtchn *xc_event_iface = xc_evtchn_open(<span class="literal">NULL</span>,<span class="number">0</span>);  </div><div class="line"><span class="keyword">if</span>(!xc_event_iface)  </div><div class="line">&#123;  </div><div class="line">    PERROR(<span class="string">"Could not open interface to libxc event channels"</span>);  </div><div class="line">&#125;  </div><div class="line">  </div><div class="line">  </div><div class="line"><span class="keyword">int</span> event_port = xc_evtchn_bind_interdomain(xc_event_iface, DOMID_SELF, event_channel_port);  </div><div class="line"><span class="keyword">if</span>(event_port != <span class="number">-1</span>)  </div><div class="line">&#123;  </div><div class="line">    PERROR(<span class="string">"event_port is: %d"</span>,event_port);  </div><div class="line">&#125;  </div><div class="line"><span class="keyword">else</span>  </div><div class="line">&#123;  </div><div class="line">    PERROR(<span class="string">"Could not bind xen port to local port"</span>);  </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>用户态绑定后，可以设置一个循环等待事件通知的到来，当然根据自己的需求进行修改。<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">while</span>(<span class="number">1</span>)  </div><div class="line">&#123;  </div><div class="line">    <span class="keyword">int</span> pending_port = xc_evtchn_pending(xc_event_iface);  </div><div class="line">    <span class="keyword">if</span>(pending_port == event_port)<span class="comment">//收到事件通知  </span></div><div class="line">    &#123;             </div><div class="line">    <span class="keyword">if</span>(xc_evtchn_unmask(xc_event_iface, event_port) == <span class="number">-1</span>)  </div><div class="line">    &#123;  </div><div class="line">        perror(<span class="string">"Could not unmask event port in loop"</span>);  </div><div class="line">        <span class="keyword">break</span>;  </div><div class="line">    &#125;  </div><div class="line">    <span class="comment">//下面就是自定义的收到事件通知后的处理代码  </span></div><div class="line">        <span class="comment">//。。。。。。。。。  </span></div><div class="line">        。  </div><div class="line">        。  </div><div class="line">        。  </div><div class="line">        。  </div><div class="line">    &#125;  </div><div class="line">    <span class="keyword">else</span>  </div><div class="line">    &#123;  </div><div class="line">    PERROR(<span class="string">"Unknown event port pending: %d"</span>, pending_port);  </div><div class="line">    &#125;  </div><div class="line">&#125;<span class="comment">//end while  </span></div><div class="line"><span class="comment">//事件通道使用完了后进行解绑释放  </span></div><div class="line">xc_evtchn_unbind(xc_event_iface, event_port);  </div><div class="line">xc_evtchn_close(xc_event_iface);  </div><div class="line"><span class="built_in">free</span>(xc_event_iface);</div></pre></td></tr></table></figure></p>
+<p>内核态发送通知代码如下：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">notify_via_specific_xen_event_channel</span><span class="params">(<span class="keyword">struct</span> domain *ld, <span class="keyword">int</span> lport)</span>  </span></div><div class="line">&#123;  </div><div class="line">    <span class="keyword">struct</span> evtchn *lchn, *rchn;  </div><div class="line">    <span class="keyword">struct</span> domain *rd;  </div><div class="line">    <span class="keyword">int</span>            rport;  </div><div class="line">  </div><div class="line">  </div><div class="line">    spin_lock(&amp;ld-&gt;event_lock);  </div><div class="line">  </div><div class="line">  </div><div class="line">    <span class="keyword">if</span> ( unlikely(ld-&gt;is_dying) )  </div><div class="line">    &#123;  </div><div class="line">        spin_unlock(&amp;ld-&gt;event_lock);  </div><div class="line">        <span class="keyword">return</span>;  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">  </div><div class="line">    ASSERT(port_is_valid(ld, lport));  </div><div class="line">    lchn = evtchn_from_port(ld, lport);<span class="comment">//bind local event channel  </span></div><div class="line">    ASSERT(consumer_is_xen(lchn));  </div><div class="line">  </div><div class="line">  </div><div class="line">    <span class="keyword">if</span> ( likely(lchn-&gt;state == ECS_INTERDOMAIN) )  </div><div class="line">    &#123;  </div><div class="line">        rd    = lchn-&gt;u.interdomain.remote_dom;  </div><div class="line">        rport = lchn-&gt;u.interdomain.remote_port;  </div><div class="line">        rchn  = evtchn_from_port(rd, rport);  </div><div class="line">        evtchn_set_pending(rd-&gt;vcpu[rchn-&gt;notify_vcpu_id], rport);  </div><div class="line">    &#125;  </div><div class="line">  </div><div class="line">  </div><div class="line">    spin_unlock(&amp;ld-&gt;event_lock);  </div><div class="line">&#125;  </div><div class="line">  </div><div class="line">  </div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">notify_domu_before_page_modify</span><span class="params">(<span class="keyword">void</span>)</span>  </span></div><div class="line">&#123;  </div><div class="line">    <span class="keyword">struct</span> domain *ld;  </div><div class="line">    ld = rcu_lock_domain_by_id(save_domid);  </div><div class="line">    notify_via_specific_xen_event_channel(ld,event_channel_port);  </div><div class="line">    rcu_unlock_domain(ld);  </div><div class="line">&#125;  </div><div class="line">  </div><div class="line">  </div><div class="line">notify_domu_before_page_modify();</div></pre></td></tr></table></figure></p>
+<p>  这样，Xen就可以向Domain0发送事件通知了。</p>
+<hr>
+<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟化基础/">虚拟化基础<span class="article-category-count">6</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/XEN/">XEN</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-kvm-migration"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -369,97 +425,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-keylogger"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170401/keylogger/">Keylogger检测</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170401/keylogger/" class="article-date">
-	  <time datetime="2017-04-01T03:12:56.000Z" itemprop="datePublished">四月 1, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Source：<a href="https://www.lastline.com/labsblog/detecting-keyloggers-on-dynamic-analysis-systems/" target="_blank" rel="external">https://www.lastline.com/labsblog/detecting-keyloggers-on-dynamic-analysis-systems/</a><br>Author： <a href="https://www.lastline.com/author/clemens/" target="_blank" rel="external">Clemens Kolbitsch</a></p>
-<pre><code>Clemens is a Security Researcher and engine developer at Lastline. As a lead-developer of Anubis, he has gained profound expertise in analyzing current, malicious code found in the wild. He has observed various trends in the malware community and successfully published peer-reviewed research papers. In the past, he also investigated offensive technologies presenting results at conferences such as BlackHat.
-</code></pre><hr>
-<p>One notorious functionality present in many variants of today’s advanced malware is the ability to steal sensitive user information. Taking control of a targeted machine, an adversary has basically unlimited abilities to secretly monitor the actions performed by an unsuspecting victim who uses the infected machine. The type of data stored on a typical machine, and to which the attacker has access to, ranges from user account credentials (such as usernames and passwords), to financial data (such as credit card numbers or transaction secrets), and even personal data (such as social security numbers).</p>
-<p>Very often, malware is specialized in capturing and identifying different types of information typed by the victim, allowing the collection of very specific information in which the attacker is interested. Typical examples are information entered in a login form for a specific URL, or values that resemble social security numbers (SSN) or credit card numbers.</p>
-<p>Automatic identification of this type of attack using traditional dynamic analysis (inside a sandbox) is tricky, as most activity requires a user to trigger the attack. Such a trigger could be using username and password to authenticate to a service, or entering user-sensitive information into an application or website.</p>
-<p>In this post, we describe some of the ways attackers manage to collect sensitive information on an infected machine and how Lastline’s high-resolution dynamic analysis engine is able to trigger and detect this type of malware.</p>
-<h2 id="How-Keyloggers-Capture-Data"><a href="#How-Keyloggers-Capture-Data" class="headerlink" title="How Keyloggers Capture Data"></a>How Keyloggers Capture Data</h2><p>When looking at keyloggers, we can typically distinguish three basic types: User-mode keyloggers, kernel-mode keyloggers and hardware-based keyloggers. In this post, we will focus on the first two types – software-based keyloggers. Hardware-based keyloggers work by intercepting data sent from external devices (such as keyboard or mouse) to the computer hardware, and are thus outside the reach of most remote attackers.</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/kerlogger1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/kerlogger1.png" width="450"></a><br>    <figcaption>Overview of keylogger methods</figcaption><br></figure>
-
-
-<p>In user-mode keyloggers, a very common approach used to steal information typed by the user is through the use of the windows API SetWindowsHook. This API can be used to intercept events from the system, such as keyboard and mouse activity. When the to-be-intercepted action is triggered, a function of the attacker’s choosing is executed. Another user-mode method for capturing keystrokes that we found in many malware variants consists of continuously checking the system’s keyboard state using the GetAsyncKeyState or GetKeyState API functions. Different from the first method, which notifies you at every keyboard event, the attacker here needs to actively monitor which keys are pressed.</p>
-<p>Kernel-mode keyloggers are more powerful than their user-mode counterparts, as they work with higher privileges, but are inherently more complex to implement. This type of  keylogger uses filter drivers to intercept keystrokes received from the keyboard or modify internal Windows kernel structures in order to capture input data. The complexity and mostly-undocumented nature of kernel code can lead to malfunction of the system if a sample is executed on an unsupported system, making user-mode keyloggers a more prominent approach.</p>
-<h2 id="Analyzing-Keylogger-Software"><a href="#Analyzing-Keylogger-Software" class="headerlink" title="Analyzing Keylogger Software"></a>Analyzing Keylogger Software</h2><p>As mentioned earlier, when executing malware with keylogging abilities on a traditional analysis system, this functionality typically remains unnoticed. This is because, unless a user triggers specific actions, the malware will not be able to capture anything during the analysis.</p>
-<p>To reveal this type of behavior during the automated analysis of a sample, the system needs to mimic user interactions such as keyboard typing and mouse movement. Interestingly, this is far from simple since some malware families only capture data when the key is pressed within a specific application or window, such as Internet Explorer or Firefox, for example.</p>
-<p>Further, the analysis framework must be able to identify the type of application and/or information that is relevant for the malware under analysis. For instance, if a keylogger only targets information on financial transactions (such as in a breach of Point-of-Sale terminals late last year), injecting other user information would not reveal any interesting behavior. If the sandbox fails to identify the data in which the attacker is interested, the keylogger remains inactive, disguising itself from the analysis system.</p>
-<h2 id="High-Resolution-Analysis-of-Keyloggers"><a href="#High-Resolution-Analysis-of-Keyloggers" class="headerlink" title="High-Resolution Analysis of Keyloggers"></a>High-Resolution Analysis of Keyloggers</h2><p>The Lastline high-resolution dynamic analysis engine has the ability to simulate specific user interactions during the analysis of a sample. Additionally, the system identifies the type of data that the malware sample is searching for and can simulate user behavior accordingly. For example, the system instruments a virtual user to use fake credit card information to do financial transactions, post user credentials to various services, or use email addresses in a way that might attract the attacker’s attention.</p>
-<p>Once the keylogger starts collecting the injected data, the system tracks how the malware under analysis uses the stolen information, which gives vital information on the attacker’s goals. For example, the system tracks if the stolen data is written to the file-system or is sent to the attacker using a command-and-control channel.</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/keylogger2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/keylogger2.png" width="450"></a><br>    <figcaption>Chewbacca analysis report</figcaption><br></figure>
-
-
-
-<h2 id="Chasing-Chewbacca-with-Lastline"><a href="#Chasing-Chewbacca-with-Lastline" class="headerlink" title="Chasing Chewbacca with Lastline"></a>Chasing Chewbacca with Lastline</h2><p>Chewbacca [2] is a trojan used in a Point-of-Sale malware operation to log keyboard data of certain systems [3]. Besides capturing keyboard activity, the malware can also scan the memory of other processes for credit card numbers using regular expressions. Clearly, all of this happens without any signs of infections visible to the user.</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/keylogger3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/keylogger3.png" width="450"></a><br>    <figcaption>Windows desktop showing no signs of the keylogger</figcaption><br></figure>
-
-<p>When executed, the malware creates a copy of itself named spoolsv.exe under the Windows Startup folder. After that, it will start capturing all keyboard events from the system, logging them to a file named system.log.</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/keylogger4.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/keylogger4.png" width="450"></a><br>    <figcaption>Chewbacca data collection hook installation</figcaption><br></figure>
-
-<p>The above figure shows the code used by Chewbacca to install the hook procedure on the system after its execution. We can see that the malware uses the Windows API SetWindowsHookEx to install the hook, with hook type WH_KEYBOARD_LL, which is used to capture low-level keyboard input. Also, to capture all keystrokes from the system, the malware sets parameter dwThreadId=0, which will install the hook on all existing threads running on the same desktop.</p>
-<p>During its execution, whenever a keypress event happens, the callback KEYLOG_$$_HOOKPROC$LONGINT$LONGINT$LONGINT$$LONGINT will record the keys pressed along with the window title on which the keypress was recorded. Additionally, the software records when the window focus changes, logging the captured information to system.log.</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/keylogger5.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/keylogger5.png" width="450"></a><br>    <figcaption>The Lastline analysis engine gives access to files generated and network traffic captured during the analysis</figcaption><br></figure>
-
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/keylogger6.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/keylogger6.png" width="450"></a><br>    <figcaption>Captured data shown in the analysis report</figcaption><br></figure>
-
-<p>When analyzing Chewbacca inside Lastline’s high-resolution analysis engine, the system identifies the keylogging functionality, clearly marking it in the report overview. Additionally, the report contains detailed examples of data the malware sample extracted, as can be seen in the figure above.</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/keylogger7.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/keylogger7.png" width="450"></a><br>    <figcaption>Text content of the data captured by the keylogger into file C:Users…Tempsystem.log</figcaption><br></figure>
-
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/keylogger8.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/keylogger8.png" width="450"></a><br>    <figcaption>Raw file content of the data captured by the keylogger into file C:Users…Tempsystem.log</figcaption><br></figure>
-
-
-<p>As one can see, the report even shows examples of the sensitive data that was targeted by the attacker, which, in this case, includes credit card information and user passwords.</p>
-<p>Conclusion<br>Keylogging functionality in advanced malware is a severe threat to user data, but traditional analysis systems are often blind to this vector of attack. Lastline’s high-resolution analysis engine tackles this threat in two ways: First, the analysis engine identifies that a keylogger was installed on the victim machine and identifies the type of information the attacker is targeting. Second, the system uses the collected information to instrument a virtual user to inject specific data to trigger the keylogger’s functionality. The injected data is then tracked throughout the analysis system to monitor how the malware processes (and potentially leaks) the stolen information.</p>
-<p>REFERENCES:</p>
-<p>[1] <a href="http://msdn.microsoft.com/en-us/library/windows/desktop/ms644990%28v=vs.85%29.aspx" target="_blank" rel="external">http://msdn.microsoft.com/en-us/library/windows/desktop/ms644990%28v=vs.85%29.aspx</a></p>
-<p>[2] <a href="https://www.virustotal.com/en/file/31d4e1b2e67706fda51633b450b280554c0c4eb595b3a0606ef4ab8421a04dc9/analysis/" target="_blank" rel="external">https://www.virustotal.com/en/file/31d4e1b2e67706fda51633b450b280554c0c4eb595b3a0606ef4ab8421a04dc9/analysis/</a></p>
-<p>[3] <a href="https://blogs.rsa.com/rsa-uncovers-new-pos-malware-operation-stealing-payment-card-personal-information/" target="_blank" rel="external">https://blogs.rsa.com/rsa-uncovers-new-pos-malware-operation-stealing-payment-card-personal-information/</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">14</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -552,6 +517,18 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170808/rowhammer/">神乎其神的Rowhammer：用比特位翻转实现云虚拟机夺权</a></h6>
+          <!--  <span>八月 8, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -733,18 +710,6 @@
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/lbr-ret2dir/">利用LBR特性检测ret2dir攻击</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -755,7 +720,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -765,7 +730,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10.77px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
     </div>
   </div>
 
