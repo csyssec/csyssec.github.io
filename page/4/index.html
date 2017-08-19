@@ -112,6 +112,84 @@
         
           <section id="main">
   
+    <article id="post-ropjop-research"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/ropjop-research/">ROP/JOP攻击与防御最新研究进展</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/ropjop-research/" class="article-date">
+	  <time datetime="2017-05-04T10:42:57.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/11/latest-researching-status-of-ropjop.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/latest-researching-status-of-ropjop.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>Control Flow Hijacking, like ROP, becomes a hot topic in recent years since ever DEP(W^X enforcement) and SMEP were introduced in h/w processor. Based upon the papers that I read recently, this post just gives a brief introduction on the recent researching status (though incomplete) about control flow attacks and defenses. </p>
+<p>When code injection attacks become more and more difficult, attackers start to seek other opportunities to execute arbitrary code with completely re-using existing executable code in application image and/or shared libraries.</p>
+<p>Typically, for example, those techniques without code injection could be return-to-libc, ROP (Return Oriented Programming), JOP (Jump Oriented Programming), or even SROP (Sigreturn Oriented Programming, see <a href="https://www.cs.vu.nl/~herbertb/papers/srop_sp14.pdf" target="_blank" rel="external">Framing Signals—A Return to Portable Shellcode</a>). </p>
+<p>Regarding techniques that defend against those control flow hijackings, here below are the lists (also incomplete).</p>
+<ul>
+<li>Change existing compilers to re-generate the code binaries. There are some typical solutions like, generate return-less binary code, generate control flow friendly binary (with extra IDs/labels for CFG hardening), modify all the control flow (ret, jmp, call) instructions to a well-known center redirection table, etc.</li>
+<li>Without binary changes, make static binary instrument and dynamic control flow tracing. For instance, build control flow graph, and enforce the control flow execution exactly aligning with the known CFG paths.</li>
+<li>Hardware assisted CFI. CFI(Control-Flow Integrity) is an efficient way to defend against ROP/JOP attacks. However, due to performance issue, complete CFI enforcement is impossible in practice. So, there are some lightweight CFI checks with the help of latest processor LBR (last branch record) to examine the control flow behaviors base upon the experience (rather than the full CFG analysis).</li>
+<li>THere are some specific solutions, like stack shadowing (to check if the target “ret” is call-preceding instruction), code section shadowing. But most of them are not a generic solution, but have many assumptions and limitations. </li>
+</ul>
+<p>Regarding to the defenses with CFI, there are many papers that focus on the policy of checking whether or not the history control flow instructions behave as a malicious software. Typically, for example:</p>
+<ul>
+<li>Some solutions to <strong><em>check the length of each one of ROP gadgets</em></strong>. If it is very short (e.g. less than 5~6 instructions), it might be suspected. If there are consecutive chain of gadgets with “short” instruction sequences in a control flow, then it might be a ROP attack.</li>
+<li>Some of them to <strong><em>check whether if the target of “ret” is a Call-Preceded instruction</em></strong> (the instruction immediately preceding is a CALL instruction), this is because normally, every “ret” instruction returns back to an instruction that immediately follows a corresponding “call” instruction. </li>
+<li>Or check if <strong><em>the target of all the indirect call/jmp instructions are the “entry-point” functions</em></strong>. This is also normally true for a legitimate application, because generally an indirect “jmp” or “call” won’t be calling into a certain middle location in a function. </li>
+</ul>
+<p>However, just as those papers (see the links in References below) indicate, all the current CFI solutions based upon above assumptions can be bypassed with advanced ROP gadgets. </p>
+<p>For example, in Nicholas’s paper, he just used some call-preceded ROP gadgets and long termination gadgets for flushing attacking history to bypass checks of the famous kBouncer and ROPecker CFI solutions.</p>
+<p>But his solution has an assumption for kBounce/ROPecker: the last branch records (LBR) can be stored in only 16 (at most) pairs of LBR MSRs. </p>
+<p>As a matter of fact, if appropriately configured, the last branch records can also be stored into a variable-sized memory-resident branch trace store (BTS) buffer specified by DS(Debug Store) save area pointed by the IA32_DS_AREA MSR . And processor doesn’t restrict how many pairs of last branch records could be stored in that BTS buffer, it also allows us to make processor generate an interrupt before the count of records reaches to the max records configured (or when the BTS buffer is nearly full). This means that we will never miss history LBR records. If we don’t consider performance cost when enforcing CFI check at run time, this could be a good solution to trace all the control flow information. </p>
+<p><strong>However, even if we can get all the control flow traces (to defend against Nicholas’s “history flushing” solution), does it mean that we can completely defend against control flow attacks?</strong> Unless that we can make full CFI checks with CFG, one of another problems that we might always encounter is how to design a better policy to reduce “false positive”, and at the same time to catch all the ROP attacks at run time with acceptable performance cost in practice. </p>
+<hr>
+<p><strong><em>References:</em></strong></p>
+<ul>
+<li>Nicholas Carlini, David Wagner, ROP is Still Dangerous: Breaking Modern Defenses<br><a href="http://www.cs.berkeley.edu/~daw/papers/rop-usenix14.pdf" target="_blank" rel="external">http://www.cs.berkeley.edu/~daw/papers/rop-usenix14.pdf</a></li>
+<li>Enes Gökta¸s, Size Does Matter - Why Using Gadget-Chain Length to Prevent Code-Reuse Attacks is Hard<br><a href="http://www.cs.columbia.edu/~mikepo/papers/chainlength.sec14.pdf" target="_blank" rel="external">http://www.cs.columbia.edu/~mikepo/papers/chainlength.sec14.pdf</a></li>
+<li>Out Of Control: Overcoming Control-Flow Integrity:  <a href="http://www.ieee-security.org/TC/SP2014/papers/OutOfControl_c_OvercomingControl-FlowIntegrity.pdf" target="_blank" rel="external">http://www.ieee-security.org/TC/SP2014/papers/OutOfControl_c_OvercomingControl-FlowIntegrity.pdf</a></li>
+<li>Technical Report TR-HGI-2014-001:<br><a href="http://www.hgi.ruhr-uni-bochum.de/media/emma/veroeffentlichungen/2014/05/09/TR-HGI-2014-001_1_1.pdf" target="_blank" rel="external">http://www.hgi.ruhr-uni-bochum.de/media/emma/veroeffentlichungen/2014/05/09/TR-HGI-2014-001_1_1.pdf</a></li>
+</ul>
+<hr>
+<p> 转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">14</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Attack/">Attack</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-nmi-virtual"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -371,99 +449,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-smep-virtual"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/smep-virtual/">如何利用虚拟化技术实现基于软件的SMEP(监督模式执行)</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/smep-virtual/" class="article-date">
-	  <time datetime="2017-05-04T10:31:10.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/11/how-to-implement-software-based.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/how-to-implement-software-based.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>As <a href="http://hypervsir.blogspot.com/2014/10/introduction-on-hardware-security.html" target="_blank" rel="external">my previous post</a> indicated, SMEP is a powerful security feature, and easy to deploy in modern commodity OS. However this feature requires H/W processor’s support, for those processors that are not SMEP-capable, this post presents a software-based solution to emulate SMEP functionality with the help of Virtualization/Hypervisor technology. </p>
-<p>When x86 processor CR4.SMEP bit is set, the system software executing in kernel mode (CPL&lt;3) cannot fetch instructions from any linear address with a translation for which the U/S flag is 1 (User) in every paging-structure entries controlling the translation. In other words, If SMEP is enabled, software operating in supervisor mode cannot fetch instructions from linear addresses that are accessible in user mode. When such an instruction fetch occurs, a #PF exception will be generated by SMEP-capable processor.</p>
-<p>So, how to implement a software-based SMEP feature? </p>
-<p>This paper (<a href="https://www.cs.cmu.edu/~arvinds/pubs/secvisor.pdf" target="_blank" rel="external">SecVisor: A Tiny Hypervisor to Provide Lifetime Kernel Code Integrity for Commodity OSes</a> from CyLab/CMU) presents an great idea: <strong>Create two separate EPT protection memory views for guest kernel (ring 0) and user (ring 3) mode respectively, with different EPT permissions for corresponding GPA-&gt;HPA translations, and then switch these two EPT page table views by intercepting kernel&lt;-&gt;kernel mode switches</strong>. In x86/Intel processor, hypervisor can configure different VMCS EPTP pointers (which points to different Extended Page Tables) and switch among them at appropriate time.</p>
-<p>To make the discussion easier, we can call these two guest memory translation tables (pointed by two different EPTP pointers) as protected memory views: <strong>one is used in guest Kernel mode, named as <em>Kernel View</em> ; the other is for User mode, named as <em>User View</em></strong>. </p>
-<p>Besides, as that paper indicates, for both views, the identity map (GPA=HPA) is created in both EPT page tables by default. But EPT page table entry permissions may be different for the same GPA addresses. The latter is the key part for emulating SMEP behaviors, I will talk about it later.</p>
-<p>By intercepting guest kernel/user mode switches, we can do this below in hypervisor:</p>
-<ol>
-<li>Switch to use <strong><em>Kernel View</em></strong> when guest logical processor entering Kernel mode;<br>As we know that, in x86 processor, there are several ways to cause logical processor enter Kernel mode, for example in Windows OS, interrupt/fault/trap (through IDT table), syscall instructions. Based upon my previous project experience, some others like task gate (only NMI on 32bit OS), call gate, are not never used in Windows OS.</li>
-<li>Switch to use <strong><em>User View</em></strong>  when guest logical processor leaving kernel (or entering User mode);</li>
-</ol>
-<p>So, the question now is that - how to get hypervisor be notified whenever a kernel/user mode switch happens?</p>
-<p>The SecVisor does it like pictures below (snapshots from this <a href="http://quning.org/self/cmu_secvisor_ppt.pdf" target="_blank" rel="external">link</a>): In <strong><em>User View</em></strong>, the <strong>Execution</strong> permission is removed in the EPT page tables for Kernel Code pages , whenever entering kernel mode to fetch the entry point instruction from Kernel code page, an EPT violation vmexit occurs, then the control is transferred to hypervisor (SecVisor), so SecVisor can switch to <strong><em>Kernel View</em></strong> by updating the corresponding EPTP pointer in VMCS. Similarly, we can switch to <strong><em>User View</em></strong> whenever leaving kernel mode. </p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/secvisor1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/secvisor1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/secvisor2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/secvisor2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-<p><strong>Now, obviously we can get to know how to emulate SMEP behaviors.</strong></p>
-<p>Assumed that the guest logical processor is running Kernel mode, and EPTP hence points to the mapping tables in <strong><em>Kernel View</em></strong> and also assumed that <strong>only</strong> approved code (e.g. Kernel and trusted LKM modules) has EPT execution permission in <strong><em>Kernel View</em></strong>, see picture below in the meanwhile, provided that there is a kernel vulnerability that can be exploited by malware to execute arbitrary user mode code. When the logical processor starts to execution user accessible code in kernel mode, an EPT violation will be generated because that user mode code cannot be executable in EPT <strong><em>Kernel View</em></strong>. </p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/secvisor3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/secvisor3.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-<p><strong>When hypervisor gets the control, the following policy could be applied to check the execution (instruction fetch) violate SMEP functionality:</strong></p>
-<ol>
-<li><strong>Read the current CPL value from corresponding guest VMCS area to see if it is ZERO (kernel mode);</strong></li>
-<li><strong>Get the current guest CR3 value (also from VMCS) and guest violation linear address (actually for EPT violation due to execution fault, that address is guest RIP) from corresponding VMCS area, then traverse the guest page table to see if U/S bit (accessible in user mode) flags in every page structures are ONE.</strong><br><br></li>
-</ol>
-<p><strong>If both conditions above are true, then we catch a SMEP-like violation in guest kernel mode.</strong><br><br></p>
-<hr>
-<p> <strong><em>Challenges:</em></strong><br>However, there are many challenges to implement this software-based SMEP feature with virtualization technology.</p>
-<ol>
-<li><p>Performance impacts.<br>Because in that paper, we create two EPT memory protection views (Kernel View and User View), in order to switch back and forth at run time, the hypervisor must have to trap every event of entering and leaving kernel. This introduces significant performance cost because kernel-user mode switches are normally very frequent.<br><br><br><strong>I think one of solutions of switching EPTP pointers (Views) without VMExit is to leverage the latest Virtualization features, like <a href="http://hypervsir.blogspot.com/2014/10/thoughts-on-virtualization-exception.html" target="_blank" rel="external">Virtualization Exception (#VE) and EPTP switching function (VMFUNC) in my previous post</a>, and also use <a href="http://hypervsir.blogspot.com/2014/11/using-lbr-last-branch-record-feature-to.html" target="_blank" rel="external">IDT Shadow/Virtualization technique</a> in my another post to trap every kernel/user mode switches due to interrupt/trap/fault events</strong>. However, on those #VE/VMFUNC-capable machines, SMEP is also available:-)<br><br><br>For the mode switches due to syscall/sysret, you can brainstorm how to handle it without vmexit!</p>
-</li>
-<li><p>In <strong><em>Kernel View</em></strong>, we configure all the kernel code executable in EPT tables. When there is an LKM module loaded or unloaded, we must update the module memory to be executable in <strong><em>Kernel View</em></strong> and to be non-executable in <strong><em>User View</em></strong> immediately.<br><br><br>The author in the paper has a solution to solve it by adding code in load_module() and the free_module() function.<br><br><br>However, without guest kernel code changes, for module loading, I think we can use a <strong>lazy solution</strong> to solve it, for example, when a new loaded LKM module starts to run at the first time in Kernel mode, a EPT violation occurs, then in hypervisor we can check if it is a trusted LKM module, if yes, then we just allow that LKM code page executable in <strong><em>Kernel View</em></strong>, and remove the execution permissions in <strong><em>User View</em></strong>. But how to update the LKM code page EPT permissions in <strong><em>Kernel View</em></strong> when such a LKM module gets unloaded from kernel?</p>
-</li>
-<li>In the case of low memory pressure, will Linux OS page out or swap out LKM code pages to the disk storage?<br>I know this is true on Windows OS system, but I have no idea if Linux will do the same thing. (Anybody can tell me?)<br>If it is the case on Linux system, then without guest kernel hooks, it is also a challenge to update LKM code page permissions in EPT <strong><em>Kernel View</em></strong> and <strong><em>User View</em></strong>.</li>
-</ol>
-<p><strong>Note that what I’m talking about in this post is for fun. I don’t think it is worth doing all those things just only for emulating SMEP-like feature with virtualization technology:(. As a matter of fact, I have yet another solution to implement a software-based SMEP feature without Virtualization/Hypervisor. Please stay tuned…in my next post.</strong></p>
-<hr>
-<p><strong><em>Update:</em></strong><br>Question: thinking of how to implement a software SMAP (Supervisor Mode Access Protection) with virtualization technology……</p>
-<hr>
-<p><strong><em>References:</em></strong><br><a href="https://www.cs.cmu.edu/~arvinds/pubs/secvisor.pdf" target="_blank" rel="external">SecVisor: A Tiny Hypervisor to Provide Lifetime Kernel Code Integrity for Commodity OSes</a>, and its presentation <a href="http://quning.org/self/cmu_secvisor_ppt.pdf" target="_blank" rel="external">link</a>．</p>
-<hr>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/硬件特性/">硬件特性<span class="article-category-count">9</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Hardware/">Hardware</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -556,6 +541,18 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170819/cachekit/">CacheKit 利用cache不一致性绕过内存监控</a></h6>
+          <!--  <span>八月 19, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -737,18 +734,6 @@
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/nmi-virtual/">虚拟化技术的NMI窗口退出</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -759,7 +744,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Notes/">Notes</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -769,7 +754,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10.77px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cache/" style="font-size: 10px;">Cache</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10.77px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/TrustZong/" style="font-size: 10px;">TrustZong</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
     </div>
   </div>
 

@@ -112,6 +112,82 @@
         
           <section id="main">
   
+    <article id="post-monitoring-syscall"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/monitoring-syscall/">X86虚拟化技术监控/陷入SYSCALL的另一种方法</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/monitoring-syscall/" class="article-date">
+	  <time datetime="2017-05-04T08:02:12.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/10/yet-another-solution-to-monitortrap.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/10/yet-another-solution-to-monitortrap.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>This article describes an idea to monitor SYSCALL with x86 Hardware Virtualization Technology. It doesn’t require visible guest code/data modification, so that in some cases, even Kernel Patch Protection (e.g. Windows x64 PatchGuard) cannot detect it. Here the SYSCALL could also be SYSENTER or INT 80h for system calls.</p>
+<p>Actually this solution can be extended to other resource monitoring, so at the end of this article I will give an overview on how to extend this as a generic solution (in a new post, LINK?).</p>
+<p>In x86/Intel, <strong>syscall</strong> (Fast System Call) instruction is invoked by a user application at privilege level 0 to call an OS system-call handler at privilege level 0. In ARM architecture, supervisor Call (<strong>SVC</strong>, formerly SWI) does the similar thing to request privileged operations or access to system resources from an operating system. </p>
+<p>To be more specific, x86/Intel syscall does so by loading RIP from the IA32_LSTAR MSR(after saving the address of the instruction following SYSCALL, returning RIP, into RCX, so when returning back from ring 0, sysret can load that user mode RIP from RCX, and continue to execute program). The WRMSR instruction ensures that the IA32_LSTAR MSR always contain a canonical address (A #GP will be triggered if an address is not canonical when WRMSR to IA32_LSTAR).</p>
+<p>The memory address in IA32_LSTAR MSR is an entry point of kernel system-call handler, it can only be configured by software software (OS kernel, normally), and cannot be a non-canonical address. </p>
+<p><strong><em>However, the key point is here: what if that address saved in IA32_LSTAR is an invalid canonical memory address (or Non-eXecute memory address)</em></strong>. When this happens, a CPU Page Fault (#PF) will be triggered at that address. And the error code indicates that this is a page-not-present instruction fetch exception (For simplicity, we don’t consider setting Non-eXecute memory address), and CR2 control register content is just that pre-set invalid canonical memory address. </p>
+<p><strong><em>Hence, whenever a syscall is invoked by application, an intended page-not-present instruction fetch #PF will be triggered</em></strong>. Then this exception is normally handled by #PF (vector = 14) handler specified in OS IDT. </p>
+<p>In a x86/Intel virtualization environment, page faults (exception vector = 14) can be configured to trigger a VMEXIT. And even more, we can selectively make only certain type of #PFs generate VMexit by configuring the VMCS page-fault error-code mask and page-fault error-code match. For example, only page-not-present instruction fetch #PF can generate a VMexit, any other #PF exceptions (like read/write access to invalid or disallowed memory) won’t generate VMexit, instead, they are handled in guest IDT #PF handler normally. By doing so, the performance impact will be minimized. </p>
+<p>So, to summarize this solution, we could do it like this to monitor every syscall invoked by user application without guest OS changes:</p>
+<ol>
+<li><p>VMM software traps any write access to IA32_LSTAR MSR, whenever a WRMSR to IA32_LSTAR happens, VMM records the original MSR value that points to the real entry point address of kernel system-call handler, and replace it with a MAGIC &amp; INVALID memory address.</p>
+</li>
+<li><p>VMM software configures relevant VMCS structures to cause only page-not-present instruction fetch #PF trigger a VMexit.</p>
+</li>
+<li><p>At runtime, whenever such a VMexit type happens, VMM software checks guest CR2 value, if it is equal to the predefined MAGIC and INVALID value, then it means this is an intended #PF exception VMexit (not considering malicious (in)direct call to that MAGIC address), we should discard this #PF, and directly resume guest OS back with a new RIP value (it is just the original MSR value that points to the real entry point address of kernel system-call handler).</p>
+<p>Otherwise, if this #PF VMexit indicates that it is an ordinary #PF, VMM software injects this exception event back to guest OS without doing anything, then it will be normally handled by #PF handler in guest IDT table.</p>
+</li>
+</ol>
+<p>Therefore, in this way, whenever a syscall is invoked in user mode application, VMM software will get an notification.</p>
+<p>But there is a problem here. You can see that we don’t need to change any guest OS kernel, however, the Kernel Patch Protection module (like PatchGuard) will probably detect this by reading MSR IA32_LSTAR and comparing it with the original value. It is very easy to solve this issue by monitoring RDMSR to IA32_LSTAR register, and hiding the real value with a return of the original value previously configured by OS kernel. </p>
+<p>Actually, there is another solution that can also works, see my previous blog on <a href="http://hypervsir.blogspot.com/2014/09/debug-registers-on-intel-x86-processor.html" target="_blank" rel="external">Debug Register usages</a>… by enabling Debug breakpoint on the original address stored in IA32_LSTAR MSR by OS kernel. </p>
+<p><strong>As an aforementioned generic solution to monitor/trap a specific event that we’re interested in, here it is:</strong></p>
+<ol>
+<li><strong>Attempt to change guest software for the purpose of making some certain instruction execution generate an intended exception. (Here it is the syscall execution in this post),</strong></li>
+<li><strong>Then the virtualization software, VMM or Hypervisor, monitors that intended exception by configuring the corresponding VMCS data structures (e.g. Exception-Bitmap VMCS).</strong></li>
+</ol>
+<p><br><br>I will write a new post to explain this solution in greater details later.</p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">11</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Monitoring/">Monitoring</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Syscall/">Syscall</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-vmcs-vmxon"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -435,81 +511,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-xen-snapshot"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/xen-snapshot/">XEN快照机制</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/xen-snapshot/" class="article-date">
-	  <time datetime="2017-05-04T07:13:37.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>作者:<a href="http://blog.csdn.net/mrbuffoon" target="_blank" rel="external">Mr_buffoon</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>虚拟机快照技术是指，在虚拟机运行过程中将虚拟机的完整运行状态，包括内存、磁盘、 CPU、网络等，保存到持久化的外部设备中，从而当虚拟机发生故障时可以通过备份的数据恢复虚拟机的运行。快照里面内存的快照又是非常重要非常关键的一部分。<br>内存快照主要实现机制主要有三种：停机拷贝机制（stop-and-copy），预拷贝机制（pre-copy），后拷贝机制（post-copy）。</p>
-<p><strong>停机拷贝机制（stop-and-copy）</strong><br>    在进行虚拟机快照的时刻要先将虚拟机挂起，然后在保存完虚拟机的完整状态后再恢复虚拟机的运行。<br>    这种方式简单，但使得整个快照过程的虚拟机停机时间完全取决于虚拟机的内存大小，而且该时间可以达到几十秒，严重影响虚拟机的性能。<br>    主流kvm、xen、vmware等都是基于停机拷贝方式实现快照功能。</p>
-<p><strong>预拷贝机制（pre-copy）</strong><br>    通过多轮迭代的方式对内存页面进行保存。每一轮保存自上一轮以来变脏的内存页面，当需要保存的内 存页面数量收敛到可以在一个较短的停机时间内完成保存的时刻，虚拟机停机。<br>    写密集时，收敛时间较长，多轮拷贝影响性能。“状态漂移”现象。<br>    Vnsnap等基于预拷贝机制实现快照。</p>
-<p><strong>后拷贝机制（post-copy）</strong><br>    首先停机，将cpu、设备等状态信息以及少量内存页面保存，然后开机，并在发生缺页中断时将相应内存页面保存。<br>    个人认为在分布式快照时优势比较明显。</p>
-<p>研究了一下xen快照部分的代码，其实xen-4.1.2的内存快照实现函数是跟迁移共用的，迁移已经是采用预拷贝机制来实现内存的迁移，所以说内存快照部分的代码其实是实现了预拷贝快照的。只是有一个参数live进行控制，live为1那么就是预拷贝，live为0就是停机拷贝。<br>快照部分函数入口及调用关系如下：</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-1.png" width="450"></a><br>    <figcaption></figcaption><br></figure><br> 注意，xen-4.4.1版本及以上使用xl命令，不再是之前版本的xm命令，也就是不再用xend，而是成了toolstack，所以上层入口有所变化，但是最底层的xc_domain_save()函数是不变的。<br><br><strong>预拷贝过程中关键数据:</strong><br><br><figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p><strong>预拷贝主流程：</strong></p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-3.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p><strong>页判定代码：</strong></p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-4.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-4.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p><strong>代码分析</strong><br>    页判定主要是判定该轮迭代要传送哪些页面。<br>    last_iter=1表示最后一轮迭代，置1后下一轮就进行停机拷贝。<br>    superpages=1表示全虚拟化，iter=1表示第一轮迭代，test_bit(n,xx)表示xx位图第n位的值，为1或0。<br><strong>判定规则</strong><br>    (1)to_send为1且to_skip为0的页<br>    (2)全虚拟化形式下第一轮迭代to_send为1的页面<br>    (3)最后一轮迭代to_send为1的页面<br>    (4)最后一轮迭代to_fix为1的页面<br>以上四种页面是本轮迭代需要传送的页面。</p>
-<p><strong>to_send、to_skip、to_fix置位时机</strong></p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-5.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-5.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>  to_fix是每一轮迭代页判断，当该页还没有被映射时就置为1。</p>
-<p><strong>页判定规则原理</strong><br>    to_send在第i-1轮迭代结束时候获取，收集的是第i-1轮迭代过程中变脏的页面，即第i轮可能拷贝页面的全集。    to_skip是第i轮迭代开始时获取，收集的是第i-1轮迭代结束到第i轮迭代开始这一短暂时间间隔内再次变脏的页面。    当to_skip为1表示这很短时间内某页面又再次被修改，也就可以认为该页频繁访问，为避免该页被重复拷贝，可以暂缓拷贝。<br>    第一轮迭代时候，to_send被初始化为全1，to_skip实际上是没有获取的，所以可以不必考虑to_skip。<br>    最后一轮迭代时候，to_fix、to_skip都需要一并拷贝，以保证内存拷贝的完整。</p>
-<p><strong>后处理代码：</strong></p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-6.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-6.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p><strong>代码分析</strong><br>    后处理主要是判定是否进行最后一轮迭代，如果是最后一轮置标记并申请停机。<br>    判定规则：<br>    如果     迭代次数iter大于等于预设最大迭代次数max_iters<br>    或者     本轮拷贝页面数与跳过页面数之和小于50<br>    或者      整个迭代过程拷贝总页面数大于迭代因子倍的P2M表对应页面数量<br>    则          进入停机拷贝。</p>
-<p>设备状态的拷贝是在XendCheckpoint.py中的save()函数中实现的。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-7.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-7.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<hr>
-<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机快照/">虚拟机快照<span class="article-category-count">1</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Snapshot/">Snapshot</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/XEN/">XEN</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -602,6 +603,18 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170819/cachekit/">CacheKit 利用cache不一致性绕过内存监控</a></h6>
+          <!--  <span>八月 19, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -783,18 +796,6 @@
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/nmi-virtual/">虚拟化技术的NMI窗口退出</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -805,7 +806,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Notes/">Notes</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -815,7 +816,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10.77px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cache/" style="font-size: 10px;">Cache</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10.77px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/TrustZong/" style="font-size: 10px;">TrustZong</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
     </div>
   </div>
 

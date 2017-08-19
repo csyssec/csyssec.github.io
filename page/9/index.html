@@ -112,6 +112,81 @@
         
           <section id="main">
   
+    <article id="post-xen-snapshot"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/xen-snapshot/">XEN快照机制</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/xen-snapshot/" class="article-date">
+	  <time datetime="2017-05-04T07:13:37.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者:<a href="http://blog.csdn.net/mrbuffoon" target="_blank" rel="external">Mr_buffoon</a><br><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>虚拟机快照技术是指，在虚拟机运行过程中将虚拟机的完整运行状态，包括内存、磁盘、 CPU、网络等，保存到持久化的外部设备中，从而当虚拟机发生故障时可以通过备份的数据恢复虚拟机的运行。快照里面内存的快照又是非常重要非常关键的一部分。<br>内存快照主要实现机制主要有三种：停机拷贝机制（stop-and-copy），预拷贝机制（pre-copy），后拷贝机制（post-copy）。</p>
+<p><strong>停机拷贝机制（stop-and-copy）</strong><br>    在进行虚拟机快照的时刻要先将虚拟机挂起，然后在保存完虚拟机的完整状态后再恢复虚拟机的运行。<br>    这种方式简单，但使得整个快照过程的虚拟机停机时间完全取决于虚拟机的内存大小，而且该时间可以达到几十秒，严重影响虚拟机的性能。<br>    主流kvm、xen、vmware等都是基于停机拷贝方式实现快照功能。</p>
+<p><strong>预拷贝机制（pre-copy）</strong><br>    通过多轮迭代的方式对内存页面进行保存。每一轮保存自上一轮以来变脏的内存页面，当需要保存的内 存页面数量收敛到可以在一个较短的停机时间内完成保存的时刻，虚拟机停机。<br>    写密集时，收敛时间较长，多轮拷贝影响性能。“状态漂移”现象。<br>    Vnsnap等基于预拷贝机制实现快照。</p>
+<p><strong>后拷贝机制（post-copy）</strong><br>    首先停机，将cpu、设备等状态信息以及少量内存页面保存，然后开机，并在发生缺页中断时将相应内存页面保存。<br>    个人认为在分布式快照时优势比较明显。</p>
+<p>研究了一下xen快照部分的代码，其实xen-4.1.2的内存快照实现函数是跟迁移共用的，迁移已经是采用预拷贝机制来实现内存的迁移，所以说内存快照部分的代码其实是实现了预拷贝快照的。只是有一个参数live进行控制，live为1那么就是预拷贝，live为0就是停机拷贝。<br>快照部分函数入口及调用关系如下：</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-1.png" width="450"></a><br>    <figcaption></figcaption><br></figure><br> 注意，xen-4.4.1版本及以上使用xl命令，不再是之前版本的xm命令，也就是不再用xend，而是成了toolstack，所以上层入口有所变化，但是最底层的xc_domain_save()函数是不变的。<br><br><strong>预拷贝过程中关键数据:</strong><br><br><figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p><strong>预拷贝主流程：</strong></p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-3.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p><strong>页判定代码：</strong></p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-4.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-4.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p><strong>代码分析</strong><br>    页判定主要是判定该轮迭代要传送哪些页面。<br>    last_iter=1表示最后一轮迭代，置1后下一轮就进行停机拷贝。<br>    superpages=1表示全虚拟化，iter=1表示第一轮迭代，test_bit(n,xx)表示xx位图第n位的值，为1或0。<br><strong>判定规则</strong><br>    (1)to_send为1且to_skip为0的页<br>    (2)全虚拟化形式下第一轮迭代to_send为1的页面<br>    (3)最后一轮迭代to_send为1的页面<br>    (4)最后一轮迭代to_fix为1的页面<br>以上四种页面是本轮迭代需要传送的页面。</p>
+<p><strong>to_send、to_skip、to_fix置位时机</strong></p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-5.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-5.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>  to_fix是每一轮迭代页判断，当该页还没有被映射时就置为1。</p>
+<p><strong>页判定规则原理</strong><br>    to_send在第i-1轮迭代结束时候获取，收集的是第i-1轮迭代过程中变脏的页面，即第i轮可能拷贝页面的全集。    to_skip是第i轮迭代开始时获取，收集的是第i-1轮迭代结束到第i轮迭代开始这一短暂时间间隔内再次变脏的页面。    当to_skip为1表示这很短时间内某页面又再次被修改，也就可以认为该页频繁访问，为避免该页被重复拷贝，可以暂缓拷贝。<br>    第一轮迭代时候，to_send被初始化为全1，to_skip实际上是没有获取的，所以可以不必考虑to_skip。<br>    最后一轮迭代时候，to_fix、to_skip都需要一并拷贝，以保证内存拷贝的完整。</p>
+<p><strong>后处理代码：</strong></p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-6.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-6.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p><strong>代码分析</strong><br>    后处理主要是判定是否进行最后一轮迭代，如果是最后一轮置标记并申请停机。<br>    判定规则：<br>    如果     迭代次数iter大于等于预设最大迭代次数max_iters<br>    或者     本轮拷贝页面数与跳过页面数之和小于50<br>    或者      整个迭代过程拷贝总页面数大于迭代因子倍的P2M表对应页面数量<br>    则          进入停机拷贝。</p>
+<p>设备状态的拷贝是在XendCheckpoint.py中的save()函数中实现的。</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/1-7.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/1-7.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<hr>
+<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟机快照/">虚拟机快照<span class="article-category-count">1</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Snapshot/">Snapshot</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/XEN/">XEN</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-xen-event"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -362,69 +437,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-qemukvm-source1"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/qemukvm-source1/">Qemu-KVM虚拟机初始化及创建过程源码简要分析（一）</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/qemukvm-source1/" class="article-date">
-	  <time datetime="2017-05-04T07:01:06.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p><strong>作者:</strong> <a href="http://blog.csdn.net/mrbuffoon" target="_blank" rel="external">Mr_buffoon</a></p>
-<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p> 我们知道，Qemu-KVM实际上包括Qemu和KVM两部分，那么在创建以及初始化虚拟机时，实际上也是在这两部分进行的。</p>
-<p>KVM实际上就是kvm内核模块，包括kvm.ko、kvm-intel.ko、kvm-amd.ko三部分，后两部分分别对应Intel体系的VMX技术以及AMD体系的SVM技术。</p>
-<p>首先，我们需要加载模块，当我们加载kvm-xxx.ko模块时，会调用对应的module_init()函数，然后调用vmx_init()或者svm_init()函数，最后进入到统一的kvm.ko模块中的kvm_init()函数，现在正式开始进行虚拟机的初始化工作。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/2-1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/2-1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">module_init(vmx_init)    <span class="comment">//位于vmx.c文件</span></div></pre></td></tr></table></figure>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">static</span> <span class="keyword">int</span> __<span class="function">init <span class="title">vmx_init</span><span class="params">(<span class="keyword">void</span>)</span>    <span class="comment">//位于vmx.c文件  </span></span></div><div class="line">&#123;  </div><div class="line">       ..............<span class="comment">//省略部分代码  </span></div><div class="line">       r= kvm_init(&amp;vmx_x86_ops, <span class="keyword">sizeof</span>(<span class="keyword">struct</span> vcpu_vmx),  </div><div class="line">                   __alignof__(<span class="keyword">struct</span> vcpu_vmx),THIS_MODULE);  </div><div class="line">       ................<span class="comment">//省略部分代码  </span></div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">kvm_init</span><span class="params">(voidvoid *opaque, <span class="keyword">unsigned</span> vcpu_size,<span class="keyword">unsigned</span> vcpu_align,  </span></span></div><div class="line">                <span class="keyword">struct</span> <span class="keyword">module</span> *<span class="keyword">module</span>)    <span class="comment">//位于kvm_main.c文件  </span></div><div class="line">&#123;  </div><div class="line">       ......................<span class="comment">//省略部分代码  </span></div><div class="line">       r= kvm_arch_init(opaque);  </div><div class="line">       ........................<span class="comment">//省略部分代码  </span></div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<p> 在进入到kvm_init()函数后，进行了很多初始化的相关工作，这里单独强调一下kvm_arch_init()函数。<br>    在vmx.c文件中声明并定义了一个结构体vmx_x86_ops，这是函数指针的集合，其实就是各种操作的一个集合。内部很多函数是后续的初始化工作需要具体调用到的，比如很多Qemu层的ioctl调用到内核层实际上就是执行这内部的一些函数。具体的内容如下：<br><figure class="highlight c++"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div><div class="line">73</div><div class="line">74</div><div class="line">75</div><div class="line">76</div><div class="line">77</div><div class="line">78</div><div class="line">79</div><div class="line">80</div><div class="line">81</div><div class="line">82</div><div class="line">83</div><div class="line">84</div><div class="line">85</div><div class="line">86</div><div class="line">87</div><div class="line">88</div><div class="line">89</div><div class="line">90</div><div class="line">91</div><div class="line">92</div><div class="line">93</div><div class="line">94</div><div class="line">95</div><div class="line">96</div><div class="line">97</div><div class="line">98</div><div class="line">99</div><div class="line">100</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">static</span> <span class="keyword">struct</span> kvm_x86_ops vmx_x86_ops = &#123;  </div><div class="line">       .cpu_has_kvm_support= cpu_has_kvm_support,  </div><div class="line">       .disabled_by_bios= vmx_disabled_by_bios,  </div><div class="line">       .hardware_setup= hardware_setup,  </div><div class="line">       .hardware_unsetup= hardware_unsetup,  </div><div class="line">       .check_processor_compatibility= vmx_check_processor_compat,  </div><div class="line">       .hardware_enable= hardware_enable,  </div><div class="line">       .hardware_disable= hardware_disable,  </div><div class="line">       .cpu_has_accelerated_tpr= report_flexpriority,  </div><div class="line">   </div><div class="line">       .vcpu_create= vmx_create_vcpu,  </div><div class="line">       .vcpu_free= vmx_free_vcpu,  </div><div class="line">       .vcpu_reset= vmx_vcpu_reset,  </div><div class="line">   </div><div class="line">       .prepare_guest_switch= vmx_save_host_state,  </div><div class="line">       .vcpu_load= vmx_vcpu_load,  </div><div class="line">       .vcpu_put= vmx_vcpu_put,  </div><div class="line">   </div><div class="line">       .update_db_bp_intercept= update_exception_bitmap,  </div><div class="line">       .get_msr= vmx_get_msr,  </div><div class="line">       .set_msr= vmx_set_msr,  </div><div class="line">       .get_segment_base= vmx_get_segment_base,  </div><div class="line">       .get_segment= vmx_get_segment,  </div><div class="line">       .set_segment= vmx_set_segment,  </div><div class="line">       .get_cpl= vmx_get_cpl,  </div><div class="line">       .get_cs_db_l_bits= vmx_get_cs_db_l_bits,  </div><div class="line">       .decache_cr0_guest_bits= vmx_decache_cr0_guest_bits,  </div><div class="line">       .decache_cr3= vmx_decache_cr3,  </div><div class="line">       .decache_cr4_guest_bits= vmx_decache_cr4_guest_bits,  </div><div class="line">       .set_cr0= vmx_set_cr0,  </div><div class="line">       .set_cr3= vmx_set_cr3,  </div><div class="line">       .set_cr4= vmx_set_cr4,  </div><div class="line">       .set_efer= vmx_set_efer,  </div><div class="line">       .get_idt= vmx_get_idt,  </div><div class="line">       .set_idt= vmx_set_idt,  </div><div class="line">       .get_gdt= vmx_get_gdt,  </div><div class="line">       .set_gdt= vmx_set_gdt,  </div><div class="line">       .set_dr7= vmx_set_dr7,  </div><div class="line">       .cache_reg= vmx_cache_reg,  </div><div class="line">       .get_rflags= vmx_get_rflags,  </div><div class="line">       .set_rflags= vmx_set_rflags,  </div><div class="line">       .fpu_activate= vmx_fpu_activate,  </div><div class="line">       .fpu_deactivate= vmx_fpu_deactivate,  </div><div class="line">   </div><div class="line">       .tlb_flush= vmx_flush_tlb,  </div><div class="line">   </div><div class="line">       .run= vmx_vcpu_run,  </div><div class="line">       .handle_exit= vmx_handle_exit,  </div><div class="line">       .skip_emulated_instruction= skip_emulated_instruction,  </div><div class="line">       .set_interrupt_shadow= vmx_set_interrupt_shadow,  </div><div class="line">       .get_interrupt_shadow= vmx_get_interrupt_shadow,  </div><div class="line">       .patch_hypercall= vmx_patch_hypercall,  </div><div class="line">       .set_irq= vmx_inject_irq,  </div><div class="line">       .set_nmi= vmx_inject_nmi,  </div><div class="line">       .queue_exception= vmx_queue_exception,  </div><div class="line">       .cancel_injection= vmx_cancel_injection,  </div><div class="line">       .interrupt_allowed= vmx_interrupt_allowed,  </div><div class="line">       .nmi_allowed= vmx_nmi_allowed,  </div><div class="line">       .get_nmi_mask= vmx_get_nmi_mask,  </div><div class="line">       .set_nmi_mask= vmx_set_nmi_mask,  </div><div class="line">       .enable_nmi_window= enable_nmi_window,  </div><div class="line">       .enable_irq_window= enable_irq_window,  </div><div class="line">       .update_cr8_intercept= update_cr8_intercept,  </div><div class="line">       .set_virtual_x2apic_mode= vmx_set_virtual_x2apic_mode,  </div><div class="line">       .vm_has_apicv= vmx_vm_has_apicv,  </div><div class="line">       .load_eoi_exitmap= vmx_load_eoi_exitmap,  </div><div class="line">       .hwapic_irr_update= vmx_hwapic_irr_update,  </div><div class="line">       .hwapic_isr_update= vmx_hwapic_isr_update,  </div><div class="line">       .sync_pir_to_irr= vmx_sync_pir_to_irr,  </div><div class="line">       .deliver_posted_interrupt= vmx_deliver_posted_interrupt,  </div><div class="line">   </div><div class="line">       .set_tss_addr= vmx_set_tss_addr,  </div><div class="line">       .get_tdp_level= get_ept_level,  </div><div class="line">       .get_mt_mask= vmx_get_mt_mask,  </div><div class="line">   </div><div class="line">       .get_exit_info= vmx_get_exit_info,  </div><div class="line">   </div><div class="line">       .get_lpage_level= vmx_get_lpage_level,  </div><div class="line">   </div><div class="line">       .cpuid_update= vmx_cpuid_update,  </div><div class="line">   </div><div class="line">       .rdtscp_supported= vmx_rdtscp_supported,  </div><div class="line">       .invpcid_supported= vmx_invpcid_supported,  </div><div class="line">   </div><div class="line">       .set_supported_cpuid= vmx_set_supported_cpuid,  </div><div class="line">   </div><div class="line">       .has_wbinvd_exit= cpu_has_vmx_wbinvd_exit,  </div><div class="line">   </div><div class="line">       .set_tsc_khz= vmx_set_tsc_khz,  </div><div class="line">       .read_tsc_offset= vmx_read_tsc_offset,  </div><div class="line">       .write_tsc_offset= vmx_write_tsc_offset,  </div><div class="line">       .adjust_tsc_offset= vmx_adjust_tsc_offset,  </div><div class="line">       .compute_tsc_offset= vmx_compute_tsc_offset,  </div><div class="line">       .read_l1_tsc= vmx_read_l1_tsc,  </div><div class="line">   </div><div class="line">       .set_tdp_cr3= vmx_set_cr3,  </div><div class="line">   </div><div class="line">       .check_intercept= vmx_check_intercept,  </div><div class="line">       .handle_external_intr= vmx_handle_external_intr,  </div><div class="line">&#125;;</div></pre></td></tr></table></figure></p>
-<p>这个结构体作为参数传递到kvm_init()函数，再传递到kvm_arch_init()函数，再传递到全局变量kvm_x86_ops中，注册各种操作函数，后续可以调用。随后还进行了一些内部<strong>数据结构</strong>以及定时器、调试信息等的一些初始化工作。与此同时，qemu层也会进行大部分的初始化工作，这一部分后一篇再讲。</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/2-2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/2-2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-<hr>
-<p><strong>转载请注明</strong>：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟化基础/">虚拟化基础<span class="article-category-count">6</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/KVM/">KVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/QEMU/">QEMU</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -517,6 +529,18 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170819/cachekit/">CacheKit 利用cache不一致性绕过内存监控</a></h6>
+          <!--  <span>八月 19, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -698,18 +722,6 @@
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/nmi-virtual/">虚拟化技术的NMI窗口退出</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -720,7 +732,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Notes/">Notes</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -730,7 +742,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10.77px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cache/" style="font-size: 10px;">Cache</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10.77px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/TrustZong/" style="font-size: 10px;">TrustZong</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
     </div>
   </div>
 

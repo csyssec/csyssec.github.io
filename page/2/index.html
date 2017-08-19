@@ -112,6 +112,128 @@
         
           <section id="main">
   
+    <article id="post-ravel"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170531/ravel/">会找漏洞的时光机-Pinpointing Vulnerabilities</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170531/ravel/" class="article-date">
+	  <time datetime="2017-05-31T13:33:58.000Z" itemprop="datePublished">五月 31, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>来源： <a href="https://www.inforsec.org/wp/?p=1993" target="_blank" rel="external">InforSec</a><br>作者：Yue CHEN, Florida State University, 博士在读<br>转载请注明来源与原作者信息。</p>
+<hr>
+<p>当我们的系统遭受攻击时，即便我们已经检测到攻击，如何知道被利用的漏洞在哪里呢？</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/ravel1.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/ravel1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/ravel2.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/ravel2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+
+<p>先让我们来看一个简单的例子(见上图)：假如用户输入的argv[1]是个巨长无比的字符串，由于strcpy不限制拷贝的字符数，buf会被溢出，那么在第6行函数return时候，很可能会控制流异常。假如使用攻击检测，很可能检测到第6行的return 0，但是真正的漏洞在第4行。症状(Symptom)和根本原因(Root Cause)在不同的地方。对于复杂的大程序，想要定位到Root Cause还是非常困难的。</p>
+<p>目前基于memory instrumentation的漏洞检测，由于要instrument所有的内存访问，其开销特别大，因此不适合用于程序运行时使用。所以这篇论文提出个系统叫Ravel (Root-cause Analysis of Vulnerabilities from Exploitation Log), 它包含一个online模块和一个offline模块. <strong>Online的模块把运行的不确定事件都记录(Record)下来，并且提供攻击检测功能；Offline的模块可以重放(Replay)程序的运行，并且可以instrument memory并且定位漏洞。</strong></p>
+<p>这样做有若干优势:</p>
+<ul>
+<li>可以把真实世界里的攻击，在实验室环境进行重放(Replay)并分析。</li>
+<li>运行时候性能开销很小，开销大的漏洞定位阶段被放在了Offline的实验室里。</li>
+<li>可扩展。可以自由添加新的攻击检测和漏洞定位方法。</li>
+<li>对于攻击检测，Ravel用了现有的方法，比如程序崩溃，异常系统调用，CFI等。 对于Record &amp; Replay,  Ravel主要记录了不确定事件，比如系统调用(syscall)结果，内核到用户空间的数据拷贝，同步原语等等 (具体参看幻灯片或者论文)。</li>
+</ul>
+<p>对于Replay阶段的Memory Instrumentation，Ravel集成了二进制翻译引擎(Binary Translation Engine，简称BT)。其中很重要的功能 (也是一项挑战) ， 是可以把BT发出的syscall和目标程序本身的syscall区分开来，以确保replay和record的一致性。</p>
+<p>对于漏洞定位，Ravel设计了一系列功能。首先是<strong>数据流分析(Data-flow Analysis)</strong>。我们把写入一块内存叫做define, 简称def；把从这块内存里读出数据叫use。假如指令A写入这块内存，指令B接着读了出来，他们就构成了一组def-use关系。一堆这种关系可以构成一张图，叫DFG (Data-flow Graph).</p>
+<p>我们可以预先把这些关系找出来，做一张DFG。假如运行时候有之前没见过的def-use关系出现，可以视为发现 违规(violation)，意味着很可能有漏洞。那么如何知道出问题的地方是在def，还是在use呢？</p>
+<p>Ravel用了一些启发式搜索(heuristics)。这里用buffer overflow举个例子。</p>
+<p>比如我们本来有三个use (也就是read from memory):</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/ravel3.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/ravel3.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>然后有一个大的def (write to memory) 把这仨use都覆盖了:</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/ravel4.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/ravel4.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>假如发现这些def-use关系是violation，那么很有可能，漏洞在def的指令及其周围。</p>
+<p>并且很有可能是buffer overflow, memory overwriting之类的。Violation关系如下图:</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/ravel5.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/ravel5.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p>别的漏洞，比如information leakage，也可以用类似的方法来定位。</p>
+<p>对于<strong>整数错误(Integer Errors)</strong>, Ravel关注的是一些用整数计数(比如放在RCX/ECX寄存器里)的指令，比如MOVS, STOS 等； 和有整数参数的函数，比如memcpy, recvfrom 等。从这些参数开始，Ravel进行backwards search来定位漏洞。</p>
+<p>可以定位的整数错误漏洞包括:</p>
+<p>Assignment Truncation (比如0x12345678 → 0x5678)</p>
+<ul>
+<li>检测方法：从longer type赋值到shorter type</li>
+</ul>
+<p>Integer Overflow/underflow (比如0xFFFFFFFF + 1)</p>
+<ul>
+<li><p>检测方法：检测RFLAGS/EFLAGS寄存器<br>Signedness Error (比如 unsigned_int_var = signed_int_var)</p>
+</li>
+<li><p>检测方法：收集Hint。比如一些指令或者函数会指定特定的signed或者unsigned参数。详情参见slides或者<br>那么有些整数错误是程序员/编译器故意设置的，如何区分呢？</p>
+</li>
+<li><p>由于这些错误已经和reported的漏洞相关，所以非常大可能是漏洞，而不是正常的整数操作。<br>假如Race Condition存在，replay的execution trace会和record下来的不一样，所以可以用该方法来检测。</p>
+</li>
+</ul>
+<p>一旦检测到，Ravel继续用happens-before relation来进一步尝试定位漏洞。</p>
+<p>Ravel还能检测以下一系列漏洞，具体参见paper，此处不再赘述:</p>
+<p>Use-after-free and Double-free</p>
+<p>Buffer Overflow</p>
+<p>Integer Errors</p>
+<p>Information Leakage</p>
+<p>Format String Vulnerabilities</p>
+<p>Ravel的Record &amp; Replay功能基于FreeBSD 10.2实现，漏洞定位基于Valgrind实现。</p>
+<p>下图用Nginx的CVE-2013-2028 漏洞举了一个Ravel如何从攻击定位到漏洞的例子, 具体描述参见论文。</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/ravel6.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/ravel6.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p>更多的Evaluation实验, 比如Heartbleed，以及别的漏洞类型比如</p>
+<p>Null Pointer Dereference,</p>
+<p>Heap Overflow,</p>
+<p>Out-of-bounds Read,</p>
+<p>Untrusted Pointer Dereference,</p>
+<p>也可以在论文里找到。</p>
+<p>最后是Online Performance Overhead的Evaluation, 实验是在流行的web服务器和SPEC CPU 2006上做的， 可以看出性能开销非常小。</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/ravel7.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/ravel7.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p>论文链接: <a href="http://ww2.cs.fsu.edu/~ychen/paper/ravel.pdf" target="_blank" rel="external">http://ww2.cs.fsu.edu/~ychen/paper/ravel.pdf</a></p>
+<p>Slides链接(pptx): <a href="http://ww2.cs.fsu.edu/~ychen/paper/ravel.pptx" target="_blank" rel="external">http://ww2.cs.fsu.edu/~ychen/paper/ravel.pptx</a></p>
+<p>Slides链接(pdf): <a href="http://ww2.cs.fsu.edu/~ychen/paper/ravel_slides.pdf" target="_blank" rel="external">http://ww2.cs.fsu.edu/~ychen/paper/ravel_slides.pdf</a></p>
+<p>作者简介:</p>
+<p>Yue CHEN, Florida State University, 博士在读。期间曽有幸在 百度美研X-Lab, 华为美研大数据组 等地实习。</p>
+<p>研究兴趣为系统安全，移动安全。个人主页: <a href="http://YueChen.me" target="_blank" rel="external">http://YueChen.me</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统安全/">系统安全<span class="article-category-count">4</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Exploit/">Exploit</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-memorysafety-attack"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -443,85 +565,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-vmi-xenproject"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170505/vmi-xenproject/">虚拟机自省技术-一个有新商业应用的安全性创造</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170505/vmi-xenproject/" class="article-date">
-	  <time datetime="2017-05-05T05:17:38.000Z" itemprop="datePublished">五月 5, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>译者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a><br>来源：<a href="https://blog.xenproject.org/2016/08/15/virtual-machine-introspection-a-security-innovation-with-new-commercial-applications/" target="_blank" rel="external">https://blog.xenproject.org/2016/08/15/virtual-machine-introspection-a-security-innovation-with-new-commercial-applications/</a><br>转载请注明: <a href="http://www.csyssec.org/20170505/vmi-xenproject/" target="_blank" rel="external">CSysSec:虚拟机自省技术-一个有新商业应用的安全性创造</a></p>
-<hr>
-<p>这篇由Xen工程主席Lars Kurth编写的文章最初发表在<a href="https://www.linux.com/news/virtual-machine-introspection-security-innovation-new-commercial-applications" target="_blank" rel="external">Linux.com</a>.</p>
-<p>几周前，Citrix和Bitdefender开启了XenServer 7 和Bitdefender Hypervisor Introspect技术研究，这项研究构成了Xen工程中Hypervisor的虚拟机自省研究（VMI）下部构造的第一个商业应用。在这篇文章中，我们会涉及一下两点：一是为何这项技术具有如此革命性，二是Xen工程区的成员和早期VMI的采用者（最受关注的<a href="http://libvmi.com/" target="_blank" rel="external">LibVMI</a>和<a href="https://drakvuf.com/" target="_blank" rel="external">DRAKVUF</a>）是如何协调成功应用这项技术的。</p>
-<h2 id="在虚拟环境下发展安全挑战"><a href="#在虚拟环境下发展安全挑战" class="headerlink" title="在虚拟环境下发展安全挑战"></a><strong>在虚拟环境下发展安全挑战</strong></h2><p>今天，恶意软件在与反恶意软件相同的环境并利用与之相同的特权运行。这也是一个愈发凸显的问题。我在这篇<a href="https://www.linux.com/news/open-source-security-process-part-1-cloud-security-introduction" target="_blank" rel="external">Linux.com文章</a>中与the Walking Dead（行尸走肉）的类比再次显现出帮助。让我们来看看传统反恶意软件是怎样与这个画面相契合，并且我们的类比是否应用于反恶意软件。</p>
-<p>在<a href="http://walkingdead.wikia.com/wiki/The_Walking_Dead_Wiki" target="_blank" rel="external">Walking Dead</a>，<a href="http://walkingdead.wikia.com/wiki/Walker" target="_blank" rel="external">Wakers尸行者</a>已控制地球，大肆蚕食剩余的人类。尸行者时时刻刻都活跃着，被声音吸引着，最终形成一个可能超出你防御范围的尸群。他们很是强壮，但却十分的木讷。正如我们在那个Linux.com的文章中探知到的，人们会犯错误，所以我们不可能一直避免尸行者侵犯我们的领地。</p>
-<p>在这一类比中，我们将尸行者比作恶意软件。试想我们的虚拟主机是一个由个人住房（虚拟机）组成的村子，Hypervisor和网络提供将村子联系起来的基础设施（街道，篱笆，供电…）。</p>
-<p>进入反恶意软件的世界：试想那些剩余的人类生存了一段时间并重新发展他们的技术，能够快速识别尸行者并修复带来的一切破坏。这可以替代巡逻队、闭路电视监控系统、警报墙/窗口等安全设施、用于抗击已发现尸行者的军队和修复所有毁坏的清理组。不幸的是，传统反恶意软件技术的现实只用于个人房屋内（亦称虚拟机），而且它们不在村里的街道。</p>
-<p>更严重的是，直到最近恶意软件相对来说还比较愚钝。然而，这个情况在最近的几年有了显著的改观。我们的尸行者逐渐进化成更快更强更智能的 <a href="http://wayward-pines.wikia.com/wiki/Wayward_Pines_Wiki" target="_blank" rel="external">Wayward Pine</a>的<a href="http://wayward-pines.wikia.com/wiki/Abby" target="_blank" rel="external">Abbies</a>。换言之，恶意软件现如今已经能够入侵或破坏掉我们的安全机制。</p>
-<p>我们所需要的是用于监视整个村落的卫星监视的替代品和在它们尝试并闯入我们的房屋时的远程破坏激光束。当然，我们还可以用这个新发现的性能来快速部署所需陆军和清理人员。这本质上是虚拟机内省技术给我们的承诺。它允许我们从操作系统外部解决安全问题，而不用依赖由地面呈现的不可靠的功能。下面会更详细的介绍这一问题。</p>
-<h2 id="从虚拟机自省技术到第一次商业应用：一个合作佳话"><a href="#从虚拟机自省技术到第一次商业应用：一个合作佳话" class="headerlink" title="从虚拟机自省技术到第一次商业应用：一个合作佳话"></a><strong>从虚拟机自省技术到第一次商业应用：一个合作佳话</strong></h2><p>将虚拟机自省技术应用到Xen Hypervisor项目上的想法是在2007年在Georgis Tech以 [Tal Garfinkel与Mendel Rosenblum]在2003年的研究为基础的。Xen Hypervisor项目在2009年通过XenAccess和内存事件的API第一次将这项技术集成进来。在某种程度上，这是对VMware的VMsafe技术的一次回应，VMsafe技术在2008年被提出，由于这项技术在可扩展性上有很大的限制在2012年被废弃。Vmsafe被vShield替代，vShield是Vmsafe的有效子集，是一种基于agent，hypervisor-facilitated, 文件系统反病毒的解决方案。</p>
-<p>在Xen项目内部，虚拟机自省技术能存活的原因在于此项技术强大的研究兴趣，并且一些专业的安全应用程序在安全性上牺牲一些性能是可以接受的。这最终导致LibVMI的诞生(2010)，这让这些API变得更容易访问。<a href="http://libvmi.com/" target="_blank" rel="external">LibVMI</a>提供了一种抽象能够最终将XEN的VMI功能的自己能暴露给其他的开源虚拟化技术，比如KVM和QEMU。</p>
-<p>在2013年5月，Intel发型了Haswell CPU，其能够利用#VE和VMFUNC扩展在VMCS上维护512个EPT指针。这被证明是对VMI技术一次潜在的颠覆，可以让hypervisor控制并让硬件在VM之间实现强隔离，而且开销比之前还小，这也让来自Bitdefender, Cisco, Intel, Novetta, TU Munich和 Zentific的安全研究员和工程师们合作起来。从2014年到2015年，XenAccess和内存事件(mem-events)API被重构到了Xen Hypervisor项目的新的VMI子系统中，添加了<a href="https://blog.xenproject.org/2016/04/13/stealthy-monitoring-with-xen-altp2m/" target="_blank" rel="external">atl2pm</a>和其它硬件特性，并且支持ARM CPU， 在Xen 4.6版本中已经发行。</p>
-<p>Citrix和Bitdefender合作将VMI技术带向市场： XenServer 7.0引入了基于Xen项目VMI接口构建的Direct Inspect APIs。用Bitdefender HVI实现，能安全地将自省能力赋予安全容器。</p>
-<h2 id="今天到底能做什么？"><a href="#今天到底能做什么？" class="headerlink" title="今天到底能做什么？"></a><strong>今天到底能做什么？</strong></h2><p>回到我们的类比：我们需要的是卫星监视系统的替代物来观察整个村庄。VMI能做到吗？在理论上：VMI将观察任意一个虚拟机的状态变为可能（村庄里的房子和它周围)，这些状态包括内存，CPU状态并且当虚拟机改变时候能接受事情。在实际上，如果不使用硬件特性的话，这样做的性能开行还是太大了。</p>
-<p>在我们想象的世界里到处都是Walkers和Abbies，这就好比我们不能监控所有的东西，意味着我们要利用自己的资源集中关注一些高价值的东西。换句话说，我们需要集中关注系统界限(每个房子的最近区域)的可疑行为。</p>
-<p>这种集中关注是通过监控可疑行为的敏感内存区域来实现的。当检测到恶意行为时，能有一种解决方案对进程状态(阻塞，杀死）或者VM状态(暂停，关闭)作出正确反映，与此同时，能在一个正运行的VM中直接收集并报告取证细节。</p>
-<p>任何时候Abbie或者Walker要接近我们的房子，想象一下我们卫星上的激光束。在技术上来说，卫星和激光设施对应XenServer的Direct Inspect API，控制和监控我们数据的软件对应Bitdefenders Hypervisor Introspection。 </p>
-<p>很重要的一点是要强调利用hypervisor来提供硬件实现的隔离，监控和补救行为发生在外部。这意味着攻击者不能破坏卫星或者激光束。</p>
-<p>当然，没有一种安全方案是完美的。如果可疑行为不会影响到VM的内存，监控软件可能不总是能检测到这种行为。这并不会削弱基于文件系统安全的地位。我们仍然需要保持警惕，没有一种完美的防御方法。在我们的村庄类比重，我们照样会被地下基础设施（比如隧道和运河）攻击。在本质上，这意味着我们必须将VMI技术和传统的反恶意软件同时利用起来。</p>
-<p>VMI和传统的hypervisor-facilitated 反病毒方案(比如vShield)相比如何呢？在我们的类比重，这些方案需要对安装在房子里的所有监控设备(CCTV,报警们/报警窗)做集中管理，然而对事件的监控特别像集中在我们村庄大厅的一个安全控制中心。即使这种方法能极大地简化发生在虚拟机里面的监控和管理方式，并不会提供自省方法能提供的额外的保护。</p>
-<p>你可以在下面找到更多有关 VMI, XenServer Direct Inspect API 和BitDefender Hypervisor Introspection 的信息(包括一些demo).</p>
-<h3 id="Xen项目虚拟机自省"><a href="#Xen项目虚拟机自省" class="headerlink" title="Xen项目虚拟机自省"></a><strong>Xen项目虚拟机自省</strong></h3><ul>
-<li>Xen项目<a href="https://wiki.xenproject.org/wiki/Virtual_Machine_Introspection" target="_blank" rel="external">虚拟机自省</a></li>
-<li>XenServer <a href="https://www.citrix.com/blogs/2016/06/21/a-revolutionary-approach-to-advanced-malware-protection/" target="_blank" rel="external">Direct Inspect API</a></li>
-<li>Bitdefender <a href="https://www.bitdefender.com/business/hypervisor-introspection.html" target="_blank" rel="external">Hypervisor Introspection</a></li>
-</ul>
-<h2 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h2><p>VMI技术的发展和它的首次开源以及商业应用都表明Xen项目社区是如何以创新的方式在发展，并能将革命性的方案带向市场。阅读代码的稀有性，从中学到一些东西，提问以及提供该井让安全研究者和像Citrix和Bitdefender这种的供应商将解决方案带向市场。</p>
-<p>值得一提的是，硬件使能的安全技术发展的非常快：只有Intel的#VE和VMFUNC的扩展子集如今被应用到了VMI技术上。利用更多的硬件扩展,能让out-of-guest工具带来的安全性以及in-guest工具带来的性能同时看到希望。</p>
-<p>更令人鼓舞的是，其它的供应商如 A1Logic, Star Lab和 Zentific在研究新的基于Xen项目的安全解决方案。另外，集中关注安全，基于Xen的<a href="http://openxt.org/" target="_blank" rel="external">OpenXT project </a>项目已经开始和Xen项目社区走的越来越近了，并保证未来在安全上的创新。</p>
-<p>这些话题的一部分会在en Project Developer Summit happening in Toronto, CA from August 25 – 26, 2016上讲得更加详细。你可以在<a href="http://events.linuxfoundation.org/events/xen-project-developer-summit" target="_blank" rel="external">这里</a>了解更多</p>
-<p>原文作者：<a href="https://blog.xenproject.org/author/lars-kurth/" target="_blank" rel="external">Lars Kurth</a></p>
-<hr>
-<p>转载请注明: <a href="http://www.csyssec.org/20170505/vmi-xenproject/" target="_blank" rel="external">CSysSec:虚拟机自省技术-一个有新商业应用的安全性创造</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">11</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Introspection/">Introspection</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Monitoring/">Monitoring</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -614,6 +657,18 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170819/cachekit/">CacheKit 利用cache不一致性绕过内存监控</a></h6>
+          <!--  <span>八月 19, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -795,18 +850,6 @@
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/nmi-virtual/">虚拟化技术的NMI窗口退出</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -817,7 +860,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Notes/">Notes</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -827,7 +870,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10.77px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cache/" style="font-size: 10px;">Cache</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10.77px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/TrustZong/" style="font-size: 10px;">TrustZong</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
     </div>
   </div>
 

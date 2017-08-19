@@ -112,6 +112,85 @@
         
           <section id="main">
   
+    <article id="post-vmi-xenproject"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170505/vmi-xenproject/">虚拟机自省技术-一个有新商业应用的安全性创造</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170505/vmi-xenproject/" class="article-date">
+	  <time datetime="2017-05-05T05:17:38.000Z" itemprop="datePublished">五月 5, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>译者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">Diting0x</a><br>来源：<a href="https://blog.xenproject.org/2016/08/15/virtual-machine-introspection-a-security-innovation-with-new-commercial-applications/" target="_blank" rel="external">https://blog.xenproject.org/2016/08/15/virtual-machine-introspection-a-security-innovation-with-new-commercial-applications/</a><br>转载请注明: <a href="http://www.csyssec.org/20170505/vmi-xenproject/" target="_blank" rel="external">CSysSec:虚拟机自省技术-一个有新商业应用的安全性创造</a></p>
+<hr>
+<p>这篇由Xen工程主席Lars Kurth编写的文章最初发表在<a href="https://www.linux.com/news/virtual-machine-introspection-security-innovation-new-commercial-applications" target="_blank" rel="external">Linux.com</a>.</p>
+<p>几周前，Citrix和Bitdefender开启了XenServer 7 和Bitdefender Hypervisor Introspect技术研究，这项研究构成了Xen工程中Hypervisor的虚拟机自省研究（VMI）下部构造的第一个商业应用。在这篇文章中，我们会涉及一下两点：一是为何这项技术具有如此革命性，二是Xen工程区的成员和早期VMI的采用者（最受关注的<a href="http://libvmi.com/" target="_blank" rel="external">LibVMI</a>和<a href="https://drakvuf.com/" target="_blank" rel="external">DRAKVUF</a>）是如何协调成功应用这项技术的。</p>
+<h2 id="在虚拟环境下发展安全挑战"><a href="#在虚拟环境下发展安全挑战" class="headerlink" title="在虚拟环境下发展安全挑战"></a><strong>在虚拟环境下发展安全挑战</strong></h2><p>今天，恶意软件在与反恶意软件相同的环境并利用与之相同的特权运行。这也是一个愈发凸显的问题。我在这篇<a href="https://www.linux.com/news/open-source-security-process-part-1-cloud-security-introduction" target="_blank" rel="external">Linux.com文章</a>中与the Walking Dead（行尸走肉）的类比再次显现出帮助。让我们来看看传统反恶意软件是怎样与这个画面相契合，并且我们的类比是否应用于反恶意软件。</p>
+<p>在<a href="http://walkingdead.wikia.com/wiki/The_Walking_Dead_Wiki" target="_blank" rel="external">Walking Dead</a>，<a href="http://walkingdead.wikia.com/wiki/Walker" target="_blank" rel="external">Wakers尸行者</a>已控制地球，大肆蚕食剩余的人类。尸行者时时刻刻都活跃着，被声音吸引着，最终形成一个可能超出你防御范围的尸群。他们很是强壮，但却十分的木讷。正如我们在那个Linux.com的文章中探知到的，人们会犯错误，所以我们不可能一直避免尸行者侵犯我们的领地。</p>
+<p>在这一类比中，我们将尸行者比作恶意软件。试想我们的虚拟主机是一个由个人住房（虚拟机）组成的村子，Hypervisor和网络提供将村子联系起来的基础设施（街道，篱笆，供电…）。</p>
+<p>进入反恶意软件的世界：试想那些剩余的人类生存了一段时间并重新发展他们的技术，能够快速识别尸行者并修复带来的一切破坏。这可以替代巡逻队、闭路电视监控系统、警报墙/窗口等安全设施、用于抗击已发现尸行者的军队和修复所有毁坏的清理组。不幸的是，传统反恶意软件技术的现实只用于个人房屋内（亦称虚拟机），而且它们不在村里的街道。</p>
+<p>更严重的是，直到最近恶意软件相对来说还比较愚钝。然而，这个情况在最近的几年有了显著的改观。我们的尸行者逐渐进化成更快更强更智能的 <a href="http://wayward-pines.wikia.com/wiki/Wayward_Pines_Wiki" target="_blank" rel="external">Wayward Pine</a>的<a href="http://wayward-pines.wikia.com/wiki/Abby" target="_blank" rel="external">Abbies</a>。换言之，恶意软件现如今已经能够入侵或破坏掉我们的安全机制。</p>
+<p>我们所需要的是用于监视整个村落的卫星监视的替代品和在它们尝试并闯入我们的房屋时的远程破坏激光束。当然，我们还可以用这个新发现的性能来快速部署所需陆军和清理人员。这本质上是虚拟机内省技术给我们的承诺。它允许我们从操作系统外部解决安全问题，而不用依赖由地面呈现的不可靠的功能。下面会更详细的介绍这一问题。</p>
+<h2 id="从虚拟机自省技术到第一次商业应用：一个合作佳话"><a href="#从虚拟机自省技术到第一次商业应用：一个合作佳话" class="headerlink" title="从虚拟机自省技术到第一次商业应用：一个合作佳话"></a><strong>从虚拟机自省技术到第一次商业应用：一个合作佳话</strong></h2><p>将虚拟机自省技术应用到Xen Hypervisor项目上的想法是在2007年在Georgis Tech以 [Tal Garfinkel与Mendel Rosenblum]在2003年的研究为基础的。Xen Hypervisor项目在2009年通过XenAccess和内存事件的API第一次将这项技术集成进来。在某种程度上，这是对VMware的VMsafe技术的一次回应，VMsafe技术在2008年被提出，由于这项技术在可扩展性上有很大的限制在2012年被废弃。Vmsafe被vShield替代，vShield是Vmsafe的有效子集，是一种基于agent，hypervisor-facilitated, 文件系统反病毒的解决方案。</p>
+<p>在Xen项目内部，虚拟机自省技术能存活的原因在于此项技术强大的研究兴趣，并且一些专业的安全应用程序在安全性上牺牲一些性能是可以接受的。这最终导致LibVMI的诞生(2010)，这让这些API变得更容易访问。<a href="http://libvmi.com/" target="_blank" rel="external">LibVMI</a>提供了一种抽象能够最终将XEN的VMI功能的自己能暴露给其他的开源虚拟化技术，比如KVM和QEMU。</p>
+<p>在2013年5月，Intel发型了Haswell CPU，其能够利用#VE和VMFUNC扩展在VMCS上维护512个EPT指针。这被证明是对VMI技术一次潜在的颠覆，可以让hypervisor控制并让硬件在VM之间实现强隔离，而且开销比之前还小，这也让来自Bitdefender, Cisco, Intel, Novetta, TU Munich和 Zentific的安全研究员和工程师们合作起来。从2014年到2015年，XenAccess和内存事件(mem-events)API被重构到了Xen Hypervisor项目的新的VMI子系统中，添加了<a href="https://blog.xenproject.org/2016/04/13/stealthy-monitoring-with-xen-altp2m/" target="_blank" rel="external">atl2pm</a>和其它硬件特性，并且支持ARM CPU， 在Xen 4.6版本中已经发行。</p>
+<p>Citrix和Bitdefender合作将VMI技术带向市场： XenServer 7.0引入了基于Xen项目VMI接口构建的Direct Inspect APIs。用Bitdefender HVI实现，能安全地将自省能力赋予安全容器。</p>
+<h2 id="今天到底能做什么？"><a href="#今天到底能做什么？" class="headerlink" title="今天到底能做什么？"></a><strong>今天到底能做什么？</strong></h2><p>回到我们的类比：我们需要的是卫星监视系统的替代物来观察整个村庄。VMI能做到吗？在理论上：VMI将观察任意一个虚拟机的状态变为可能（村庄里的房子和它周围)，这些状态包括内存，CPU状态并且当虚拟机改变时候能接受事情。在实际上，如果不使用硬件特性的话，这样做的性能开行还是太大了。</p>
+<p>在我们想象的世界里到处都是Walkers和Abbies，这就好比我们不能监控所有的东西，意味着我们要利用自己的资源集中关注一些高价值的东西。换句话说，我们需要集中关注系统界限(每个房子的最近区域)的可疑行为。</p>
+<p>这种集中关注是通过监控可疑行为的敏感内存区域来实现的。当检测到恶意行为时，能有一种解决方案对进程状态(阻塞，杀死）或者VM状态(暂停，关闭)作出正确反映，与此同时，能在一个正运行的VM中直接收集并报告取证细节。</p>
+<p>任何时候Abbie或者Walker要接近我们的房子，想象一下我们卫星上的激光束。在技术上来说，卫星和激光设施对应XenServer的Direct Inspect API，控制和监控我们数据的软件对应Bitdefenders Hypervisor Introspection。 </p>
+<p>很重要的一点是要强调利用hypervisor来提供硬件实现的隔离，监控和补救行为发生在外部。这意味着攻击者不能破坏卫星或者激光束。</p>
+<p>当然，没有一种安全方案是完美的。如果可疑行为不会影响到VM的内存，监控软件可能不总是能检测到这种行为。这并不会削弱基于文件系统安全的地位。我们仍然需要保持警惕，没有一种完美的防御方法。在我们的村庄类比重，我们照样会被地下基础设施（比如隧道和运河）攻击。在本质上，这意味着我们必须将VMI技术和传统的反恶意软件同时利用起来。</p>
+<p>VMI和传统的hypervisor-facilitated 反病毒方案(比如vShield)相比如何呢？在我们的类比重，这些方案需要对安装在房子里的所有监控设备(CCTV,报警们/报警窗)做集中管理，然而对事件的监控特别像集中在我们村庄大厅的一个安全控制中心。即使这种方法能极大地简化发生在虚拟机里面的监控和管理方式，并不会提供自省方法能提供的额外的保护。</p>
+<p>你可以在下面找到更多有关 VMI, XenServer Direct Inspect API 和BitDefender Hypervisor Introspection 的信息(包括一些demo).</p>
+<h3 id="Xen项目虚拟机自省"><a href="#Xen项目虚拟机自省" class="headerlink" title="Xen项目虚拟机自省"></a><strong>Xen项目虚拟机自省</strong></h3><ul>
+<li>Xen项目<a href="https://wiki.xenproject.org/wiki/Virtual_Machine_Introspection" target="_blank" rel="external">虚拟机自省</a></li>
+<li>XenServer <a href="https://www.citrix.com/blogs/2016/06/21/a-revolutionary-approach-to-advanced-malware-protection/" target="_blank" rel="external">Direct Inspect API</a></li>
+<li>Bitdefender <a href="https://www.bitdefender.com/business/hypervisor-introspection.html" target="_blank" rel="external">Hypervisor Introspection</a></li>
+</ul>
+<h2 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h2><p>VMI技术的发展和它的首次开源以及商业应用都表明Xen项目社区是如何以创新的方式在发展，并能将革命性的方案带向市场。阅读代码的稀有性，从中学到一些东西，提问以及提供该井让安全研究者和像Citrix和Bitdefender这种的供应商将解决方案带向市场。</p>
+<p>值得一提的是，硬件使能的安全技术发展的非常快：只有Intel的#VE和VMFUNC的扩展子集如今被应用到了VMI技术上。利用更多的硬件扩展,能让out-of-guest工具带来的安全性以及in-guest工具带来的性能同时看到希望。</p>
+<p>更令人鼓舞的是，其它的供应商如 A1Logic, Star Lab和 Zentific在研究新的基于Xen项目的安全解决方案。另外，集中关注安全，基于Xen的<a href="http://openxt.org/" target="_blank" rel="external">OpenXT project </a>项目已经开始和Xen项目社区走的越来越近了，并保证未来在安全上的创新。</p>
+<p>这些话题的一部分会在en Project Developer Summit happening in Toronto, CA from August 25 – 26, 2016上讲得更加详细。你可以在<a href="http://events.linuxfoundation.org/events/xen-project-developer-summit" target="_blank" rel="external">这里</a>了解更多</p>
+<p>原文作者：<a href="https://blog.xenproject.org/author/lars-kurth/" target="_blank" rel="external">Lars Kurth</a></p>
+<hr>
+<p>转载请注明: <a href="http://www.csyssec.org/20170505/vmi-xenproject/" target="_blank" rel="external">CSysSec:虚拟机自省技术-一个有新商业应用的安全性创造</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/虚拟机监控/">虚拟机监控<span class="article-category-count">11</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Introspection/">Introspection</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Monitoring/">Monitoring</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-cf-exception"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -384,84 +463,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-ropjop-research"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/ropjop-research/">ROP/JOP攻击与防御最新研究进展</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/ropjop-research/" class="article-date">
-	  <time datetime="2017-05-04T10:42:57.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/11/latest-researching-status-of-ropjop.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/latest-researching-status-of-ropjop.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>Control Flow Hijacking, like ROP, becomes a hot topic in recent years since ever DEP(W^X enforcement) and SMEP were introduced in h/w processor. Based upon the papers that I read recently, this post just gives a brief introduction on the recent researching status (though incomplete) about control flow attacks and defenses. </p>
-<p>When code injection attacks become more and more difficult, attackers start to seek other opportunities to execute arbitrary code with completely re-using existing executable code in application image and/or shared libraries.</p>
-<p>Typically, for example, those techniques without code injection could be return-to-libc, ROP (Return Oriented Programming), JOP (Jump Oriented Programming), or even SROP (Sigreturn Oriented Programming, see <a href="https://www.cs.vu.nl/~herbertb/papers/srop_sp14.pdf" target="_blank" rel="external">Framing Signals—A Return to Portable Shellcode</a>). </p>
-<p>Regarding techniques that defend against those control flow hijackings, here below are the lists (also incomplete).</p>
-<ul>
-<li>Change existing compilers to re-generate the code binaries. There are some typical solutions like, generate return-less binary code, generate control flow friendly binary (with extra IDs/labels for CFG hardening), modify all the control flow (ret, jmp, call) instructions to a well-known center redirection table, etc.</li>
-<li>Without binary changes, make static binary instrument and dynamic control flow tracing. For instance, build control flow graph, and enforce the control flow execution exactly aligning with the known CFG paths.</li>
-<li>Hardware assisted CFI. CFI(Control-Flow Integrity) is an efficient way to defend against ROP/JOP attacks. However, due to performance issue, complete CFI enforcement is impossible in practice. So, there are some lightweight CFI checks with the help of latest processor LBR (last branch record) to examine the control flow behaviors base upon the experience (rather than the full CFG analysis).</li>
-<li>THere are some specific solutions, like stack shadowing (to check if the target “ret” is call-preceding instruction), code section shadowing. But most of them are not a generic solution, but have many assumptions and limitations. </li>
-</ul>
-<p>Regarding to the defenses with CFI, there are many papers that focus on the policy of checking whether or not the history control flow instructions behave as a malicious software. Typically, for example:</p>
-<ul>
-<li>Some solutions to <strong><em>check the length of each one of ROP gadgets</em></strong>. If it is very short (e.g. less than 5~6 instructions), it might be suspected. If there are consecutive chain of gadgets with “short” instruction sequences in a control flow, then it might be a ROP attack.</li>
-<li>Some of them to <strong><em>check whether if the target of “ret” is a Call-Preceded instruction</em></strong> (the instruction immediately preceding is a CALL instruction), this is because normally, every “ret” instruction returns back to an instruction that immediately follows a corresponding “call” instruction. </li>
-<li>Or check if <strong><em>the target of all the indirect call/jmp instructions are the “entry-point” functions</em></strong>. This is also normally true for a legitimate application, because generally an indirect “jmp” or “call” won’t be calling into a certain middle location in a function. </li>
-</ul>
-<p>However, just as those papers (see the links in References below) indicate, all the current CFI solutions based upon above assumptions can be bypassed with advanced ROP gadgets. </p>
-<p>For example, in Nicholas’s paper, he just used some call-preceded ROP gadgets and long termination gadgets for flushing attacking history to bypass checks of the famous kBouncer and ROPecker CFI solutions.</p>
-<p>But his solution has an assumption for kBounce/ROPecker: the last branch records (LBR) can be stored in only 16 (at most) pairs of LBR MSRs. </p>
-<p>As a matter of fact, if appropriately configured, the last branch records can also be stored into a variable-sized memory-resident branch trace store (BTS) buffer specified by DS(Debug Store) save area pointed by the IA32_DS_AREA MSR . And processor doesn’t restrict how many pairs of last branch records could be stored in that BTS buffer, it also allows us to make processor generate an interrupt before the count of records reaches to the max records configured (or when the BTS buffer is nearly full). This means that we will never miss history LBR records. If we don’t consider performance cost when enforcing CFI check at run time, this could be a good solution to trace all the control flow information. </p>
-<p><strong>However, even if we can get all the control flow traces (to defend against Nicholas’s “history flushing” solution), does it mean that we can completely defend against control flow attacks?</strong> Unless that we can make full CFI checks with CFG, one of another problems that we might always encounter is how to design a better policy to reduce “false positive”, and at the same time to catch all the ROP attacks at run time with acceptable performance cost in practice. </p>
-<hr>
-<p><strong><em>References:</em></strong></p>
-<ul>
-<li>Nicholas Carlini, David Wagner, ROP is Still Dangerous: Breaking Modern Defenses<br><a href="http://www.cs.berkeley.edu/~daw/papers/rop-usenix14.pdf" target="_blank" rel="external">http://www.cs.berkeley.edu/~daw/papers/rop-usenix14.pdf</a></li>
-<li>Enes Gökta¸s, Size Does Matter - Why Using Gadget-Chain Length to Prevent Code-Reuse Attacks is Hard<br><a href="http://www.cs.columbia.edu/~mikepo/papers/chainlength.sec14.pdf" target="_blank" rel="external">http://www.cs.columbia.edu/~mikepo/papers/chainlength.sec14.pdf</a></li>
-<li>Out Of Control: Overcoming Control-Flow Integrity:  <a href="http://www.ieee-security.org/TC/SP2014/papers/OutOfControl_c_OvercomingControl-FlowIntegrity.pdf" target="_blank" rel="external">http://www.ieee-security.org/TC/SP2014/papers/OutOfControl_c_OvercomingControl-FlowIntegrity.pdf</a></li>
-<li>Technical Report TR-HGI-2014-001:<br><a href="http://www.hgi.ruhr-uni-bochum.de/media/emma/veroeffentlichungen/2014/05/09/TR-HGI-2014-001_1_1.pdf" target="_blank" rel="external">http://www.hgi.ruhr-uni-bochum.de/media/emma/veroeffentlichungen/2014/05/09/TR-HGI-2014-001_1_1.pdf</a></li>
-</ul>
-<hr>
-<p> 转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">14</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Attack/">Attack</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Malware/">Malware</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -554,6 +555,18 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170819/cachekit/">CacheKit 利用cache不一致性绕过内存监控</a></h6>
+          <!--  <span>八月 19, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -735,18 +748,6 @@
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/nmi-virtual/">虚拟化技术的NMI窗口退出</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -757,7 +758,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Notes/">Notes</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -767,7 +768,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10.77px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cache/" style="font-size: 10px;">Cache</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10.77px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/TrustZong/" style="font-size: 10px;">TrustZong</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
     </div>
   </div>
 
