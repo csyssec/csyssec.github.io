@@ -29,7 +29,7 @@ metaphor：">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/rop4.jpeg">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/rop5.jpeg">
 <meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/ROP6.jpeg">
-<meta property="og:updated_time" content="2017-08-22T11:56:24.000Z">
+<meta property="og:updated_time" content="2017-08-22T11:59:08.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="ROP攻与防">
 <meta name="twitter:description" content="diting0x
@@ -183,7 +183,7 @@ metaphor：">
 <p><a href="https://www.usenix.org/sites/default/files/conference/protected-files/sec14_slides_carlini.pdf" target="_blank" rel="external">slides</a><br><a href="https://www.usenix.org/system/files/conference/usenixsecurity14/sec14-paper-carlini.pdf" target="_blank" rel="external">pdf</a> <a href="https://www.usenix.org/node/184508" target="_blank" rel="external">video</a></p>
 <p>防：ASLR-Guard（ccs’15 Byoungyoung）<br>要实施code reuse attack，要满足两个条件：1.知道现有gadgets的地址，2.用这个地址覆盖被控制的数据。对2的防御有：stackguard,cfi,code pointer integrity，对1的防御有：ASLR,但是ASLR有个缺陷，信息泄露，比如代码指针的泄露导致可验获取代码地址（JIT-ROP,Blind ROP, “Missing the point”)<br>本文目标：阻止代码指针的泄露。方法：系统化的发现代码指针，两种技术来阻止代码指针的泄露，隔离与加密。将代码指针存储在隔离的内存区域，隔离还不够，还需进行加密。实现：gcc,gas,ld,ld.so 3000sloc，eglibc,glibc。<br><a href="https://lifeasageek.github.io/papers/lu:aslrguard-slides.pdf" target="_blank" rel="external">slides</a> <a href="https://lifeasageek.github.io/papers/lu:aslrguard.pdf" target="_blank" rel="external">pdf</a></p>
 <p>防：XnR  (CCS’15)<br>里面关于rop,aslr,jit-rop等介绍的很详细<br>该文从代码泄漏的角度进行了防护：当代码在被执行期间，不允许对代码的读操作，从而能有效抵御JIT code reuse攻击，简称XnR。类似W^X（W⨁X)策略。 这一思路在无硬件支撑的条件下，通过软件MMU实现，<br>基本思路：要实现XnR策略，在硬件不支持的情况下，可通过修改MMU中处理过程，实现软体MMU。 目前架构中：mmu可以检测到写，但是无法检测到读；读只能通过内存页的non-present实现；但是一旦non-present的话，代码也将无法运行。解决方法：修改page fault handler,在handler中区分page fault产生的原因，并决定是否继续正常执行，还是发现代码内存读取行为，中止执行。 具体的，在代码运行期间，仅允许极少的代码可读，文中的实验数据表明，采用3页的sliding windows是一个比较好的选择，即当前代码页面的相邻两页。是否可读性的实现方式是通过设置页面的present位实现，非法的读取将陷入中断，在中断中判断中断原因是缺页还是非法读。<br><a href="https://www.infsec.cs.uni-saarland.de/wp-content/uploads/sites/2/2014/10/nuernberger2014ccs_disclosure.pdf" target="_blank" rel="external">PDF</a> <a href="http://happyhacking.info/post/xnr" target="_blank" rel="external">来自liangyu blog</a></p>
-<p>防：No-Execute-After-Read:<br>Preventing Code Disclosure in Commodity Software （AsiaCCS’16）<br>文章提出最新的XnR技术不能防御just-in-time的代码复用攻击，并设计了一种No-Execute-After-Read(NEAR)，针对just-it-time攻击进行强安全保证。NEAR允许所有代码被披露，但是阻止被披露的代码继续执行。<br><a href="https://www3.cs.stonybrook.edu/~mikepo/papers/near.asiaccs16.pdf" target="_blank" rel="external">pdf</a> <a href="https://github.com/UNCSecLab/VMXXNR" target="_blank" rel="external">code</a></p>
+<p>防：No-Execute-After-Read:<br>Preventing Code Disclosure in Commodity Software （AsiaCCS’16）<br>文章提出最新的XnR技术不能防御just-in-time的代码复用攻击，并设计了一种No-Execute-After-Read(NEAR)，针对just-it-time攻击进行强安全保证。NEAR允许所有代码被披露，但是阻止被披露的代码继续执行。<br><a href="https://www3.cs.stonybrook.edu/~mikepo/papers/near.asiaccs16.pdf" target="_blank" rel="external">pdf</a> </p>
 <hr>
 <p>待续</p>
 
