@@ -112,6 +112,71 @@
         
           <section id="main">
   
+    <article id="post-virtual-ret2dir"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170504/virtual-ret2dir/">利用虚拟化技术防御ret2dir攻击</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170504/virtual-ret2dir/" class="article-date">
+	  <time datetime="2017-05-04T10:34:43.000Z" itemprop="datePublished">五月 4, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/11/defending-against-ret2dir-attacks.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/defending-against-ret2dir-attacks.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+<hr>
+<p>I was so excited when recently reading the paper (<strong><a href="http://www.cs.columbia.edu/~vpk/papers/ret2dir.sec14.pdf" target="_blank" rel="external">ret2dir: Rethinking Kernel Isolation</a></strong> from <strong><a href="http://www.cs.columbia.edu/~vpk/" target="_blank" rel="external">Vasileios P. Kemerlis</a></strong>. This post is basically going to introduce the idea of ret2dir attack, and how to prevent such an attack with hardware virtualization technology, actually partially. </p>
+<p>ret2dir (Return-to-Direct-Mapped-Memory) attack abuses <strong><em>physmap</em></strong> design in kernel virtual memory management system of many Linux/Unix OSs, it can bypass the SMEP/SMAP, PXN, KERNEXEC/UDEREF. </p>
+<p>So, what is <strong><em>physmap</em></strong>? </p>
+<p>It is Address Aliasing technique, which is designed for performance improvement. According to the author, “Given the existence of physmap, whenever the kernel (buddy allocator) maps a page frame to user space, it effectively creates an alias ( synonym) of user content in kernel space!”</p>
+<p>To be more specific, the key point is that <strong><em>for the same physical memory address space in physmap region, there might have two virtual address addresses that will be translated or mapped to the same physical memory space, aka, N:1 mapping, here N is 2</em></strong>. One virtual address is in kernel address space (Page table U/S bit =0), and the other is in user address space (U/S=1). See picture below from ret2dir paper.</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/ret2dir.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/ret2dir.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>In order to make this kind of attacks work, the paper presents several innovative solutions. For example, how to force user memory allocation physical pages emerge in physmap area, how to get PFN info through information leak, and how to do physmap spaying (<strong><a href="http://hypervsir.blogspot.com/2014/11/what-does-transactional-synchronization.html" target="_blank" rel="external">Can TSX help x-spaying exploit writing</a></strong>?) , etc. </p>
+<p>Besides, the author also innovates a solution in Linux kernel to mitigate this ret2dir attack: eXclusive Page Frame Ownerwhip (XPFO). </p>
+<p>The basic idea is very straightforward, it enforces exclusive ownership (of page frames) by either the kernel or userland unless explicitly requested by a kernel component(e.g., to implement zero-copy shared buffers). It means whenever a page frame is allocated to userland, it unmaps it from <strong><em>physmap</em></strong> ; when such a page frame is reclaimed from userland, it puts it back to <strong><em>physmap</em></strong>. </p>
+<p><strong>In a virtualization environment, however, this solution (</strong><a href="http://hypervsir.blogspot.com/2014/11/how-to-implement-software-based.html" target="_blank" rel="external">How to Implement a software-based SMEP with Virtualization/Hypervisor Technology</a><strong>) in my previous post may be able to stop or defend against ret2dir attacks. But it also has a limitation: the virtualization-based software SMEP can only stop execution of shellcode/payload in physmem area.</strong></p>
+<p><strong>In order to stop read/write access to payload from kernel space with ret2dir attacks (which could be used to do ROP attacks, e.g. use the payload as kernel stack after stack pivoting), technically, we can extend that solution to implement a virtualization-based software SMAP to defend against ret2dir attacks…</strong></p>
+<hr>
+<p><strong><em>References:</em></strong><br>ret2dir: Rethinking Kernel Isolation – paper:<br><a href="http://www.cs.columbia.edu/~vpk/papers/ret2dir.sec14.pdf" target="_blank" rel="external">http://www.cs.columbia.edu/~vpk/papers/ret2dir.sec14.pdf</a></p>
+<p>and its slides:<br><a href="https://www.usenix.org/sites/default/files/conference/protected-files/sec14_slides_kemerlis.pdf" target="_blank" rel="external">https://www.usenix.org/sites/default/files/conference/protected-files/sec14_slides_kemerlis.pdf</a></p>
+<p>OPENBSD FIX TO REMOVE EXECUTABLE PERMISSION IN DIRECT-MAP PAGES (RECENTLY):<br><a href="https://secure.freshbsd.org/commit/openbsd/52e8e9f52ef21a21a315187623fafe4800efd868" target="_blank" rel="external">https://secure.freshbsd.org/commit/openbsd/52e8e9f52ef21a21a315187623fafe4800efd868</a></p>
+<hr>
+<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/恶意代码/">恶意代码<span class="article-category-count">14</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Attack/">Attack</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-smep-nx"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -445,83 +510,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-bitvisor"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/bitvisor/">BitVisor- 一种实施I/O设备安全的轻量级Hypervisor</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/bitvisor/" class="article-date">
-	  <time datetime="2017-05-04T10:25:16.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author：<a href="https://github.com/bzhu5" target="_blank" rel="external">Bing Zhu</a><br>Source：<a href="http://hypervsir.blogspot.com/2014/11/paper-read-bitvisor-thin-hypervisor-for.html" target="_blank" rel="external">http://hypervsir.blogspot.com/2014/11/paper-read-bitvisor-thin-hypervisor-for.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>This post is wrote to share an idea of the paper (<a href="http://dl.acm.org/citation.cfm?id=1508311" target="_blank" rel="external">BitVisor: A Thin Hypervisor for Enforcing I/O Device Security</a>) that I read recently. It innovates a <strong>hypervisor-based solution for enforcing storage/disk encryption of ATA devices</strong>.<br>As we know that Direct memory access (DMA) is a feature in computer system that allows certain hardware subsystems to directly access main system memory independently of the CPU/processor. </p>
-<p>As shown in picture below (from <a href="http://en.wikipedia.org/wiki/IOMMU" target="_blank" rel="external">wikipedia</a>), processor MMU (if present) cannot directly intercept data movement between external DMA-capable devices and the main memory. Even in a virtualization environment, extended page table (EPT or NPT) MMU configured by Hypervisor cannot protect the main memory resource, this is one of reasons of why the technology IOMMU like VT-d (<a href="https://software.intel.com/en-us/articles/intel-virtualization-technology-for-directed-io-vt-d-enhancing-intel-platforms-for-efficient-virtualization-of-io-devices" target="_blank" rel="external">Intel Virtualization Technology for Directed I/O</a>) is introduced to prevent malicious device drivers from attacking against the main memory even hypervisor owned memory space. </p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/MMU_and_IOMMU.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/MMU_and_IOMMU.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p><strong>Although the processor has no chance to intercept the data transferred between device and main memory, it still has chances to intercept the access to DMA control data regions like DMA descriptors that store transferring information,<br>such as the buffer address and the size of the data.</strong></p>
-<p>Because basically all the DMA host controllers are using some specific command control registers to configure and trigger DMA data transfers. Those registers are commonly represented as I/O based or/and MMIO based registers, the former registers are accessed with I/O port (e.g. IN/OUT or INTS/OUTS instructions in x86 system), and the latter registers are accessed with <a href="http://en.wikipedia.org/wiki/Memory-mapped_I/O" target="_blank" rel="external">memory-mapped I/O</a> method with generic memory movement instructions (like MOV instruction).</p>
-<p>In x86 virtualization, both accesses with I/O port and MMIO can be monitored by hypervisor (e.g. through I/O port bitmap VMCS configuration, and appropriate EPT page permission settings). </p>
-<p>In BitVisor, <strong>a thin hypervisor intercepts any read/write access to the ATA DMA host controller’s command-block registers and control-block register. Therefore, it is easy to obtain information necessary to enforce encryption</strong>. For example, the hypervisor can obtain the LBA and sector count by intercepting writes to these registers. Similarly, the corresponding ATA disk DMA descriptor can also be monitored and controlled by BitVisor hypervisor. </p>
-<p><strong>With intercepting all the information as mentioned above, the hypervisor has knowledge of where the DMA buffer (physical address) will be transferred to/from, when to start/stop data transfers, and what size in bytes will be transferred to/from external device.</strong></p>
-<p>This paper presents a novel idea of <strong><em>shadow DMA descriptors</em></strong> (see Figure below, click it to enlarge) for safely intercepting the content of data transferred by DMA. A shadow DMA descriptor is a shadow of the DMA descriptor of the guest OS (guest DMA descriptor).The hypervisor sets the shadow DMA descriptors to the host controller (rather than the real guest DMA descriptor). The shadow DMA descriptor specifies a memory region controlled by the hypervisor as a temp buffer, called the shadow buffer. </p>
-<p>When data movement starts, the DMA host controller transfers data between the shadow buffer (rather than the real guest buffer) and the device, based on the shadow DMA descriptors. After data movement is completed, the hypervisor emulates the host controller behaviors by copying data between the shadow buffer and the guest buffer that is specified in the real guest DMA descriptor.</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/BitVisor.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/BitVisor.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>Now that hypervisor can fully control and intercept the DMA data content, the encryption and decryption become easy. When guest software writes the data to ATA disk, the hypervisor can enforce encryption from guest buffer to shadow buffer (that eventually goes to disk), and in reverse order when guest software reads data from ATA disk, the hypervisor will decrypt data from shadow buffer (coming from disk) to guest buffer. </p>
-<p>On the other side, as a pretty good side effort, <strong><em>we can utilize this solution to enforce protection from device-specific DMA attacks on a platform that is lack of IOMMU (e.g. VT-d) capability</em></strong>. For instance, the hypervisor can verify the address of guest buffers specified in the guest DMA descriptors so that the address (plus the data size) does not point to the hypervisor memory regions and any other protected guest memory regions.  </p>
-<p>As we can see that the hypervisor can capture the event when DMA starts. However, the end of DMA transfer is usually notified by a hardware interrupt, but BitVisor cannot identify the ATA device that issues hardware interrupts. Instead, BitVisor captures I/O access to status registers, because device drivers usually read status registers to check whether DMA transfer has finished successfully or not, and write registers to acknowledge interrupts. <strong><em>As an alternative, the solution in <a href="http://hypervsir.blogspot.com/2014/10/monitortrap-software-interrupt-int-08h.html" target="_blank" rel="external">my previous post</a> can solve this issue by monitoring the ATA disk external interrupt.</em></strong></p>
-<p>To download the source code of latest BitVisor, please go to the official site <a href="http://www.bitvisor.org/" target="_blank" rel="external">http://www.bitvisor.org/</a></p>
-<p>See below <a href="https://www.bitvisor.org/summit/slides/BitVisor-Summit-04-matsubara.pdf" target="_blank" rel="external">snapshot</a> (and other one <a href="http://www.slideshare.net/shinagawa/20121204-bitvisor-summit" target="_blank" rel="external">BitVisor Summit @2012</a>), it uses the Ring3 layer in VMX-root to hold various services. </p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/BitVisor-layer.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/BitVisor-layer.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-
-<hr>
-<p><strong><em>References:</em></strong><br>TreVisor:<br>OS-Independent Software-Based Full Disk Encryption &amp; Secure Against Main Memory Attacks<br><a href="http://www1.cs.fau.de/filepool/projects/trevisor/trevisor.pdf" target="_blank" rel="external">http://www1.cs.fau.de/filepool/projects/trevisor/trevisor.pdf</a></p>
-<p>OSb: OSv on BitVisor<br><a href="http://www.slideshare.net/yushiomote/osb-osv-on-bitvisor" target="_blank" rel="external">http://www.slideshare.net/yushiomote/osb-osv-on-bitvisor</a></p>
-<p>Takahiro Shinagawa: Introduction to the BitVisor and Comparison with Xen<br><a href="http://www.slideshare.net/xen_com_mgr/xs-japan-2008-bitvisor-english" target="_blank" rel="external">http://www.slideshare.net/xen_com_mgr/xs-japan-2008-bitvisor-english</a></p>
-<p>Dependable Cloud Computing<br><a href="http://www.slideshare.net/kazuhikokato/121127-37898979" target="_blank" rel="external">http://www.slideshare.net/kazuhikokato/121127-37898979</a></p>
-<p>Kernel Memory Protection by an Insertable Hypervisor which has VM Introspection and Stealth Breakpoints (IWSEC2014)<br><a href="http://www.slideshare.net/suzaki/international-workshop-on-security-iwsec2014" target="_blank" rel="external">http://www.slideshare.net/suzaki/international-workshop-on-security-iwsec2014</a></p>
-<p>A Hypervisor IPS based on Hardware Assisted Virtualization Technology<br><a href="http://www.slideshare.net/ffri/bh-usa08murakami" target="_blank" rel="external">http://www.slideshare.net/ffri/bh-usa08murakami</a></p>
-<hr>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/Hypervisor安全/">Hypervisor安全<span class="article-category-count">1</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Virtualization/">Virtualization</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -614,6 +602,18 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170822/rop-attack-defense/">ROP攻与防</a></h6>
+          <!--  <span>八月 22, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -795,18 +795,6 @@
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/rop-intel/">因特尔发布新的技术规范去防御 ROP 攻击</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -817,7 +805,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Notes/">Notes</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Notes/">Notes</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -827,7 +815,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cache/" style="font-size: 10px;">Cache</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/EPT/" style="font-size: 10px;">EPT</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10.77px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/TrustZong/" style="font-size: 10px;">TrustZong</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cache/" style="font-size: 10px;">Cache</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/EPT/" style="font-size: 10px;">EPT</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 11.54px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10.77px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/TrustZong/" style="font-size: 10px;">TrustZong</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
     </div>
   </div>
 

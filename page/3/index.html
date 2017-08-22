@@ -112,6 +112,82 @@
         
           <section id="main">
   
+    <article id="post-intro-aslr"  class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" itemprop="name">
+      <a class="article-title" href="/20170508/intro-aslr/">系统安全浅薄知识系列(一)-ASLR</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170508/intro-aslr/" class="article-date">
+	  <time datetime="2017-05-08T12:59:01.000Z" itemprop="datePublished">五月 8, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>作者：<a href="http://weibo.com/diting0x" target="_blank" rel="external">@Diting0x</a><br>转载请注明：作者信息以及来源<a href="http://www.csyssec.org/20170508/intro-aslr/" target="_blank" rel="external">《CSysSec:系统安全浅薄知识系列(一)-ASLR》</a></p>
+<hr>
+<p>ASLR全称是Address Space Layout Randomization，翻译成中文就是地址空间布局随机化。</p>
+<p><strong>怎么做？</strong></p>
+<p>随机化程序的关键数据在内存中的位置，这些数据包括程序的数据段、堆、栈以及共享库。见下图：（图来源于CCS’15）</p>
+<figure><br>    <a href="http://7xppf1.com1.z0.glb.clouddn.com/aslr1.png" target="_blank" rel="external"><img src="http://7xppf1.com1.z0.glb.clouddn.com/aslr1.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>这些数据为什么没有包括代码段？ 下文会继续讨论。</p>
+<p><strong>干嘛用的？</strong> </p>
+<p>ASLR是一种保护缓冲区溢出攻击的防御技术，通过增加内存攻击(如return-into-libc或ROP)预测目标地址的难度阻碍其实施攻击。见下图：(图来源于CODASPY’16)</p>
+<figure><br>    <a href="http://7xppf1.com1.z0.glb.clouddn.com/aslr2.png" target="_blank" rel="external"><img src="http://7xppf1.com1.z0.glb.clouddn.com/aslr2.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>攻击者欲跳转到目标地址0xbfffd5d8的shellcode中，但在执行时其地址被随机化到了0xbfffe3f8中，此时跳转到0xbfffd5d8会导致内存奔溃。</p>
+<p><strong>ASLR历史</strong></p>
+<p>请看下图：（图来源于Abusing Performance Optimization Weaknesses to Bypass ASLR， 2014 BlackHat USA）</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/aslrhistory.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/aslrhistory.jpeg" width="450"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p><strong>如何开启或关闭ASLR?</strong> </p>
+<p>以Linux系统为例，通过配置<code>/proc/sys/kernel/randomize_va_space</code>中的值来开启或关闭ASLR.<br>运行<code>cat /proc/sys/kernel/randomize_va_space</code>命令，若输出为0，表示没有随机化，所有都是静态的；若输出为1，表示保守随机化，共享库、栈、mmap()，VDSO以及堆都被随机化；若输出为2，表示全随机化，在1的基础上，增加了通过brk()方式内存管理的随机化。<br>下图为Ubuntu14.04的结果</p>
+<p><img src="http://7xppf1.com1.z0.glb.clouddn.com/aslr3.png" alt="aslr3"></p>
+<p>关闭ASLR,可以运行<code>echo 0 /proc/sys/kernel/randomize_va_space</code></p>
+<p>Windows和Linux在ASLR机制上有所不同，想了解详情可以参考<a href="http://www.freebuf.com/articles/system/29392.html" target="_blank" rel="external">这里</a></p>
+<p><strong>编译成PIE?</strong></p>
+<p>说到这里，还遗留了一个问题，那就是随机化的数据为什么没有包括代码段？ 要想让ASLR机制有效，就必须保证程序在内存空间的所有区域都是随机化的。有任何一部分没有被随机化，都有可能被攻击者利用来定位有效的gadgets来实施攻击。实际上，ASLR对代码段(.text)是不作随机化的，只有当可执行文件在编译成PIE(Position Independent Executable，位置依赖可执行文件)时，代码段才会被随机化。</p>
+<p>对于non-PIE(也就是没有添加编译选项PIE),尽管ASLR的级别设置为2，攻击者仍然能利用程序的.text段以及GOT/PLT(全局偏移表/过程连接表)实施攻击(比如return-to-got/plt、ROP)。</p>
+<p>既然non-PIE的可执行文件不能享受ASLR机制带来的安全性，那ASLR又有何意义? 是不是可以把所有的程序在编译时都加上PIE选项？ 对Linux系统来说，是有选择性的编译PIE，所有的库文件都是默认编译成PIE的，而大部分程序默认是不会被编译成PIE的。详情可以参考这篇论文的发现<a href="http://e-collection.library.ethz.ch/eserv/eth:5699/eth-5699-01.pdf?pid=eth:5699&amp;dsID=eth-5699-01.pdf" target="_blank" rel="external">Too much PIE is bad for performance</a>。</p>
+<p>说了这么多，PIE的原理是什么？文章提到的这么多专有名词，ROP, Return-to-libc,Return-to-GOT/PIT, gadgets都又是什么呢？有机会再谈。</p>
+<h3 id="References"><a href="#References" class="headerlink" title="References"></a>References</h3><p>Lu et al,”ASLR-Guard: Stopping Address Space Leakage for Code Reuse Attacks”,CODASPY’16<br>Gu et al, “Derandomizing Kernel Address Space Layout for Memory Introspection and Forensics”, CCS’15<br><a href="http://www.freebuf.com/articles/system/29392.html" target="_blank" rel="external">ASLR在Windows与Linux系统之间的差别</a><br><a href="https://pax.grsecurity.net/docs/aslr.txt" target="_blank" rel="external">PAX/ASLR</a><br><a href="https://securityetalii.es/2013/02/03/how-effective-is-aslr-on-linux-systems/" target="_blank" rel="external">How Effective is ASLR on Linux Systems?</a></p>
+<hr>
+<p>转载请注明：作者信息以及来源<a href="http://www.csyssec.org/20170508/intro-aslr/" target="_blank" rel="external">《CSysSec:系统安全浅薄知识系列(一)-ASLR》</a></p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统安全科普/">系统安全科普<span class="article-category-count">1</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/ASLR/">ASLR</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/System/">System</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+</article>
+
+<!-- Table of Contents -->
+
+  
     <article id="post-cfi-mathias"  class="article article-type-post" itemscope itemprop="blogPost" >
   <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
     
@@ -395,97 +471,6 @@
 <!-- Table of Contents -->
 
   
-    <article id="post-cfi-ccs05"  class="article article-type-post" itemscope itemprop="blogPost" >
-  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="thumb" itemprop="name">
-      <a class="article-title" href="/20170504/cfi-ccs05/">控制流完整性-CCS05年论文</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-meta">
-      
-	Posted on <a href="/20170504/cfi-ccs05/" class="article-date">
-	  <time datetime="2017-05-04T10:46:24.000Z" itemprop="datePublished">五月 4, 2017</time>
-	</a>
-
-    </div>
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Author：<a href="http://mudongliang.github.io/about/" target="_blank" rel="external">Dongliang Mu</a><br>Source：<a href="http://mudongliang.github.io/2015/04/14/ccs-05-cfi.html" target="_blank" rel="external">http://mudongliang.github.io/2015/04/14/ccs-05-cfi.html</a><br>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-<hr>
-<p>CFI(Control-Flow Integrity)来自于CCS 05！</p>
-<h2 id="简介"><a href="#简介" class="headerlink" title="简介"></a><strong>简介</strong></h2><p>控制流完整性，可以防止那些任意控制程序行为的攻击。CFI的特点：</p>
-<ul>
-<li>CFI实施是很简单的，保障很容易建立；更近一步说，它是很实用的，它可以兼容现存的。</li>
-<li>CFI实施提供保护，即使是对整个执行程序的数据有完全控制的敌人。</li>
-<li>CFI为实施进一步的安全策略提供一个有用的基础。</li>
-</ul>
-<p>CFI的安全策略要求/命令软件执行过程必须按照一个提前设定的CFG中的路径,然后这个CFG可以通过源码分析、二进制分析或者执行剖析得到.这个提前设定的CFG是一个关键。</p>
-<p>因为从我的感觉，这个方法就像是程序设计者或者说保护着预先设计了一个游戏，这个游戏规定用户只能做出这样或者那样的行为，不能跳出他的设计范围，否则即刻出局.</p>
-<p>用原文中的话就是说，运行时的动态检测必须保证控制流保持在给定CFG的范围内。CFI的主要工作就是对于直接或者间接的控制流进行限制。</p>
-<p>由于在一些攻击中不正常的控制流更改是必须的步骤，所以CFI对于它们的防御还是很有效果的。比如说<strong>classic</strong>, <strong>stack-based buffer overflow</strong>。CFI实施并不是万能钥匙，因为对于已允许CFG边界内的渗透无法防御。这些渗透包含依赖错误参数字符串转化的特定渗透等。就像上面说的游戏的例子，只要用户行为在游戏规定的范围之类，就算这属于攻击行为，游戏程序也是不会对它做出反应的。</p>
-<p>CFI需要，程序执行期间，无论何时一个机器指令转移控制流，它目标定位于一个有效的目的地址，正如先前创建的CFG图判定的。因为大部分的指令目标是一个常量目标地址，所以这个要求通常静态地施行。然而，对于目的地址只能在动态运行时确定的计算控制流，这个要求必须实施一个动态检查.</p>
-<h2 id="实现"><a href="#实现" class="headerlink" title="实现"></a><strong>实现</strong></h2><figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/label.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/label.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>利用ID来进行跳转的动态检查，这里的call，ret的用法都不是原本这两个命令所有的用法，有可能是进行插桩修改过的！完全看不出来作者的实现方法.</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/instrumentation.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/instrumentation.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>这张图解析了两种可行的ID和ID检测方式。作者使用12345678h来作为ID，上图中第一部分是一个简单的间接跳转实例！左侧是直接跳转指令<code>jmp ecx</code>，右侧是一个从栈上取内容的<code>mov</code>指令。其中<code>ecx</code>中放的是目的指令所在的地址。</p>
-<ul>
-<li><p>a方案：在目的地址<code>mov</code>指令处加上<code>ID</code>，同时在计算目的地址处加上<code>lea</code>指令（这个指令的 好处是不修改<code>eflags</code>，同时将<code>ecx</code>加4）。直接比较<code>[ecx]</code>和<code>12345678h</code>，不等的话直接跳转到错误<code>label</code>，否则将<code>ecx</code>加上4，然后跳转.</p>
-</li>
-<li><p>b方案：使用ID-1作为ID检查的常量，在运行期间加1。相同的是，b方案也没有改变计算跳转地址，但是它并不是插入一个ID，而是加入了一个无副作用的<code>prefetchnta</code>指令来人工合成ID。要注意，这里所谓的无副作用指令，就是没有效果，单纯放在那里，引出来参数地址。这里有一个疑问3没有解决。</p>
-</li>
-</ul>
-<p>我们来说明一下核心思想：对于限制间接跳转的动态检查，我们可以这样做！假设我们有一个动态检查的可能集合。对于间接跳转，我们将动态运行的结果和我们的集合进行对比，如果动态结果不在我们预先设置的集合，就跳到错误处理的地方.</p>
-<p>但是，对于动态集合大小的设定，我们需要在精确和效率做一个权衡，这里涉及到图1中的ID设定，如果<code>sort2</code>不同的放回位置设置不同的ID，我感觉也是可以的！但是这样就要考虑由于动态检查集合的增大而带来的性能损失.</p>
-<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/implemention.png" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/implemention.png" width="450"></a><br>    <figcaption></figcaption><br></figure>
-
-<p>这张图解释了函数调用和返回的时候使用的插桩方法.函数调用这里综合了a，b两种方案，你可以对比它们！对于后边<code>prefetchnta</code>的作用是为函数返回时增加动态验证.关于这个地方，我们可以从函数返回处的插桩代码很容易看出来.<code>ecx</code>原本指向<code>prefetchnta [AABBCCDDh]</code>这个指令的地址，所以使用<code>cmp [ecx+4],AABBCCDDh</code>来进行动态检查.</p>
-<p>这篇文章向我讲述了很多关于间接转移指令，如函数返回，函数指针调用，<code>switch</code>结构和其他如<code>C++ vtables</code>之类的结构。</p>
-<h2 id="问题讨论"><a href="#问题讨论" class="headerlink" title="问题讨论"></a><strong>问题讨论</strong></h2><ol>
-<li><p>文章中说已给出的CFG是如何生成，间接跳转它是如何拿出来的？</p>
-</li>
-<li><p>关于作者自己定义的<code>Lable ID; call ID,DST; ret ID</code>这些指令是自己实现的，还是一个虚拟定义，具体实现的时候并不是这样的？为什么问这个，因为我去查过关于<code>call</code>和<code>ret</code>，没有这样的用法！ret指令，是可以带参数，但是这个表示的也不是ID啊.</p>
-</li>
-<li><p>关于<code>mov eax,12345677h;inc eax</code>;没有想出来原因.</p>
-</li>
-<li><p>关于<code>prefetchnta</code>这个指令的使用，无论是Figure 2(b)还是Figure 3中，完全不明白是什么意思？曾经去查过这个指令，它是intel用于缓存的命令，但是手册上面并没有详细说明？</p>
-</li>
-<li><p>CFG结构正确处理了x86中执行计算控制转移的指令，包括函数返回，通过函数指针发出的函数调用，switch结构，动态调度。上述话语描述了程序中的间接跳转，但是我不是很明白这个可能集合如何得到？？？ 特别是switch结构的各种case如何得到？对于函数指针发出的函数调用，本文利用二进制文件中的重定位信息来获得.这个问题貌似又回到了问题1.</p>
-</li>
-</ol>
-<hr>
-<p>转载请注明：原作者信息以及<a href="http://www.csyssec.org/about/" target="_blank" rel="external">CSysSec</a></p>
-
-      
-    </div>
-    <footer class="entry-meta entry-footer">
-      
-	<span class="ico-folder"></span>
-    <a class="article-category-link" href="/categories/内核安全/">内核安全<span class="article-category-count">2</span></a>
-
-
-      
-  <span class="ico-tags"></span>
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/CFI/">CFI</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Kernel/">Kernel</a></li></ul>
-
-      
-    </footer>
-  </div>
-  
-</article>
-
-<!-- Table of Contents -->
-
-  
 
 
   <nav id="page-nav">
@@ -578,6 +563,18 @@
     </ul>
     <div class="widget">
       <ul>
+        
+          <li class="clearfix">
+
+            
+              <div class="widget-entry-summary" style="margin: 0;">
+            
+
+              <h6 style="margin: 0;"><a href="/20170822/rop-attack-defense/">ROP攻与防</a></h6>
+          <!--  <span>八月 22, 2017</span> -->
+            </div>
+
+          </li>
         
           <li class="clearfix">
 
@@ -759,18 +756,6 @@
 
           </li>
         
-          <li class="clearfix">
-
-            
-              <div class="widget-entry-summary" style="margin: 0;">
-            
-
-              <h6 style="margin: 0;"><a href="/20170504/rop-intel/">因特尔发布新的技术规范去防御 ROP 攻击</a></h6>
-          <!--  <span>五月 4, 2017</span> -->
-            </div>
-
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -781,7 +766,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">分类导航</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Notes/">Notes</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Hypervisor安全/">Hypervisor安全</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Notes/">Notes</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/主流会议/">主流会议</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/二进制分析/">二进制分析</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内存安全/">内存安全</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核安全/">内核安全</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/内核完整性/">内核完整性</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/博士之路/">博士之路</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/名人课堂/">名人课堂</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/学术专家/">学术专家</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/安全圈子/">安全圈子</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/恶意代码/">恶意代码</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/漏洞利用/">漏洞利用</a><span class="category-list-count">14</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件特性/">硬件特性</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/硬件虚拟化/">硬件虚拟化</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统内核/">系统内核</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全/">系统安全</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/系统安全科普/">系统安全科普</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化原理/">虚拟化原理</a><span class="category-list-count">7</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化基础/">虚拟化基础</a><span class="category-list-count">6</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟化综合/">虚拟化综合</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机快照/">虚拟机快照</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机监控/">虚拟机监控</a><span class="category-list-count">11</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机记录与重放/">虚拟机记录与重放</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/虚拟机迁移/">虚拟机迁移</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -791,7 +776,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签导航</h3>
     <div class="widget tagcloud">
-      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cache/" style="font-size: 10px;">Cache</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/EPT/" style="font-size: 10px;">EPT</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 10.77px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10.77px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/TrustZong/" style="font-size: 10px;">TrustZong</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
+      <a href="/tags/ASLR/" style="font-size: 12.31px;">ASLR</a> <a href="/tags/ASPLOS/" style="font-size: 10px;">ASPLOS</a> <a href="/tags/Attack/" style="font-size: 12.31px;">Attack</a> <a href="/tags/Binary/" style="font-size: 10.77px;">Binary</a> <a href="/tags/CFI/" style="font-size: 12.31px;">CFI</a> <a href="/tags/Cache/" style="font-size: 10px;">Cache</a> <a href="/tags/Cloud/" style="font-size: 10px;">Cloud</a> <a href="/tags/Compiler/" style="font-size: 10px;">Compiler</a> <a href="/tags/Conference/" style="font-size: 12.31px;">Conference</a> <a href="/tags/Conferences/" style="font-size: 10px;">Conferences</a> <a href="/tags/Course/" style="font-size: 13.08px;">Course</a> <a href="/tags/EPT/" style="font-size: 10px;">EPT</a> <a href="/tags/Exception/" style="font-size: 10px;">Exception</a> <a href="/tags/Exploit/" style="font-size: 16.92px;">Exploit</a> <a href="/tags/Forensics/" style="font-size: 10px;">Forensics</a> <a href="/tags/HAV/" style="font-size: 12.31px;">HAV</a> <a href="/tags/Hardware/" style="font-size: 13.85px;">Hardware</a> <a href="/tags/Heap/" style="font-size: 10.77px;">Heap</a> <a href="/tags/Hooking/" style="font-size: 10px;">Hooking</a> <a href="/tags/Instrumentation/" style="font-size: 10.77px;">Instrumentation</a> <a href="/tags/Introspection/" style="font-size: 13.85px;">Introspection</a> <a href="/tags/JOP/" style="font-size: 10px;">JOP</a> <a href="/tags/KVM/" style="font-size: 16.15px;">KVM</a> <a href="/tags/Kernel/" style="font-size: 17.69px;">Kernel</a> <a href="/tags/Libvmi/" style="font-size: 13.08px;">Libvmi</a> <a href="/tags/Linux/" style="font-size: 13.08px;">Linux</a> <a href="/tags/Malware/" style="font-size: 15.38px;">Malware</a> <a href="/tags/Memory/" style="font-size: 13.08px;">Memory</a> <a href="/tags/Migration/" style="font-size: 11.54px;">Migration</a> <a href="/tags/Monitoring/" style="font-size: 13.08px;">Monitoring</a> <a href="/tags/NX/" style="font-size: 10px;">NX</a> <a href="/tags/Overflow/" style="font-size: 10.77px;">Overflow</a> <a href="/tags/PIN/" style="font-size: 10px;">PIN</a> <a href="/tags/Paper/" style="font-size: 11.54px;">Paper</a> <a href="/tags/Ph-D/" style="font-size: 10.77px;">Ph.D</a> <a href="/tags/Ppaerwriting/" style="font-size: 10px;">Ppaerwriting</a> <a href="/tags/Professor/" style="font-size: 12.31px;">Professor</a> <a href="/tags/QEMU/" style="font-size: 14.62px;">QEMU</a> <a href="/tags/RE/" style="font-size: 10px;">RE</a> <a href="/tags/ROP/" style="font-size: 11.54px;">ROP</a> <a href="/tags/Rootkit/" style="font-size: 11.54px;">Rootkit</a> <a href="/tags/Rowhammer/" style="font-size: 10.77px;">Rowhammer</a> <a href="/tags/SYSCALL/" style="font-size: 10px;">SYSCALL</a> <a href="/tags/Sandbox/" style="font-size: 10.77px;">Sandbox</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/Shellcode/" style="font-size: 10px;">Shellcode</a> <a href="/tags/Snapshot/" style="font-size: 10px;">Snapshot</a> <a href="/tags/Stack/" style="font-size: 10.77px;">Stack</a> <a href="/tags/Syscall/" style="font-size: 10px;">Syscall</a> <a href="/tags/System/" style="font-size: 18.46px;">System</a> <a href="/tags/Systemcall/" style="font-size: 11.54px;">Systemcall</a> <a href="/tags/TSX/" style="font-size: 10px;">TSX</a> <a href="/tags/TrustZone/" style="font-size: 10px;">TrustZone</a> <a href="/tags/TrustZong/" style="font-size: 10px;">TrustZong</a> <a href="/tags/VT-x/" style="font-size: 10px;">VT-x</a> <a href="/tags/Valgrind/" style="font-size: 10px;">Valgrind</a> <a href="/tags/Virtualization/" style="font-size: 19.23px;">Virtualization</a> <a href="/tags/Volatility/" style="font-size: 10px;">Volatility</a> <a href="/tags/XEN/" style="font-size: 13.08px;">XEN</a>
     </div>
   </div>
 

@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>rop攻与防 | Index of Computer System and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+    <meta name="keywords" content="computer system, computer security" />
+  
+  
+  
+  
+  <meta name="description" content="diting0x
+ROP是一种代码复用攻击方式(Code Reuse Attack)。 ROP攻击劫持控制流后，复用内存中可执行的指令(gadget)，这些gadgets以ret指令返回，攻击者利用这些gadgets以不同方式拼接并执行，完成攻击工程。
+下面以几个图来展示ROP攻击(图来源于Blackhat 2013 Kevin Z.Snow, Luca Davi)
+metaphor：">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ROP攻与防">
+<meta property="og:url" content="http://yoursite.com/20170822/rop-attack-defense/index.html">
+<meta property="og:site_name" content="Index of Computer System and Security">
+<meta property="og:description" content="diting0x
+ROP是一种代码复用攻击方式(Code Reuse Attack)。 ROP攻击劫持控制流后，复用内存中可执行的指令(gadget)，这些gadgets以ret指令返回，攻击者利用这些gadgets以不同方式拼接并执行，完成攻击工程。
+下面以几个图来展示ROP攻击(图来源于Blackhat 2013 Kevin Z.Snow, Luca Davi)
+metaphor：">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/rop1.jpeg">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/rop2.jpeg">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/rop3.jpeg">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/rop4.jpeg">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/rop5.jpeg">
+<meta property="og:image" content="http://oij0laovn.bkt.clouddn.com/ROP6.jpeg">
+<meta property="og:updated_time" content="2017-08-22T11:56:24.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="ROP攻与防">
+<meta name="twitter:description" content="diting0x
+ROP是一种代码复用攻击方式(Code Reuse Attack)。 ROP攻击劫持控制流后，复用内存中可执行的指令(gadget)，这些gadgets以ret指令返回，攻击者利用这些gadgets以不同方式拼接并执行，完成攻击工程。
+下面以几个图来展示ROP攻击(图来源于Blackhat 2013 Kevin Z.Snow, Luca Davi)
+metaphor：">
+<meta name="twitter:image" content="http://oij0laovn.bkt.clouddn.com/rop1.jpeg">
+  
+    <link rel="alternate" href="/atom.xml" title="Index of Computer System and Security" type="application/atom+xml">
+  
+  <link rel="icon" href="/css/images/favicon.ico">
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans|Montserrat:700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic" rel="stylesheet" type="text/css">
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <style type="text/css">
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/90cf9f/000000000000000000010091/27/l?subset_id=2&fvd=n7) format("woff2");font-weight:500;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/8a5494/000000000000000000013365/27/l?subset_id=2&fvd=n4) format("woff2");font-weight:lighter;font-style:normal;}
+    @font-face{font-family:futura-pt;src:url(https://use.typekit.net/af/d337d8/000000000000000000010095/27/l?subset_id=2&fvd=i4) format("woff2");font-weight:400;font-style:italic;}</style>
+    
+  <link rel="stylesheet" id="athemes-headings-fonts-css" href="//fonts.googleapis.com/css?family=Yanone+Kaffeesatz%3A200%2C300%2C400%2C700&amp;ver=4.6.1" type="text/css" media="all">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/js/jquery-3.1.1.min.js"></script>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="/css/bootstrap.css" >
+  <link rel="stylesheet" href="/css/hiero.css" >
+  <link rel="stylesheet" href="/css/glyphs.css" >
+
+</head>
+
+<body>
+  <header id="allheader" class="site-header" role="banner">
+  <div class="clearfix container">
+      <div class="site-branding">
+
+          <h1 class="site-title">
+            <a href="/" title="Index of Computer System and Security" rel="home">
+              Index of Computer System and Security</a>
+          </h1>
+          <div class="site-description">Diting0x@</div>
+
+            
+          <nav id="main-navigation" class="main-navigation" role="navigation">
+            <a class="nav-open">Menu</a>
+            <a class="nav-close">Close</a>
+            <div class="clearfix sf-menu">
+
+              <ul id="main-nav" class="nmenu sf-js-enabled">
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/">首页</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/about">关于</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/syssec">系统安全</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/architecture">系统结构</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/virtualization">虚拟化</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/malware">恶意代码</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/conferences">主流会议</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/courses">名人课堂</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/academy">学术专家</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/news">安全事件</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/knowledge">小科普</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/share">技术分享</a> </li>
+                    
+                      <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-1663"> <a class="" href="/contribution">本站达人</a> </li>
+                    
+              </ul>
+            </div>
+          </nav>
+
+
+      </div>
+  </div>
+</header>
+
+
+
+
+  <div id="container">
+    <div id="wrap">
+            
+      <div id="content" class="outer">
+        
+          <section id="main" style="float:none;"><article id="post-rop-attack-defense" style="width: 66%; float:left;" class="article article-type-post" itemscope itemprop="blogPost" >
+  <div id="articleInner" class="clearfix post-1016 post type-post status-publish format-standard has-post-thumbnail hentry category-template-2 category-uncategorized tag-codex tag-edge-case tag-featured-image tag-image tag-template">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="thumb" class="article-title" itemprop="name">
+      ROP攻与防
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-meta">
+      
+	Posted on <a href="/20170822/rop-attack-defense/" class="article-date">
+	  <time datetime="2017-08-22T11:55:10.000Z" itemprop="datePublished">八月 22, 2017</time>
+	</a>
+
+    </div>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p><a href="http://weibo.com/diting0x" target="_blank" rel="external">diting0x</a></p>
+<p>ROP是一种代码复用攻击方式(Code Reuse Attack)。 ROP攻击劫持控制流后，复用内存中可执行的指令(gadget)，这些gadgets以ret指令返回，攻击者利用这些gadgets以不同方式拼接并执行，完成攻击工程。</p>
+<p>下面以几个图来展示ROP攻击(图来源于Blackhat 2013 Kevin Z.Snow, Luca Davi)</p>
+<p>metaphor： </p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/rop1.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/rop1.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>攻击过程：</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/rop2.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/rop2.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
+
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/rop3.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/rop3.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
+
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/rop4.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/rop4.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
+
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/rop5.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/rop5.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
+
+<p>代码复用攻击历史：</p>
+<figure><br>    <a href="http://oij0laovn.bkt.clouddn.com/ROP6.jpeg" target="_blank" rel="external"><img src="http://oij0laovn.bkt.clouddn.com/ROP6.jpeg" width="400"></a><br>    <figcaption></figcaption><br></figure>
+
+
+<p>再次声明，以上六张图全部来源于(Blackhat 2013 Kevin Z.Snow, Luca Davi)</p>
+<p>上图可以大致了解2010年前ROP的发展历程，而下文大多数介绍的是近三五年ROP的攻与防。</p>
+<p>Ret2libc可以说是ROP的前身，有点接近ROP。其主要是复用libc的函数地址(而不是含有shellcode代码的栈地址)覆盖被利用栈的返回地址。如果攻击者想触发一个shell, 他会利用system()地址来覆盖返回地址并设置好system()在栈中需要的必要参数，以便能成功调用system()。</p>
+<p>随着ASLR的出现，将程序的数据段、堆、栈以及共享库在内存中的位置随机化，使得Ret2libc和ROP变得更加困难。<br>道高一尺魔高一丈，一攻一防，近些年对ROP的研究越来越热，不断有研究者设计更高级的ROP来绕过系统中现有的防御机制(包括DEP,ASLR),又不断有研究者设计更安全的ASLR或其它安全机制来抵御ROP。</p>
+<p>攻：JIT-ROP(IEEE S&amp;P 2013)，其主要思想是即时扫描有效内存，即时反汇编搜寻rop gadgets。具体过程是，利用内存泄漏(memory disclousure)获取一个运行时的代码指针，泄漏当前4K的内存页，再利用页中指向其它页的分支获取更多的页面。之后将当前页反汇编获取所需的gadgets，构造ROP链。</p>
+<p><a href="https://media.blackhat.com/us-13/US-13-Snow-Just-In-Time-Code-Reuse-Slides.pdf" target="_blank" rel="external">slides</a> </p>
+<p>防：ROPecker (NDSS 2014)</p>
+<p>ROPecker是一个利用Intel LBR特性记录代码执行流来检测和防御ROP的工具，是第一个可以针对所有形式ROP攻击的一种general的，不需要源代码，二进制代码重写。</p>
+<p>ROPecker分析了现有ROP攻击的特点,发现ROP的gadgets一般利用jmp与分支判断指令跳转，在代码段中会进行大幅度的跳转，且其调用链很长。基于这两个特点，ROPecker先对要检测的程序进行离线gadgets分析，利用LBR记录代码执行流的分析信息，将不在代码当前执行片段周围的代码（sliding window）设置为不可执行状态，执行sliding window以外的代码就会触发ROPecker对攻击的分析。基于离线gadgets分析，再加上LBR的分析信息（当前程序的过去和未来的执行情况），一旦发现程序的执行流不符则认为程序受到了ROP攻击，则强制终止程序。以上检测和防御机制假设DEP已经打开。<br><a href="http://ink.library.smu.edu.sg/cgi/viewcontent.cgi?article=2972&amp;context=sis_research" target="_blank" rel="external">pdf</a></p>
+<p>防：Kbouncer（Security’13） 也是利用LBR记录程序的执行分支信息，识别程序的控制流转移信息，在关键点监控程序的间接指令来检测并防御ROP，其在Windows 7中实现。Kbouncer基于两个发现，1) ROP攻击会返回到non-call-preceded地址，其相对应的防御机制是Call-Preceded原则，没有恶意的代码指令执行的时候，ret指令回到的地址的上一条指令一定是call；2)ROP是由许多短gadgets组成的长链序列，其相对应的防御机制是不允许许多短gadgets组成的长链序列<br><a href="http://www.csd.uoc.gr/~hy457/reports/kbouncer-slides.pdf" target="_blank" rel="external">slides</a></p>
+<p>攻： ROP is Still Dangerous:<br>Breaking Modern Defenses  (Security’14 -Berkeley)<br>Abstract: 提出三种方法(Call-Preceded ROP, Evasion Attacks, History Flushing)攻破现有的ROP防御方法，包括kbouncer,ROPecker。<br>并对未来防御ROP的方式提出两点要求：1)将代码分类成gadgets与non-gadgets并非易事；2)防御机制需要集中关注正常执行与ROP攻击的基本不同点。</p>
+<p><a href="https://www.usenix.org/sites/default/files/conference/protected-files/sec14_slides_carlini.pdf" target="_blank" rel="external">slides</a><br><a href="https://www.usenix.org/system/files/conference/usenixsecurity14/sec14-paper-carlini.pdf" target="_blank" rel="external">pdf</a> <a href="https://www.usenix.org/node/184508" target="_blank" rel="external">video</a></p>
+<p>防：ASLR-Guard（ccs’15 Byoungyoung）<br>要实施code reuse attack，要满足两个条件：1.知道现有gadgets的地址，2.用这个地址覆盖被控制的数据。对2的防御有：stackguard,cfi,code pointer integrity，对1的防御有：ASLR,但是ASLR有个缺陷，信息泄露，比如代码指针的泄露导致可验获取代码地址（JIT-ROP,Blind ROP, “Missing the point”)<br>本文目标：阻止代码指针的泄露。方法：系统化的发现代码指针，两种技术来阻止代码指针的泄露，隔离与加密。将代码指针存储在隔离的内存区域，隔离还不够，还需进行加密。实现：gcc,gas,ld,ld.so 3000sloc，eglibc,glibc。<br><a href="https://lifeasageek.github.io/papers/lu:aslrguard-slides.pdf" target="_blank" rel="external">slides</a> <a href="https://lifeasageek.github.io/papers/lu:aslrguard.pdf" target="_blank" rel="external">pdf</a></p>
+<p>防：XnR  (CCS’15)<br>里面关于rop,aslr,jit-rop等介绍的很详细<br>该文从代码泄漏的角度进行了防护：当代码在被执行期间，不允许对代码的读操作，从而能有效抵御JIT code reuse攻击，简称XnR。类似W^X（W⨁X)策略。 这一思路在无硬件支撑的条件下，通过软件MMU实现，<br>基本思路：要实现XnR策略，在硬件不支持的情况下，可通过修改MMU中处理过程，实现软体MMU。 目前架构中：mmu可以检测到写，但是无法检测到读；读只能通过内存页的non-present实现；但是一旦non-present的话，代码也将无法运行。解决方法：修改page fault handler,在handler中区分page fault产生的原因，并决定是否继续正常执行，还是发现代码内存读取行为，中止执行。 具体的，在代码运行期间，仅允许极少的代码可读，文中的实验数据表明，采用3页的sliding windows是一个比较好的选择，即当前代码页面的相邻两页。是否可读性的实现方式是通过设置页面的present位实现，非法的读取将陷入中断，在中断中判断中断原因是缺页还是非法读。<br><a href="https://www.infsec.cs.uni-saarland.de/wp-content/uploads/sites/2/2014/10/nuernberger2014ccs_disclosure.pdf" target="_blank" rel="external">PDF</a> <a href="http://happyhacking.info/post/xnr" target="_blank" rel="external">来自liangyu blog</a></p>
+<p>防：No-Execute-After-Read:<br>Preventing Code Disclosure in Commodity Software （AsiaCCS’16）<br>文章提出最新的XnR技术不能防御just-in-time的代码复用攻击，并设计了一种No-Execute-After-Read(NEAR)，针对just-it-time攻击进行强安全保证。NEAR允许所有代码被披露，但是阻止被披露的代码继续执行。<br><a href="https://www3.cs.stonybrook.edu/~mikepo/papers/near.asiaccs16.pdf" target="_blank" rel="external">pdf</a> <a href="https://github.com/UNCSecLab/VMXXNR" target="_blank" rel="external">code</a></p>
+<hr>
+<p>待续</p>
+
+      
+    </div>
+    <footer class="entry-meta entry-footer">
+      
+	<span class="ico-folder"></span>
+    <a class="article-category-link" href="/categories/系统安全/">系统安全<span class="article-category-count">5</span></a>
+
+
+      
+  <span class="ico-tags"></span>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/ROP/">ROP</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/">Security</a></li></ul>
+
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+  
+    <a href="/20170821/intel-pml/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">下一篇</strong>
+      <div class="article-nav-title">Intel VT 页面修改记录(PML)</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+<!-- Table of Contents -->
+
+  <aside id="sidebar">
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    
+    <ol class="toc">无</ol>
+    
+    </div>
+  </aside>
+</section>
+        
+      </div>
+      <footer id="footer" class="site-footer">
+  
+
+  <div class="clearfix container">
+      <div class="site-info">
+	      版权所有&copy; 2017 Index of Computer System and Security 保留所有权利.
+      </div>
+      <div class="site-credit">
+       <!--  自豪地使用 <a href="https://github.com/iTimeTraveler/hexo-theme-hiero" target="_blank">hiero</a> --> 
+      </div>
+  </div>
+</footer>
+
+
+<!-- min height -->
+
+<script>
+    var wrapdiv = document.getElementById("wrap");
+    var contentdiv = document.getElementById("content");
+
+    wrapdiv.style.minHeight = document.body.offsetHeight + "px";
+    contentdiv.style.minHeight = document.body.offsetHeight - document.getElementById("allheader").offsetHeight - document.getElementById("footer").offsetHeight + "px";
+</script>
+
+    </div>
+    <!-- <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+    <a href="/syssec" class="mobile-nav-link">Syssec</a>
+  
+    <a href="/architecture" class="mobile-nav-link">Architecture</a>
+  
+    <a href="/virtualization" class="mobile-nav-link">Virtualization</a>
+  
+    <a href="/malware" class="mobile-nav-link">Malware</a>
+  
+    <a href="/conferences" class="mobile-nav-link">Conferences</a>
+  
+    <a href="/courses" class="mobile-nav-link">Courses</a>
+  
+    <a href="/academy" class="mobile-nav-link">Academy</a>
+  
+    <a href="/news" class="mobile-nav-link">News</a>
+  
+    <a href="/knowledge" class="mobile-nav-link">Knowledge</a>
+  
+    <a href="/share" class="mobile-nav-link">Share</a>
+  
+    <a href="/contribution" class="mobile-nav-link">Contribution</a>
+  
+</nav> -->
+    
+<div style="display: none;">
+  <script src="https://s11.cnzz.com/z_stat.php?id=1260716016&web_id=1260716016" language="JavaScript"></script>
+</div>
+
+<!-- mathjax config similar to math.stackexchange -->
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+</script>
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+<script src="/js/bootstrap.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+
+
+  </div>
+
+  <a id="rocket" href="#top" class=""></a>
+  <script type="text/javascript" src="/js/totop.js" async=""></script>
+  
+
+  <div style="display: none;">
+    <script src="https://s95.cnzz.com/z_stat.php?id=1261078922&web_id=1261078922" language="JavaScript"></script>
+  </div>
+
+
+</body>
+</html>
